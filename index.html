@@ -3581,9 +3581,18 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
 
 // Tetris Effect-style block: glossy 3D bevel (bright top-left highlight,
 // dark bottom-right shadow) over a deep gradient face, with an embossed
-// per-piece glyph in the centre. Shimmer is drawn as a single overlay pass
-// in drawBoard, not per-block, to keep the inner-loop cheap.
+// per-piece glyph in the centre. The face is painted in the theme's accent
+// colour rather than the piece's native colour — every piece looks the same
+// uniform cyan, and the embossed glyph is what tells them apart (matches the
+// photo). Shimmer is drawn as a single overlay pass in drawBoard.
 function drawBlockTE(context, x, y, color, size, alpha = 1) {
+  const theme = getTheme(level);
+  // Map piece-color → glyph type FIRST (before we override `color` below),
+  // since locked blocks only carry their original colour in board[r][c].
+  const type = COLOR_TO_TYPE[color];
+  // Override face colour to the theme accent so every block reads as the
+  // same hue. Glyph (assigned above) still distinguishes piece types.
+  const faceColor = (theme && theme.colors && theme.colors.accent) || color;
   context.globalAlpha = alpha;
   // Outer ring — dark navy frame so neighbouring blocks have a clean seam,
   // matching the photo's slight separation between cells.
@@ -3593,9 +3602,9 @@ function drawBlockTE(context, x, y, color, size, alpha = 1) {
   const inset = Math.max(1, Math.floor(size * 0.08));
   const fx = x + inset, fy = y + inset, fs = size - inset * 2;
   const face = context.createLinearGradient(fx, fy, fx, fy + fs);
-  face.addColorStop(0, shadeColor(color, 50));
-  face.addColorStop(0.55, color);
-  face.addColorStop(1, shadeColor(color, -55));
+  face.addColorStop(0, shadeColor(faceColor, 50));
+  face.addColorStop(0.55, faceColor);
+  face.addColorStop(1, shadeColor(faceColor, -55));
   context.fillStyle = face;
   context.fillRect(fx, fy, fs, fs);
   // Top-left bevel highlight (chamfer)
@@ -3609,11 +3618,9 @@ function drawBlockTE(context, x, y, color, size, alpha = 1) {
   context.fillRect(fx + fs - bevel, fy, bevel, fs);          // right
   // Embossed glyph based on piece type — drawn dark with a 1px highlight
   // beneath for the engraved-into-the-face look from the photo.
-  const type = COLOR_TO_TYPE[color];
   if (type && size >= 14) drawBlockGlyph(context, fx, fy, fs, type);
-  // Outer glow halo
-  const theme = getTheme(level);
-  context.shadowColor = color;
+  // Outer glow halo (uses face colour so every piece glows the same hue)
+  context.shadowColor = faceColor;
   context.shadowBlur = theme ? theme.blockGlow : 10;
   context.fillStyle = 'rgba(0,0,0,0)';
   context.fillRect(x, y, size, size);
