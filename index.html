@@ -1101,6 +1101,14 @@ const voiceEngine = (() => {
       if (!voiceEnabled) return;
       const pool = CLEAR_FILES[cleared] || CLEAR_FILES[4];
       play(pick(pool));
+      // Duck the backing track so the voice cuts through. Combo callout
+      // extends the duck. Length tuned to match "Triple! ... On fire!"
+      // (~1.2s for single, ~1.7s with combo).
+      try {
+        if (audioEngine && audioEngine.duckTrack) {
+          audioEngine.duckTrack(combo > 1 ? 1.7 : 1.2);
+        }
+      } catch {}
       // Stack the combo line ~350ms later so it reads as "Triple! ... On fire!"
       // with a natural announcer beat, not slurred together.
       if (combo > 1) {
@@ -1141,20 +1149,29 @@ const PIECE_KEYS = Object.keys(PIECES);
 // ============================================================
 const LEVEL_THEMES = [
   null, // index 0 unused
-  { // Level 1 - The College Dropout
-    name: 'The College Dropout',
-    bpm: 88,
-    colors: { bg1: '#2a1800', bg2: '#0f0800', accent: '#d4943a', glow: '#ff8c00' },
-    particleHue: 30,
-    particleStyle: 'circles', // warm floating circles like vinyl grooves
-    blockGlow: 8,
+  { // Level 1 - Underground (Suno track + warehouse aesthetic)
+    name: 'Underground',
+    // BPM is needed for visual beat-pulse + bg-particle sync. Estimated from
+    // the track via onset autocorrelation; nudge if the visuals drift.
+    bpm: 103,
+    // When `track` is set, audioEngine plays the MP3 instead of the procedural
+    // drums/bass/synth. Other levels without `track` keep their procedural
+    // sound — lets us add Suno tracks one level at a time.
+    track: 'underground.mp3',
+    colors: { bg1: '#0a0c10', bg2: '#05060a', accent: '#00d4ff', glow: '#33eeff' },
+    particleHue: 195,
+    particleStyle: 'warehouse', // dancing silhouette figures over warehouse bg
+    blockStyle: 'tetrisEffect',  // glossy 3D bevel + shimmer
+    blockGlow: 10,
+    // Drum/bass/synth patterns retained as a fallback if the MP3 fails to load,
+    // so the level still plays. Same pattern as the original College Dropout.
     kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
     hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
     hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
     bass:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
-    bassNote: 55, // A1
-    scale: [261.63, 293.66, 329.63, 349.23, 392, 440], // C major
+    bassNote: 55,
+    scale: [261.63, 293.66, 329.63, 349.23, 392, 440],
     chords: [[261.63, 329.63, 392], [220, 277.18, 329.63], [293.66, 349.23, 440]],
     synthType: 'soulChop',
   },
@@ -2044,6 +2061,14 @@ const audioEngine = {
   delaySend: null,
   bassBus: null,          // bass runs through here (ducked by kick)
   bassDuckGain: null,     // controlled by _duckBass()
+  // Per-level MP3 backing track (Suno / hand-authored). When the current
+  // theme has a `track` field, the procedural drums/bass/synth bypass and
+  // the loaded MP3 plays instead. Visual beat-pulse stays synced via the
+  // procedural scheduler (it still runs and updates beatPhase).
+  trackGain: null,        // post-track, pre-master — duck under voice
+  _trackSource: null,     // current AudioBufferSourceNode (looping)
+  _trackName: null,       // currently-playing filename (for swap detection)
+  _trackBuffers: {},      // decoded-buffer cache keyed on filename
   isPlaying: false,
   currentStep: 0,
   nextStepTime: 0,
@@ -2051,6 +2076,7 @@ const audioEngine = {
   bar: 0,
   chordIdx: 0,
   MASTER_LEVEL: 0.75,
+  TRACK_LEVEL: 0.85,      // backing-track gain relative to master
 
   init() {
     if (this.ctx) return; // idempotent
@@ -2074,6 +2100,78 @@ const audioEngine = {
     this.bassDuckGain.connect(this.compressor);
     this.compressor.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
+    // Backing-track gain — connects directly to masterGain (bypasses the
+    // procedural compressor + delay so the mastered track keeps its own
+    // dynamics). Also independently duckable when the announcer speaks.
+    this.trackGain = this.ctx.createGain();
+    this.trackGain.gain.value = this.TRACK_LEVEL;
+    this.trackGain.connect(this.masterGain);
+  },
+
+  // Load and decode the named MP3 from /audio/levels/. Cached, so subsequent
+  // calls return instantly. Resolves to null if fetch/decode fails (e.g.
+  // file missing) — caller falls back to procedural audio.
+  async _loadTrack(name) {
+    if (this._trackBuffers[name]) return this._trackBuffers[name];
+    if (!this.ctx) return null;
+    try {
+      const r = await fetch('audio/levels/' + name, { cache: 'force-cache' });
+      if (!r.ok) return null;
+      const ab = await r.arrayBuffer();
+      const buf = await this.ctx.decodeAudioData(ab);
+      this._trackBuffers[name] = buf;
+      return buf;
+    } catch (e) {
+      console.warn('[audio] failed to load track', name, e);
+      return null;
+    }
+  },
+
+  // Play a backing track in a loop with a short fade-in. Stops any currently
+  // playing track first (with a fade-out) so level transitions crossfade.
+  async _playTrack(name) {
+    if (!this.ctx) return;
+    if (this._trackName === name && this._trackSource) return; // already on it
+    const buf = await this._loadTrack(name);
+    if (!buf) return; // load failed — silently fall back
+    this._stopTrack(0.4); // crossfade out anything currently playing
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const g = this.ctx.createGain();
+    g.gain.value = 0;
+    src.connect(g);
+    g.connect(this.trackGain);
+    src.start();
+    g.gain.linearRampToValueAtTime(1, this.ctx.currentTime + 0.4);
+    this._trackSource = { node: src, gain: g };
+    this._trackName = name;
+  },
+
+  _stopTrack(fadeOut) {
+    if (!this._trackSource) { this._trackName = null; return; }
+    const { node, gain } = this._trackSource;
+    const t = this.ctx.currentTime;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(gain.gain.value, t);
+    gain.gain.linearRampToValueAtTime(0, t + (fadeOut || 0.2));
+    try { node.stop(t + (fadeOut || 0.2) + 0.05); } catch {}
+    this._trackSource = null;
+    this._trackName = null;
+  },
+
+  // Briefly lower the backing track so a voice callout cuts through. Mirrors
+  // the bass-duck pattern but on the trackGain. Call from voiceEngine.
+  duckTrack(durationSec) {
+    if (!this.trackGain || !this.ctx) return;
+    const g = this.trackGain.gain;
+    const t = this.ctx.currentTime;
+    const dur = durationSec || 1.4;
+    const target = this.TRACK_LEVEL * 0.45; // ~7 dB attenuation
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(g.value, t);
+    g.linearRampToValueAtTime(target, t + 0.08);
+    g.linearRampToValueAtTime(this.TRACK_LEVEL, t + dur + 0.1);
   },
 
   _createDelay() {
@@ -2145,6 +2243,9 @@ const audioEngine = {
     this.nextStepTime = this.ctx.currentTime + 0.05;
     this._updateDelayTime();
     this._schedule();
+    // Kick off the per-level backing track if the current theme has one.
+    const theme = getTheme(level);
+    if (theme && theme.track) this._playTrack(theme.track);
   },
 
   _schedule() {
@@ -2169,10 +2270,23 @@ const audioEngine = {
     // Reset chord progression on era change to stay musical
     this.chordIdx = 0;
     this.bar = 0;
+    // Crossfade backing tracks on level change. If the new level has a
+    // track, play it; if it doesn't (and the previous one did), stop the
+    // current track so we cleanly hand back to procedural audio.
+    const theme = getTheme(level);
+    if (theme && theme.track) {
+      if (theme.track !== this._trackName) this._playTrack(theme.track);
+    } else {
+      this._stopTrack(0.6);
+    }
   },
 
   _playStep(step, time) {
     const theme = getTheme(level);
+    // When the level uses a backing track, the procedural drums/bass/synth
+    // would clash. Skip note generation but keep the scheduler running so
+    // beatPhase still advances for the visual beat-pulse + bg particles.
+    if (theme && theme.track) return;
     const st = this._stepTime();
     // Swing: delay odd 16ths slightly (about 12% of a step)
     const swingAmt = (theme.synthType === 'industrial') ? 0 : st * 0.14;
@@ -2817,7 +2931,7 @@ const audioEngine = {
     o.start(t); o.stop(t + 1.5);
   },
 
-  stop() { this.isPlaying = false; }
+  stop() { this.isPlaying = false; this._stopTrack(0.3); }
 };
 
 // ============================================================
@@ -3432,8 +3546,19 @@ function drawGhostBlock(context, x, y, color, size) {
   context.restore();
 }
 
+// Reverse map of piece-color → piece-type so locked blocks (which only carry
+// the color in board[r][c]) can render the correct embossed icon in the
+// Tetris-Effect block style.
+const COLOR_TO_TYPE = Object.fromEntries(
+  Object.entries(PIECES).map(([k, v]) => [v.color, k])
+);
+
 function drawBlock(context, x, y, color, size, alpha = 1) {
   const theme = getTheme(level);
+  if (theme && theme.blockStyle === 'tetrisEffect') {
+    drawBlockTE(context, x, y, color, size, alpha);
+    return;
+  }
   context.globalAlpha = alpha;
   const grad = context.createLinearGradient(x, y, x + size, y + size);
   grad.addColorStop(0, color);
@@ -3452,6 +3577,93 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   context.fillRect(x, y, size, size);
   context.shadowBlur = 0;
   context.globalAlpha = 1;
+}
+
+// Tetris Effect-style block: glossy 3D bevel (bright top-left highlight,
+// dark bottom-right shadow) over a deep gradient face, with an embossed
+// per-piece glyph in the centre. Shimmer is drawn as a single overlay pass
+// in drawBoard, not per-block, to keep the inner-loop cheap.
+function drawBlockTE(context, x, y, color, size, alpha = 1) {
+  context.globalAlpha = alpha;
+  // Outer ring — dark navy frame so neighbouring blocks have a clean seam,
+  // matching the photo's slight separation between cells.
+  context.fillStyle = 'rgba(0,8,20,0.85)';
+  context.fillRect(x, y, size, size);
+  // Inner face — vertical gradient from highlight color to shadow color.
+  const inset = Math.max(1, Math.floor(size * 0.08));
+  const fx = x + inset, fy = y + inset, fs = size - inset * 2;
+  const face = context.createLinearGradient(fx, fy, fx, fy + fs);
+  face.addColorStop(0, shadeColor(color, 50));
+  face.addColorStop(0.55, color);
+  face.addColorStop(1, shadeColor(color, -55));
+  context.fillStyle = face;
+  context.fillRect(fx, fy, fs, fs);
+  // Top-left bevel highlight (chamfer)
+  const bevel = Math.max(1, Math.floor(size * 0.13));
+  context.fillStyle = 'rgba(255,255,255,0.55)';
+  context.fillRect(fx, fy, fs, bevel);                       // top
+  context.fillRect(fx, fy, bevel, fs);                       // left
+  // Bottom-right shadow chamfer
+  context.fillStyle = 'rgba(0,0,0,0.55)';
+  context.fillRect(fx, fy + fs - bevel, fs, bevel);          // bottom
+  context.fillRect(fx + fs - bevel, fy, bevel, fs);          // right
+  // Embossed glyph based on piece type — drawn dark with a 1px highlight
+  // beneath for the engraved-into-the-face look from the photo.
+  const type = COLOR_TO_TYPE[color];
+  if (type && size >= 14) drawBlockGlyph(context, fx, fy, fs, type);
+  // Outer glow halo
+  const theme = getTheme(level);
+  context.shadowColor = color;
+  context.shadowBlur = theme ? theme.blockGlow : 10;
+  context.fillStyle = 'rgba(0,0,0,0)';
+  context.fillRect(x, y, size, size);
+  context.shadowBlur = 0;
+  context.globalAlpha = 1;
+}
+
+// Per-piece glyph carved into the block face. Same shape language as the
+// Tetris Effect blocks: a small geometric mark hinting at the piece's
+// silhouette without trying to be representational. Stays dim so the
+// shimmer pass on top still reads as the dominant motion.
+function drawBlockGlyph(context, fx, fy, size, type) {
+  const cx = fx + size / 2, cy = fy + size / 2;
+  const r = size * 0.18;
+  context.save();
+  // Engraved shadow (offset 1px down-right) underneath the dark mark — sells
+  // the carved-into-the-face look on the photo.
+  context.translate(0.5, 0.5);
+  context.fillStyle = 'rgba(255,255,255,0.18)';
+  glyphPath(context, cx, cy, r, type);
+  context.translate(-1, -1);
+  context.fillStyle = 'rgba(0,0,0,0.55)';
+  glyphPath(context, cx, cy, r, type);
+  context.restore();
+}
+
+function glyphPath(context, cx, cy, r, type) {
+  context.beginPath();
+  switch (type) {
+    case 'I': // horizontal bar
+      context.rect(cx - r * 1.4, cy - r * 0.25, r * 2.8, r * 0.5); break;
+    case 'O': // small filled square
+      context.rect(cx - r * 0.7, cy - r * 0.7, r * 1.4, r * 1.4); break;
+    case 'T': // T-shape
+      context.rect(cx - r, cy - r * 0.7, r * 2, r * 0.5);
+      context.rect(cx - r * 0.25, cy - r * 0.7, r * 0.5, r * 1.6); break;
+    case 'S': // forward-slash zigzag
+      context.rect(cx - r * 0.6, cy - r * 0.7, r * 1.2, r * 0.45);
+      context.rect(cx - r, cy - r * 0.05, r * 1.2, r * 0.45); break;
+    case 'Z': // back-slash zigzag
+      context.rect(cx - r, cy - r * 0.7, r * 1.2, r * 0.45);
+      context.rect(cx - r * 0.6, cy - r * 0.05, r * 1.2, r * 0.45); break;
+    case 'J': // backwards-L
+      context.rect(cx - r * 0.7, cy - r, r * 0.5, r * 1.6);
+      context.rect(cx - r * 0.7, cy + r * 0.3, r * 1.6, r * 0.5); break;
+    case 'L': // L-shape
+      context.rect(cx + r * 0.2, cy - r, r * 0.5, r * 1.6);
+      context.rect(cx - r, cy + r * 0.3, r * 1.6, r * 0.5); break;
+  }
+  context.fill();
 }
 
 function drawBoard() {
@@ -3494,6 +3706,28 @@ function drawBoard() {
       }
     }
     for (const [bx, by] of currentPiece) drawBlock(ctx, (currentX + bx) * CELL, (currentY + by) * CELL, color, CELL);
+  }
+
+  // Tetris-Effect shimmer pass — diagonal highlight stripe sweeping across
+  // every filled cell. Single global pass with `source-atop` so it only paints
+  // on top of existing pixels (block faces), not the empty grid background.
+  // Drawn AFTER active piece so both locked and active blocks shimmer alike.
+  // Ghost piece is excluded since it's a dashed outline, not a filled block.
+  if (theme && theme.blockStyle === 'tetrisEffect') {
+    const w = mainCanvas.width, h = mainCanvas.height;
+    const cycle = 2400; // ms per full sweep
+    const phase = (Date.now() % cycle) / cycle;       // 0..1
+    const stripeW = w * 0.35;
+    const cxPos = -stripeW + (w + stripeW * 2) * phase;
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-atop';
+    const sg = ctx.createLinearGradient(cxPos, 0, cxPos + stripeW, h);
+    sg.addColorStop(0,    'rgba(255,255,255,0)');
+    sg.addColorStop(0.5,  'rgba(255,255,255,0.22)');
+    sg.addColorStop(1,    'rgba(255,255,255,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
   }
 
   // Zone overlay
@@ -3597,6 +3831,158 @@ function drawNext() {
   }
 }
 
+// ============================================================
+// WAREHOUSE SCENE (Underground / Level 1)
+// ============================================================
+// Lazily-initialised dancer state. Re-initialised when bgCanvas resizes.
+let _dancers = null;
+let _dancersBgW = 0;
+function ensureDancers() {
+  if (_dancers && _dancersBgW === bgCanvas.width) return;
+  _dancersBgW = bgCanvas.width;
+  // Place dancers in the strips of bg-canvas BESIDE the board (not below it,
+  // since the touch controls + safe area cover the bottom). Board is centered
+  // horizontally with width COLS*CELL. We leave room for the side panels and
+  // park dancers outside that zone.
+  const w = bgCanvas.width, h = bgCanvas.height;
+  const boardW = COLS * CELL;
+  const boardCx = w / 2;
+  const sideStrip = (w - boardW) / 2;
+  // If the side strip is too narrow (mobile portrait), skip dancers entirely
+  // — there's no room without overlapping the board, and the layout would
+  // look cramped.
+  if (sideStrip < 90) { _dancers = []; return; }
+  // Two on each side, vertically positioned around the lower-mid of the
+  // board area so they read as standing on the warehouse floor near the cut
+  // crates rather than floating in space.
+  const yBase = Math.min(h - 80, h * 0.72);
+  const offsets = [
+    { side: -1, dx: -0.55 }, { side: -1, dx: -0.85 },
+    { side: +1, dx:  0.55 }, { side: +1, dx:  0.85 },
+  ];
+  _dancers = offsets.map((o, i) => ({
+    x: boardCx + o.side * boardW / 2 + o.dx * sideStrip,
+    yBase,
+    phase: (i * 0.6) % (Math.PI * 2),
+    armPhase: i * 0.9,
+    scale: 0.95 + (i % 2) * 0.25,
+  }));
+}
+
+function drawWarehouseScene(theme, now) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  // Concrete vignette: deep gradient pulling toward the centre, slightly
+  // pulsing on each beat so the room feels lived-in.
+  const beatPulse = 1 + (beatPhase % 4 === 0 ? 0.06 : 0) * Math.max(0, Math.sin(beatPhase / 4 * Math.PI * 2));
+  const cg = bgCtx.createRadialGradient(w / 2, h * 0.55, 0, w / 2, h * 0.55, w * 0.75);
+  cg.addColorStop(0, 'rgba(20,28,42,0.55)');
+  cg.addColorStop(0.55, 'rgba(8,12,20,0.65)');
+  cg.addColorStop(1, 'rgba(0,2,6,0.85)');
+  bgCtx.fillStyle = cg;
+  bgCtx.fillRect(0, 0, w, h);
+
+  // Overhead spotlight cone lighting the play field. Two soft cones on the
+  // sides paint where the dancers stand. All three pulse with the kick.
+  const accentRgb = hexToRgb(theme.colors.glow);
+  const coneAlpha = 0.18 * beatPulse;
+  const drawCone = (cx, top, baseW, color, alpha) => {
+    const g = bgCtx.createLinearGradient(cx, top, cx, h);
+    g.addColorStop(0, `rgba(${color[0]},${color[1]},${color[2]},${alpha})`);
+    g.addColorStop(1, `rgba(${color[0]},${color[1]},${color[2]},0)`);
+    bgCtx.fillStyle = g;
+    bgCtx.beginPath();
+    bgCtx.moveTo(cx - 8, top);
+    bgCtx.lineTo(cx + 8, top);
+    bgCtx.lineTo(cx + baseW / 2, h);
+    bgCtx.lineTo(cx - baseW / 2, h);
+    bgCtx.closePath();
+    bgCtx.fill();
+  };
+  drawCone(w * 0.5,  -10, w * 0.55, accentRgb, coneAlpha);
+  drawCone(w * 0.15, -10, w * 0.18, accentRgb, coneAlpha * 0.7);
+  drawCone(w * 0.85, -10, w * 0.18, accentRgb, coneAlpha * 0.7);
+
+  // Industrial silhouettes along the bottom edge — stacked crates that
+  // anchor the dancers and give a sense of depth.
+  bgCtx.fillStyle = 'rgba(0,3,10,0.75)';
+  bgCtx.fillRect(0, h - 24, w, 24);
+  // Random-ish crate stacks (deterministic so they don't shimmer)
+  const stacks = [
+    { x: 0.06, w: 60, h: 50 }, { x: 0.28, w: 80, h: 65 },
+    { x: 0.66, w: 70, h: 55 }, { x: 0.92, w: 50, h: 45 },
+  ];
+  for (const s of stacks) {
+    const sx = s.x * w - s.w / 2;
+    bgCtx.fillRect(sx, h - 24 - s.h, s.w, s.h);
+    // Crate edges
+    bgCtx.strokeStyle = 'rgba(20,30,45,0.6)';
+    bgCtx.lineWidth = 1;
+    bgCtx.strokeRect(sx + 0.5, h - 24 - s.h + 0.5, s.w - 1, s.h - 1);
+  }
+
+  // Dancing silhouettes
+  ensureDancers();
+  const bpm = theme.bpm || 100;
+  const beatMs = 60000 / bpm;
+  for (const d of _dancers) {
+    const t = (now / beatMs) * Math.PI + d.phase;
+    drawDancer(d, t, theme.colors.glow);
+  }
+}
+
+// One silhouette figure: head, torso, arms, legs. Bobs on every beat,
+// arms swing to a slightly slower rhythm so it doesn't look mechanical.
+function drawDancer(d, beatT, glowHex) {
+  const bob = Math.abs(Math.sin(beatT)) * 8 * d.scale;
+  const cx = d.x;
+  const cy = d.yBase - bob;
+  const s = d.scale;
+  bgCtx.save();
+  // Rim glow behind the figure so it pops off the warehouse backdrop
+  const [gr, gg, gb] = hexToRgb(glowHex);
+  const rim = bgCtx.createRadialGradient(cx, cy - 18 * s, 0, cx, cy - 18 * s, 36 * s);
+  rim.addColorStop(0, `rgba(${gr},${gg},${gb},0.35)`);
+  rim.addColorStop(1, `rgba(${gr},${gg},${gb},0)`);
+  bgCtx.fillStyle = rim;
+  bgCtx.fillRect(cx - 50 * s, cy - 70 * s, 100 * s, 110 * s);
+  // Silhouette body — solid near-black so the figure reads cleanly against
+  // the lit warehouse floor.
+  bgCtx.fillStyle = 'rgba(2,5,12,0.95)';
+  bgCtx.strokeStyle = 'rgba(2,5,12,0.95)';
+  bgCtx.lineWidth = 5 * s;
+  bgCtx.lineCap = 'round';
+  // Head
+  bgCtx.beginPath();
+  bgCtx.arc(cx, cy - 38 * s, 8 * s, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Torso
+  bgCtx.beginPath();
+  bgCtx.moveTo(cx, cy - 28 * s);
+  bgCtx.lineTo(cx, cy + 4 * s);
+  bgCtx.stroke();
+  // Arms — wave with a separate phase, slight up/out swing
+  const armSwing = Math.sin(beatT + d.armPhase) * 0.7;
+  const arm = (dir) => {
+    const ax = cx + dir * Math.cos(armSwing) * 18 * s;
+    const ay = cy - 22 * s + Math.abs(Math.sin(armSwing)) * -10 * s;
+    bgCtx.beginPath();
+    bgCtx.moveTo(cx, cy - 22 * s);
+    bgCtx.lineTo(ax, ay);
+    bgCtx.stroke();
+  };
+  arm(1); arm(-1);
+  // Legs — slight bend on each bounce so it reads as actually dancing
+  const bend = Math.abs(Math.sin(beatT)) * 6 * s;
+  const leg = (dir) => {
+    bgCtx.beginPath();
+    bgCtx.moveTo(cx, cy + 4 * s);
+    bgCtx.lineTo(cx + dir * 7 * s, cy + 22 * s - bend);
+    bgCtx.stroke();
+  };
+  leg(1); leg(-1);
+  bgCtx.restore();
+}
+
 function drawBackground() {
   const theme = getTheme(level);
   const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
@@ -3608,6 +3994,13 @@ function drawBackground() {
   const style = theme.particleStyle;
   const beatBump = (beatPhase % 4 === 0) ? 1.6 : 1;
   const isMono = style === 'dots'; // Donda is black & white
+
+  // Warehouse scene (Underground level): concrete vignette + a pulsing
+  // overhead light cone + dancing silhouettes flanking the play area.
+  // Drawn before particles so dust drifts in front of the architecture.
+  if (style === 'warehouse') {
+    drawWarehouseScene(theme, now);
+  }
 
   for (const p of bgParticles) {
     // Movement varies by style
@@ -3644,6 +4037,11 @@ function drawBackground() {
       case 'dots':
         p.y -= p.speed * 0.15;
         p.x += Math.sin(now / 5000 + p.phase) * 0.15;
+        break;
+      case 'warehouse':
+        // Slow dust motes drifting up through the light shaft, swaying.
+        p.y -= p.speed * 0.4;
+        p.x += Math.sin(now / 4000 + p.phase) * 0.5;
         break;
       default:
         p.y -= p.speed;
