@@ -1,8 +1,9 @@
 // Tetris Beats — shared leaderboard + PvP lobby server.
 //
-// Runs on 0.0.0.0:PORT (default 8765). Accessible via:
-//   - LAN        http://<mac-lan-ip>:8765          (when home)
-//   - Tailscale  https://alfreds-mac-mini.tail493f2f.ts.net:8443   (anywhere)
+// Local development server only. Production deploy uses GitHub Pages for the
+// static frontend + a Cloudflare Worker for the leaderboard/PvP API — see
+// DEPLOY.md. This server runs on 0.0.0.0:PORT (default 8765) and is intended
+// for use on your LAN during development.
 //
 // Surfaces:
 //   GET  /                → static index.html + assets
@@ -263,7 +264,7 @@ ensureDataDir();
 if (!fs.existsSync(SCORES_FILE)) saveScores([]);
 
 server.listen(PORT, '0.0.0.0', () => {
-  // Log both interfaces so the launchd log tells Sir how to reach it.
+  // Log local IPs so you can open the game from another device on the same LAN.
   const nets = os.networkInterfaces();
   const lan = [];
   for (const addrs of Object.values(nets)) {
@@ -272,6 +273,5 @@ server.listen(PORT, '0.0.0.0', () => {
     }
   }
   console.log(`[tetris] listening on 0.0.0.0:${PORT}`);
-  for (const ip of lan) console.log(`[tetris]   LAN:       http://${ip}:${PORT}`);
-  console.log(`[tetris]   Tailscale: https://alfreds-mac-mini.tail493f2f.ts.net:8443  (proxied)`);
+  for (const ip of lan) console.log(`[tetris]   LAN: http://${ip}:${PORT}`);
 });
