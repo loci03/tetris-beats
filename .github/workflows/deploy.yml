@@ -24,14 +24,28 @@ jobs:
   # ──────────────────────────────────────────────────────────────────
   deploy-worker:
     runs-on: ubuntu-latest
-    if: ${{ vars.WORKER_URL != '' }}     # skip until secrets/vars are wired
+    if: ${{ vars.WORKER_URL != '' }}     # skip until WORKER_URL is set
     defaults: { run: { working-directory: worker } }
     steps:
       - uses: actions/checkout@v4
+      - name: Check API token presence
+        id: token
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          if [ -z "$CF_API_TOKEN" ]; then
+            echo "::warning::CF_API_TOKEN not set — skipping Worker deploy. Add it under Settings → Secrets and variables → Actions to enable autodeploy."
+            echo "have_token=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_token=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.token.outputs.have_token == 'true'
         with: { node-version: '20', cache: 'npm', cache-dependency-path: worker/package.json }
-      - run: npm install
+      - if: steps.token.outputs.have_token == 'true'
+        run: npm install
       - name: Deploy worker
+        if: steps.token.outputs.have_token == 'true'
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
