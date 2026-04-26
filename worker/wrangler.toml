@@ -19,8 +19,8 @@ compatibility_date = "2024-09-01"
 # `wrangler dev` and can be the same value.
 [[kv_namespaces]]
 binding = "SCORES"
-id = "REPLACE_WITH_KV_ID"
-preview_id = "REPLACE_WITH_KV_ID"
+id = "e919ea4ed43c4f079d52fd66054522ae"
+preview_id = "e919ea4ed43c4f079d52fd66054522ae"
 
 # Durable Object class for PvP rooms. Each 4-letter code maps to one Room
 # instance via idFromName(code). Cloudflare's free tier covers 1M req/day.
@@ -30,7 +30,7 @@ class_name = "Room"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["Room"]
+new_sqlite_classes = ["Room"]
 
 # `wrangler dev` runs the worker locally on http://localhost:8787 with the same
 # bindings (KV is emulated, Durable Objects use a local SQLite shadow). Use it
