@@ -18,7 +18,13 @@
     color: #fff;
     font-family: 'Segoe UI', system-ui, sans-serif;
     overflow: hidden;
-    height: 100vh;
+    /* iOS Safari treats `100vh` as the URL-bar-hidden viewport, which is
+       always TALLER than what's actually visible while the URL bar is up.
+       That makes the body extend below the fold and clips the bottom of
+       the board + touch controls. `100dvh` (dynamic viewport height) tracks
+       the real visible height and shrinks/grows as the URL bar appears. */
+    height: 100vh;          /* fallback for browsers without dvh support */
+    height: 100dvh;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1523,6 +1529,19 @@ function computeCellSize() {
   return Math.max(12, Math.min(36, Math.min(byW, byH)));
 }
 
+// Throttle resizeCanvases triggers — iOS fires visualViewport `scroll` rapidly
+// as the URL bar slides, so we coalesce to one rAF tick to avoid layout thrash.
+let _resizePending = false;
+function scheduleResize() {
+  if (_resizePending) return;
+  _resizePending = true;
+  requestAnimationFrame(() => {
+    _resizePending = false;
+    resizeCanvases();
+    if (typeof bgParticles !== 'undefined' && bgParticles) initBgParticles();
+  });
+}
+
 function resizeCanvases() {
   const p1Cell = computeCellSize();
   CELL = p1Cell;
@@ -1556,19 +1575,23 @@ function resizeCanvases() {
   const next = document.getElementById('next-canvas');
   const nr = next.getBoundingClientRect();
   if (nr.width > 0) { next.width = nr.width; next.height = nr.height; }
-  bgCanvas.width = window.innerWidth;
-  bgCanvas.height = window.innerHeight;
+  // Match the bg canvas to the actually-visible viewport so the dark
+  // background fills the full screen on iOS regardless of URL-bar state.
+  const vvw = (window.visualViewport && window.visualViewport.width)  || window.innerWidth;
+  const vvh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+  bgCanvas.width  = vvw;
+  bgCanvas.height = vvh;
 }
 resizeCanvases();
-window.addEventListener('resize', () => { resizeCanvases(); if (typeof bgParticles !== 'undefined' && bgParticles) initBgParticles(); });
-window.addEventListener('orientationchange', () => setTimeout(() => { resizeCanvases(); if (typeof bgParticles !== 'undefined' && bgParticles) initBgParticles(); }, 100));
+window.addEventListener('resize', scheduleResize);
+window.addEventListener('orientationchange', () => setTimeout(scheduleResize, 100));
 // iOS Safari changes visualViewport.height as the URL bar auto-hides on scroll.
-// Re-fit the board so it never gets cut off mid-game.
+// Listen on BOTH `resize` (keyboard show/hide, orientation) and `scroll`
+// (URL-bar slide as the user scrolls) so the board is always sized to the
+// actually-visible region.
 if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', () => {
-    resizeCanvases();
-    if (typeof bgParticles !== 'undefined' && bgParticles) initBgParticles();
-  });
+  window.visualViewport.addEventListener('resize', scheduleResize);
+  window.visualViewport.addEventListener('scroll', scheduleResize);
 }
 
 // ─────────────────────────────────────────────────────────────────
