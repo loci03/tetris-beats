@@ -49,6 +49,10 @@ jobs:
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          # Workers:Edit-scoped tokens can't list account memberships, so
+          # wrangler needs the account id passed in directly. The id isn't
+          # a secret per Cloudflare's docs — it's an identifier.
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
 
   # ──────────────────────────────────────────────────────────────────
   # GitHub Pages — static frontend (index.html + audio + tiles).
