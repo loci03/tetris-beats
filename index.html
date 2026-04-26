@@ -1,0 +1,4519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!--
+  Backend URL. Empty → use same-origin (local dev with `node server.js`).
+  Set to your Cloudflare Worker URL (e.g. https://tetris-beats.<sub>.workers.dev)
+  before pushing to GitHub Pages so the public site talks to the Worker.
+  The deploy GitHub Action substitutes this automatically — see DEPLOY.md.
+-->
+<meta name="api-base" content="">
+<title>TETRIS BEATS</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f;
+    color: #fff;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  #bg-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+  }
+  #game-container {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+  .player-wrap {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+  /* Alfred (P2) only visible in vs mode. Hidden by default so solo mode
+     layout is untouched. */
+  #p2-wrap { display: none; }
+  body.vs-mode #p2-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .p2-header {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.55);
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+  }
+  #p2-stats {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.75);
+    text-transform: none;
+  }
+  #p2-stats #p2-score { color: #fff; font-weight: 700; }
+  #main-canvas-2 {
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    image-rendering: pixelated;
+    box-shadow: 0 0 30px rgba(255, 60, 60, 0.15);
+  }
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 130px;
+  }
+  .panel-box {
+    background: rgba(10, 10, 20, 0.7);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 12px;
+    backdrop-filter: blur(10px);
+  }
+  .panel-box h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .mini-grid {
+    display: flex;
+    justify-content: center;
+  }
+  #main-canvas {
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    image-rendering: pixelated;
+    box-shadow: 0 0 60px rgba(128, 0, 255, 0.15), 0 0 120px rgba(0, 128, 255, 0.08);
+    transition: box-shadow 0.8s;
+    will-change: transform;
+  }
+  #score-display {
+    font-size: 28px;
+    font-weight: 700;
+    text-align: center;
+    color: #fff;
+    text-shadow: 0 0 20px rgba(128,0,255,0.5);
+  }
+  #level-display, #lines-display {
+    font-size: 16px;
+    text-align: center;
+    color: rgba(255,255,255,0.7);
+  }
+  #era-display {
+    font-size: 12px;
+    text-align: center;
+    color: rgba(255,255,255,0.4);
+    font-style: italic;
+    margin-top: 4px;
+  }
+  #zone-bar-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  #zone-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #ff00ff, #00ffff);
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+  #zone-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.4);
+    text-align: center;
+  }
+  #start-screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(5,5,15,0.95);
+    backdrop-filter: blur(20px);
+  }
+  #start-screen h1 {
+    font-size: 64px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #ff00ff, #00ffff, #ff6600);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+    letter-spacing: 4px;
+  }
+  #start-screen .sub {
+    font-size: 16px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 40px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+  }
+  #start-btn, #start-btn-2 {
+    padding: 16px 48px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #8000ff, #ff00ff);
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  #mode-select {
+    display: flex; gap: 12px; margin-bottom: 24px;
+  }
+  .mode-btn {
+    padding: 10px 24px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    background: transparent;
+    color: rgba(255,255,255,0.4);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 30px;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s, background 0.2s;
+  }
+  .mode-btn:hover { color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.5); }
+  .mode-btn.mode-active {
+    color: #fff;
+    border-color: #ff00ff;
+    background: rgba(255,0,255,0.12);
+  }
+  #start-btn:hover, #start-btn-2:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 40px rgba(128,0,255,0.5);
+  }
+  .controls-info {
+    margin-top: 30px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.3);
+    text-align: center;
+    line-height: 1.8;
+  }
+  .options-toggle {
+    margin-top: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 1px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .options-toggle input[type="checkbox"] {
+    width: 16px; height: 16px;
+    accent-color: #ff00ff;
+    cursor: pointer;
+  }
+  .options-toggle .opt-hint {
+    font-size: 10px;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0;
+    margin-left: 2px;
+  }
+  #game-over-screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 10;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(5,5,15,0.9);
+    backdrop-filter: blur(20px);
+  }
+  #game-over-screen h2 {
+    font-size: 48px;
+    font-weight: 900;
+    color: #ff0066;
+    margin-bottom: 16px;
+  }
+  #final-score {
+    font-size: 24px;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 32px;
+  }
+  /* Vs-mode result overlay — same layout as game-over, different copy. */
+  #vs-result-screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 11;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(5,5,15,0.92);
+    backdrop-filter: blur(20px);
+    padding: 0 32px;
+    text-align: center;
+  }
+  #vs-result-title {
+    font-size: 72px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 6px;
+    margin-bottom: 16px;
+  }
+  #vs-result-title.lose {
+    background: linear-gradient(135deg, #ff0066, #ff9900);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  #vs-result-sub {
+    font-size: 16px;
+    color: rgba(255,255,255,0.55);
+    margin-bottom: 36px;
+    line-height: 1.7;
+    letter-spacing: 1px;
+  }
+  #vs-replay-btn {
+    padding: 16px 48px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #8000ff, #ff00ff);
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+  }
+  .zone-active #main-canvas {
+    box-shadow: 0 0 80px rgba(0,255,255,0.4), 0 0 160px rgba(255,0,255,0.3) !important;
+  }
+  #combo-display {
+    position: fixed;
+    font-size: 24px;
+    font-weight: 900;
+    color: #ff00ff;
+    text-shadow: 0 0 20px rgba(255,0,255,0.8);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 5;
+    left: 50%;
+    top: 40%;
+    transform: translateX(-50%);
+  }
+  #level-announce {
+    position: fixed;
+    z-index: 8;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 40px;
+    font-weight: 900;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+    text-shadow: 0 0 40px currentColor;
+    line-height: 1.4;
+  }
+  #level-announce .era-name {
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    display: block;
+    margin-top: 8px;
+    opacity: 0.7;
+  }
+
+  /* ---------- TOUCH CONTROLS ---------- */
+  #touch-controls {
+    display: none;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 6;
+    /* Tightened from 10px/18px to 4px/8px + env() so the board can zoom.
+       env(safe-area-inset-bottom) handles the iPhone home indicator. */
+    padding: 4px 12px calc(env(safe-area-inset-bottom, 0px) + 8px);
+    background: linear-gradient(180deg, rgba(5,5,15,0) 0%, rgba(5,5,15,0.85) 30%, rgba(5,5,15,0.95) 100%);
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+  }
+  #touch-controls .tc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  #touch-controls .tc-row:last-child { margin-bottom: 0; }
+  #touch-controls .tc-group {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .tc-btn {
+    background: rgba(20, 20, 35, 0.85);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.85);
+    border-radius: 10px;
+    font-size: 20px;
+    font-weight: 700;
+    min-width: 48px;
+    height: 48px;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+    transition: transform 0.08s, background 0.08s;
+    touch-action: none;
+    cursor: pointer;
+  }
+  .tc-btn.tc-wide {
+    flex: 1;
+    font-size: 14px;
+    letter-spacing: 2px;
+  }
+  .tc-btn.tc-drop {
+    background: linear-gradient(135deg, #8000ff, #ff00ff);
+    color: #fff;
+    border: none;
+  }
+  .tc-btn.tc-zone {
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    color: #fff;
+    border: none;
+  }
+  .tc-btn:active, .tc-btn.tc-pressed {
+    transform: scale(0.92);
+    background: rgba(128, 0, 255, 0.4);
+  }
+  .tc-btn.tc-drop:active, .tc-btn.tc-drop.tc-pressed {
+    background: linear-gradient(135deg, #a020ff, #ff20ff);
+  }
+  .tc-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    opacity: 0.75;
+    text-transform: uppercase;
+  }
+
+  /* ---------- MOBILE LAYOUT ---------- */
+  @media (min-width: 721px) and (pointer: fine) {
+    .mobile-only { display: none !important; }
+  }
+  @media (max-width: 720px), (pointer: coarse) {
+    .desktop-only { display: none !important; }
+    .mobile-only { display: block !important; }
+    body {
+      align-items: flex-start;
+      padding-top: 6px;
+    }
+    #game-container {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 6px 140px;
+      width: 100%;
+    }
+    /* The old mobile layout expected side-panels + main-canvas to live
+       directly inside #game-container and wrap. Now they live inside
+       #p1-wrap, so give it the same wrapping behaviour. */
+    #p1-wrap {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+    }
+    .side-panel {
+      flex-direction: row;
+      min-width: 0;
+      gap: 6px;
+    }
+    .side-panel:first-child {
+      order: 1;
+      flex: 1 1 auto;
+    }
+    .side-panel:last-child {
+      order: 2;
+      flex: 0 0 auto;
+    }
+    #main-canvas {
+      order: 3;
+      /* flex-basis:100% used to force wrap but also stretched the canvas width
+         to 100% of container, which made the browser scale the height to keep
+         the bitmap aspect ratio — pushing the bottom of the board behind the
+         touch controls on iPhones. The side-panels already fill the first row
+         via flex:1 1 auto, so flex:0 0 auto lets the canvas wrap naturally at
+         its intrinsic CELL*COLS × CELL*ROWS size. */
+      flex: 0 0 auto;
+      align-self: center;
+      margin: 6px auto 0;
+      display: block;
+      max-width: 100%;
+    }
+    /* Vs mode on mobile: Alfred's mini board stacks at the top, your full
+       board (p1-wrap) lives below — matches the "your board big, Alfred mini"
+       layout the user picked. Solo mode keeps the existing wrap layout. */
+    body.vs-mode #game-container { flex-direction: column; align-items: center; gap: 4px; }
+    body.vs-mode #p2-wrap { order: -1; margin-bottom: 4px; }
+    body.vs-mode .p2-header { font-size: 9px; letter-spacing: 2px; }
+    body.vs-mode #p1-wrap {
+      order: 1;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+    }
+    /* Side panels in vs-mode mobile compress to a single row above the board
+       so the player still sees score/level/hold/next without crowding the
+       board out. */
+    body.vs-mode #p1-wrap .side-panel {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .panel-box {
+      padding: 6px 8px;
+      min-width: 0;
+    }
+    .side-panel:first-child .panel-box { flex: 1; }
+    .panel-box h3 {
+      font-size: 9px;
+      margin-bottom: 3px;
+    }
+    #score-display {
+      font-size: 20px;
+    }
+    #level-display, #lines-display {
+      font-size: 11px;
+    }
+    #era-display {
+      font-size: 9px;
+      margin-top: 2px;
+    }
+    #zone-label { font-size: 9px; }
+    #hold-canvas { width: 56px; height: 40px; }
+    #next-canvas { width: 56px; height: 40px; }
+    #touch-controls { display: block; }
+    #start-screen h1 { font-size: 44px; letter-spacing: 2px; }
+    #start-screen .sub { font-size: 13px; letter-spacing: 3px; margin-bottom: 24px; }
+    #start-btn, #start-btn-2 { padding: 14px 36px; font-size: 15px; }
+    .controls-info { font-size: 11px; padding: 0 20px; }
+    #combo-display { font-size: 20px; top: 35%; }
+    #level-announce { font-size: 30px; }
+    #level-announce .era-name { font-size: 14px; }
+  }
+
+  /* Very small phones */
+  @media (max-width: 380px) {
+    .tc-btn { min-width: 46px; height: 46px; font-size: 18px; padding: 0 8px; }
+    .tc-btn.tc-wide { font-size: 12px; }
+    #touch-controls { padding: 6px 8px 12px; }
+  }
+
+  /* ============================================================
+     Leaderboard + initials entry
+     ============================================================ */
+  .leaderboard {
+    width: min(360px, 90vw);
+    background: rgba(10, 10, 20, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 14px 18px;
+    backdrop-filter: blur(10px);
+  }
+  .leaderboard h3 {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .lb-empty {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.35);
+    text-align: center;
+    letter-spacing: 1px;
+    padding: 8px 0;
+  }
+  .lb-row {
+    display: grid;
+    grid-template-columns: 28px 48px 1fr auto;
+    gap: 10px;
+    align-items: baseline;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    padding: 4px 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-rank {
+    color: rgba(255, 255, 255, 0.45);
+    font-weight: 700;
+    font-size: 12px;
+    text-align: right;
+  }
+  .lb-name {
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: 2px;
+    font-family: 'Courier New', monospace;
+  }
+  .lb-score {
+    color: rgba(255, 255, 255, 0.85);
+    font-variant-numeric: tabular-nums;
+  }
+  .lb-meta {
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-align: right;
+  }
+  .lb-row.is-new {
+    background: linear-gradient(90deg, rgba(255, 0, 255, 0.12), rgba(0, 255, 255, 0.08));
+    border-radius: 6px;
+    padding: 6px 8px;
+    border-bottom: none;
+    animation: lbPulse 1.4s ease-in-out infinite;
+  }
+  .lb-row.is-new .lb-name {
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  @keyframes lbPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 0, 255, 0.25); }
+    50%      { box-shadow: 0 0 18px 2px rgba(255, 0, 255, 0.25); }
+  }
+
+  #new-hs-banner {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #ffdd00, #ff00ff, #00ffff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+    animation: lbPulse 1.2s ease-in-out infinite;
+  }
+  #new-hs-banner.hidden { display: none; }
+
+  /* PvP lobby overlay */
+  #lobby-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 10; display: none;
+    flex-direction: column; justify-content: center; align-items: center;
+    background: rgba(5, 5, 15, 0.92);
+    backdrop-filter: blur(20px);
+    padding: 24px;
+    text-align: center;
+  }
+  #lobby-screen.visible { display: flex; }
+  #lobby-screen h2 {
+    font-size: 32px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 24px;
+  }
+  #lobby-screen .lobby-mode-btns {
+    display: flex; gap: 12px; margin-bottom: 18px;
+  }
+  #lobby-screen .lobby-mode-btns button {
+    padding: 10px 22px; font-size: 12px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50px; cursor: pointer;
+  }
+  #lobby-screen .lobby-mode-btns button.active {
+    border-color: #ff00ff;
+    box-shadow: 0 0 16px rgba(255, 0, 255, 0.35);
+  }
+  .lobby-panel {
+    width: min(420px, 92vw);
+    background: rgba(10, 10, 20, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 22px 26px;
+  }
+  .lobby-panel .section { display: none; }
+  .lobby-panel .section.active { display: block; }
+  .lobby-panel .hint {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 8px;
+  }
+  #lobby-room-code {
+    font-family: 'Courier New', monospace;
+    font-size: 48px; font-weight: 900; letter-spacing: 14px;
+    text-indent: 14px;
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    padding: 10px 0 6px;
+  }
+  #lobby-join-input {
+    width: 100%;
+    padding: 12px 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 28px; font-weight: 900;
+    letter-spacing: 12px; text-indent: 12px;
+    text-align: center; text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(0, 255, 255, 0.5);
+    border-radius: 8px;
+    color: #fff; outline: none;
+    margin-bottom: 10px;
+  }
+  #lobby-join-input:focus {
+    border-color: #00ffff;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.35);
+  }
+  .lobby-status {
+    font-size: 13px; color: rgba(255, 255, 255, 0.65);
+    letter-spacing: 1px; margin-top: 12px; min-height: 20px;
+  }
+  .lobby-status.err { color: #ff5566; }
+  .lobby-btn-row { display: flex; gap: 10px; justify-content: center; margin-top: 16px; }
+  .lobby-btn {
+    padding: 11px 26px; font-size: 13px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    background: linear-gradient(135deg, #8000ff, #ff00ff);
+    color: #fff; border: none; border-radius: 50px; cursor: pointer;
+  }
+  .lobby-btn.secondary {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  .lobby-btn:disabled {
+    opacity: 0.35; cursor: not-allowed;
+  }
+  #lobby-connection-badge {
+    position: absolute; top: 14px; right: 14px;
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.4);
+  }
+  #lobby-connection-badge.ok { color: #00ff99; }
+  #lobby-connection-badge.err { color: #ff5566; }
+  .lobby-peer { font-size: 14px; color: rgba(255,255,255,0.75); }
+  .lobby-peer strong { color: #00ffff; }
+
+  #initials-entry {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  #initials-entry.hidden { display: none; }
+  #initials-entry .prompt {
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+  }
+  #initials-input {
+    width: 170px;
+    padding: 10px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: 12px;
+    text-align: center;
+    text-indent: 12px;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 0, 255, 0.5);
+    border-radius: 8px;
+    color: #fff;
+    caret-color: #ff00ff;
+    outline: none;
+  }
+  #initials-input:focus {
+    border-color: #ff00ff;
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.35);
+  }
+  #initials-submit {
+    padding: 10px 32px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #8000ff, #ff00ff);
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+  }
+  #game-over-screen .leaderboard {
+    margin-bottom: 20px;
+    max-height: 42vh;
+    overflow-y: auto;
+  }
+  #start-screen .leaderboard {
+    margin-top: 22px;
+  }
+  /* Compact leaderboard on short screens */
+  @media (max-height: 720px) {
+    #start-screen .leaderboard { margin-top: 14px; padding: 10px 14px; }
+    #start-screen .leaderboard .lb-row { font-size: 12px; padding: 2px 2px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div id="start-screen">
+  <h1>TETRIS BEATS</h1>
+  <div id="mode-select">
+    <button class="mode-btn mode-active" data-mode="solo">SOLO</button>
+    <button class="mode-btn" data-mode="vs">VS ALFRED</button>
+    <button class="mode-btn" data-mode="human">VS FRIEND</button>
+  </div>
+  <button id="start-btn">DROP THE BEAT</button>
+  <div class="controls-info desktop-only">
+    Arrow Keys / WASD - Move & Rotate<br>
+    Space - Hard Drop | Shift / C - Hold<br>
+    Z - Zone | P - Pause
+  </div>
+  <div class="controls-info mobile-only" style="display:none;">
+    Buttons below to play<br>
+    Swipe: ← → move, ↓ soft, ↑ hard drop<br>
+    Tap piece = hold, tap elsewhere = rotate
+  </div>
+  <label class="options-toggle">
+    <input type="checkbox" id="ghost-toggle" checked>
+    <span>Ghost piece <span class="opt-hint">(G)</span></span>
+  </label>
+  <label class="options-toggle">
+    <input type="checkbox" id="voice-toggle" checked>
+    <span>Line-clear voice <span class="opt-hint">(V)</span></span>
+  </label>
+  <div id="start-leaderboard" class="leaderboard" aria-live="polite">
+    <h3>High Scores</h3>
+    <div class="lb-body"></div>
+  </div>
+</div>
+
+<!-- PvP lobby — shown when mode=human, replaces direct game start -->
+<div id="lobby-screen">
+  <div id="lobby-connection-badge">connecting…</div>
+  <h2>VS FRIEND</h2>
+  <div class="lobby-mode-btns">
+    <button class="lm-btn active" data-lm="create">CREATE ROOM</button>
+    <button class="lm-btn" data-lm="join">JOIN ROOM</button>
+  </div>
+  <div class="lobby-panel">
+    <div class="hint">Your initials</div>
+    <input id="lobby-name-input" type="text" maxlength="3"
+           autocomplete="off" autocapitalize="characters" spellcheck="false"
+           value="YOU"
+           style="width: 150px; padding: 8px 10px; font-family: 'Courier New', monospace;
+                  font-size: 22px; font-weight: 900; letter-spacing: 8px; text-indent: 8px;
+                  text-align: center; text-transform: uppercase;
+                  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
+                  border-radius: 6px; color: #fff; outline: none; margin-bottom: 14px;">
+    <!-- Create Room section -->
+    <div class="section active" data-section="create">
+      <div id="lobby-create-idle">
+        <div class="hint">Click to generate a room code. Share it with your friend.</div>
+        <div class="lobby-btn-row">
+          <button class="lobby-btn" id="lobby-create-btn">CREATE ROOM</button>
+        </div>
+      </div>
+      <div id="lobby-create-live" style="display:none;">
+        <div class="hint">Room code — share with your opponent</div>
+        <div id="lobby-room-code">————</div>
+        <div class="lobby-peer" id="lobby-peer-status">Waiting for opponent…</div>
+        <div class="lobby-btn-row">
+          <button class="lobby-btn secondary" id="lobby-cancel-btn">CANCEL</button>
+          <button class="lobby-btn" id="lobby-start-btn" disabled>START MATCH</button>
+        </div>
+      </div>
+    </div>
+    <!-- Join Room section -->
+    <div class="section" data-section="join">
+      <div class="hint">Enter the 4-character code from your opponent</div>
+      <input id="lobby-join-input" type="text" maxlength="4"
+             autocomplete="off" autocapitalize="characters" spellcheck="false"
+             placeholder="————">
+      <div class="lobby-btn-row">
+        <button class="lobby-btn secondary" id="lobby-cancel-btn-2">CANCEL</button>
+        <button class="lobby-btn" id="lobby-join-btn">JOIN</button>
+      </div>
+    </div>
+    <div class="lobby-status" id="lobby-status"></div>
+  </div>
+</div>
+
+<div id="game-over-screen">
+  <div id="new-hs-banner" class="hidden">★ New High Score ★</div>
+  <h2>GAME OVER</h2>
+  <div id="final-score"></div>
+  <div id="initials-entry" class="hidden">
+    <div class="prompt">Enter your initials</div>
+    <input id="initials-input" type="text" maxlength="3" autocomplete="off"
+           autocapitalize="characters" spellcheck="false" inputmode="text"
+           aria-label="Enter your initials">
+    <button id="initials-submit">Save Score</button>
+  </div>
+  <div id="gameover-leaderboard" class="leaderboard">
+    <h3>High Scores</h3>
+    <div class="lb-body"></div>
+  </div>
+  <button id="start-btn-2">REPLAY</button>
+</div>
+
+<!-- Vs-mode result overlay — appears when either player tops out. -->
+<div id="vs-result-screen">
+  <div id="vs-result-title">YOU WIN</div>
+  <div id="vs-result-sub"></div>
+  <button id="vs-replay-btn">REPLAY</button>
+</div>
+
+<div id="game-container">
+  <div class="player-wrap" id="p1-wrap">
+    <div class="side-panel">
+      <div class="panel-box">
+        <h3>Hold</h3>
+        <div class="mini-grid"><canvas id="hold-canvas" width="100" height="80"></canvas></div>
+      </div>
+      <div class="panel-box">
+        <div id="score-display">0</div>
+        <div id="level-display">Level 1</div>
+        <div id="lines-display">Lines: 0</div>
+        <div id="era-display">The College Dropout</div>
+      </div>
+      <div class="panel-box">
+        <div id="zone-label">Zone</div>
+        <div id="zone-bar-container"><div id="zone-bar"></div></div>
+      </div>
+    </div>
+    <canvas id="main-canvas"></canvas>
+    <div class="side-panel">
+      <div class="panel-box">
+        <h3>Next</h3>
+        <div class="mini-grid"><canvas id="next-canvas" width="100" height="320"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <!-- Player 2 (Alfred) — hidden until vs mode is active. -->
+  <div class="player-wrap" id="p2-wrap">
+    <div class="p2-header">
+      🦇 ALFRED
+      <span id="p2-stats"><span id="p2-score">0</span> · <span id="p2-lines">0</span>L</span>
+    </div>
+    <canvas id="main-canvas-2"></canvas>
+  </div>
+</div>
+<div id="combo-display"></div>
+<div id="level-announce"></div>
+
+<div id="touch-controls">
+  <div class="tc-row">
+    <div class="tc-group">
+      <button class="tc-btn" data-action="left" aria-label="Move left">◀</button>
+      <button class="tc-btn" data-action="down" aria-label="Soft drop">▼</button>
+      <button class="tc-btn" data-action="right" aria-label="Move right">▶</button>
+    </div>
+    <div class="tc-group">
+      <button class="tc-btn" data-action="rotate" aria-label="Rotate">↻</button>
+      <button class="tc-btn" data-action="hold" aria-label="Hold">⇧</button>
+    </div>
+  </div>
+  <div class="tc-row">
+    <button class="tc-btn tc-zone tc-wide" data-action="zone" aria-label="Zone">ZONE</button>
+    <button class="tc-btn tc-drop tc-wide" data-action="harddrop" aria-label="Hard drop">⤓ DROP</button>
+    <button class="tc-btn" data-action="pause" aria-label="Pause">II</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// TETRIS BEATS - The Kanye Collection
+// ============================================================
+
+const COLS = 10, ROWS = 20;
+// `var` so vs-mode can swap CELL to the P2 mini-board's smaller cell size
+// when drawing Alfred's side.
+var CELL = 30;
+
+// Player-visible options (persisted to localStorage). Ghost piece shows where
+// the current piece will land on hard-drop; some players prefer it off for
+// a harder challenge.
+// ============================================================
+// VOICE CALLOUTS — "Single / Double / Triple / Tetris" on line clears
+// ============================================================
+// Uses the browser's built-in SpeechSynthesis (Web Speech API). Zero assets,
+// works offline, Safari/iOS supported. We pick an English voice with a
+// preference for British/American natural voices so "Tetris" lands well.
+// Preference persists to localStorage; toggleable from the start screen and
+// via the `V` key.
+let voiceEnabled = (() => {
+  try { const v = localStorage.getItem('tetris.voice'); return v === null ? true : v === 'true'; }
+  catch { return true; }
+})();
+function setVoiceEnabled(v) {
+  const wasOn = voiceEnabled;
+  voiceEnabled = !!v;
+  try { localStorage.setItem('tetris.voice', String(voiceEnabled)); } catch {}
+  const cb = document.getElementById('voice-toggle');
+  if (cb) cb.checked = voiceEnabled;
+  if (!voiceEnabled && 'speechSynthesis' in window) {
+    try { speechSynthesis.cancel(); } catch {}
+  }
+  // Flipped from off → on: immediately play the greeting MP3 so the user
+  // hears an instant confirmation. Ensures the audio context is live (the
+  // toggle fires from a user gesture, which also unlocks the AudioContext
+  // on Safari if it's still suspended).
+  if (!wasOn && voiceEnabled) {
+    if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+      audioEngine.ctx.resume().catch(()=>{});
+    } else if (!audioEngine.ctx) {
+      audioEngine.init();
+    }
+    voiceEngine.prime();
+    // Slight delay to let the fetch/decode complete on first use.
+    setTimeout(() => voiceEngine.sayGreeting(), 250);
+  }
+}
+
+const voiceEngine = (() => {
+  // Pre-rendered announcer MP3s under /audio/voice/. Playing through the
+  // game's Web Audio masterGain means they're just another SFX — no OS-level
+  // ducking (unlike SpeechSynthesis, which shares the Siri/VoiceOver channel
+  // and causes macOS/iOS to duck all other audio).
+  const CLEAR_FILES = {
+    1: ['single-1', 'single-2', 'single-3', 'single-4'],
+    2: ['double-1', 'double-2', 'double-3', 'double-4'],
+    3: ['triple-1', 'triple-2', 'triple-3', 'triple-4'],
+    4: ['tetris-1', 'tetris-2', 'tetris-3', 'tetris-4', 'tetris-5'],
+  };
+  const COMBO_FILES = {
+    2: ['combo-2a', 'combo-2b'],
+    3: ['combo-3a', 'combo-3b'],
+    4: ['combo-4a', 'combo-4b'],
+    5: ['combo-5a', 'combo-5b'],
+    6: ['combo-6a', 'combo-6b'],
+  };
+  const GREETING = 'greeting';
+  const ALL_FILES = [
+    ...Object.values(CLEAR_FILES).flat(),
+    ...Object.values(COMBO_FILES).flat(),
+    GREETING,
+  ];
+  const buffers = {};   // name -> AudioBuffer
+  let loadStarted = false;
+  let loadPromise = null;
+
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  // Load on first use (or via explicit prime). Requires audioEngine.ctx which
+  // startGame() initialises. Calling load() before the ctx exists is a no-op
+  // — we retry on next prime/announceClear.
+  async function load() {
+    if (loadPromise) return loadPromise;
+    if (!audioEngine.ctx) return null;
+    loadStarted = true;
+    loadPromise = (async () => {
+      await Promise.all(ALL_FILES.map(async (name) => {
+        try {
+          const r = await fetch(`audio/voice/${name}.mp3`, { cache: 'force-cache' });
+          if (!r.ok) return;
+          const ab = await r.arrayBuffer();
+          buffers[name] = await audioEngine.ctx.decodeAudioData(ab);
+        } catch {}
+      }));
+    })();
+    return loadPromise;
+  }
+
+  function play(name) {
+    if (!voiceEnabled || !name) return;
+    const ctx = audioEngine.ctx;
+    if (!ctx || !audioEngine.masterGain) return;
+    const buf = buffers[name];
+    if (!buf) {
+      // Not loaded yet — kick off load, skip this one. Next call will have it.
+      if (!loadStarted) load();
+      return;
+    }
+    try {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      // Own gain so we can bump voice volume a touch above the mix without
+      // affecting the master level. 1.3× feels right over the beat.
+      const g = ctx.createGain();
+      g.gain.value = 1.3;
+      src.connect(g);
+      g.connect(audioEngine.masterGain);
+      src.start();
+    } catch {}
+  }
+
+  return {
+    isSupported() { return true; },
+    isPrimed() { return !!loadPromise; },
+    // Called from a user-gesture click handler (Start / Replay / lobby Start).
+    // Kicks off MP3 preloading if the audio context is now available.
+    prime() { load(); },
+
+    // For the toggle's audible confirmation.
+    sayGreeting() { if (voiceEnabled) play(GREETING); },
+
+    announceClear(cleared, combo) {
+      if (!voiceEnabled) return;
+      const pool = CLEAR_FILES[cleared] || CLEAR_FILES[4];
+      play(pick(pool));
+      // Stack the combo line ~350ms later so it reads as "Triple! ... On fire!"
+      // with a natural announcer beat, not slurred together.
+      if (combo > 1) {
+        const key = Math.min(combo, 6);
+        const comboPool = COMBO_FILES[key] || COMBO_FILES[6];
+        const comboName = pick(comboPool);
+        setTimeout(() => play(comboName), 350);
+      }
+    },
+  };
+})();
+
+let showGhost = (() => {
+  try { const v = localStorage.getItem('tetris.showGhost'); return v === null ? true : v === 'true'; }
+  catch { return true; }
+})();
+function setShowGhost(v) {
+  showGhost = !!v;
+  try { localStorage.setItem('tetris.showGhost', String(showGhost)); } catch {}
+  const cb = document.getElementById('ghost-toggle');
+  if (cb) cb.checked = showGhost;
+}
+const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || window.matchMedia('(pointer: coarse)').matches;
+
+const PIECES = {
+  I: { shape: [[0,0],[1,0],[2,0],[3,0]], color: '#00ffff' },
+  O: { shape: [[0,0],[1,0],[0,1],[1,1]], color: '#ffff00' },
+  T: { shape: [[0,0],[1,0],[2,0],[1,1]], color: '#aa00ff' },
+  S: { shape: [[1,0],[2,0],[0,1],[1,1]], color: '#00ff66' },
+  Z: { shape: [[0,0],[1,0],[1,1],[2,1]], color: '#ff3300' },
+  J: { shape: [[0,0],[0,1],[1,1],[2,1]], color: '#0066ff' },
+  L: { shape: [[2,0],[0,1],[1,1],[2,1]], color: '#ff8800' }
+};
+const PIECE_KEYS = Object.keys(PIECES);
+
+// ============================================================
+// LEVEL THEMES - Kanye Eras
+// ============================================================
+const LEVEL_THEMES = [
+  null, // index 0 unused
+  { // Level 1 - The College Dropout
+    name: 'The College Dropout',
+    bpm: 88,
+    colors: { bg1: '#2a1800', bg2: '#0f0800', accent: '#d4943a', glow: '#ff8c00' },
+    particleHue: 30,
+    particleStyle: 'circles', // warm floating circles like vinyl grooves
+    blockGlow: 8,
+    kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
+    bassNote: 55, // A1
+    scale: [261.63, 293.66, 329.63, 349.23, 392, 440], // C major
+    chords: [[261.63, 329.63, 392], [220, 277.18, 329.63], [293.66, 349.23, 440]],
+    synthType: 'soulChop',
+  },
+  { // Level 2 - Late Registration
+    name: 'Late Registration',
+    bpm: 92,
+    colors: { bg1: '#1a0000', bg2: '#0a0005', accent: '#ff3344', glow: '#ff0033' },
+    particleHue: 0,
+    particleStyle: 'notes', // rising music notes
+    blockGlow: 10,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+    bass:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+    bassNote: 65.41, // C2
+    scale: [220, 261.63, 293.66, 349.23, 392, 440], // Am
+    chords: [[220, 261.63, 329.63], [196, 246.94, 293.66], [174.61, 220, 261.63]],
+    synthType: 'strings',
+  },
+  { // Level 3 - Graduation
+    name: 'Graduation',
+    bpm: 100,
+    colors: { bg1: '#0f0028', bg2: '#000a1a', accent: '#cc00ff', glow: '#ff00ff' },
+    particleHue: 280,
+    particleStyle: 'diamonds', // geometric diamonds
+    blockGlow: 14,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,1, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
+    bassNote: 55,
+    scale: [329.63, 369.99, 415.30, 440, 493.88, 523.25, 587.33, 659.25],
+    chords: [[329.63, 415.30, 493.88], [349.23, 440, 523.25], [392, 493.88, 587.33]],
+    synthType: 'synthArp',
+  },
+  { // Level 4 - 808s & Heartbreak
+    name: '808s & Heartbreak',
+    bpm: 80,
+    colors: { bg1: '#001020', bg2: '#000810', accent: '#66ccff', glow: '#00aaff' },
+    particleHue: 200,
+    particleStyle: 'snow', // falling snowflakes
+    blockGlow: 6,
+    kick:  [1,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    bass:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    bassNote: 41.20, // E1 - deep 808
+    scale: [220, 246.94, 261.63, 329.63, 349.23, 440],
+    chords: [[220, 261.63, 329.63], [196, 246.94, 311.13]],
+    synthType: 'autotune',
+  },
+  { // Level 5 - My Beautiful Dark Twisted Fantasy
+    name: 'Dark Twisted Fantasy',
+    bpm: 96,
+    colors: { bg1: '#1a0008', bg2: '#0a0015', accent: '#ff0055', glow: '#ff0044' },
+    particleHue: 340,
+    particleStyle: 'rings', // expanding baroque rings
+    blockGlow: 16,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
+    hh:    [1,1,1,1, 1,0,1,1, 1,1,1,1, 1,0,1,1],
+    hhOpen:[0,0,0,0, 0,1,0,0, 0,0,0,0, 0,1,0,0],
+    bass:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
+    bassNote: 55,
+    scale: [261.63, 311.13, 329.63, 392, 415.30, 523.25],
+    chords: [[261.63, 311.13, 392], [220, 277.18, 349.23], [246.94, 311.13, 369.99], [261.63, 329.63, 392]],
+    synthType: 'power',
+  },
+  { // Level 6 - Yeezus
+    name: 'Yeezus',
+    bpm: 130,
+    colors: { bg1: '#100000', bg2: '#000000', accent: '#ff0000', glow: '#ff2200' },
+    particleHue: 0,
+    particleStyle: 'glitch', // jagged glitch fragments
+    blockGlow: 4,
+    kick:  [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hh:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    hhOpen:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    bass:  [1,0,0,1, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+    bassNote: 36.71, // D1 - aggressive low
+    scale: [220, 233.08, 261.63, 311.13, 329.63, 440],
+    chords: [[220, 277.18, 329.63], [233.08, 293.66, 349.23]],
+    synthType: 'industrial',
+  },
+  { // Level 7 - The Life of Pablo
+    name: 'The Life of Pablo',
+    bpm: 105,
+    colors: { bg1: '#1a0f00', bg2: '#0a0800', accent: '#ffaa33', glow: '#ff8800' },
+    particleHue: 40,
+    particleStyle: 'rays', // rising light rays
+    blockGlow: 12,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [1,0,1,1, 1,0,1,1, 1,0,1,1, 1,0,1,1],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+    bassNote: 49.0, // G1
+    scale: [261.63, 293.66, 329.63, 392, 440, 523.25],
+    chords: [[261.63, 329.63, 392], [349.23, 440, 523.25], [293.66, 349.23, 440]],
+    synthType: 'gospel',
+  },
+  { // Level 8+ - Donda
+    name: 'Donda',
+    bpm: 75,
+    colors: { bg1: '#080808', bg2: '#000000', accent: '#ffffff', glow: '#888888' },
+    particleHue: 0,
+    particleStyle: 'dots', // minimal floating dots, black & white
+    blockGlow: 3,
+    kick:  [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    bass:  [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    bassNote: 32.70, // C1 - deep organ bass
+    scale: [130.81, 146.83, 164.81, 196, 220, 261.63],
+    chords: [[130.81, 164.81, 196], [146.83, 174.61, 220]],
+    synthType: 'organ',
+  },
+  { // Level 9 - Donda 2
+    name: 'Donda 2',
+    bpm: 140,
+    colors: { bg1: '#0a0005', bg2: '#050000', accent: '#ff3366', glow: '#ff0044' },
+    particleHue: 350,
+    particleStyle: 'embers', // rising embers for stem project fire
+    blockGlow: 5,
+    kick:  [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
+    hh:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    hhOpen:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    bass:  [1,0,0,1, 0,0,0,1, 1,0,0,1, 0,0,0,0],
+    bassNote: 41.20, // E1 - club bass
+    scale: [164.81, 196, 220, 261.63, 293.66, 329.63, 392, 440],
+    chords: [[164.81, 220, 293.66], [196, 261.63, 329.63], [220, 293.66, 392]],
+    synthType: 'choir',
+  },
+  { // Level 10 - Vultures 1
+    name: 'Vultures 1',
+    bpm: 125,
+    colors: { bg1: '#1a0510', bg2: '#0d0008', accent: '#ffaa00', glow: '#ff8800' },
+    particleHue: 45,
+    particleStyle: 'smoke', // drifting smoke/volatile aesthetic
+    blockGlow: 7,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
+    hh:    [1,0,1,1, 1,0,1,0, 1,0,1,1, 1,0,1,0],
+    hhOpen:[0,0,0,0, 0,1,0,0, 0,0,0,0, 0,1,0,0],
+    bass:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,1],
+    bassNote: 44.45, // F1
+    scale: [174.61, 196, 220, 261.63, 293.66, 349.23, 392, 440],
+    chords: [[174.61, 220, 293.66], [196, 261.63, 349.23], [220, 293.66, 392]],
+    synthType: 'gospel',
+  },
+  { // Level 11 - Vultures 2
+    name: 'Vultures 2',
+    bpm: 132,
+    colors: { bg1: '#100520', bg2: '#08000f', accent: '#cc44ff', glow: '#aa00ff' },
+    particleHue: 285,
+    particleStyle: 'spores', // floating purple spores
+    blockGlow: 9,
+    kick:  [1,0,0,1, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
+    hh:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    hhOpen:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,1, 0,0,0,0, 1,0,0,1, 0,0,0,0],
+    bassNote: 43.65, // F1 - grimy
+    scale: [174.61, 207.65, 233.08, 277.18, 311.13, 369.99, 415.30, 466.16],
+    chords: [[174.61, 233.08, 311.13], [207.65, 277.18, 369.99], [233.08, 311.13, 415.30]],
+    synthType: 'industrial',
+  },
+  { // Level 12 - Bully
+    name: 'Bully',
+    bpm: 118,
+    colors: { bg1: '#001828', bg2: '#000d18', accent: '#00ffaa', glow: '#00dd88' },
+    particleHue: 155,
+    particleStyle: 'waves', // rippling water/tear drop feel
+    blockGlow: 10,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hh:    [1,0,1,1, 1,0,1,0, 1,0,1,1, 1,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    bassNote: 55, // A1
+    scale: [220, 261.63, 293.66, 329.63, 392, 440, 493.88, 523.25],
+    chords: [[220, 293.66, 392], [261.63, 329.63, 440], [293.66, 392, 493.88]],
+    synthType: 'autotune',
+  },
+  { // Level 13 - Bully (extended outro)
+    name: 'Bully',
+    bpm: 118,
+    colors: { bg1: '#002010', bg2: '#001008', accent: '#00ff66', glow: '#00ff44' },
+    particleHue: 140,
+    particleStyle: 'fireflies', // slow bioluminescent fireflies
+    blockGlow: 14,
+    kick:  [1,0,0,1, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hh:    [1,0,1,1, 1,0,1,0, 1,0,1,1, 1,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,1, 0,0,0,0, 1,0,0,1, 0,0,0,0],
+    bassNote: 55,
+    scale: [220, 261.63, 293.66, 329.63, 392, 440, 493.88, 523.25],
+    chords: [[220, 293.66, 392], [261.63, 329.63, 440], [293.66, 392, 493.88]],
+    synthType: 'autotune',
+  },
+  { // Level 14 - Back to College Dropout (full circle)
+    name: 'The College Dropout',
+    bpm: 88,
+    colors: { bg1: '#2a1800', bg2: '#0f0800', accent: '#d4943a', glow: '#ff8c00' },
+    particleHue: 30,
+    particleStyle: 'circles',
+    blockGlow: 8,
+    kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
+    bassNote: 55,
+    scale: [261.63, 293.66, 329.63, 349.23, 392, 440],
+    chords: [[261.63, 329.63, 392], [220, 277.18, 329.63], [293.66, 349.23, 440]],
+    synthType: 'soulChop',
+  },
+  { // Level 15 - Late Registration (final form)
+    name: 'Late Registration',
+    bpm: 92,
+    colors: { bg1: '#1a0000', bg2: '#0a0005', accent: '#ff3344', glow: '#ff0033' },
+    particleHue: 0,
+    particleStyle: 'notes',
+    blockGlow: 10,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+    bass:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+    bassNote: 65.41,
+    scale: [220, 261.63, 293.66, 349.23, 392, 440],
+    chords: [[220, 261.63, 329.63], [196, 246.94, 293.66], [174.61, 220, 261.63]],
+    synthType: 'strings',
+  },
+  { // Level 16 - Cruel Summer (G.O.O.D. Music compilation, sun-drenched and lush)
+    name: 'Cruel Summer',
+    bpm: 108,
+    colors: { bg1: '#2a1a00', bg2: '#1a0d00', accent: '#ffcc44', glow: '#ffaa22' },
+    particleHue: 50,
+    particleStyle: 'rays',
+    blockGlow: 12,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,1, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hh:    [1,0,1,1, 1,0,1,1, 1,0,1,1, 1,0,1,1],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    bassNote: 49.0, // G1
+    scale: [196, 246.94, 293.66, 349.23, 392, 440, 493.88, 587.33],
+    chords: [[196, 246.94, 293.66], [220, 277.18, 329.63], [261.63, 329.63, 392]],
+    synthType: 'gospel',
+  },
+  { // Level 17 - Watch the Throne (Jay-Z + Kanye, regal and grand)
+    name: 'Watch the Throne',
+    bpm: 118,
+    colors: { bg1: '#1a0a05', bg2: '#0a0500', accent: '#ffd700', glow: '#ffaa00' },
+    particleHue: 50,
+    particleStyle: 'diamonds',
+    blockGlow: 18,
+    kick:  [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,1],
+    hh:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,0,1],
+    bassNote: 41.20, // E1 - throne weight
+    scale: [220, 261.63, 311.13, 349.23, 392, 466.16, 523.25, 622.25],
+    chords: [[220, 277.18, 329.63], [233.08, 293.66, 349.23], [261.63, 311.13, 392]],
+    synthType: 'power',
+  },
+  { // Level 18 - Jesus Is King (gospel, soaring choir)
+    name: 'Jesus Is King',
+    bpm: 102,
+    colors: { bg1: '#0a1a28', bg2: '#040d18', accent: '#88ddff', glow: '#aaeeff' },
+    particleHue: 200,
+    particleStyle: 'rays',
+    blockGlow: 22,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [1,0,1,0, 1,0,1,1, 1,0,1,0, 1,0,1,1],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0],
+    bassNote: 55, // A1
+    scale: [261.63, 293.66, 329.63, 349.23, 392, 440, 493.88, 523.25],
+    chords: [[261.63, 329.63, 392], [349.23, 440, 523.25], [392, 493.88, 587.33], [440, 523.25, 659.25]],
+    synthType: 'gospel',
+  },
+  { // Level 19 - The Singularity (final boss, ALL eras collapse — frenetic, transcendent)
+    name: 'The Singularity',
+    bpm: 150,
+    colors: { bg1: '#1a001a', bg2: '#0a000f', accent: '#ff00ff', glow: '#ffffff' },
+    particleHue: 300,
+    particleStyle: 'glitch',
+    blockGlow: 28,
+    kick:  [1,0,1,0, 0,1,1,0, 1,0,1,1, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,1, 0,0,0,1, 1,0,0,1],
+    hh:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    hhOpen:[0,0,0,1, 0,0,0,1, 0,0,0,1, 0,0,0,1],
+    bass:  [1,0,0,1, 0,1,0,1, 1,0,0,1, 0,1,0,1],
+    bassNote: 32.70, // C1 - apocalyptic
+    scale: [196, 233.08, 277.18, 311.13, 369.99, 415.30, 466.16, 554.37, 622.25],
+    chords: [[196, 233.08, 311.13], [220, 277.18, 349.23], [233.08, 311.13, 415.30], [261.63, 329.63, 392]],
+    synthType: 'industrial',
+  },
+];
+
+function getTheme(lvl) {
+  const idx = Math.min(lvl, LEVEL_THEMES.length - 1);
+  return LEVEL_THEMES[idx];
+}
+
+// Difficulty curve. Old curve flat-lined at 50ms by level 13, so levels 14-19
+// were identical in feel. New curve: -60ms/level through L13 (matches old
+// behaviour for muscle memory), then a steeper ramp 14→19 down to 35ms (≈3
+// rows/sec gravity at level 19 — fast but not impossible like the 25ms wall).
+// Lock delay also tightens at high levels so you can't infinite-spin a piece
+// at the top once gravity is cooking.
+function computeDropInterval(lvl) {
+  if (lvl <= 1) return 800;
+  if (lvl <= 13) return Math.max(80, 800 - (lvl - 1) * 60);
+  // L14-19: linear ramp from 80ms (L13) → 35ms (L19), step ≈7.5ms
+  return Math.max(35, Math.round(80 - (lvl - 13) * 7.5));
+}
+function computeLockDelay(lvl) {
+  if (lvl <= 10) return 500;
+  if (lvl <= 15) return 400;
+  if (lvl <= 18) return 300;
+  return 220; // level 19 — almost no breathing room
+}
+
+// Canvas setup — `var` (not let) so the vs-Alfred context swap can reassign
+// them via globalThis['mainCanvas'] when switching between P1 and P2 turns
+// without having to thread a `p` argument through every draw function.
+var mainCanvas = document.getElementById('main-canvas');
+var ctx = mainCanvas.getContext('2d');
+
+var holdCanvas = document.getElementById('hold-canvas');
+var holdCtx = holdCanvas.getContext('2d');
+var nextCanvas = document.getElementById('next-canvas');
+var nextCtx = nextCanvas.getContext('2d');
+
+const bgCanvas = document.getElementById('bg-canvas');
+const bgCtx = bgCanvas.getContext('2d');
+
+function computeCellSize() {
+  const vw = window.innerWidth;
+  // Prefer visualViewport on mobile — it accounts for Safari's URL bar / bottom bar
+  // and the keyboard if it's open. Falls back to innerHeight on older browsers.
+  const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+  const isMobile = vw <= 720 || IS_TOUCH;
+  if (!isMobile) return 30;
+  // Mobile: reserve the minimum space actually consumed by non-board UI so
+  // the board can zoom in as far as possible. Measured values:
+  //   panels strip ~82px, touch controls ~130px (after tightening),
+  //   safe-area home indicator ~30px, 4px buffer.
+  const maxW = Math.max(220, vw - 20);
+  // In vs mode we stack Alfred's mini board above P1's. Keep the reserve
+  // lean — ~130px for a small mini + its label + a one-line score — so the
+  // player's own board gets the bulk of the screen.
+  const vsExtra = gameMode === 'vs' ? 130 : 0;
+  const reservedH = 82 + 130 + 30 + 4 + vsExtra;
+  const maxH = Math.max(240, vh - reservedH);
+  const byW = Math.floor(maxW / COLS);
+  const byH = Math.floor(maxH / ROWS);
+  // Cap raised from 30 → 36 so tall phones (iPhone 15 Pro etc.) can actually
+  // use the vertical space instead of leaving huge empty margins.
+  return Math.max(12, Math.min(36, Math.min(byW, byH)));
+}
+
+function resizeCanvases() {
+  const p1Cell = computeCellSize();
+  CELL = p1Cell;
+  // Size every player's main canvas to the current CELL. In vs mode, P2's
+  // Alfred-mini canvas uses a smaller CELL so it doesn't dominate the screen.
+  const p1Main = document.getElementById('main-canvas');
+  p1Main.width  = COLS * p1Cell;
+  p1Main.height = ROWS * p1Cell;
+  const p2Main = document.getElementById('main-canvas-2');
+  const vw = window.innerWidth;
+  // Alfred's mini board — small on mobile so P1's board gets the real
+  // estate, closer to P1 size on desktop where there's room to spare.
+  const p2Cell = vw <= 720 ? Math.max(5,  Math.floor(p1Cell * 0.25))   // mobile: ~25% of P1 CELL
+                           : Math.max(14, Math.floor(p1Cell * 0.85));  // desktop: nearly P1 size
+  if (p2Main) {
+    p2Main.width  = COLS * p2Cell;
+    p2Main.height = ROWS * p2Cell;
+  }
+  // Propagate the resolved cell sizes into each player's record so the
+  // render-loop swap picks the right CELL when drawing that player.
+  // Guard against being called before the players array is initialised
+  // (this function runs once at script load, before `var players = []`).
+  for (const p of (players || [])) {
+    p.CELL = p.id === 2 ? p2Cell : p1Cell;
+    if (p === activePlayer) CELL = p.CELL;
+  }
+  // Scale hold/next canvases on mobile to match panel widths (CSS sizes them visually)
+  const hold = document.getElementById('hold-canvas');
+  const hr = hold.getBoundingClientRect();
+  if (hr.width > 0) { hold.width = hr.width; hold.height = hr.height; }
+  const next = document.getElementById('next-canvas');
+  const nr = next.getBoundingClientRect();
+  if (nr.width > 0) { next.width = nr.width; next.height = nr.height; }
+  bgCanvas.width = window.innerWidth;
+  bgCanvas.height = window.innerHeight;
+}
+resizeCanvases();
+window.addEventListener('resize', () => { resizeCanvases(); if (typeof bgParticles !== 'undefined' && bgParticles) initBgParticles(); });
+window.addEventListener('orientationchange', () => setTimeout(() => { resizeCanvases(); if (typeof bgParticles !== 'undefined' && bgParticles) initBgParticles(); }, 100));
+// iOS Safari changes visualViewport.height as the URL bar auto-hides on scroll.
+// Re-fit the board so it never gets cut off mid-game.
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    resizeCanvases();
+    if (typeof bgParticles !== 'undefined' && bgParticles) initBgParticles();
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PER-PLAYER STATE — declared `var` so vs-Alfred mode can swap the
+// active player's fields in/out via globalThis[key] without a deep
+// refactor. In solo mode there is one player and these behave as
+// regular globals.
+// ─────────────────────────────────────────────────────────────────
+var board, currentPiece, currentX, currentY, currentType;
+var holdPieceType, canHold, nextQueue, score, lines, level, prevLevel;
+var gameOver, dropInterval, lastDrop, lockDelay, lockTimer, isLocking;
+var zoneEnergy, zoneActive, zoneTimer, combo;
+var particles;
+var bag = [];
+var levelTransitionAlpha = 0;
+var levelTransitionColor = '#fff';
+
+// ─── Shared state (not per-player) ───────────────────────────────
+// `var` so inspection tooling and cross-frame code can reach them via
+// globalThis, matching the pattern used by per-player fields above.
+var paused, gameStarted, animFrame;
+var bgParticles;
+var beatPhase = 0;
+// ─── Tetris Effect-style FX (shared, not per-player) ──────────────
+// Shockwaves: rings emitted from cleared rows that expand and fade.
+// Each entry: { x, y, r, maxR, alpha, color, life }
+var shockwaves = [];
+// Screen shake: number of frames remaining + magnitude in px. Decays each frame.
+var shakeFrames = 0;
+var shakeMag = 0;
+
+// ─── VS-mode plumbing ────────────────────────────────────────────
+var gameMode = 'solo';    // 'solo' | 'vs'
+var players = [];          // populated in startGame()
+var activePlayer = null;   // whichever player's fields currently live in globals
+
+// Fields that live in the globals and belong to whichever player is currently
+// "active". Swapped by setActivePlayer().
+const PLAYER_FIELDS = [
+  'board','currentPiece','currentX','currentY','currentType',
+  'holdPieceType','canHold','nextQueue','bag',
+  'score','lines','level','prevLevel',
+  'gameOver','dropInterval','lastDrop','lockDelay','lockTimer','isLocking',
+  'zoneEnergy','zoneActive','zoneTimer','combo',
+  'particles','levelTransitionAlpha','levelTransitionColor',
+];
+// Canvas refs that also differ per player in vs mode. `CELL` is also in
+// here because P2's mini-board uses a smaller cell size than P1's full one.
+const CANVAS_FIELDS = ['mainCanvas','ctx','holdCanvas','holdCtx','nextCanvas','nextCtx','CELL'];
+
+function createPlayer({ id, isAI, name, mainCanvas: mc, holdCanvas: hc, nextCanvas: nc }) {
+  return {
+    id, isAI, name,
+    mainCanvas: mc, ctx: mc.getContext('2d'),
+    holdCanvas: hc || null, holdCtx: hc ? hc.getContext('2d') : null,
+    nextCanvas: nc || null, nextCtx: nc ? nc.getContext('2d') : null,
+    CELL: 30, // filled in by resizeCanvases()
+    // Game state — initialised by startGame.
+    board: null,
+    currentPiece: null, currentX: 0, currentY: 0, currentType: null,
+    holdPieceType: null, canHold: true,
+    nextQueue: [], bag: [],
+    score: 0, lines: 0, level: 1, prevLevel: 1,
+    gameOver: false,
+    dropInterval: 800, lastDrop: 0, lockDelay: 500, lockTimer: 0, isLocking: false,
+    zoneEnergy: 0, zoneActive: false, zoneTimer: 0,
+    combo: -1,
+    particles: [],
+    levelTransitionAlpha: 0, levelTransitionColor: '#fff',
+    incomingGarbage: 0,         // reserved for Turn 2 (garbage exchange)
+    // AI difficulty tuning lives on this object so it's easy to expose a
+    // difficulty selector later without rewriting the aiTick loop.
+    ai: isAI ? {
+      plan: null,
+      stepCooldown: 0,
+      postDropPause: 0,
+      // Tuning dialed in against user feedback: default "Alfred" plays at
+      // ~half the speed of the unrestrained AI with a ~1-in-7 misplay rate.
+      // Feels beatable but still punishes sloppy play.
+      thinkPause: 18,     // frames before first move after piece spawn (was 10)
+      movePause: 8,       // frames between individual moves (was 5)
+      dropPause: 32,      // frames after hard-drop before next plan (was 20)
+      mistakeChance: 0.15, // ~1 in 7 placements takes a sub-optimal spot
+    } : null,
+  };
+}
+
+// Save current globals into the currently-active player, then load the
+// target player's state into the globals.
+function setActivePlayer(p) {
+  if (activePlayer) {
+    for (const f of PLAYER_FIELDS)  activePlayer[f] = globalThis[f];
+    for (const f of CANVAS_FIELDS)  activePlayer[f] = globalThis[f];
+  }
+  for (const f of PLAYER_FIELDS)  globalThis[f] = p[f];
+  for (const f of CANVAS_FIELDS)  globalThis[f] = p[f];
+  activePlayer = p;
+}
+
+// Seeded PRNG for deterministic 7-bag ordering across networked players.
+// Mulberry32: tiny, fast, good enough that both sides see the same pieces.
+// Not cryptographic — that's not the goal. Fed by the server-provided seed
+// string (hex bytes) hashed to a uint32 on match start.
+let _netRand = null;
+function setNetworkSeed(seed) {
+  if (!seed) { _netRand = null; return; }
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  let a = h >>> 0;
+  _netRand = function() {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function _pieceRand() { return _netRand ? _netRand() : Math.random(); }
+
+function nextFromBag() {
+  if (bag.length === 0) {
+    // Fisher–Yates shuffle using the active PRNG (seeded or Math.random).
+    bag = [...PIECE_KEYS];
+    for (let i = bag.length - 1; i > 0; i--) {
+      const j = Math.floor(_pieceRand() * (i + 1));
+      [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+  }
+  return bag.pop();
+}
+function fillNextQueue() { while (nextQueue.length < 5) nextQueue.push(nextFromBag()); }
+
+function initBoard() { board = Array.from({ length: ROWS }, () => Array(COLS).fill(null)); }
+
+function spawnPiece() {
+  fillNextQueue();
+  currentType = nextQueue.shift();
+  fillNextQueue();
+  currentPiece = PIECES[currentType].shape.map(p => [...p]);
+  currentX = Math.floor(COLS / 2) - 2;
+  currentY = 0;
+  canHold = true;
+  isLocking = false;
+  if (collides(currentPiece, currentX, currentY)) {
+    gameOver = true;
+    handleTopOut();
+  }
+}
+
+// Route top-out to the right end-of-game screen. Solo mode keeps the
+// existing Game Over screen; vs mode shows a WIN/LOSE overlay with the
+// opponent's stats so the round reads like a proper PvP finale.
+function handleTopOut() {
+  // Flush the current globals back into the active player's object so
+  // showVsResult() sees the fresh gameOver/score/lines state when it
+  // reads p1.gameOver / p2.gameOver / etc.
+  if (activePlayer) {
+    for (const f of PLAYER_FIELDS) activePlayer[f] = globalThis[f];
+  }
+  if (gameMode === 'vs') {
+    showVsResult();
+  } else if (gameMode === 'human') {
+    // We topped out. Tell the server so the opponent gets a result broadcast.
+    netSend({ type: 'topout' });
+    stopNetStateStream();
+    // Show local result overlay (loser side). Opponent sees YOU WIN via their
+    // own `result` handler.
+    handleNetworkResult({ youWon: false, reason: 'topout' });
+  } else {
+    showGameOver();
+  }
+}
+
+function collides(piece, px, py) {
+  for (const [bx, by] of piece) {
+    const nx = px + bx, ny = py + by;
+    if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+    if (ny >= 0 && board[ny][nx]) return true;
+  }
+  return false;
+}
+
+function rotatePiece(dir) {
+  let cx = 0, cy = 0;
+  for (const [bx, by] of currentPiece) { cx += bx; cy += by; }
+  cx /= currentPiece.length; cy /= currentPiece.length;
+  const rotated = currentPiece.map(([bx, by]) => {
+    const rx = bx - cx, ry = by - cy;
+    return dir === 1 ? [Math.round(cx - ry), Math.round(cy + rx)] : [Math.round(cx + ry), Math.round(cy - rx)];
+  });
+  for (const kick of [0, -1, 1, -2, 2]) {
+    for (const yOff of [0, -1]) {
+      if (!collides(rotated, currentX + kick, currentY + yOff)) {
+        currentPiece = rotated;
+        currentX += kick;
+        currentY += yOff;
+        audioEngine.playRotate();
+        spawnParticles(currentX * CELL + CELL * 2, currentY * CELL + CELL, PIECES[currentType].color, 6);
+        isLocking = false;
+        return;
+      }
+    }
+  }
+}
+
+function moveLeft() {
+  if (!collides(currentPiece, currentX - 1, currentY)) { currentX--; audioEngine.playMove(); isLocking = false; }
+}
+function moveRight() {
+  if (!collides(currentPiece, currentX + 1, currentY)) { currentX++; audioEngine.playMove(); isLocking = false; }
+}
+function softDrop() {
+  if (!collides(currentPiece, currentX, currentY + 1)) { currentY++; score += 1; audioEngine.playMove(); isLocking = false; }
+}
+
+function hardDrop() {
+  let drop = 0;
+  while (!collides(currentPiece, currentX, currentY + 1)) { currentY++; drop++; }
+  score += drop * 2;
+  audioEngine.playHardDrop();
+  lockPiece();
+}
+
+function getGhostY() {
+  let gy = currentY;
+  while (!collides(currentPiece, currentX, gy + 1)) gy++;
+  return gy;
+}
+
+function lockPiece() {
+  const color = PIECES[currentType].color;
+  for (const [bx, by] of currentPiece) {
+    const nx = currentX + bx, ny = currentY + by;
+    if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) board[ny][nx] = color;
+  }
+  for (const [bx, by] of currentPiece) {
+    spawnParticles((currentX + bx) * CELL + CELL / 2, (currentY + by) * CELL + CELL / 2, color, 3);
+  }
+  const cleared = clearLines();
+  // Vs mode: garbage exchange. When you clear lines, you first offset your
+  // own pending garbage; any surplus rains on Alfred. If you didn't clear
+  // anything this lock, any pending garbage rises up on your board now.
+  if (gameMode === 'vs' && activePlayer) {
+    if (cleared > 0) {
+      let attack = (GARBAGE_ATTACK[cleared] || 0) + comboBonus(combo);
+      const offset = Math.min(attack, activePlayer.incomingGarbage);
+      activePlayer.incomingGarbage -= offset;
+      attack -= offset;
+      if (attack > 0 && activePlayer.opponent) {
+        activePlayer.opponent.incomingGarbage += attack;
+      }
+    } else if (activePlayer.incomingGarbage > 0) {
+      riseGarbage(activePlayer.incomingGarbage);
+      activePlayer.incomingGarbage = 0;
+      if (gameOver) { handleTopOut(); return; }
+    }
+  }
+  // VS FRIEND mode: P1 is local, P2 is remote. Garbage in = pending; on next
+  // lock without clear it rises. Garbage out = sent over socket (the remote
+  // client adds it to THEIR incomingGarbage via applyRemoteGarbage).
+  else if (gameMode === 'human' && activePlayer && !activePlayer.isRemote) {
+    if (cleared > 0) {
+      let attack = (GARBAGE_ATTACK[cleared] || 0) + comboBonus(combo);
+      const offset = Math.min(attack, activePlayer.incomingGarbage | 0);
+      activePlayer.incomingGarbage = (activePlayer.incomingGarbage | 0) - offset;
+      globalThis.incomingGarbage = activePlayer.incomingGarbage;
+      attack -= offset;
+      if (attack > 0) netSend({ type: 'garbage', n: attack });
+    } else if ((activePlayer.incomingGarbage | 0) > 0) {
+      riseGarbage(activePlayer.incomingGarbage);
+      activePlayer.incomingGarbage = 0;
+      globalThis.incomingGarbage = 0;
+      if (gameOver) { handleTopOut(); return; }
+    }
+  }
+  spawnPiece();
+}
+
+// Attack table (PPT-simplified; no T-spin or B2B in MVP):
+//   single = 0, double = 1, triple = 2, tetris = 4 lines sent
+// Combo bonus stacks on top of the base attack.
+const GARBAGE_ATTACK = { 1: 0, 2: 1, 3: 2, 4: 4 };
+function comboBonus(comboCount) {
+  if (comboCount < 1) return 0;
+  if (comboCount <= 2) return 1;
+  if (comboCount <= 4) return 2;
+  return 3;
+}
+
+// Push `n` garbage rows up from the bottom of the current player's board.
+// Each garbage row is uniformly filled with a gray colour except for a
+// single column hole (the same column for all rows in this rise — PPT-style,
+// lets you dig through with one I-piece). If the rise would push any
+// locked block past the top of the field, flag gameOver.
+function riseGarbage(n) {
+  // Top-out check: blocks in the topmost n rows would be pushed off-screen.
+  for (let r = 0; r < n; r++) {
+    if (board[r] && board[r].some(c => c !== null)) {
+      gameOver = true;
+      return;
+    }
+  }
+  const holeCol = Math.floor(Math.random() * COLS);
+  for (let i = 0; i < n; i++) {
+    board.shift();
+    const row = new Array(COLS).fill('#4a4a4a');
+    row[holeCol] = null;
+    board.push(row);
+  }
+}
+
+function clearLines() {
+  // Returns the count of lines cleared this call, so lockPiece can compute
+  // the vs-mode garbage attack vs. the default rise-your-own behaviour.
+  let cleared = 0;
+  const clearRows = [];
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (board[r].every(c => c !== null)) { clearRows.push(r); cleared++; }
+  }
+  if (cleared > 0) {
+    for (const r of clearRows) {
+      for (let c = 0; c < COLS; c++) spawnParticles(c * CELL + CELL / 2, r * CELL + CELL / 2, board[r][c], 5);
+    }
+    // Tetris Effect-style FX: shockwave per cleared row + screen shake on big clears.
+    // Shockwave only on the active (human) player's board so AI clears don't strobe
+    // the screen. Magnitude scales with line count + current level intensity.
+    if (!activePlayer || !activePlayer.isAI) {
+      const theme = getTheme(level);
+      const boardW = COLS * CELL;
+      const wColor = theme.colors.glow || theme.colors.accent;
+      for (const r of clearRows) {
+        shockwaves.push({
+          x: boardW / 2,
+          y: r * CELL + CELL / 2,
+          r: 0,
+          maxR: boardW * 0.95,
+          alpha: 1,
+          color: wColor,
+          life: 1,
+        });
+      }
+      // Screen shake: doubles → tiny, triples → light, tetris → heavy. Scales
+      // up at high levels so L19 has real punch even on a single.
+      const lvlBoost = Math.max(0, (level - 13)) * 0.3;
+      const shakeBase = [0, 0.6, 2, 4, 8][cleared] || 8;
+      const mag = (shakeBase + lvlBoost * cleared) * (1 + Math.max(0, combo) * 0.18);
+      if (mag > shakeMag) {
+        shakeMag = mag;
+        shakeFrames = Math.min(28, 8 + cleared * 3 + Math.max(0, combo) * 2);
+      }
+    }
+    for (const r of clearRows.sort((a, b) => a - b)) {
+      board.splice(r, 1);
+      board.unshift(Array(COLS).fill(null));
+    }
+    combo++;
+    const basePoints = [0, 100, 300, 500, 800];
+    score += (basePoints[cleared] || 800) * level * (1 + combo * 0.5);
+    lines += cleared;
+    const newLevel = Math.floor(lines / 10) + 1;
+    if (newLevel !== level) {
+      prevLevel = level;
+      level = newLevel;
+      dropInterval = computeDropInterval(level);
+      lockDelay = computeLockDelay(level);
+      onLevelChange();
+    }
+    if (!zoneActive) zoneEnergy = Math.min(100, zoneEnergy + cleared * 15);
+    audioEngine.playLineClear(cleared);
+    showCombo(cleared);
+  } else {
+    combo = -1;
+  }
+  return cleared;
+}
+
+function holdCurrentPiece() {
+  if (!canHold) return;
+  canHold = false;
+  audioEngine.playHold();
+  if (holdPieceType) {
+    const temp = holdPieceType;
+    holdPieceType = currentType;
+    currentType = temp;
+    currentPiece = PIECES[currentType].shape.map(p => [...p]);
+    currentX = Math.floor(COLS / 2) - 2;
+    currentY = 0;
+    isLocking = false;
+  } else {
+    holdPieceType = currentType;
+    spawnPiece();
+  }
+}
+
+function activateZone() {
+  if (zoneEnergy < 100 || zoneActive) return;
+  zoneActive = true;
+  zoneTimer = 12000;
+  zoneEnergy = 0;
+  document.getElementById('game-container').classList.add('zone-active');
+  audioEngine.playZone();
+}
+
+function onLevelChange() {
+  const theme = getTheme(level);
+
+  // Per-player effects (flash on this player's board) always run.
+  levelTransitionAlpha = 1.0;
+  levelTransitionColor = theme.colors.accent;
+
+  // Shared-DOM side effects (level announce banner, era display, canvas
+  // glow, global bg particles) belong to the human player's panel. Skip
+  // them when an AI level-up triggers this so Alfred's theme doesn't hijack
+  // your HUD.
+  if (activePlayer && activePlayer.isAI) return;
+
+  // Announce
+  const el = document.getElementById('level-announce');
+  el.style.color = theme.colors.accent;
+  el.innerHTML = `Level ${level}<span class="era-name">${theme.name}</span>`;
+  el.style.opacity = 1;
+  setTimeout(() => el.style.opacity = 0, 2500);
+
+  // Update era display
+  document.getElementById('era-display').textContent = theme.name;
+
+  // Update canvas glow
+  mainCanvas.style.boxShadow = `0 0 60px ${theme.colors.glow}33, 0 0 120px ${theme.colors.glow}15`;
+
+  // Regenerate bg particles for new theme
+  initBgParticles();
+
+  // Update audio
+  audioEngine.onLevelChange();
+}
+
+// ============================================================
+// AUDIO ENGINE - Kanye Production
+// ============================================================
+const audioEngine = {
+  ctx: null,
+  masterGain: null,
+  compressor: null,
+  reverbNode: null,
+  delayNode: null,
+  delayFeedback: null,
+  delaySend: null,
+  bassBus: null,          // bass runs through here (ducked by kick)
+  bassDuckGain: null,     // controlled by _duckBass()
+  isPlaying: false,
+  currentStep: 0,
+  nextStepTime: 0,
+  schedulerRunning: false,
+  bar: 0,
+  chordIdx: 0,
+  MASTER_LEVEL: 0.75,
+
+  init() {
+    if (this.ctx) return; // idempotent
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.compressor = this.ctx.createDynamicsCompressor();
+    this.compressor.threshold.value = -12;
+    this.compressor.knee.value = 10;
+    this.compressor.ratio.value = 4;
+    this.compressor.attack.value = 0.005;
+    this.compressor.release.value = 0.12;
+    this.masterGain = this.ctx.createGain();
+    this.masterGain.gain.value = this.MASTER_LEVEL;
+    this.reverbNode = this._createReverb();
+    this._createDelay();
+    // Bass bus with sidechain-style ducking gain
+    this.bassBus = this.ctx.createGain();
+    this.bassBus.gain.value = 1.0;
+    this.bassDuckGain = this.ctx.createGain();
+    this.bassDuckGain.gain.value = 1.0;
+    this.bassBus.connect(this.bassDuckGain);
+    this.bassDuckGain.connect(this.compressor);
+    this.compressor.connect(this.masterGain);
+    this.masterGain.connect(this.ctx.destination);
+  },
+
+  _createDelay() {
+    // Tempo-synced delay: dotted 8th feel
+    this.delayNode = this.ctx.createDelay(1.5);
+    this.delayFeedback = this.ctx.createGain();
+    this.delaySend = this.ctx.createGain();
+    this.delaySend.gain.value = 0.22;
+    this.delayFeedback.gain.value = 0.35;
+    // Filter in feedback loop for a warmer echo
+    const dfilt = this.ctx.createBiquadFilter();
+    dfilt.type = 'lowpass';
+    dfilt.frequency.value = 2400;
+    this.delayNode.connect(dfilt);
+    dfilt.connect(this.delayFeedback);
+    this.delayFeedback.connect(this.delayNode);
+    this.delayNode.connect(this.delaySend);
+    this.delaySend.connect(this.compressor);
+    // Initial time set when playing starts
+    this.delayNode.delayTime.value = 0.375;
+  },
+
+  _updateDelayTime() {
+    if (!this.delayNode) return;
+    const beat = 60 / getTheme(level).bpm; // one quarter note
+    // Dotted 8th = 0.75 * beat
+    this.delayNode.delayTime.setTargetAtTime(beat * 0.75, this.ctx.currentTime, 0.05);
+  },
+
+  _duckBass(time) {
+    if (!this.bassDuckGain) return;
+    const g = this.bassDuckGain.gain;
+    g.cancelScheduledValues(time);
+    g.setValueAtTime(0.35, time);
+    g.linearRampToValueAtTime(1.0, time + 0.18);
+  },
+
+  _currentChord(theme) {
+    const chords = theme.chords || [];
+    if (chords.length === 0) return null;
+    return chords[this.chordIdx % chords.length];
+  },
+
+  _createReverb() {
+    const conv = this.ctx.createConvolver();
+    const rate = this.ctx.sampleRate;
+    const len = rate * 1.8;
+    const impulse = this.ctx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = impulse.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+    }
+    conv.buffer = impulse;
+    const g = this.ctx.createGain();
+    g.gain.value = 0.18;
+    conv.connect(g);
+    g.connect(this.masterGain);
+    return conv;
+  },
+
+  _stepTime() { return 60 / getTheme(level).bpm / 4; },
+
+  start() {
+    if (this.isPlaying) return;
+    this.isPlaying = true;
+    this.currentStep = 0;
+    this.bar = 0;
+    this.chordIdx = 0;
+    this.nextStepTime = this.ctx.currentTime + 0.05;
+    this._updateDelayTime();
+    this._schedule();
+  },
+
+  _schedule() {
+    if (!this.isPlaying) return;
+    const st = this._stepTime();
+    while (this.nextStepTime < this.ctx.currentTime + 0.1) {
+      this._playStep(this.currentStep, this.nextStepTime);
+      this.nextStepTime += st;
+      this.currentStep = (this.currentStep + 1) % 16;
+      if (this.currentStep === 0) {
+        this.bar++;
+        const chords = getTheme(level).chords || [];
+        if (chords.length) this.chordIdx = this.bar % chords.length;
+      }
+      beatPhase = this.currentStep;
+    }
+    requestAnimationFrame(() => this._schedule());
+  },
+
+  onLevelChange() {
+    this._updateDelayTime();
+    // Reset chord progression on era change to stay musical
+    this.chordIdx = 0;
+    this.bar = 0;
+  },
+
+  _playStep(step, time) {
+    const theme = getTheme(level);
+    const st = this._stepTime();
+    // Swing: delay odd 16ths slightly (about 12% of a step)
+    const swingAmt = (theme.synthType === 'industrial') ? 0 : st * 0.14;
+    const t = (step % 2 === 1) ? time + swingAmt : time;
+    const chord = this._currentChord(theme);
+    const isFillBar = (this.bar % 4 === 3); // last bar of every 4-bar phrase
+    const nearFillEnd = isFillBar && step >= 12;
+
+    // --- DRUMS ---
+    if (theme.kick[step]) {
+      this._kick(t, theme);
+      this._duckBass(t);
+    }
+    if (theme.snare[step]) {
+      this._snare(t, theme);
+      this._clap(t, theme); // stacked clap for weight
+    } else if (step === 6 || step === 14) {
+      // Ghost snare on syncopated offbeats (except industrial)
+      if (theme.synthType !== 'organ' && theme.synthType !== 'industrial') {
+        this._snare(t, theme, 0.18);
+      }
+    }
+    if (theme.hh[step]) this._hihat(t, theme.hhOpen[step] ? 0.18 : 0.05);
+
+    // Shaker on every offbeat for groove (skip Donda - it's minimal)
+    if (theme.synthType !== 'organ' && step % 2 === 1) {
+      this._shaker(t, theme.synthType === 'autotune' ? 0.035 : 0.05);
+    }
+
+    // --- BASS (chord-aware) ---
+    if (theme.bass[step]) {
+      const bassFreq = chord ? chord[0] / 4 : theme.bassNote; // root, -2 octaves
+      this._bass(t, theme, bassFreq);
+    }
+
+    // --- HARMONIC LAYER ---
+    // Play chord pad on beat 1 of each bar (not on every 4 steps - too busy)
+    if (step === 0) this._synthLayer(t, step, theme);
+
+    // --- LEAD MELODY (chord-tone arpeggio instead of random) ---
+    // Play at 0, 4, 8, 12 (every quarter). Pattern index cycles.
+    if (step % 4 === 0) this._leadMelody(t, step, theme, chord);
+
+    // --- FILLS (last bar of 4-bar phrase) ---
+    if (nearFillEnd && step === 14) {
+      this._fill(t, theme);
+    }
+  },
+
+  // --- DRUMS ---
+  _kick(time, theme) {
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = 'sine';
+    // Yeezus gets a punchier kick
+    const startFreq = theme.synthType === 'industrial' ? 200 : 150;
+    o.frequency.setValueAtTime(startFreq, time);
+    o.frequency.exponentialRampToValueAtTime(28, time + 0.35);
+    g.gain.setValueAtTime(0.9, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+    o.connect(g); g.connect(this.compressor);
+    o.start(time); o.stop(time + 0.45);
+    // Transient click
+    const c = this.ctx.createOscillator();
+    const cg = this.ctx.createGain();
+    c.type = theme.synthType === 'industrial' ? 'sawtooth' : 'square';
+    c.frequency.value = theme.synthType === 'industrial' ? 1200 : 800;
+    cg.gain.setValueAtTime(0.3, time);
+    cg.gain.exponentialRampToValueAtTime(0.001, time + 0.015);
+    c.connect(cg); cg.connect(this.compressor);
+    c.start(time); c.stop(time + 0.02);
+  },
+
+  _snare(time, theme, velocity) {
+    const vel = velocity == null ? 1 : velocity;
+    const bufSz = this.ctx.sampleRate * 0.15;
+    const buf = this.ctx.createBuffer(1, bufSz, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufSz; i++) d[i] = Math.random() * 2 - 1;
+    const n = this.ctx.createBufferSource(); n.buffer = buf;
+    const nf = this.ctx.createBiquadFilter(); nf.type = 'highpass'; nf.frequency.value = 1000;
+    const ng = this.ctx.createGain();
+    ng.gain.setValueAtTime(0.55 * vel, time);
+    ng.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+    n.connect(nf); nf.connect(ng); ng.connect(this.compressor);
+    if (vel >= 0.5) ng.connect(this.reverbNode);
+    n.start(time);
+    // Tone
+    const o = this.ctx.createOscillator();
+    const og = this.ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(200, time);
+    o.frequency.exponentialRampToValueAtTime(80, time + 0.08);
+    og.gain.setValueAtTime(0.4 * vel, time);
+    og.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+    o.connect(og); og.connect(this.compressor);
+    o.start(time); o.stop(time + 0.1);
+  },
+
+  _hihat(time, decay) {
+    const bufSz = this.ctx.sampleRate * 0.08;
+    const buf = this.ctx.createBuffer(1, bufSz, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufSz; i++) d[i] = Math.random() * 2 - 1;
+    const n = this.ctx.createBufferSource(); n.buffer = buf;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7000;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 10000;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.22, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + decay);
+    n.connect(hp); hp.connect(bp); bp.connect(g); g.connect(this.compressor);
+    n.start(time);
+  },
+
+  _clap(time, theme) {
+    // Layered clap: 3 quick noise bursts + body resonance
+    const sr = this.ctx.sampleRate;
+    const bufSz = Math.floor(sr * 0.2);
+    const buf = this.ctx.createBuffer(1, bufSz, sr);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufSz; i++) d[i] = Math.random() * 2 - 1;
+    const offsets = [0, 0.008, 0.017, 0.028];
+    const mg = this.ctx.createGain();
+    mg.gain.value = 0.32;
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = 0.9;
+    for (const off of offsets) {
+      const n = this.ctx.createBufferSource(); n.buffer = buf;
+      const eg = this.ctx.createGain();
+      const t0 = time + off;
+      eg.gain.setValueAtTime(0.6 * (1 - off * 4), t0);
+      eg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.04);
+      n.connect(eg); eg.connect(bp);
+      n.start(t0);
+    }
+    bp.connect(mg);
+    mg.connect(this.compressor);
+    mg.connect(this.reverbNode);
+  },
+
+  _shaker(time, gainVal) {
+    const sr = this.ctx.sampleRate;
+    const bufSz = Math.floor(sr * 0.06);
+    const buf = this.ctx.createBuffer(1, bufSz, sr);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufSz; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bufSz);
+    const n = this.ctx.createBufferSource(); n.buffer = buf;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 5500;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gainVal, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    n.connect(hp); hp.connect(g); g.connect(this.compressor);
+    n.start(time);
+  },
+
+  _fill(time, theme) {
+    // 16th-note snare roll ramping up over the last 2 16ths of the bar
+    const st = this._stepTime();
+    for (let i = 0; i < 4; i++) {
+      const t = time + (i * st * 0.5);
+      this._snare(t, theme, 0.25 + i * 0.12);
+    }
+  },
+
+  _leadMelody(time, step, theme, chord) {
+    // Arpeggio pattern - cycle through chord tones based on beat position
+    // Without a chord, fall back to scale. Pattern: root, third, fifth, third
+    const beatIdx = Math.floor(step / 4); // 0..3
+    let note;
+    if (chord && chord.length) {
+      const patterns = [
+        [0, 1, 2, 1], // 1-3-5-3
+        [0, 2, 1, 2], // 1-5-3-5
+        [2, 1, 0, 1], // 5-3-1-3
+        [1, 2, 1, 0], // 3-5-3-1
+      ];
+      const pat = patterns[this.bar % patterns.length];
+      note = chord[pat[beatIdx] % chord.length];
+      // Octave jumps on last beat for interest
+      if (beatIdx === 3 && this.bar % 2 === 1) note *= 2;
+    } else {
+      note = theme.scale[beatIdx % theme.scale.length];
+    }
+    this._melodyHit(time, step, theme, note);
+  },
+
+  _bass(time, theme, freq) {
+    const baseFreq = freq || theme.bassNote;
+    const o = this.ctx.createOscillator();
+    const o2 = this.ctx.createOscillator(); // subtle fifth/octave layer
+    const g = this.ctx.createGain();
+    o.type = 'sine';
+    o2.type = 'triangle';
+    o.frequency.setValueAtTime(baseFreq, time);
+    // Add slight pitch-bend-down for 808 feel on deep basses
+    if (theme.synthType === 'autotune' || theme.synthType === 'industrial') {
+      o.frequency.setValueAtTime(baseFreq * 1.08, time);
+      o.frequency.exponentialRampToValueAtTime(baseFreq, time + 0.08);
+    }
+    o2.frequency.setValueAtTime(baseFreq * 2, time);
+    // 808s & Heartbreak and Donda get long sustain bass
+    const sustain = (theme.synthType === 'autotune' || theme.synthType === 'organ') ? 0.8 : 0.5;
+    g.gain.setValueAtTime(0.5, time);
+    g.gain.setValueAtTime(0.5, time + sustain * 0.4);
+    g.gain.exponentialRampToValueAtTime(0.001, time + sustain);
+    // Octave layer volume
+    const g2 = this.ctx.createGain();
+    g2.gain.value = 0.12;
+    // Saturation
+    const shaper = this.ctx.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { const x = (i/128)-1; curve[i] = Math.tanh(x * (theme.synthType === 'industrial' ? 5 : 2)); }
+    shaper.curve = curve;
+    const outBus = this.bassBus || this.compressor;
+    o.connect(shaper); shaper.connect(g); g.connect(outBus);
+    o2.connect(g2); g2.connect(g);
+    o.start(time); o.stop(time + sustain + 0.1);
+    o2.start(time); o2.stop(time + sustain + 0.1);
+  },
+
+  // --- ERA-SPECIFIC SYNTH LAYERS ---
+  _synthLayer(time, step, theme) {
+    // Lock in current chord progression note for layers that pick random chords
+    const chord = this._currentChord(theme);
+    const origChords = theme.chords;
+    if (chord) theme.chords = [chord];
+    try {
+      switch (theme.synthType) {
+        case 'soulChop': this._soulChop(time, theme); break;
+        case 'strings': this._strings(time, theme); break;
+        case 'synthArp': this._synthArp(time, step, theme); break;
+        case 'autotune': this._autotunepad(time, theme); break;
+        case 'power': this._powerLayer(time, theme); break;
+        case 'industrial': this._industrialNoise(time, theme); break;
+        case 'gospel': this._gospelOrgan(time, theme); break;
+        case 'organ': this._pipeOrgan(time, theme); break;
+      }
+    } finally {
+      theme.chords = origChords;
+    }
+  },
+
+  // L1: Chipmunk soul sample (pitched-up sawtooth + formants)
+  _soulChop(time, theme) {
+    const formants = [
+      { freq: 900, bw: 80, amp: 1 },
+      { freq: 1400, bw: 100, amp: 0.4 },
+      { freq: 2800, bw: 130, amp: 0.2 },
+    ];
+    const baseFreq = theme.scale[Math.floor(Math.random() * theme.scale.length)] * 2; // pitched up (chipmunk)
+    const src = this.ctx.createOscillator();
+    src.type = 'sawtooth';
+    src.frequency.value = baseFreq;
+    const mg = this.ctx.createGain();
+    mg.gain.setValueAtTime(0.1, time);
+    mg.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+    for (const f of formants) {
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = f.freq; bp.Q.value = f.freq / f.bw;
+      const fg = this.ctx.createGain(); fg.gain.value = f.amp;
+      src.connect(bp); bp.connect(fg); fg.connect(mg);
+    }
+    mg.connect(this.compressor); mg.connect(this.reverbNode);
+    src.start(time); src.stop(time + 0.25);
+  },
+
+  // L2: Orchestral strings (detuned sawtooths through lowpass)
+  _strings(time, theme) {
+    const chord = theme.chords[Math.floor(Math.random() * theme.chords.length)];
+    const mg = this.ctx.createGain();
+    mg.gain.setValueAtTime(0, time);
+    mg.gain.linearRampToValueAtTime(0.06, time + 0.4);
+    mg.gain.setValueAtTime(0.06, time + 1.2);
+    mg.gain.linearRampToValueAtTime(0, time + 2.0);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 1200;
+    for (const freq of chord) {
+      for (const detune of [-8, 0, 8]) {
+        const o = this.ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.value = freq;
+        o.detune.value = detune + (Math.random() - 0.5) * 5;
+        o.connect(lp);
+        o.start(time); o.stop(time + 2.1);
+      }
+    }
+    lp.connect(mg); mg.connect(this.compressor); mg.connect(this.reverbNode);
+  },
+
+  // L3: Synth arpeggios (bright square wave arps)
+  _synthArp(time, step, theme) {
+    const arpNotes = theme.scale;
+    const idx = (step / 4 + Math.floor(Math.random() * 3)) % arpNotes.length;
+    const note = arpNotes[Math.floor(idx)];
+    for (let i = 0; i < 4; i++) {
+      const t = time + i * this._stepTime() * 0.5;
+      const n = arpNotes[(Math.floor(idx) + i) % arpNotes.length];
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      const f = this.ctx.createBiquadFilter();
+      o.type = 'square';
+      o.frequency.value = n;
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(3000, t);
+      f.frequency.exponentialRampToValueAtTime(500, t + 0.12);
+      g.gain.setValueAtTime(0.08, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      o.connect(f); f.connect(g); g.connect(this.compressor); g.connect(this.reverbNode);
+      o.start(t); o.stop(t + 0.15);
+    }
+  },
+
+  // L4: Auto-tune pad (pitch-gliding sine + vibrato)
+  _autotunepad(time, theme) {
+    const chord = theme.chords[Math.floor(Math.random() * theme.chords.length)];
+    const mg = this.ctx.createGain();
+    mg.gain.setValueAtTime(0, time);
+    mg.gain.linearRampToValueAtTime(0.07, time + 0.2);
+    mg.gain.setValueAtTime(0.07, time + 1.5);
+    mg.gain.linearRampToValueAtTime(0, time + 2.5);
+    for (const freq of chord) {
+      const o = this.ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      // Vibrato for auto-tune feel
+      const lfo = this.ctx.createOscillator();
+      const lfoG = this.ctx.createGain();
+      lfo.frequency.value = 5.5;
+      lfoG.gain.value = 4;
+      lfo.connect(lfoG); lfoG.connect(o.frequency);
+      lfo.start(time); lfo.stop(time + 2.6);
+      o.connect(mg);
+      o.start(time); o.stop(time + 2.6);
+    }
+    mg.connect(this.compressor); mg.connect(this.reverbNode);
+  },
+
+  // L5: Power layers (massive stacked chords)
+  _powerLayer(time, theme) {
+    const chord = theme.chords[Math.floor(Math.random() * theme.chords.length)];
+    const mg = this.ctx.createGain();
+    mg.gain.setValueAtTime(0, time);
+    mg.gain.linearRampToValueAtTime(0.09, time + 0.15);
+    mg.gain.setValueAtTime(0.09, time + 0.8);
+    mg.gain.linearRampToValueAtTime(0, time + 1.5);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 2000;
+    for (const freq of chord) {
+      for (const type of ['sawtooth', 'square']) {
+        for (const oct of [1, 2]) {
+          const o = this.ctx.createOscillator();
+          o.type = type;
+          o.frequency.value = freq * oct;
+          o.detune.value = (Math.random() - 0.5) * 20;
+          o.connect(lp);
+          o.start(time); o.stop(time + 1.6);
+        }
+      }
+    }
+    lp.connect(mg); mg.connect(this.compressor); mg.connect(this.reverbNode);
+  },
+
+  // L6: Industrial noise burst + acid synth
+  _industrialNoise(time, theme) {
+    // Noise burst
+    const bufSz = this.ctx.sampleRate * 0.1;
+    const buf = this.ctx.createBuffer(1, bufSz, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufSz; i++) d[i] = (Math.random() * 2 - 1);
+    const n = this.ctx.createBufferSource(); n.buffer = buf;
+    const dist = this.ctx.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { const x = (i/128)-1; curve[i] = Math.sign(x) * Math.pow(Math.abs(x), 0.3); }
+    dist.curve = curve;
+    const ng = this.ctx.createGain();
+    ng.gain.setValueAtTime(0.15, time);
+    ng.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+    n.connect(dist); dist.connect(ng); ng.connect(this.compressor);
+    n.start(time);
+
+    // Acid synth
+    const o = this.ctx.createOscillator();
+    const f = this.ctx.createBiquadFilter();
+    const g = this.ctx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.value = theme.scale[Math.floor(Math.random() * theme.scale.length)];
+    f.type = 'lowpass'; f.frequency.setValueAtTime(4000, time);
+    f.frequency.exponentialRampToValueAtTime(200, time + 0.15);
+    f.Q.value = 15;
+    g.gain.setValueAtTime(0.12, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+    o.connect(f); f.connect(g); g.connect(this.compressor);
+    o.start(time); o.stop(time + 0.2);
+  },
+
+  // L7: Gospel organ (additive synthesis + tremolo)
+  _gospelOrgan(time, theme) {
+    const chord = theme.chords[Math.floor(Math.random() * theme.chords.length)];
+    const mg = this.ctx.createGain();
+    mg.gain.setValueAtTime(0, time);
+    mg.gain.linearRampToValueAtTime(0.07, time + 0.2);
+    mg.gain.setValueAtTime(0.07, time + 1.5);
+    mg.gain.linearRampToValueAtTime(0, time + 2.5);
+    // Leslie tremolo
+    const trem = this.ctx.createOscillator();
+    const tremG = this.ctx.createGain();
+    trem.frequency.value = 5.8;
+    tremG.gain.value = 0.015;
+    trem.connect(tremG); tremG.connect(mg.gain);
+    trem.start(time); trem.stop(time + 2.6);
+
+    for (const freq of chord) {
+      // Organ = sine + harmonics
+      for (const [harmonic, amp] of [[1, 1], [2, 0.6], [3, 0.3], [4, 0.15]]) {
+        const o = this.ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = freq * harmonic;
+        const hg = this.ctx.createGain();
+        hg.gain.value = amp * 0.08;
+        o.connect(hg); hg.connect(mg);
+        o.start(time); o.stop(time + 2.6);
+      }
+    }
+    mg.connect(this.compressor); mg.connect(this.reverbNode);
+  },
+
+  // L8: Pipe organ drone (deep, minimal, dark)
+  _pipeOrgan(time, theme) {
+    const chord = theme.chords[Math.floor(Math.random() * theme.chords.length)];
+    const mg = this.ctx.createGain();
+    mg.gain.setValueAtTime(0, time);
+    mg.gain.linearRampToValueAtTime(0.06, time + 0.8);
+    mg.gain.setValueAtTime(0.06, time + 3);
+    mg.gain.linearRampToValueAtTime(0, time + 4);
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 600;
+    for (const freq of chord) {
+      for (const [h, a] of [[1,1],[2,0.5],[3,0.25],[4,0.12],[6,0.06]]) {
+        const o = this.ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = freq * h;
+        const hg = this.ctx.createGain(); hg.gain.value = a * 0.06;
+        o.connect(hg); hg.connect(lp);
+        o.start(time); o.stop(time + 4.1);
+      }
+    }
+    lp.connect(mg); mg.connect(this.compressor); mg.connect(this.reverbNode);
+  },
+
+  // Melody hits (era-aware). If fixedNote provided, use it; else random scale tone.
+  _melodyHit(time, step, theme, fixedNote) {
+    const note = (fixedNote != null) ? fixedNote : theme.scale[Math.floor(Math.random() * theme.scale.length)];
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    const f = this.ctx.createBiquadFilter();
+
+    switch (theme.synthType) {
+      case 'soulChop':
+        o.type = 'triangle'; f.type = 'lowpass'; f.frequency.value = 1500;
+        g.gain.setValueAtTime(0.08, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+        break;
+      case 'strings':
+        o.type = 'sine'; f.type = 'lowpass'; f.frequency.value = 2000;
+        g.gain.setValueAtTime(0.06, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+        break;
+      case 'synthArp':
+        o.type = 'square'; f.type = 'lowpass';
+        f.frequency.setValueAtTime(3000, time); f.frequency.exponentialRampToValueAtTime(400, time + 0.2);
+        g.gain.setValueAtTime(0.07, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+        break;
+      case 'autotune':
+        o.type = 'sine'; f.type = 'lowpass'; f.frequency.value = 3000;
+        o.frequency.setValueAtTime(note * 0.95, time);
+        o.frequency.linearRampToValueAtTime(note, time + 0.05); // pitch correction glide
+        g.gain.setValueAtTime(0.07, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+        break;
+      case 'power':
+        o.type = 'sawtooth'; f.type = 'lowpass'; f.frequency.value = 1800;
+        g.gain.setValueAtTime(0.06, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
+        break;
+      case 'industrial':
+        o.type = 'sawtooth'; f.type = 'lowpass';
+        f.frequency.setValueAtTime(5000, time); f.frequency.exponentialRampToValueAtTime(300, time + 0.1);
+        f.Q.value = 10;
+        g.gain.setValueAtTime(0.1, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+        break;
+      case 'gospel':
+        o.type = 'sine'; f.type = 'lowpass'; f.frequency.value = 2500;
+        g.gain.setValueAtTime(0.06, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+        break;
+      case 'organ':
+        o.type = 'sine'; f.type = 'lowpass'; f.frequency.value = 800;
+        g.gain.setValueAtTime(0.04, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
+        break;
+      default:
+        o.type = 'triangle'; f.type = 'lowpass'; f.frequency.value = 1500;
+        g.gain.setValueAtTime(0.06, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+    }
+    o.frequency.value = note;
+    // Gentle vibrato for life
+    const lfo = this.ctx.createOscillator();
+    const lfoG = this.ctx.createGain();
+    lfo.frequency.value = 4.5;
+    lfoG.gain.value = note * 0.004;
+    lfo.connect(lfoG); lfoG.connect(o.frequency);
+    lfo.start(time); lfo.stop(time + 0.7);
+    o.connect(f); f.connect(g);
+    g.connect(this.compressor);
+    g.connect(this.reverbNode);
+    if (this.delayNode) g.connect(this.delayNode);
+    o.start(time); o.stop(time + 0.6);
+  },
+
+  // --- PLAYER ACTION SOUNDS ---
+  // In vs mode, suppress sound effects caused by Alfred (the AI player) so
+  // you aren't hearing his drops and line-clears layered over yours. Music
+  // scheduling (the drum loop, bassline, etc.) is unaffected.
+  _isAiPlayer() {
+    return typeof activePlayer !== 'undefined' && activePlayer && activePlayer.isAI;
+  },
+  playMove() {
+    if (this._isAiPlayer()) return;
+    const t = this.ctx.currentTime;
+    const theme = getTheme(level);
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = theme.scale[Math.floor(Math.random() * theme.scale.length)] * 0.5;
+    g.gain.setValueAtTime(0.06, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    o.connect(g); g.connect(this.compressor);
+    o.start(t); o.stop(t + 0.05);
+  },
+
+  playRotate() {
+    if (this._isAiPlayer()) return;
+    const t = this.ctx.currentTime;
+    const theme = getTheme(level);
+    const note = theme.scale[Math.floor(Math.random() * theme.scale.length)];
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.value = note * 2;
+    g.gain.setValueAtTime(0.1, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    o.connect(g); g.connect(this.compressor); g.connect(this.reverbNode);
+    o.start(t); o.stop(t + 0.12);
+  },
+
+  playHardDrop() {
+    if (this._isAiPlayer()) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(25, t + 0.25);
+    g.gain.setValueAtTime(0.5, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    o.connect(g); g.connect(this.compressor);
+    o.start(t); o.stop(t + 0.35);
+    // Crash
+    const bs = this.ctx.sampleRate * 0.08;
+    const buf = this.ctx.createBuffer(1, bs, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bs; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bs);
+    const n = this.ctx.createBufferSource(); n.buffer = buf;
+    const ng = this.ctx.createGain();
+    ng.gain.setValueAtTime(0.25, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    n.connect(ng); ng.connect(this.compressor);
+    n.start(t);
+  },
+
+  playHold() {
+    if (this._isAiPlayer()) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(600, t);
+    o.frequency.linearRampToValueAtTime(800, t + 0.1);
+    g.gain.setValueAtTime(0.08, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    o.connect(g); g.connect(this.compressor);
+    o.start(t); o.stop(t + 0.12);
+  },
+
+  playLineClear(count) {
+    if (this._isAiPlayer()) return;
+    const t = this.ctx.currentTime;
+    const theme = getTheme(level);
+    const notes = count >= 4 ? theme.scale.slice(0, 5) : theme.scale.slice(0, count + 1);
+    notes.forEach((freq, i) => {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = freq;
+      const st = t + i * 0.06;
+      g.gain.setValueAtTime(0.13, st);
+      g.gain.exponentialRampToValueAtTime(0.001, st + 0.3);
+      o.connect(g); g.connect(this.compressor); g.connect(this.reverbNode);
+      o.start(st); o.stop(st + 0.35);
+    });
+    if (count >= 3) this._vocalChop(t + 0.1, theme);
+  },
+
+  _vocalChop(time, theme) {
+    const formants = [{ freq: 800, bw: 80, a: 1 }, { freq: 1200, bw: 90, a: 0.5 }, { freq: 2500, bw: 120, a: 0.3 }];
+    const src = this.ctx.createOscillator();
+    src.type = 'sawtooth';
+    src.frequency.value = theme.synthType === 'soulChop' ? 300 : 150; // higher pitch for soul era
+    const mg = this.ctx.createGain();
+    mg.gain.setValueAtTime(0.1, time);
+    mg.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+    for (const f of formants) {
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = f.freq; bp.Q.value = f.freq / f.bw;
+      const fg = this.ctx.createGain(); fg.gain.value = f.a;
+      src.connect(bp); bp.connect(fg); fg.connect(mg);
+    }
+    mg.connect(this.compressor); mg.connect(this.reverbNode);
+    src.start(time); src.stop(time + 0.25);
+  },
+
+  playZone() {
+    if (this._isAiPlayer()) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    const f = this.ctx.createBiquadFilter();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(200, t);
+    o.frequency.exponentialRampToValueAtTime(2000, t + 1);
+    f.type = 'lowpass';
+    f.frequency.setValueAtTime(400, t);
+    f.frequency.exponentialRampToValueAtTime(4000, t + 1);
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.linearRampToValueAtTime(0.04, t + 1);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
+    o.connect(f); f.connect(g); g.connect(this.compressor); g.connect(this.reverbNode);
+    o.start(t); o.stop(t + 1.5);
+  },
+
+  stop() { this.isPlaying = false; }
+};
+
+// ============================================================
+// PARTICLES
+// ============================================================
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.5) * 6 - 2,
+      life: 1,
+      decay: 0.015 + Math.random() * 0.02,
+      size: 2 + Math.random() * 4,
+      color
+    });
+  }
+}
+
+function initBgParticles() {
+  bgParticles = [];
+  const theme = getTheme(level);
+  const count = theme.particleStyle === 'dots' ? 30 : 80;
+  for (let i = 0; i < count; i++) {
+    bgParticles.push({
+      x: Math.random() * bgCanvas.width,
+      y: Math.random() * bgCanvas.height,
+      size: Math.random() * 3 + 0.5,
+      speed: Math.random() * 0.5 + 0.1,
+      alpha: Math.random() * 0.4 + 0.1,
+      phase: Math.random() * Math.PI * 2,
+      rot: Math.random() * Math.PI * 2,
+    });
+  }
+}
+
+function showCombo(cleared) {
+  const el = document.getElementById('combo-display');
+  const theme = getTheme(level);
+  const names = ['', 'Single', 'Double', 'Triple', 'TETRIS!'];
+  let text = names[cleared] || 'TETRIS!';
+  if (combo > 0) text += ` x${combo + 1}`;
+  el.textContent = text;
+  // Voice callout — only on the local player's board so a remote opponent's
+  // clears don't narrate over the human player.
+  if (!activePlayer || !activePlayer.isRemote) {
+    voiceEngine.announceClear(cleared, combo + 1);
+  }
+  el.style.color = theme.colors.accent;
+  el.style.textShadow = `0 0 20px ${theme.colors.accent}`;
+  el.style.opacity = 1;
+  setTimeout(() => el.style.opacity = 0, 1200);
+}
+
+// ============================================================
+// NETWORK CLIENT — shared leaderboard + PvP WebSocket
+// ============================================================
+// The page may be served from a static host (no backend) or from server.js
+// (has /api/scores + /ws). Feature-detect lazily so a file:// or
+// `python3 -m http.server` deploy still works — just without multiplayer or
+// shared scores.
+const NET = {
+  ws: null,
+  connected: false,
+  roomCode: null,
+  isHost: false,
+  opponentName: null,
+  side: null,            // 'host' | 'guest'
+  matchStarted: false,
+  seed: null,
+  apiAvailable: null,    // null=unknown, true/false after probe
+  onMessage: null,       // replaced per-phase
+};
+
+// API base URL. In local dev (Express on the same origin) this stays empty so
+// fetch('/api/scores') is relative. In production (GitHub Pages serving the
+// static page from <user>.github.io), point it at the Cloudflare Worker URL
+// via a <meta name="api-base" content="https://tetris-beats.<sub>.workers.dev">
+// tag in the HTML head — the Worker handles CORS and exposes the same routes.
+const API_BASE = (() => {
+  const meta = document.querySelector('meta[name="api-base"]');
+  const v = meta && meta.getAttribute('content');
+  return (v && v.trim()) || '';
+})();
+const apiUrl = (path) => `${API_BASE}${path}`;
+function wsUrl() {
+  if (API_BASE) {
+    // Worker URL is https://… → wss://…/ws
+    const u = new URL(API_BASE);
+    u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+    u.pathname = (u.pathname.replace(/\/$/, '')) + '/ws';
+    return u.toString();
+  }
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${location.host}/ws`;
+}
+
+async function probeServer() {
+  if (NET.apiAvailable !== null) return NET.apiAvailable;
+  try {
+    const r = await fetch(apiUrl('/api/health'), { cache: 'no-store' });
+    NET.apiAvailable = r.ok;
+  } catch { NET.apiAvailable = false; }
+  return NET.apiAvailable;
+}
+
+// Pull shared leaderboard from server (falls back to local if unavailable).
+async function fetchSharedScores() {
+  if (!(await probeServer())) return null;
+  try {
+    const r = await fetch(apiUrl('/api/scores'), { cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return Array.isArray(j.scores) ? j.scores : null;
+  } catch { return null; }
+}
+
+// Push a score to the server. Server authoritative — response includes the
+// merged top-10 so we can refresh the local cache from it. If the server is
+// unreachable, the score is queued and retried on next refresh — without this,
+// a flaky network would silently drop a hard-earned high score.
+const PENDING_KEY = 'tetris.pendingScores.v1';
+function loadPendingScores() {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; }
+}
+function savePendingScores(list) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(0, 20))); } catch {}
+}
+async function submitSharedScore(name, score, linesVal, levelVal) {
+  const payload = { name, score: Math.floor(score), lines: linesVal|0, level: levelVal|0 };
+  if (!(await probeServer())) {
+    // Server down — queue for next reachability cycle.
+    const q = loadPendingScores(); q.push(payload); savePendingScores(q);
+    updateSyncBadge('offline');
+    return null;
+  }
+  try {
+    const r = await fetch(apiUrl('/api/scores'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error('post-failed');
+    updateSyncBadge('synced');
+    return await r.json();
+  } catch {
+    const q = loadPendingScores(); q.push(payload); savePendingScores(q);
+    updateSyncBadge('offline');
+    return null;
+  }
+}
+
+// Drain queued scores once the server is reachable again. Called by
+// refreshSharedLeaderboard so it piggy-backs on the existing 1-min cycle.
+async function flushPendingScores() {
+  const q = loadPendingScores();
+  if (!q.length) return;
+  if (!(await probeServer())) return;
+  const remaining = [];
+  for (const p of q) {
+    try {
+      const r = await fetch(apiUrl('/api/scores'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(p),
+      });
+      if (!r.ok) remaining.push(p);
+    } catch { remaining.push(p); }
+  }
+  savePendingScores(remaining);
+  if (remaining.length === 0) updateSyncBadge('synced');
+}
+
+// Tiny corner badge: green dot = synced, grey = offline (queued retries).
+// Lives outside any tab so it's always visible. Created lazily on first call.
+function updateSyncBadge(state) {
+  let el = document.getElementById('lb-sync-badge');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'lb-sync-badge';
+    el.style.cssText = 'position:fixed;bottom:6px;right:8px;z-index:20;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);pointer-events:none;font-family:Segoe UI,system-ui;';
+    document.body.appendChild(el);
+  }
+  const queued = loadPendingScores().length;
+  if (state === 'synced') {
+    el.textContent = '● synced';
+    el.style.color = 'rgba(80,255,160,0.7)';
+  } else {
+    el.textContent = queued ? `● offline (${queued} queued)` : '● offline';
+    el.style.color = 'rgba(255,180,80,0.7)';
+  }
+}
+
+// --- WebSocket lifecycle -------------------------------------------------
+// Dedupes in two ways: (1) an already-open socket resolves immediately, (2) a
+// socket mid-handshake returns the SAME in-flight promise so parallel callers
+// don't each open a new ws.
+let _netConnectInflight = null;
+function netConnect(opts = {}) {
+  if (NET.ws && NET.ws.readyState === 1) return Promise.resolve(NET.ws);
+  if (_netConnectInflight) return _netConnectInflight;
+  // The Cloudflare Worker binds the room at WS-upgrade time via ?code=…, so
+  // we pass the desired code here (or "CREATE" to mint one). The local
+  // Express server ignores the query string and waits for the {type:'create'}
+  // /{type:'join'} message instead — both backends end up calling the same
+  // protocol from this point on.
+  let url = wsUrl();
+  if (opts.code) url += (url.includes('?') ? '&' : '?') + 'code=' + encodeURIComponent(opts.code);
+  _netConnectInflight = new Promise((resolve, reject) => {
+    let ws;
+    try { ws = new WebSocket(url); }
+    catch (e) { _netConnectInflight = null; return reject(e); }
+    NET.ws = ws;
+    const done = { v: false };
+    const finish = (ok, val) => {
+      if (done.v) return;
+      done.v = true;
+      _netConnectInflight = null;
+      ok ? resolve(val) : reject(val);
+    };
+    ws.addEventListener('open', () => {
+      NET.connected = true;
+      updateLobbyBadge('connected', 'ok');
+      finish(true, ws);
+    });
+    ws.addEventListener('error', () => {
+      updateLobbyBadge('error', 'err');
+      finish(false, new Error('ws error'));
+    });
+    ws.addEventListener('close', () => {
+      NET.connected = false;
+      updateLobbyBadge('disconnected', 'err');
+      // Clear room state so the lobby doesn't think we're still in one.
+      NET.roomCode = null;
+      NET.isHost = false;
+      NET.opponentName = null;
+    });
+    ws.addEventListener('message', (ev) => {
+      let msg; try { msg = JSON.parse(ev.data); } catch { return; }
+      handleNetMessage(msg);
+    });
+  });
+  return _netConnectInflight;
+}
+
+function netSend(obj) {
+  if (NET.ws && NET.ws.readyState === 1) {
+    try { NET.ws.send(JSON.stringify(obj)); } catch {}
+  }
+}
+
+function updateLobbyBadge(text, cls) {
+  const el = document.getElementById('lobby-connection-badge');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('ok', 'err');
+  if (cls) el.classList.add(cls);
+}
+
+function setLobbyStatus(text, isErr) {
+  const el = document.getElementById('lobby-status');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('err', !!isErr);
+}
+
+// Central message handler. Lobby/game phases look at different fields.
+function handleNetMessage(msg) {
+  switch (msg.type) {
+    case 'hello': break;
+    case 'room': {
+      NET.roomCode = msg.code;
+      NET.isHost = !!msg.host;
+      const codeEl = document.getElementById('lobby-room-code');
+      if (codeEl) codeEl.textContent = msg.code;
+      // Host view: swap Create panel from idle → live ("Waiting for opponent…").
+      // Guest view: we came in via JOIN, so `peer` will fire right after with
+      // the host info and we don't need this toggle.
+      if (msg.host) {
+        const idle = document.getElementById('lobby-create-idle');
+        const live = document.getElementById('lobby-create-live');
+        if (idle) idle.style.display = 'none';
+        if (live) live.style.display = '';
+      }
+      setLobbyStatus('');
+      break;
+    }
+    case 'peer': {
+      if (msg.joined) {
+        NET.opponentName = msg.name || 'OPPONENT';
+        // Both players land on the "live" view once the peer joins. The
+        // guest is on the Join panel before this fires — flip them to
+        // Create so the match status is visible and the Start button works.
+        setLobbyPanel('create');
+        const idle = document.getElementById('lobby-create-idle');
+        const live = document.getElementById('lobby-create-live');
+        if (idle) idle.style.display = 'none';
+        if (live) live.style.display = '';
+        const status = document.getElementById('lobby-peer-status');
+        if (status) status.innerHTML = `Opponent joined: <strong>${NET.opponentName}</strong>`;
+        const startBtn = document.getElementById('lobby-start-btn');
+        if (startBtn) startBtn.disabled = false;
+        // Hide the room-code line for the guest — they already joined it, it's
+        // just noise. Host keeps it so they can still read it aloud.
+        const codeEl = document.getElementById('lobby-room-code');
+        if (codeEl && !NET.isHost) codeEl.style.display = 'none';
+      } else {
+        const status = document.getElementById('lobby-peer-status');
+        if (status) status.textContent = 'Opponent left — waiting…';
+        const startBtn = document.getElementById('lobby-start-btn');
+        if (startBtn) startBtn.disabled = true;
+        NET.opponentName = null;
+      }
+      break;
+    }
+    case 'start': {
+      NET.matchStarted = true;
+      NET.seed = msg.seed;
+      NET.side = msg.yourSide;
+      NET.opponentName = msg.opponent || NET.opponentName || 'OPPONENT';
+      setNetworkSeed(msg.seed);
+      document.getElementById('lobby-screen').classList.remove('visible');
+      startNetworkMatch();
+      break;
+    }
+    case 'state': {
+      if (typeof applyRemoteState === 'function') applyRemoteState(msg);
+      break;
+    }
+    case 'garbage': {
+      if (typeof applyRemoteGarbage === 'function') applyRemoteGarbage(msg.n | 0);
+      break;
+    }
+    case 'result': {
+      if (typeof handleNetworkResult === 'function') handleNetworkResult(msg);
+      break;
+    }
+    case 'error': {
+      setLobbyStatus(msg.message || 'Error', true);
+      break;
+    }
+  }
+}
+
+// Called by lobby buttons.
+async function lobbyCreateRoom(name) {
+  try {
+    await netConnect({ code: 'CREATE' });
+    netSend({ type: 'hello', name });
+    netSend({ type: 'create' });
+    setLobbyStatus('');
+  } catch (e) {
+    setLobbyStatus('Cannot reach server', true);
+  }
+}
+async function lobbyJoinRoom(name, code) {
+  try {
+    await netConnect({ code });
+    netSend({ type: 'hello', name });
+    netSend({ type: 'join', code });
+    setLobbyStatus('');
+  } catch (e) {
+    setLobbyStatus('Cannot reach server', true);
+  }
+}
+function lobbyStartMatch() {
+  netSend({ type: 'ready' });
+  setLobbyStatus('Starting…');
+}
+function lobbyLeave() {
+  netSend({ type: 'leave' });
+  if (NET.ws) try { NET.ws.close(); } catch {}
+  NET.ws = null; NET.connected = false;
+  NET.roomCode = null; NET.isHost = false; NET.opponentName = null;
+  NET.matchStarted = false;
+}
+
+// ============================================================
+// LEADERBOARD (persistent top-10, keyed on solo runs only)
+// ============================================================
+// Scores live in localStorage so they survive reloads. VS mode doesn't write
+// here — the Alfred matchup is its own thing and a leaderboard of solo-only
+// runs stays comparable. Shape: [{ name, score, lines, level, date }, ...]
+// sorted high-to-low, capped at MAX_ENTRIES.
+const LB_KEY = 'tetris.leaderboard.v1';
+const LB_MAX = 10;
+
+function loadLeaderboard() {
+  try {
+    const raw = localStorage.getItem(LB_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(e => e && typeof e.score === 'number').slice(0, LB_MAX);
+  } catch { return []; }
+}
+function saveLeaderboard(list) {
+  try { localStorage.setItem(LB_KEY, JSON.stringify(list.slice(0, LB_MAX))); } catch {}
+}
+// Returns the 1-based rank the given score would earn (1..LB_MAX), or null if
+// it wouldn't make the cut. Qualifies if board has fewer than LB_MAX entries
+// OR score strictly beats the lowest.
+function qualifiesForLeaderboard(score) {
+  if (score <= 0) return null;
+  const list = loadLeaderboard();
+  if (list.length < LB_MAX) {
+    let rank = list.length + 1;
+    for (let i = 0; i < list.length; i++) {
+      if (score > list[i].score) { rank = i + 1; break; }
+    }
+    return rank;
+  }
+  if (score > list[list.length - 1].score) {
+    let rank = LB_MAX;
+    for (let i = 0; i < list.length; i++) {
+      if (score > list[i].score) { rank = i + 1; break; }
+    }
+    return rank;
+  }
+  return null;
+}
+function addLeaderboardEntry(name, score, linesVal, levelVal) {
+  const list = loadLeaderboard();
+  const entry = {
+    name: (name || 'AAA').toUpperCase().slice(0, 3),
+    score: Math.floor(score),
+    lines: linesVal | 0,
+    level: levelVal | 0,
+    date: Date.now(),
+  };
+  list.push(entry);
+  list.sort((a, b) => b.score - a.score);
+  const trimmed = list.slice(0, LB_MAX);
+  saveLeaderboard(trimmed);
+  return { list: trimmed, entry };
+}
+function formatLbDate(ts) {
+  const d = new Date(ts);
+  const m = d.getMonth() + 1, day = d.getDate(), y = String(d.getFullYear()).slice(2);
+  return `${m}/${day}/${y}`;
+}
+function renderLeaderboardInto(container, highlightEntry) {
+  if (!container) return;
+  const body = container.querySelector('.lb-body');
+  if (!body) return;
+  const list = loadLeaderboard();
+  if (list.length === 0) {
+    body.innerHTML = '<div class="lb-empty">No scores yet — drop the beat.</div>';
+    return;
+  }
+  body.innerHTML = list.map((e, i) => {
+    const isNew = highlightEntry &&
+      e.name === highlightEntry.name &&
+      e.score === highlightEntry.score &&
+      e.date === highlightEntry.date;
+    return `<div class="lb-row${isNew ? ' is-new' : ''}">` +
+      `<span class="lb-rank">${i + 1}</span>` +
+      `<span class="lb-name">${e.name}</span>` +
+      `<span class="lb-score">${e.score.toLocaleString()}</span>` +
+      `<span class="lb-meta">L${e.level} · ${e.lines}ln</span>` +
+    `</div>`;
+  }).join('');
+}
+function renderStartLeaderboard() {
+  renderLeaderboardInto(document.getElementById('start-leaderboard'));
+  // Best-effort: if the server is reachable, replace the local cache with the
+  // server-wide top-10 so anyone on the LAN/Tailscale sees the shared board.
+  refreshSharedLeaderboard();
+}
+
+async function refreshSharedLeaderboard() {
+  // Piggy-back the queued-score retry on this same cycle so any score posted
+  // while the server was down eventually lands.
+  await flushPendingScores();
+  const remote = await fetchSharedScores();
+  if (remote == null) {
+    updateSyncBadge('offline');
+    return;
+  }
+  saveLeaderboard(remote);
+  renderLeaderboardInto(document.getElementById('start-leaderboard'));
+  renderLeaderboardInto(document.getElementById('gameover-leaderboard'));
+  updateSyncBadge('synced');
+}
+
+// Game-over flow: if the score qualifies, show initials entry + rank banner.
+// Otherwise, just show the final score + leaderboard as-is. Keeps the REPLAY
+// button hidden until the player has either saved or skipped entry, so a
+// stray Enter-press doesn't restart mid-input.
+let _pendingRank = null;
+async function showGameOver() {
+  const finalScore = Math.floor(score);
+  const banner = document.getElementById('new-hs-banner');
+  const entry = document.getElementById('initials-entry');
+  const replayBtn = document.getElementById('start-btn-2');
+  const finalLine = document.getElementById('final-score');
+
+  finalLine.textContent = `Score: ${finalScore.toLocaleString()} · Lines: ${lines} · Level: ${level}`;
+  document.getElementById('game-over-screen').style.display = 'flex';
+  audioEngine.stop();
+
+  // Cross-device source-of-truth: pull the live server leaderboard FIRST so
+  // the rank check matches what every other device sees. Falls back to the
+  // local cache if the server is unreachable (offline play).
+  const remote = await fetchSharedScores();
+  if (remote) saveLeaderboard(remote);
+
+  const rank = qualifiesForLeaderboard(finalScore);
+  _pendingRank = rank;
+
+  if (rank) {
+    banner.textContent = rank === 1 ? '★ New Top Score ★' : `★ Rank #${rank} ★`;
+    banner.classList.remove('hidden');
+    entry.classList.remove('hidden');
+    replayBtn.style.display = 'none';
+    const input = document.getElementById('initials-input');
+    input.value = '';
+    // Defer focus until after the overlay animates in so iOS Safari actually
+    // pops the keyboard. Without the timeout, focus fires during the display
+    // transition and Safari silently drops it.
+    setTimeout(() => { try { input.focus(); input.select(); } catch {} }, 80);
+  } else {
+    banner.classList.add('hidden');
+    entry.classList.add('hidden');
+    replayBtn.style.display = '';
+  }
+  renderLeaderboardInto(document.getElementById('gameover-leaderboard'));
+}
+
+async function submitInitials() {
+  if (_pendingRank == null) return;
+  const input = document.getElementById('initials-input');
+  const raw = (input.value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3);
+  const name = raw.length > 0 ? raw.padEnd(3, ' ').trimEnd() : 'AAA';
+  const { entry } = addLeaderboardEntry(name, score, lines, level);
+  _pendingRank = null;
+  document.getElementById('initials-entry').classList.add('hidden');
+  document.getElementById('new-hs-banner').classList.add('hidden');
+  document.getElementById('start-btn-2').style.display = '';
+  renderLeaderboardInto(document.getElementById('gameover-leaderboard'), entry);
+  renderStartLeaderboard();
+  // Post to the shared server leaderboard (best effort). If it comes back
+  // with an authoritative list, overwrite the local cache so every client on
+  // the network sees the same board.
+  const result = await submitSharedScore(name, score, lines, level);
+  if (result && Array.isArray(result.scores)) {
+    saveLeaderboard(result.scores);
+    // Re-render with the new shared list, keeping our fresh entry highlighted
+    // if it survived the merge.
+    const kept = result.scores.find(e =>
+      e.name === entry.name && e.score === entry.score
+    );
+    renderLeaderboardInto(document.getElementById('gameover-leaderboard'), kept);
+    renderLeaderboardInto(document.getElementById('start-leaderboard'), kept);
+  }
+}
+
+// Vs-mode end screen. Whoever *didn't* top out wins. Called by the losing
+// player's spawn/rise top-out path, but guarded so it only fires once per
+// round even if both players happen to top out on the same frame.
+let _vsResultShown = false;
+function showVsResult() {
+  if (_vsResultShown) return;
+  _vsResultShown = true;
+  const p1 = players[0], p2 = players[1];
+  // Whichever player is NOT gameOver is the winner. If both are gameOver
+  // (race condition), the one with more lines wins.
+  let winner;
+  if (p1.gameOver && !p2.gameOver) winner = p2;
+  else if (p2.gameOver && !p1.gameOver) winner = p1;
+  else winner = p1.lines >= p2.lines ? p1 : p2;
+  const youWon = winner === p1;
+  const title = document.getElementById('vs-result-title');
+  title.textContent = youWon ? 'YOU WIN' : 'ALFRED WINS';
+  title.classList.toggle('lose', !youWon);
+  document.getElementById('vs-result-sub').innerHTML =
+    `You: ${Math.floor(p1.score).toLocaleString()} · ${p1.lines} lines<br>` +
+    `Alfred: ${Math.floor(p2.score).toLocaleString()} · ${p2.lines} lines`;
+  document.getElementById('vs-result-screen').style.display = 'flex';
+  audioEngine.stop();
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function hexToRgb(hex) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function shadeColor(color, percent) {
+  const [r, g, b] = hexToRgb(color);
+  return `rgb(${Math.min(255,Math.max(0,r+percent))},${Math.min(255,Math.max(0,g+percent))},${Math.min(255,Math.max(0,b+percent))})`;
+}
+
+// Proper ghost: dashed outline with a very faint fill, no gradient / no
+// highlight so it reads as "outline of where the piece will land" instead of
+// a washed-out twin of the real piece.
+function drawGhostBlock(context, x, y, color, size) {
+  context.save();
+  const [r, g, b] = hexToRgb(color);
+  // Faint interior tint — enough to distinguish at a glance, dim enough not
+  // to compete with the active piece or locked blocks.
+  context.fillStyle = `rgba(${r},${g},${b},0.08)`;
+  context.fillRect(x + 2, y + 2, size - 4, size - 4);
+  // Dashed outline in the piece colour.
+  context.strokeStyle = `rgba(${r},${g},${b},0.85)`;
+  context.lineWidth = 1.5;
+  context.setLineDash([4, 3]);
+  context.strokeRect(x + 2.5, y + 2.5, size - 5, size - 5);
+  context.setLineDash([]);
+  context.restore();
+}
+
+function drawBlock(context, x, y, color, size, alpha = 1) {
+  const theme = getTheme(level);
+  context.globalAlpha = alpha;
+  const grad = context.createLinearGradient(x, y, x + size, y + size);
+  grad.addColorStop(0, color);
+  grad.addColorStop(1, shadeColor(color, -30));
+  context.fillStyle = grad;
+  context.fillRect(x + 1, y + 1, size - 2, size - 2);
+  context.fillStyle = 'rgba(255,255,255,0.2)';
+  context.fillRect(x + 1, y + 1, size - 2, 3);
+  context.fillRect(x + 1, y + 1, 3, size - 2);
+  context.fillStyle = 'rgba(0,0,0,0.2)';
+  context.fillRect(x + 1, y + size - 3, size - 2, 2);
+  context.fillRect(x + size - 3, y + 1, 2, size - 2);
+  context.shadowColor = color;
+  context.shadowBlur = theme ? theme.blockGlow : 8;
+  context.fillStyle = 'rgba(0,0,0,0)';
+  context.fillRect(x, y, size, size);
+  context.shadowBlur = 0;
+  context.globalAlpha = 1;
+}
+
+function drawBoard() {
+  const theme = getTheme(level);
+  const [r, g, b] = hexToRgb(theme.colors.bg2);
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 1;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) ctx.strokeRect(c * CELL, r * CELL, CELL, CELL);
+  }
+
+  // Beat pulse — gets meaningfully more intense as you climb past L13 so the
+  // late-game eras feel like they're physically vibrating with the track.
+  const pulseIntensity = 0.04 + Math.max(0, level - 13) * 0.012;
+  const pulse = Math.sin(beatPhase / 16 * Math.PI * 2) * pulseIntensity;
+  if (pulse > 0) {
+    const [ar, ag, ab] = hexToRgb(theme.colors.accent);
+    ctx.fillStyle = `rgba(${ar},${ag},${ab},${pulse})`;
+    ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+  }
+
+  // Locked blocks
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (board[r][c]) drawBlock(ctx, c * CELL, r * CELL, board[r][c], CELL);
+    }
+  }
+
+  if (currentPiece && !gameOver) {
+    const color = PIECES[currentType].color;
+    if (showGhost) {
+      const ghostY = getGhostY();
+      // Only draw ghost if it's actually below the piece (not at same spot)
+      if (ghostY > currentY) {
+        for (const [bx, by] of currentPiece) drawGhostBlock(ctx, (currentX + bx) * CELL, (ghostY + by) * CELL, color, CELL);
+      }
+    }
+    for (const [bx, by] of currentPiece) drawBlock(ctx, (currentX + bx) * CELL, (currentY + by) * CELL, color, CELL);
+  }
+
+  // Zone overlay
+  if (zoneActive) {
+    const [ar, ag, ab] = hexToRgb(theme.colors.glow);
+    ctx.fillStyle = `rgba(${ar},${ag},${ab},${0.04 + Math.sin(Date.now() / 200) * 0.03})`;
+    ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+  }
+
+  // Level transition flash
+  if (levelTransitionAlpha > 0) {
+    const [tr, tg, tb] = hexToRgb(levelTransitionColor);
+    ctx.fillStyle = `rgba(${tr},${tg},${tb},${levelTransitionAlpha * 0.3})`;
+    ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+    levelTransitionAlpha -= 0.02;
+  }
+
+  // Tetris Effect-style shockwaves: expanding rings drawn over the board after
+  // a line clear. Lives in shared state (not per-player) so we only draw them
+  // on the human player's main canvas (skipped for the AI mini board).
+  if (shockwaves.length && (!activePlayer || !activePlayer.isAI)) {
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const w = shockwaves[i];
+      w.r += (w.maxR - w.r) * 0.12 + 4;
+      w.alpha -= 0.04;
+      w.life -= 0.04;
+      if (w.life <= 0) { shockwaves.splice(i, 1); continue; }
+      const [wr, wg, wb] = hexToRgb(w.color);
+      ctx.save();
+      ctx.strokeStyle = `rgba(${wr},${wg},${wb},${Math.max(0, w.alpha)})`;
+      ctx.lineWidth = 3;
+      ctx.shadowColor = w.color;
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
+      ctx.stroke();
+      // Inner echo ring (half radius, dimmer)
+      ctx.strokeStyle = `rgba(${wr},${wg},${wb},${Math.max(0, w.alpha * 0.5)})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(w.x, w.y, w.r * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Incoming-garbage meter — thin red bar on the left edge of the board,
+  // height proportional to pending attack lines. Only drawn in vs mode and
+  // only when there's actually something queued.
+  if (gameMode === 'vs' && activePlayer && activePlayer.incomingGarbage > 0) {
+    const meterW = Math.max(3, Math.floor(CELL * 0.18));
+    const totalH = ROWS * CELL;
+    const filledH = Math.min(ROWS, activePlayer.incomingGarbage) * CELL;
+    // Background strip
+    ctx.fillStyle = 'rgba(255, 0, 40, 0.12)';
+    ctx.fillRect(0, 0, meterW, totalH);
+    // Filled portion grows from the bottom up (rises on next lock)
+    const pulse = 0.75 + Math.sin(Date.now() / 140) * 0.25;
+    ctx.fillStyle = `rgba(255, 40, 60, ${pulse})`;
+    ctx.fillRect(0, totalH - filledH, meterW, filledH);
+    ctx.strokeStyle = 'rgba(255, 200, 200, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, totalH - filledH + 0.5, meterW - 1, filledH - 1);
+  }
+}
+
+function drawMiniPiece(context, type, ox, oy, cs) {
+  if (!type) return;
+  const def = PIECES[type];
+  for (const [bx, by] of def.shape) drawBlock(context, ox + bx * cs, oy + by * cs, def.color, cs);
+}
+
+function drawHold() {
+  holdCtx.fillStyle = 'rgba(8,8,16,1)';
+  holdCtx.fillRect(0, 0, holdCanvas.width, holdCanvas.height);
+  if (holdPieceType) {
+    // Auto-size and center based on canvas dimensions
+    const cs = Math.max(6, Math.min(16, Math.floor(holdCanvas.width / 6)));
+    const ox = Math.floor((holdCanvas.width - cs * 4) / 2);
+    const oy = Math.floor((holdCanvas.height - cs * 2) / 2);
+    drawMiniPiece(holdCtx, holdPieceType, ox, oy, cs);
+  }
+}
+
+function drawNext() {
+  nextCtx.fillStyle = 'rgba(8,8,16,1)';
+  nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+  // Show as many next pieces as fit. Layout adapts: horizontal if canvas is wide & short, vertical otherwise.
+  const nw = nextCanvas.width, nh = nextCanvas.height;
+  const horizontal = nh < 80;
+  if (horizontal) {
+    // Just show the immediate next piece, centered
+    const cs = Math.max(6, Math.min(12, Math.floor(nh / 3.5)));
+    const ox = Math.floor((nw - cs * 4) / 2);
+    const oy = Math.floor((nh - cs * 2) / 2);
+    if (nextQueue.length) drawMiniPiece(nextCtx, nextQueue[0], ox, oy, cs);
+  } else {
+    const cs = 16;
+    const count = Math.min(5, Math.floor((nh - 10) / 62), nextQueue.length);
+    for (let i = 0; i < count; i++) drawMiniPiece(nextCtx, nextQueue[i], 18, 10 + i * 62, cs);
+  }
+}
+
+function drawBackground() {
+  const theme = getTheme(level);
+  const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
+  bgCtx.fillStyle = `rgba(${r1},${g1},${b1},0.12)`;
+  bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+  const now = Date.now();
+  const hue = theme.particleHue;
+  const style = theme.particleStyle;
+  const beatBump = (beatPhase % 4 === 0) ? 1.6 : 1;
+  const isMono = style === 'dots'; // Donda is black & white
+
+  for (const p of bgParticles) {
+    // Movement varies by style
+    switch (style) {
+      case 'circles':
+        p.y -= p.speed * 0.5;
+        p.x += Math.sin(now / 2500 + p.phase) * 0.4;
+        break;
+      case 'notes':
+        p.y -= p.speed * 0.8;
+        p.x += Math.sin(now / 2000 + p.phase) * 0.6;
+        break;
+      case 'diamonds':
+        p.y -= p.speed * 0.3;
+        p.x += Math.cos(now / 1500 + p.phase) * 0.7;
+        p.rot += 0.01;
+        break;
+      case 'snow':
+        p.y += p.speed * 0.6;
+        p.x += Math.sin(now / 3000 + p.phase) * 0.8;
+        break;
+      case 'rings':
+        p.y -= p.speed * 0.2;
+        p.x += Math.sin(now / 2000 + p.phase) * 0.3;
+        break;
+      case 'glitch':
+        p.y -= p.speed * 0.1;
+        p.x += (Math.random() - 0.5) * 2;
+        if (Math.random() < 0.01) { p.x = Math.random() * bgCanvas.width; p.y = Math.random() * bgCanvas.height; }
+        break;
+      case 'rays':
+        p.y -= p.speed * 1.2;
+        break;
+      case 'dots':
+        p.y -= p.speed * 0.15;
+        p.x += Math.sin(now / 5000 + p.phase) * 0.15;
+        break;
+      default:
+        p.y -= p.speed;
+    }
+
+    // Wrap
+    if (p.y < -20) { p.y = bgCanvas.height + 20; p.x = Math.random() * bgCanvas.width; }
+    if (p.y > bgCanvas.height + 20) { p.y = -20; p.x = Math.random() * bgCanvas.width; }
+
+    const a = p.alpha * beatBump;
+
+    if (isMono) {
+      bgCtx.fillStyle = `rgba(255,255,255,${a * 0.6})`;
+    } else {
+      bgCtx.fillStyle = `hsla(${hue + Math.sin(p.phase) * 30}, 70%, 60%, ${a})`;
+    }
+
+    bgCtx.save();
+    bgCtx.translate(p.x, p.y);
+
+    switch (style) {
+      case 'diamonds':
+        bgCtx.rotate(p.rot);
+        const s = p.size * beatBump * 1.5;
+        bgCtx.beginPath();
+        bgCtx.moveTo(0, -s); bgCtx.lineTo(s, 0); bgCtx.lineTo(0, s); bgCtx.lineTo(-s, 0);
+        bgCtx.closePath(); bgCtx.fill();
+        break;
+      case 'rings':
+        bgCtx.strokeStyle = bgCtx.fillStyle;
+        bgCtx.lineWidth = 1;
+        const ringSize = p.size * beatBump * 3;
+        bgCtx.beginPath();
+        bgCtx.arc(0, 0, ringSize, 0, Math.PI * 2);
+        bgCtx.stroke();
+        break;
+      case 'glitch':
+        const gw = p.size * beatBump * 4;
+        const gh = p.size * beatBump * 1.5;
+        bgCtx.fillRect(-gw / 2, -gh / 2, gw, gh);
+        break;
+      case 'rays':
+        bgCtx.fillRect(-0.5, 0, 1, p.size * beatBump * 15);
+        break;
+      case 'snow':
+        bgCtx.globalAlpha = a;
+        bgCtx.beginPath();
+        // 6-point snowflake
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 3) * i;
+          bgCtx.moveTo(0, 0);
+          bgCtx.lineTo(Math.cos(angle) * p.size * 2, Math.sin(angle) * p.size * 2);
+        }
+        bgCtx.strokeStyle = `hsla(${hue}, 40%, 80%, ${a})`;
+        bgCtx.lineWidth = 0.5;
+        bgCtx.stroke();
+        break;
+      default:
+        bgCtx.beginPath();
+        bgCtx.arc(0, 0, p.size * beatBump, 0, Math.PI * 2);
+        bgCtx.fill();
+    }
+
+    bgCtx.restore();
+  }
+}
+
+function drawParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= p.decay;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+function updateUI() {
+  document.getElementById('score-display').textContent = Math.floor(score).toLocaleString();
+  document.getElementById('level-display').textContent = `Level ${level}`;
+  document.getElementById('lines-display').textContent = `Lines: ${lines}`;
+  document.getElementById('zone-bar').style.width = zoneEnergy + '%';
+}
+// Updates the small "ALFRED · <score> · <lines>L" strip that lives next to
+// Alfred's mini board header in vs mode.
+function updateP2Stats() {
+  const el = document.getElementById('p2-score');
+  const el2 = document.getElementById('p2-lines');
+  if (!el || !el2) return;
+  const p2 = players[1];
+  if (!p2) return;
+  el.textContent = Math.floor(p2.score).toLocaleString();
+  el2.textContent = p2.lines;
+}
+
+// ============================================================
+// AI (ALFRED) — plans each piece greedily, executes moves with a small
+// cooldown so it looks like a player rather than a snap. Heuristic is a
+// Dellacherie-lite: penalise holes and aggregate height, reward line clears.
+// ============================================================
+function aiRotateShape(piece, dir) {
+  let cx = 0, cy = 0;
+  for (const [bx, by] of piece) { cx += bx; cy += by; }
+  cx /= piece.length; cy /= piece.length;
+  return piece.map(([bx, by]) => {
+    const rx = bx - cx, ry = by - cy;
+    return dir === 1 ? [Math.round(cx - ry), Math.round(cy + rx)]
+                     : [Math.round(cx + ry), Math.round(cy - rx)];
+  });
+}
+function aiLandingY(board, piece, px) {
+  // Find the lowest y where the piece can sit at column px without overlapping.
+  let py = 0;
+  while (true) {
+    const nextY = py + 1;
+    let collide = false;
+    for (const [bx, by] of piece) {
+      const nx = px + bx, ny = nextY + by;
+      if (nx < 0 || nx >= COLS) return null;       // piece horizontally OOB
+      if (ny >= ROWS) { collide = true; break; }
+      if (ny >= 0 && board[ny][nx]) { collide = true; break; }
+    }
+    if (collide) break;
+    py = nextY;
+    if (py > ROWS + 4) { collide = true; break; }  // safety
+  }
+  return py;
+}
+function aiEvalBoard(b) {
+  const heights = new Array(COLS).fill(0);
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r < ROWS; r++) {
+      if (b[r][c]) { heights[c] = ROWS - r; break; }
+    }
+  }
+  let holes = 0;
+  for (let c = 0; c < COLS; c++) {
+    let seen = false;
+    for (let r = 0; r < ROWS; r++) {
+      if (b[r][c]) seen = true;
+      else if (seen) holes++;
+    }
+  }
+  let bump = 0;
+  for (let i = 0; i < COLS - 1; i++) bump += Math.abs(heights[i] - heights[i+1]);
+  const aggH = heights.reduce((a, v) => a + v, 0);
+  return { aggH, holes, bump };
+}
+function aiCountLinesCleared(b) {
+  let cleared = 0;
+  for (const row of b) if (row.every(c => c)) cleared++;
+  return cleared;
+}
+function aiPlanMove(p) {
+  let shape = p.currentPiece.map(q => [...q]);
+  const candidates = [];
+  for (let rot = 0; rot < 4; rot++) {
+    let minX = Infinity, maxX = -Infinity;
+    for (const [bx] of shape) { if (bx < minX) minX = bx; if (bx > maxX) maxX = bx; }
+    for (let px = -minX; px <= COLS - 1 - maxX; px++) {
+      const py = aiLandingY(p.board, shape, px);
+      if (py === null) continue;
+      const sim = p.board.map(row => row.slice());
+      let topOut = false;
+      for (const [bx, by] of shape) {
+        const nx = px + bx, ny = py + by;
+        if (ny < 0) { topOut = true; break; }
+        sim[ny][nx] = 'x';
+      }
+      if (topOut) continue;
+      const cleared = aiCountLinesCleared(sim);
+      const compact = sim.filter(r => !r.every(c => c));
+      while (compact.length < ROWS) compact.unshift(new Array(COLS).fill(null));
+      const m = aiEvalBoard(compact);
+      const score = 1.5 * cleared - 4.0 * m.holes - 0.55 * m.aggH - 0.25 * m.bump;
+      candidates.push({ score, rotations: rot, col: px });
+    }
+    shape = aiRotateShape(shape, 1);
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => b.score - a.score);
+  // Difficulty tuning — occasionally pick a weaker placement instead of the
+  // optimal one so Alfred feels beatable. On a successful "mistake" we pick
+  // from the 2nd-to-5th best moves, which are typically close-but-not-ideal
+  // rather than catastrophic.
+  const mistakeChance = p.ai.mistakeChance ?? 0.22;
+  if (candidates.length > 1 && Math.random() < mistakeChance) {
+    const pick = 1 + Math.floor(Math.random() * Math.min(4, candidates.length - 1));
+    return candidates[pick];
+  }
+  return candidates[0];
+}
+function aiTick(p /*, timestamp */) {
+  if (!gameStarted || p.gameOver || paused) return;
+  const ai = p.ai;
+  if (!ai.plan) {
+    const plan = aiPlanMove(p);
+    if (!plan) return;
+    ai.plan = Object.assign(plan, { rotationsDone: 0, stuckFrames: 0 });
+    ai.stepCooldown = ai.thinkPause;
+    return;
+  }
+  if (ai.stepCooldown > 0) { ai.stepCooldown--; return; }
+  ai.stepCooldown = ai.movePause;
+  const plan = ai.plan;
+  if (plan.rotationsDone < plan.rotations) {
+    rotatePiece(1);
+    plan.rotationsDone++;
+    return;
+  }
+  if (currentX < plan.col)      { moveRight(); }
+  else if (currentX > plan.col) { moveLeft();  }
+  else { hardDrop(); ai.plan = null; ai.stepCooldown = ai.dropPause; return; }
+  plan.stuckFrames = (plan.stuckFrames || 0) + 1;
+  if (plan.stuckFrames > 20) { hardDrop(); ai.plan = null; ai.stepCooldown = ai.dropPause; }
+}
+
+// ============================================================
+// GAME LOOP
+// ============================================================
+// Single-player-style tick that operates on whichever player is currently
+// active in the globals. Unchanged from before; called once per player.
+function update(timestamp) {
+  if (!gameStarted || gameOver || paused) return;
+  if (timestamp - lastDrop > dropInterval) {
+    if (!collides(currentPiece, currentX, currentY + 1)) {
+      currentY++;
+      isLocking = false;
+    } else {
+      if (!isLocking) { isLocking = true; lockTimer = timestamp; }
+      else if (timestamp - lockTimer > lockDelay) lockPiece();
+    }
+    lastDrop = timestamp;
+  }
+  if (zoneActive) {
+    zoneTimer -= 16.67;
+    if (zoneTimer <= 0) { zoneActive = false; document.getElementById('game-container').classList.remove('zone-active'); }
+  }
+}
+
+function render(timestamp) {
+  animFrame = requestAnimationFrame(render);
+  drawBackground();
+  // Screen-shake decay applied via CSS transform on the main canvas. Cheaper
+  // than redrawing into a translated context, and respects the per-player
+  // canvas swap because we always target the *active* canvas.
+  if (shakeFrames > 0) {
+    shakeFrames--;
+    const m = shakeMag * (shakeFrames / 28);
+    const dx = (Math.random() - 0.5) * 2 * m;
+    const dy = (Math.random() - 0.5) * 2 * m;
+    const rot = (Math.random() - 0.5) * (m * 0.012);
+    const target = (players[0] && players[0].mainCanvas) || mainCanvas;
+    target.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}rad)`;
+    if (shakeFrames === 0) {
+      shakeMag = 0;
+      target.style.transform = '';
+    }
+  }
+  // Pre-game: only the background animates behind the start screen.
+  // `board` is undefined until startGame() fills it, so we skip all board
+  // drawing here — matches original behaviour (the start-screen overlay
+  // hides the un-rendered canvas anyway).
+  if (!gameStarted) return;
+  // Tick and draw each player in turn. Solo mode has one player so this
+  // loop does a single iteration and behaves identically to before.
+  for (const p of players) {
+    setActivePlayer(p);
+    if (p.isAI) aiTick(p, timestamp);
+    // Remote (PvP) players are driven entirely by incoming `state` messages.
+    // Skip the local simulation — we only paint their latest snapshot.
+    if (!p.isRemote) update(timestamp);
+    drawBoard();
+    drawParticles();
+    if (p.holdCanvas) drawHold();
+    if (p.nextCanvas) drawNext();
+    if (!p.isAI && !p.isRemote) updateUI();
+  }
+  // Leave P1 active for input handlers between frames.
+  if (players[0]) setActivePlayer(players[0]);
+  if (gameMode === 'vs') updateP2Stats();
+}
+
+// ============================================================
+// INPUT
+// ============================================================
+const keys = {};
+const dasTimer = {};
+const DAS = 133, ARR = 30;
+
+document.addEventListener('keydown', (e) => {
+  if (gameOver || !gameStarted) return;
+  if (paused && e.key !== 'p' && e.key !== 'P') return;
+  switch (e.key) {
+    case 'ArrowLeft': case 'a': case 'A':
+      if (!keys['left']) { moveLeft(); keys['left'] = true; dasTimer['left'] = Date.now(); } break;
+    case 'ArrowRight': case 'd': case 'D':
+      if (!keys['right']) { moveRight(); keys['right'] = true; dasTimer['right'] = Date.now(); } break;
+    case 'ArrowDown': case 's': case 'S':
+      if (!keys['down']) { softDrop(); keys['down'] = true; dasTimer['down'] = Date.now(); } break;
+    case 'ArrowUp': case 'w': case 'W': case 'x': case 'X':
+      rotatePiece(1); break;
+    case 'z':
+      if (!e.shiftKey && !e.ctrlKey) activateZone(); break;
+    case 'Z': activateZone(); break;
+    case ' ': e.preventDefault(); hardDrop(); break;
+    case 'Shift': case 'c': case 'C': holdCurrentPiece(); break;
+    case 'g': case 'G': setShowGhost(!showGhost); break;
+    case 'v': case 'V': setVoiceEnabled(!voiceEnabled); break;
+    case 'p': case 'P':
+      paused = !paused;
+      if (paused) audioEngine.stop(); else audioEngine.start();
+      break;
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  switch (e.key) {
+    case 'ArrowLeft': case 'a': case 'A': keys['left'] = false; break;
+    case 'ArrowRight': case 'd': case 'D': keys['right'] = false; break;
+    case 'ArrowDown': case 's': case 'S': keys['down'] = false; break;
+  }
+});
+
+setInterval(() => {
+  if (gameOver || !gameStarted || paused) return;
+  const now = Date.now();
+  if (keys['left'] && now - dasTimer['left'] > DAS) moveLeft();
+  if (keys['right'] && now - dasTimer['right'] > DAS) moveRight();
+  if (keys['down'] && now - dasTimer['down'] > DAS) softDrop();
+}, ARR);
+
+// ============================================================
+// TOUCH INPUT
+// ============================================================
+function togglePause() {
+  if (!gameStarted || gameOver) return;
+  paused = !paused;
+  if (paused) audioEngine.stop(); else audioEngine.start();
+}
+
+function doAction(action) {
+  if (!gameStarted || gameOver || paused) {
+    if (action === 'pause') togglePause();
+    return;
+  }
+  switch (action) {
+    case 'left': moveLeft(); break;
+    case 'right': moveRight(); break;
+    case 'down': softDrop(); break;
+    case 'rotate': rotatePiece(1); break;
+    case 'harddrop': hardDrop(); break;
+    case 'hold': holdCurrentPiece(); break;
+    case 'zone': activateZone(); break;
+    case 'pause': togglePause(); break;
+  }
+}
+
+// Touch button handling with auto-repeat for directional keys
+const REPEAT_ACTIONS = { left: true, right: true, down: true };
+const touchBtnState = {};
+document.querySelectorAll('#touch-controls .tc-btn').forEach(btn => {
+  const action = btn.dataset.action;
+  const press = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    btn.classList.add('tc-pressed');
+    doAction(action);
+    if (REPEAT_ACTIONS[action]) {
+      // Initial delay then repeat
+      clearTimeout(touchBtnState[action + '_t']);
+      clearInterval(touchBtnState[action + '_i']);
+      touchBtnState[action + '_t'] = setTimeout(() => {
+        touchBtnState[action + '_i'] = setInterval(() => doAction(action), ARR);
+      }, DAS);
+    }
+  };
+  const release = (e) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    btn.classList.remove('tc-pressed');
+    if (REPEAT_ACTIONS[action]) {
+      clearTimeout(touchBtnState[action + '_t']);
+      clearInterval(touchBtnState[action + '_i']);
+    }
+  };
+  btn.addEventListener('touchstart', press, { passive: false });
+  btn.addEventListener('touchend', release, { passive: false });
+  btn.addEventListener('touchcancel', release, { passive: false });
+  // Also support mouse for desktop testing
+  btn.addEventListener('mousedown', press);
+  btn.addEventListener('mouseup', release);
+  btn.addEventListener('mouseleave', release);
+  // Prevent default click
+  btn.addEventListener('click', (e) => e.preventDefault());
+});
+
+// Swipe gestures on main canvas
+(function setupSwipe() {
+  let startX = 0, startY = 0, startTime = 0, lastMoveX = 0, lastMoveY = 0;
+  let endX = 0, endY = 0;
+  let moved = false;
+  let swipeActive = false;
+  let startedOnPiece = false;
+  const SWIPE_THRESHOLD = 20; // px per move step
+  const TAP_MAX_DIST = 12;
+  const TAP_MAX_TIME = 250;
+  const HARD_DROP_VELOCITY = 0.8; // px/ms
+
+  // Is this touch point inside one of the currently-falling piece's cells?
+  // Used so a tap on the piece itself triggers hold (like pressing Shift),
+  // while a tap anywhere else on the board still rotates.
+  function isTouchOnPiece(clientX, clientY) {
+    if (!currentPiece) return false;
+    const rect = mainCanvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return false;
+    const bx = (clientX - rect.left) * (mainCanvas.width / rect.width);
+    const by = (clientY - rect.top) * (mainCanvas.height / rect.height);
+    const cellX = Math.floor(bx / CELL);
+    const cellY = Math.floor(by / CELL);
+    // currentPiece is itself the array of [dx, dy] offsets (not piece.shape).
+    for (const [dx, dy] of currentPiece) {
+      if (currentX + dx === cellX && currentY + dy === cellY) return true;
+    }
+    return false;
+  }
+
+  mainCanvas.addEventListener('touchstart', (e) => {
+    if (!gameStarted || gameOver || paused) return;
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    startX = lastMoveX = endX = t.clientX;
+    startY = lastMoveY = endY = t.clientY;
+    startTime = Date.now();
+    moved = false;
+    swipeActive = true;
+    startedOnPiece = isTouchOnPiece(t.clientX, t.clientY);
+  }, { passive: false });
+
+  mainCanvas.addEventListener('touchmove', (e) => {
+    if (!swipeActive) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    // Track latest point every move so touchend always sees net travel,
+    // even for smooth flicks that don't cross the per-step threshold.
+    endX = t.clientX;
+    endY = t.clientY;
+    const dx = t.clientX - lastMoveX;
+    const dy = t.clientY - lastMoveY;
+    // Horizontal movement -> step piece
+    if (Math.abs(dx) >= SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+      if (dx > 0) moveRight(); else moveLeft();
+      lastMoveX = t.clientX;
+      lastMoveY = t.clientY;
+      moved = true;
+    }
+    // Downward soft drop
+    else if (dy >= SWIPE_THRESHOLD && Math.abs(dy) > Math.abs(dx)) {
+      softDrop();
+      lastMoveX = t.clientX;
+      lastMoveY = t.clientY;
+      moved = true;
+    }
+  }, { passive: false });
+
+  mainCanvas.addEventListener('touchend', (e) => {
+    if (!swipeActive) return;
+    e.preventDefault();
+    swipeActive = false;
+    const totalDx = endX - startX;
+    const totalDy = endY - startY;
+    const dt = Date.now() - startTime;
+    const dist = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+    // Flick up -> hard drop. The old guard required `!moved`, but a quick
+    // side-nudge-then-flick would set moved=true and block the drop — now we
+    // only require net upward motion that's clearly vertical.
+    if (totalDy < -50 && Math.abs(totalDy) > Math.abs(totalDx) * 1.2) {
+      hardDrop();
+      return;
+    }
+    // Strong downward flick -> hard drop
+    if (totalDy > 60 && dt > 0 && (totalDy / dt) > HARD_DROP_VELOCITY && Math.abs(totalDy) > Math.abs(totalDx) * 1.5) {
+      hardDrop();
+      return;
+    }
+    // Tap: on the piece -> hold, elsewhere on the board -> rotate.
+    if (!moved && dist < TAP_MAX_DIST && dt < TAP_MAX_TIME) {
+      if (startedOnPiece) holdCurrentPiece();
+      else rotatePiece(1);
+    }
+  }, { passive: false });
+
+  mainCanvas.addEventListener('touchcancel', () => { swipeActive = false; }, { passive: false });
+})();
+
+// Prevent double-tap zoom / pull-to-refresh on touch devices during gameplay
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.body.addEventListener('touchmove', (e) => {
+  if (gameStarted && !gameOver) e.preventDefault();
+}, { passive: false });
+
+// ============================================================
+// INIT
+// ============================================================
+function startGame() {
+  // VS FRIEND is driven by the lobby — skip if the WS match hasn't started.
+  if (gameMode === 'human' && !NET.matchStarted) {
+    openLobby();
+    return;
+  }
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('game-over-screen').style.display = 'none';
+  const vsRes = document.getElementById('vs-result-screen');
+  if (vsRes) vsRes.style.display = 'none';
+  _vsResultShown = false;
+
+  // Build the player roster based on selected mode.
+  players = [];
+  activePlayer = null;
+  const p1 = createPlayer({
+    id: 1, isAI: false, name: 'You',
+    mainCanvas: document.getElementById('main-canvas'),
+    holdCanvas: document.getElementById('hold-canvas'),
+    nextCanvas: document.getElementById('next-canvas'),
+  });
+  players.push(p1);
+  if (gameMode === 'vs') {
+    document.body.classList.add('vs-mode');
+    const p2 = createPlayer({
+      id: 2, isAI: true, name: 'Alfred',
+      mainCanvas: document.getElementById('main-canvas-2'),
+      holdCanvas: null, nextCanvas: null,
+    });
+    p1.opponent = p2; p2.opponent = p1;
+    players.push(p2);
+  } else if (gameMode === 'human') {
+    document.body.classList.add('vs-mode');
+    const p2 = createPlayer({
+      id: 2, isAI: false, name: NET.opponentName || 'OPPONENT',
+      mainCanvas: document.getElementById('main-canvas-2'),
+      holdCanvas: null, nextCanvas: null,
+    });
+    p2.isRemote = true;
+    p1.opponent = p2; p2.opponent = p1;
+    players.push(p2);
+  } else {
+    document.body.classList.remove('vs-mode');
+  }
+
+  // Initialise each player's game state.
+  for (const p of players) {
+    setActivePlayer(p);
+    initBoard();
+    score = 0; lines = 0; level = 1; prevLevel = 1; combo = -1;
+    zoneEnergy = 0; zoneActive = false;
+    holdPieceType = null; bag = []; nextQueue = [];
+    gameOver = false;
+    dropInterval = computeDropInterval(level); lockDelay = computeLockDelay(level);
+    particles = []; levelTransitionAlpha = 0;
+    fillNextQueue();
+    spawnPiece();
+    lastDrop = performance.now();
+  }
+  // Ensure P1 is active when the game starts so input affects the human.
+  setActivePlayer(p1);
+  paused = false;
+  beatPhase = 0;
+
+  const theme = getTheme(1);
+  document.getElementById('era-display').textContent = theme.name;
+  mainCanvas.style.boxShadow = `0 0 60px ${theme.colors.glow}33, 0 0 120px ${theme.colors.glow}15`;
+
+  resizeCanvases();
+  audioEngine.init();
+  // Now that the AudioContext exists, kick off voice-engine MP3 preload so
+  // the first Tetris clear doesn't miss its announcer callout waiting on fetch.
+  voiceEngine.prime();
+  // iOS Safari: AudioContext starts "suspended" and needs a user gesture.
+  // resume() is async — we must await it before the scheduler starts, otherwise
+  // notes get scheduled on a context that isn't running yet and nothing plays.
+  if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+    audioEngine.ctx.resume().then(() => audioEngine.start());
+  } else {
+    audioEngine.start();
+  }
+  initBgParticles();
+  gameStarted = true;
+
+  // VS FRIEND: begin state stream to opponent on a 10 Hz interval.
+  if (gameMode === 'human' && NET.matchStarted) beginNetStateStream();
+}
+
+// Called from the lobby's `start` message — seed's already been applied.
+function startNetworkMatch() { gameMode = 'human'; startGame(); }
+
+// Push state 10Hz to the opponent. Piece type included so their ghost of our
+// current piece can be drawn. Falls back to no-op if WS isn't open.
+let _netStreamTimer = null;
+function beginNetStateStream() {
+  stopNetStateStream();
+  _netStreamTimer = setInterval(() => {
+    if (!gameStarted || !NET.matchStarted) return stopNetStateStream();
+    const p = players[0]; if (!p) return;
+    // Flush active globals to p so we read a consistent frame.
+    for (const f of PLAYER_FIELDS) p[f] = globalThis[f];
+    // Compact board encoding: single string of hex ints, null→'.'.
+    // The 10-column row fits in one compact run. Faster than per-cell JSON.
+    const colorIdx = {};
+    const palette = [];
+    const flat = [];
+    const b = p.board;
+    if (!b) return;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const v = b[r][c];
+        if (!v) { flat.push(-1); continue; }
+        if (!(v in colorIdx)) { colorIdx[v] = palette.length; palette.push(v); }
+        flat.push(colorIdx[v]);
+      }
+    }
+    netSend({
+      type: 'state',
+      board: flat, palette,
+      score: Math.floor(p.score), lines: p.lines, level: p.level,
+      pieceType: p.currentType, px: p.currentX, py: p.currentY,
+      piece: p.currentPiece,
+      incomingGarbage: p.incomingGarbage | 0,
+    });
+  }, 100);
+}
+function stopNetStateStream() {
+  if (_netStreamTimer) clearInterval(_netStreamTimer);
+  _netStreamTimer = null;
+}
+
+// Receiver: paint opponent's snapshot into P2's slot. P2 is flagged
+// `isRemote` so the main loop doesn't run `update()` on it — we only draw.
+function applyRemoteState(msg) {
+  const p2 = players[1]; if (!p2 || !p2.isRemote) return;
+  if (Array.isArray(msg.board) && Array.isArray(msg.palette)) {
+    const b = p2.board || Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const idx = msg.board[r * COLS + c];
+        b[r][c] = idx < 0 ? null : (msg.palette[idx] || null);
+      }
+    }
+    p2.board = b;
+  }
+  p2.score = msg.score | 0; p2.lines = msg.lines | 0; p2.level = msg.level | 0;
+  p2.currentType = msg.pieceType || null;
+  p2.currentX = msg.px | 0; p2.currentY = msg.py | 0;
+  p2.currentPiece = Array.isArray(msg.piece) ? msg.piece : null;
+  p2.incomingGarbage = msg.incomingGarbage | 0;
+}
+
+// Garbage from opponent — same contract as the local Alfred mode: when you
+// clear, attack lands on opponent; if you DON'T clear on next lock, your
+// pending garbage rises. `applyRemoteGarbage` increments P1's pending total.
+function applyRemoteGarbage(n) {
+  const p1 = players[0]; if (!p1 || n <= 0) return;
+  p1.incomingGarbage = (p1.incomingGarbage | 0) + n;
+  // If P1 is the active player (usually true), also mirror to the global.
+  if (activePlayer === p1) globalThis.incomingGarbage = p1.incomingGarbage;
+}
+
+function handleNetworkResult(msg) {
+  stopNetStateStream();
+  // Force gameOver on our side so input stops; show a simple result overlay.
+  gameOver = true;
+  _vsResultShown = true;
+  const p1 = players[0] || {}, p2 = players[1] || {};
+  const title = document.getElementById('vs-result-title');
+  title.textContent = msg.youWon ? 'YOU WIN' : (msg.reason === 'disconnect' ? 'OPPONENT LEFT' : `${(NET.opponentName || 'OPPONENT')} WINS`);
+  title.classList.toggle('lose', !msg.youWon);
+  document.getElementById('vs-result-sub').innerHTML =
+    `You: ${(p1.score|0).toLocaleString()} · ${p1.lines|0} lines<br>` +
+    `${(NET.opponentName || 'Opponent')}: ${(p2.score|0).toLocaleString()} · ${p2.lines|0} lines`;
+  document.getElementById('vs-result-screen').style.display = 'flex';
+  audioEngine.stop();
+  NET.matchStarted = false;
+}
+
+function openLobby() {
+  document.getElementById('lobby-screen').classList.add('visible');
+  setLobbyStatus('');
+  resetLobbyView();
+  setLobbyPanel('create');
+  // Probe via the HTTP /api/health rather than pre-opening a WS — opening a WS
+  // without a code on the Cloudflare Worker would mint a throwaway room.
+  probeServer().then(ok => {
+    if (!ok) setLobbyStatus('Multiplayer server not reachable', true);
+    else updateLobbyBadge('ready', 'ok');
+  });
+}
+function resetLobbyView() {
+  const codeEl = document.getElementById('lobby-room-code');
+  if (codeEl) { codeEl.textContent = '————'; codeEl.style.display = ''; }
+  const peer = document.getElementById('lobby-peer-status');
+  if (peer) peer.textContent = 'Waiting for opponent…';
+  const startBtn = document.getElementById('lobby-start-btn');
+  if (startBtn) startBtn.disabled = true;
+  const idle = document.getElementById('lobby-create-idle');
+  const live = document.getElementById('lobby-create-live');
+  if (idle) idle.style.display = '';
+  if (live) live.style.display = 'none';
+  const joinInput = document.getElementById('lobby-join-input');
+  if (joinInput) joinInput.value = '';
+}
+function closeLobby() {
+  document.getElementById('lobby-screen').classList.remove('visible');
+  document.getElementById('start-screen').style.display = 'flex';
+  renderStartLeaderboard();
+}
+function setLobbyPanel(which) {
+  document.querySelectorAll('#lobby-screen .lm-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.lm === which);
+  });
+  document.querySelectorAll('#lobby-screen .section').forEach(s => {
+    s.classList.toggle('active', s.dataset.section === which);
+  });
+}
+// When the user switches tabs while holding a room, drop the room so they can
+// cleanly take the other path. Safe-guarded: only sends `leave` if we're
+// actually holding a room code.
+function leaveCurrentRoom() {
+  if (NET.roomCode) {
+    netSend({ type: 'leave' });
+    NET.roomCode = null;
+    NET.isHost = false;
+    NET.opponentName = null;
+  }
+  resetLobbyView();
+}
+
+// Prime the voice engine on any user gesture that starts a game session —
+// Safari/iOS require at least one speak() call inside a real click handler
+// before it will play audio from async contexts (the game loop).
+function primeVoiceOnClick() { try { voiceEngine.prime(); } catch {} }
+document.getElementById('start-btn').addEventListener('click', () => { primeVoiceOnClick(); startGame(); });
+document.getElementById('start-btn-2').addEventListener('click', () => { primeVoiceOnClick(); startGame(); });
+document.getElementById('vs-replay-btn').addEventListener('click', () => {
+  document.getElementById('vs-result-screen').style.display = 'none';
+  document.getElementById('start-screen').style.display = 'flex';
+  renderStartLeaderboard();
+  gameStarted = false;
+  // If we were in a PvP match, leave the room so the next round is clean.
+  if (gameMode === 'human') lobbyLeave();
+});
+
+// Lobby button wiring — explicit flows, no auto-create.
+(function wireLobby() {
+  const byId = id => document.getElementById(id);
+  const nameInput = byId('lobby-name-input');
+  const getName = () => ((nameInput && nameInput.value) || 'YOU').slice(0, 3) || 'YOU';
+
+  // Normalise initials input.
+  if (nameInput) nameInput.addEventListener('input', () => {
+    const v = nameInput.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3);
+    if (nameInput.value !== v) nameInput.value = v;
+  });
+
+  // Tab switch: leave any room we're holding, reset the view. ONE handler.
+  document.querySelectorAll('#lobby-screen .lm-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      setLobbyPanel(b.dataset.lm);
+      leaveCurrentRoom();
+      setLobbyStatus('');
+    });
+  });
+
+  // CREATE ROOM button: connect, hello, create. After this, we wait for
+  // `room` + `peer` messages; START MATCH enables when opponent joins.
+  const createBtn = byId('lobby-create-btn');
+  if (createBtn) createBtn.addEventListener('click', async () => {
+    setLobbyStatus('Connecting…');
+    try {
+      await netConnect({ code: 'CREATE' });
+      netSend({ type: 'hello', name: getName() });
+      netSend({ type: 'create' });
+      // Show the "waiting for opponent" half once we get the `room` reply.
+    } catch {
+      setLobbyStatus('Cannot reach server', true);
+    }
+  });
+
+  // JOIN ROOM button: connect, hello, join with the entered code. On success
+  // the server sends `room` + `peer` back — we fall into the same match-start
+  // path as the host.
+  const joinBtn = byId('lobby-join-btn');
+  if (joinBtn) joinBtn.addEventListener('click', async () => {
+    const code = (byId('lobby-join-input').value || '').toUpperCase().slice(0, 4);
+    if (code.length !== 4) return setLobbyStatus('Enter a 4-character code', true);
+    setLobbyStatus('Joining…');
+    try {
+      await netConnect({ code });
+      netSend({ type: 'hello', name: getName() });
+      netSend({ type: 'join', code });
+    } catch {
+      setLobbyStatus('Cannot reach server', true);
+    }
+  });
+
+  const startBtn = byId('lobby-start-btn');
+  if (startBtn) startBtn.addEventListener('click', () => { primeVoiceOnClick(); lobbyStartMatch(); });
+
+  ['lobby-cancel-btn', 'lobby-cancel-btn-2'].forEach(id => {
+    const el = byId(id);
+    if (el) el.addEventListener('click', () => {
+      lobbyLeave();
+      closeLobby();
+    });
+  });
+
+  const joinInput = byId('lobby-join-input');
+  if (joinInput) {
+    joinInput.addEventListener('input', () => {
+      const v = joinInput.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 4);
+      if (joinInput.value !== v) joinInput.value = v;
+    });
+    joinInput.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); byId('lobby-join-btn')?.click(); }
+    });
+  }
+})();
+
+// Initials entry — force uppercase + [A-Z0-9] only, submit on Enter. Keeps
+// the arrow keys from bubbling to the game's keydown listener (harmless today
+// because the listener early-returns on gameOver, but a defensive stopProp
+// here lets future refactors not accidentally regress).
+(function wireInitialsEntry() {
+  const input = document.getElementById('initials-input');
+  const btn = document.getElementById('initials-submit');
+  if (!input || !btn) return;
+  input.addEventListener('input', () => {
+    const clean = input.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3);
+    if (input.value !== clean) input.value = clean;
+  });
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); submitInitials(); }
+  });
+  btn.addEventListener('click', submitInitials);
+})();
+
+// Paint the start-screen leaderboard on first load so returning players see
+// their scores before the first game of the session. Also poll the shared
+// server every 30s while the start screen is visible so a score landed on
+// another device shows up here without a page reload.
+renderStartLeaderboard();
+setInterval(() => {
+  const startVisible = document.getElementById('start-screen').style.display !== 'none';
+  if (startVisible) refreshSharedLeaderboard();
+}, 30_000);
+
+// Mode selector (Solo / Vs Alfred) on the start screen.
+(function wireModeSelect() {
+  const btns = document.querySelectorAll('.mode-btn');
+  btns.forEach(btn => btn.addEventListener('click', () => {
+    gameMode = btn.dataset.mode;
+    btns.forEach(b => b.classList.toggle('mode-active', b === btn));
+  }));
+})();
+
+// Sync voice toggle with saved preference and wire the checkbox.
+(function wireVoiceToggle() {
+  const cb = document.getElementById('voice-toggle');
+  if (!cb) return;
+  cb.checked = voiceEnabled;
+  cb.addEventListener('change', () => setVoiceEnabled(cb.checked));
+})();
+
+// Sync ghost toggle with saved preference and wire the checkbox.
+(function wireGhostToggle() {
+  const cb = document.getElementById('ghost-toggle');
+  if (!cb) return;
+  cb.checked = showGhost;
+  cb.addEventListener('change', () => setShowGhost(cb.checked));
+})();
+
+particles = [];
+bgParticles = [];
+beatPhase = 0;
+level = 1;
+initBgParticles();
+render(0);
+</script>
+</body>
+</html>

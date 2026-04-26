@@ -1,0 +1,39 @@
+# Cloudflare Worker config for Tetris Beats backend.
+#
+# Provisioning is one-time:
+#   1. `npm install -g wrangler` (or use `npx wrangler` everywhere)
+#   2. `wrangler login`        — browser auth, opens once
+#   3. `wrangler kv:namespace create SCORES`
+#      → copy the returned id into the `[[kv_namespaces]]` block below
+#   4. `wrangler deploy`       — first deploy (creates the worker + binds KV/DO)
+#
+# After that, every `wrangler deploy` updates the live worker in ~5s. The
+# GitHub Action wired in .github/workflows/deploy.yml does this on every push.
+
+name = "tetris-beats"
+main = "index.js"
+compatibility_date = "2024-09-01"
+
+# KV namespace for the leaderboard. Replace `id` after running
+# `wrangler kv:namespace create SCORES`. The `preview_id` is used by
+# `wrangler dev` and can be the same value.
+[[kv_namespaces]]
+binding = "SCORES"
+id = "REPLACE_WITH_KV_ID"
+preview_id = "REPLACE_WITH_KV_ID"
+
+# Durable Object class for PvP rooms. Each 4-letter code maps to one Room
+# instance via idFromName(code). Cloudflare's free tier covers 1M req/day.
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["Room"]
+
+# `wrangler dev` runs the worker locally on http://localhost:8787 with the same
+# bindings (KV is emulated, Durable Objects use a local SQLite shadow). Use it
+# to test the API + WS without deploying.
+[dev]
+port = 8787

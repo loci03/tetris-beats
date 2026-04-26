@@ -1,0 +1,14 @@
+{
+  "name": "tetris-beats-server",
+  "version": "1.0.0",
+  "description": "Tetris Beats — shared leaderboard + PvP lobbies over LAN/Tailscale",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "ws": "^8.18.0"
+  }
+}
