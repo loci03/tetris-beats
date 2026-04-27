@@ -1601,8 +1601,8 @@ const LEVEL_THEMES = [
     // code stream + line-clear shockwave.
     colors: { bg1: '#020806', bg2: '#000503', accent: '#00ff41', glow: '#39ff7e' },
     particleHue: 130,
-    particleStyle: 'balloons', // hot-air balloons drifting up, reactive
-    blockStyle: 'matrix',      // dark cell + falling-code glyph (drawBlockMatrix)
+    particleStyle: 'matrix-rain', // vertical katakana code rain (drawMatrixRain)
+    blockStyle: 'matrix',         // dark cell + falling-code glyph (drawBlockMatrix)
     blockGlow: 12,
     // Procedural fallback drum/bass — used only if back-for-more.mp3 fails
     // to load. Mid-tempo trap-leaning beat so the level still has a pulse.
@@ -3555,57 +3555,35 @@ function spawnParticles(x, y, color, count) {
 function initBgParticles() {
   bgParticles = [];
   const theme = getTheme(level);
-  // Violins + balloons are large physical objects (not motes), so we
-  // render fewer of them at a much bigger base size — the screen would
-  // otherwise feel like a violin warehouse explosion. Donda stays minimal
-  // at 30 dots.
-  const count = theme.particleStyle === 'dots' ? 30
+  // Violins are large physical objects (not motes), so we render fewer of
+  // them at a much bigger base size. Matrix-rain manages its own column
+  // state in drawMatrixRain (no per-particle loop), so 0 particles here.
+  // Donda stays minimal at 30 dots.
+  const count = theme.particleStyle === 'matrix-rain' ? 0
+              : theme.particleStyle === 'dots' ? 30
               : theme.particleStyle === 'violins' ? 18
-              : theme.particleStyle === 'balloons' ? 12
               : 80;
   const isViolins  = theme.particleStyle === 'violins';
-  const isBalloons = theme.particleStyle === 'balloons';
-  // Curated balloon palette — warm, festival-fair colours so the rising
-  // balloons feel celebratory against the Matrix-green play area.
-  const BALLOON_HUES = [350, 30, 50, 110, 200, 270, 320];
   for (let i = 0; i < count; i++) {
-    const p = {
+    bgParticles.push({
       x: Math.random() * bgCanvas.width,
-      // Stagger the initial Y across a taller-than-screen range so violins/
-      // balloons are already mid-flight on first frame instead of dumping
-      // in a row.
-      y: (isViolins || isBalloons)
+      // Stagger the initial Y across a taller-than-screen range so violins
+      // are already mid-flight on first frame instead of dumping in a row.
+      y: isViolins
          ? Math.random() * bgCanvas.height * 2 - bgCanvas.height * 0.5
          : Math.random() * bgCanvas.height,
       // Bumped 0.5–3.5 → 14–28 for violins so the silhouette renders large
-      // enough to read as a violin (not a smudge). Balloons even bigger
-      // (28–58) — they're meant to feel like real hot-air balloons in the
-      // distance, not party balloons.
-      size: isBalloons ? 28 + Math.random() * 30
-          : isViolins  ? 14 + Math.random() * 14
-          : Math.random() * 3 + 0.5,
-      // Violins were 0.7–1.6 (raw) × 1.3 (mult) ≈ 55–125 px/s — too quick
-      // to read as a slow drift. Cut to 0.18–0.42 raw + 0.7 mult below for
-      // ~10–22 px/s baseline (a violin takes ~10–20 s to clear the screen).
-      // Balloons drift even slower — they're the calm anchor against the
-      // strobing matrix code.
-      speed: isBalloons ? 0.12 + Math.random() * 0.22
-           : isViolins  ? 0.18 + Math.random() * 0.24
-           : Math.random() * 0.5 + 0.1,
-      alpha: (isViolins || isBalloons) ? 0.6 + Math.random() * 0.3
-           : Math.random() * 0.4 + 0.1,
+      // enough to read as a violin (not a smudge).
+      size: isViolins ? 14 + Math.random() * 14 : Math.random() * 3 + 0.5,
+      // Violins reduced again — Sir says still too fast. Now 0.08–0.18 raw
+      // × 0.7 mult ≈ 5–12 px/s baseline; a violin takes 30–60 s to cross
+      // the screen. Plenty of time to admire the silhouette.
+      speed: isViolins ? 0.08 + Math.random() * 0.10 : Math.random() * 0.5 + 0.1,
+      alpha: isViolins ? 0.6 + Math.random() * 0.3 : Math.random() * 0.4 + 0.1,
       phase: Math.random() * Math.PI * 2,
-      // Violins/balloons stay nearly upright (gentle wobble), so they read
-      // as physical objects not spinning shrapnel. Others keep full spin.
-      rot: (isViolins || isBalloons) ? (Math.random() - 0.5) * 0.4
-         : Math.random() * Math.PI * 2,
-    };
-    if (isBalloons) {
-      // Per-balloon canopy hue picked once at init so every balloon keeps
-      // its colour identity for its full flight (instead of strobing).
-      p.hue = BALLOON_HUES[Math.floor(Math.random() * BALLOON_HUES.length)];
-    }
-    bgParticles.push(p);
+      // Violins stay nearly upright (gentle wobble); others keep full spin.
+      rot: isViolins ? (Math.random() - 0.5) * 0.4 : Math.random() * Math.PI * 2,
+    });
   }
 }
 
@@ -5487,6 +5465,132 @@ function drawPhone(handX, handY, scale, accentRgb) {
   bgCtx.restore();
 }
 
+// Matrix code-rain background (Back for More). Renders vertical streams
+// of katakana/digit glyphs falling down the screen. Bright phosphor head,
+// fading green tail. Reactive to gameplay:
+//   - cheerPulse (line clears)  → fall accelerates briefly
+//   - movePulse  (piece moves)  → random columns flicker brighter
+//   - kick beat                 → head glyphs scale + glow pulse
+//   - stageFlash (Tetris-Effect)→ whole field brightens for the FX moment
+//
+// Column state lives on the function itself (cached on a closure-static
+// `_cols` array) so it persists across frames without globals. Initial
+// y positions are staggered so the rain starts mid-flight on first paint.
+let _matrixCols = null;
+let _matrixCellW = 0;
+function drawMatrixRain(theme, now, playRects) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (w <= 0 || h <= 0) return;
+  // Glyph cell size scales with viewport — bigger screens get bigger
+  // glyphs so the rain doesn't look like a smear on a 4K display.
+  const cellW = Math.max(12, Math.floor(w / 80));
+  // Rebuild column array on first call OR when the viewport changes
+  // (resize fires resizeCanvases which can change bgCanvas dimensions).
+  if (!_matrixCols || _matrixCellW !== cellW || _matrixCols.length !== Math.ceil(w / cellW)) {
+    _matrixCellW = cellW;
+    _matrixCols = [];
+    const n = Math.ceil(w / cellW);
+    for (let i = 0; i < n; i++) {
+      _matrixCols.push({
+        // Stagger initial heads across the screen so the rain starts
+        // mid-flight, not in a single row.
+        y: -Math.random() * h,
+        // Per-column raw fall speed (px per frame). Mixed slow/fast so
+        // the streams don't all advance at the same rate.
+        speed: 1.2 + Math.random() * 3.2,
+        // Trail length — longer trails read as faster streams in the
+        // film. 8–22 glyphs feels right at this glyph size.
+        len: 8 + Math.floor(Math.random() * 14),
+        // Per-column flicker intensity used by movePulse reactions.
+        flick: 0,
+      });
+    }
+  }
+  const cellH = cellW * 1.1;
+  const cheer = (typeof cheerPulse  === 'number') ? cheerPulse  : 0;
+  const move  = (typeof movePulse   === 'number') ? movePulse   : 0;
+  const flash = (typeof stageFlash  === 'number') ? stageFlash  : 0;
+  const onKick = (beatPhase % 4 === 0);
+  const fallBoost = 1 + cheer * 1.6 + flash * 0.6;
+  // Trail-fade pass — translucent black over the whole bg canvas so
+  // previous frames' tails dim down. The base bg fill at the top of
+  // drawBackground already cleared most of it; this just deepens the
+  // last few frames so heads have a longer-feeling glow trail.
+  bgCtx.fillStyle = 'rgba(0,4,2,0.32)';
+  bgCtx.fillRect(0, 0, w, h);
+  // Periodic flicker pings on random columns (movePulse-driven). Picks
+  // a few columns each frame proportional to movePulse so a quick
+  // left/right press doesn't wash the whole field.
+  if (move > 0.02 && _matrixCols.length) {
+    const pings = Math.min(8, Math.ceil(move * 14));
+    for (let i = 0; i < pings; i++) {
+      const c = _matrixCols[Math.floor(Math.random() * _matrixCols.length)];
+      c.flick = Math.min(1, c.flick + 0.7);
+    }
+  }
+  bgCtx.font = `bold ${Math.floor(cellH * 0.85)}px "Courier New", monospace`;
+  bgCtx.textAlign = 'center';
+  bgCtx.textBaseline = 'middle';
+  // Helper: is this cell hidden by the play area? Skip rendering both
+  // head and tail so the rain doesn't read through the semi-translucent
+  // matrix board. We let the column keep advancing — it just doesn't
+  // paint while behind the board.
+  const _hidden = (px, py) => {
+    if (!playRects.length) return false;
+    for (const r of playRects) {
+      if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) return true;
+    }
+    return false;
+  };
+  for (let i = 0; i < _matrixCols.length; i++) {
+    const col = _matrixCols[i];
+    const cx = i * cellW + cellW / 2;
+    col.y += col.speed * fallBoost;
+    // Wrap when the head goes off the bottom: re-spawn above the
+    // viewport with a fresh speed/length so the rain stays varied.
+    if (col.y - col.len * cellH > h) {
+      col.y = -Math.random() * h * 0.5;
+      col.speed = 1.2 + Math.random() * 3.2;
+      col.len = 8 + Math.floor(Math.random() * 14);
+      col.flick = 0;
+    }
+    const headRow = Math.floor(col.y / cellH);
+    const flick = col.flick;
+    // Head glyph — bright white-green. Kick beat scales it slightly so
+    // the rain visibly throbs with the track.
+    const headY = headRow * cellH + cellH / 2;
+    if (!_hidden(cx, headY)) {
+      const headBright = onKick ? 1 : 0.92;
+      const headGlow = onKick ? Math.max(6, cellH * 0.55) : Math.max(3, cellH * 0.3);
+      bgCtx.shadowColor = '#7fff9f';
+      bgCtx.shadowBlur = headGlow + flash * 14;
+      bgCtx.fillStyle = `rgba(220,255,225,${Math.min(1, headBright + flick * 0.2)})`;
+      const headCh = _matrixGlyphAt(i, headRow);
+      bgCtx.fillText(headCh, cx, headY);
+      bgCtx.shadowBlur = 0;
+    }
+    // Trail — fades from bright phosphor at the head to nearly black at
+    // the tail. Glyph picked deterministically per (column, row) via the
+    // existing _matrixGlyphAt hash so each cell has its own letter that
+    // changes on the same 600ms cadence as the block-face glyphs.
+    for (let t = 1; t < col.len; t++) {
+      const row = headRow - t;
+      const py = row * cellH + cellH / 2;
+      if (py < -cellH || py > h + cellH) continue;
+      if (_hidden(cx, py)) continue;
+      const fade = (1 - t / col.len);
+      const a = Math.min(1, fade * 0.85 + flick * 0.25);
+      // Bright phosphor green with a hue lift on a kick beat.
+      const g = Math.floor(255 * (0.55 + 0.45 * fade));
+      bgCtx.fillStyle = `rgba(0,${g},${Math.floor(60 * fade)},${a})`;
+      const ch = _matrixGlyphAt(i, row);
+      bgCtx.fillText(ch, cx, py);
+    }
+    // Decay this column's flicker so a movePulse ping doesn't linger.
+    if (col.flick > 0) col.flick = Math.max(0, col.flick - 0.06);
+  }
+}
+
 function drawBackground() {
   const theme = getTheme(level);
   const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
@@ -5506,7 +5610,7 @@ function drawBackground() {
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
   const playRects = [];
-  const usesPlayAreaMask = (style === 'violins' || style === 'balloons');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain');
   if (gameStarted && usesPlayAreaMask) {
     const c1 = document.getElementById('main-canvas');
     if (c1) {
@@ -5545,6 +5649,14 @@ function drawBackground() {
   // Drawn before particles so dust drifts in front of the architecture.
   if (style === 'warehouse') {
     drawWarehouseScene(theme, now);
+  }
+  // Matrix code-rain (Back for More): vertical falling-code columns. Owns
+  // its own column state — no per-particle loop needed (bgParticles is
+  // empty for this style). Returns early since there's nothing else to
+  // render for this background.
+  if (style === 'matrix-rain') {
+    drawMatrixRain(theme, now, playRects);
+    return;
   }
 
   for (const p of bgParticles) {
@@ -5618,28 +5730,6 @@ function drawBackground() {
         // Period slowed 1100ms → 2000ms to match the slower fall.
         const wobble = Math.sin(now / 2000 + p.phase) * (0.14 + cheer * 0.25);
         p.rot = wobble + swayDir * move * 0.35;
-        break;
-      }
-      case 'balloons': {
-        // Hot-air balloons drift upward slowly (so the matrix wall is read
-        // as falling code while the balloons rise — opposing motion sells
-        // the depth). Three game signals drive their behaviour:
-        //   - movePulse  → quick sideways nudge from piece moves
-        //   - cheerPulse → bigger updraft + sway on line clears, like a
-        //                  burner blast lifting them higher
-        //   - beat kick  → tiny upward bounce on every kick so the burners
-        //                  visually fire with the track
-        const move  = (typeof movePulse  === 'number') ? movePulse  : 0;
-        const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
-        const onKick = (beatPhase % 4 === 0) ? 0.6 : 0;
-        const liftBoost = 1 + cheer * 1.8 + onKick * 0.4;
-        p.y -= p.speed * 0.9 * liftBoost;
-        // Slow lateral drift, individualised per balloon via phase so
-        // they don't all sway in lockstep.
-        const swayDir = Math.sin(p.phase * 2.3) >= 0 ? 1 : -1;
-        p.x += Math.sin(now / 4200 + p.phase) * (0.3 + cheer * 0.6) + swayDir * move * 3;
-        // Tiny tilt that wobbles around upright; movePulse adds a lurch.
-        p.rot = Math.sin(now / 2400 + p.phase) * (0.08 + cheer * 0.12) + swayDir * move * 0.15;
         break;
       }
       default:
@@ -5823,96 +5913,6 @@ function drawBackground() {
           bgCtx.lineTo(i * S * 0.07 + pluckOff, S * 1.05);
           bgCtx.stroke();
         }
-        bgCtx.globalAlpha = a;
-        break;
-      }
-      case 'balloons': {
-        // Hot-air balloon: dome canopy + slim ropes + wicker basket. The
-        // canopy hue is fixed per balloon (set in initBgParticles) so each
-        // one keeps its identity for its full flight. Reactivity:
-        //   - cheerPulse → burner glow flares + canopy lightens (line clears)
-        //   - movePulse  → canopy tilts in the sway direction (piece moves)
-        //   - kick beat  → canopy briefly scales (matches the burner blast
-        //                  in the movement step)
-        const cheerLocal = (typeof cheerPulse === 'number') ? cheerPulse : 0;
-        const moveLocal  = (typeof movePulse  === 'number') ? movePulse  : 0;
-        const onKick = (beatPhase % 4 === 0) ? 1.06 : 1.0;
-        const B = p.size * onKick * (1 + cheerLocal * 0.08);
-        bgCtx.rotate(p.rot);
-        bgCtx.globalAlpha = Math.min(1, a * 1.3);
-        const ph = (typeof p.hue === 'number') ? p.hue : 30;
-        const lit = Math.min(95, 55 + cheerLocal * 25);
-
-        // ─── Soft glow halo around canopy (sells the balloon's lift) ───
-        bgCtx.shadowColor = `hsla(${ph}, 80%, 65%, ${0.55 + cheerLocal * 0.4})`;
-        bgCtx.shadowBlur = 14 + cheerLocal * 18;
-
-        // ─── CANOPY: a dome — wide ellipse on top, narrowing to gather
-        //   point at the bottom. Quadratic bezier for the iconic teardrop.
-        bgCtx.fillStyle = `hsla(${ph}, 70%, ${lit}%, 0.95)`;
-        bgCtx.strokeStyle = `hsla(${ph}, 60%, ${Math.max(20, lit - 30)}%, 0.95)`;
-        bgCtx.lineWidth = 1.2;
-        bgCtx.beginPath();
-        bgCtx.moveTo(-B, -B * 0.1);
-        bgCtx.bezierCurveTo(-B, -B * 1.5, B, -B * 1.5, B, -B * 0.1);
-        bgCtx.bezierCurveTo(B * 0.8, B * 0.3, -B * 0.8, B * 0.3, -B, -B * 0.1);
-        bgCtx.closePath();
-        bgCtx.fill();
-        bgCtx.stroke();
-        // Vertical seam stripes — the multi-panel envelope detail that
-        // makes a circle "read" as a hot-air balloon.
-        bgCtx.strokeStyle = `hsla(${ph}, 60%, ${Math.max(15, lit - 40)}%, 0.6)`;
-        bgCtx.lineWidth = 0.7;
-        for (const xs of [-0.55, 0, 0.55]) {
-          bgCtx.beginPath();
-          bgCtx.moveTo(xs * B, -B * 1.35);
-          bgCtx.quadraticCurveTo(xs * B * 0.8, -B * 0.4, xs * B * 0.4, B * 0.1);
-          bgCtx.stroke();
-        }
-        bgCtx.shadowBlur = 0;
-
-        // ─── BURNER GLOW (only when cheerPulse is hot — line-clear blast)
-        if (cheerLocal > 0.05) {
-          const burnerR = B * 0.25 * (1 + cheerLocal);
-          bgCtx.fillStyle = `rgba(255,200,80,${0.5 + cheerLocal * 0.5})`;
-          bgCtx.beginPath();
-          bgCtx.arc(0, B * 0.4, burnerR, 0, Math.PI * 2);
-          bgCtx.fill();
-        }
-
-        // ─── ROPES from canopy to basket ────────────────────────────────
-        bgCtx.strokeStyle = 'rgba(60,35,15,0.9)';
-        bgCtx.lineWidth = Math.max(0.6, B * 0.025);
-        for (const xs of [-0.55, 0.55]) {
-          bgCtx.beginPath();
-          bgCtx.moveTo(xs * B * 0.7, B * 0.15);
-          bgCtx.lineTo(xs * B * 0.4, B * 0.7);
-          bgCtx.stroke();
-        }
-
-        // ─── BASKET: small trapezoid with a wicker hatch pattern ────────
-        bgCtx.fillStyle = 'rgba(120,75,30,0.95)';
-        bgCtx.strokeStyle = 'rgba(60,35,10,0.95)';
-        const bw = B * 0.55, bh = B * 0.32;
-        bgCtx.beginPath();
-        bgCtx.moveTo(-bw * 0.55, B * 0.7);
-        bgCtx.lineTo(bw * 0.55, B * 0.7);
-        bgCtx.lineTo(bw * 0.45, B * 0.7 + bh);
-        bgCtx.lineTo(-bw * 0.45, B * 0.7 + bh);
-        bgCtx.closePath();
-        bgCtx.fill();
-        bgCtx.stroke();
-        // Wicker cross-hatch
-        bgCtx.lineWidth = 0.5;
-        bgCtx.beginPath();
-        for (let xs = -0.45; xs <= 0.45; xs += 0.18) {
-          bgCtx.moveTo(xs * bw, B * 0.7);
-          bgCtx.lineTo(xs * bw, B * 0.7 + bh);
-        }
-        bgCtx.moveTo(-bw * 0.5, B * 0.7 + bh * 0.5);
-        bgCtx.lineTo(bw * 0.5, B * 0.7 + bh * 0.5);
-        bgCtx.stroke();
-
         bgCtx.globalAlpha = a;
         break;
       }
