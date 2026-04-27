@@ -540,44 +540,58 @@
     font-size: 16px;
   }
   .tc-btn {
-    background: rgba(20, 20, 35, 0.85);
-    border: 1px solid rgba(255,255,255,0.15);
-    color: rgba(255,255,255,0.85);
-    border-radius: 10px;
-    font-size: 20px;
-    font-weight: 700;
-    min-width: 48px;
-    height: 48px;
-    padding: 0 10px;
+    flex: 1 1 0;
+    background: rgba(18, 22, 36, 0.78);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.92);
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    min-width: 0;
+    height: 60px;
+    padding: 6px 8px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(10px);
-    transition: transform 0.08s, background 0.08s;
+    gap: 2px;
+    backdrop-filter: blur(14px);
+    transition: transform 0.08s ease-out, background 0.12s, box-shadow 0.12s;
     touch-action: none;
     cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
   }
-  .tc-btn.tc-wide {
-    flex: 1;
-    font-size: 14px;
+  .tc-btn .tc-icon {
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  }
+  .tc-btn .tc-label {
+    font-size: 9px;
     letter-spacing: 2px;
-  }
-  .tc-btn.tc-drop {
-    background: linear-gradient(135deg, #8000ff, #ff00ff);
-    color: #fff;
-    border: none;
+    opacity: 0.85;
   }
   .tc-btn.tc-zone {
-    background: linear-gradient(135deg, #ff00ff, #00ffff);
-    color: #fff;
+    background: linear-gradient(140deg, #ff00ff 0%, #8000ff 50%, #00ffff 100%);
     border: none;
+    color: #fff;
+    box-shadow: 0 2px 14px rgba(128,0,255,0.45), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .tc-btn.tc-hold {
+    background: linear-gradient(140deg, rgba(40,46,66,0.95), rgba(20,24,38,0.95));
+    border: 1px solid rgba(0,212,255,0.3);
+    box-shadow: 0 2px 12px rgba(0,212,255,0.18), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+  .tc-btn.tc-hold .tc-icon { color: #66e0ff; }
+  .tc-btn.tc-pause {
+    background: rgba(15, 18, 28, 0.85);
+    border: 1px solid rgba(255,255,255,0.10);
   }
   .tc-btn:active, .tc-btn.tc-pressed {
-    transform: scale(0.92);
-    background: rgba(128, 0, 255, 0.4);
-  }
-  .tc-btn.tc-drop:active, .tc-btn.tc-drop.tc-pressed {
-    background: linear-gradient(135deg, #a020ff, #ff20ff);
+    transform: scale(0.94);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
   }
   .tc-label {
     font-size: 10px;
@@ -1124,14 +1138,24 @@
 
      A small "swipe to play" hint underneath teaches first-time mobile users
      that movement is gestural now. -->
+<!-- Touch HUD — minimal: ZONE / HOLD / PAUSE. Hard-drop is a swipe-up
+     gesture, soft-drop is swipe-down, left/right is swipe, rotate is tap. -->
 <div id="touch-controls">
   <div class="tc-row">
-    <button class="tc-btn tc-zone tc-wide" data-action="zone" aria-label="Zone">ZONE</button>
-    <button class="tc-btn tc-action" data-action="hold" aria-label="Hold">HOLD</button>
-    <button class="tc-btn tc-drop tc-wide" data-action="harddrop" aria-label="Hard drop">↓ DROP</button>
-    <button class="tc-btn tc-pause" data-action="pause" aria-label="Pause">II</button>
+    <button class="tc-btn tc-zone" data-action="zone" aria-label="Zone">
+      <span class="tc-icon">⚡</span>
+      <span class="tc-label">ZONE</span>
+    </button>
+    <button class="tc-btn tc-hold" data-action="hold" aria-label="Hold">
+      <span class="tc-icon">⇧</span>
+      <span class="tc-label">HOLD</span>
+    </button>
+    <button class="tc-btn tc-pause" data-action="pause" aria-label="Pause">
+      <span class="tc-icon">II</span>
+      <span class="tc-label">PAUSE</span>
+    </button>
   </div>
-  <div class="tc-hint">SWIPE TO MOVE · TAP TO ROTATE</div>
+  <div class="tc-hint">SWIPE ↑ DROP · ↓ SOFT · ← → MOVE · TAP ROTATE</div>
 </div>
 
 <script>
@@ -1286,18 +1310,19 @@ const voiceEngine = (() => {
 })();
 
 // ============================================================
-// PLAYER FEMALE VOICE — Web Speech API
+// ORACLE — encouraging female coach voice in vs-Alfred mode
 // ============================================================
-// Used in vs-Alfred mode so the player's clears narrate in a distinct voice
-// from Alfred's deeper male voice. Solo mode keeps the existing MP3 announcer
-// (which the user has been happy with). Picks the first available female
-// English voice; pitch + rate tuned to read clearly over the music.
+// Layered on top of the MP3 announcer to coach the player against Alfred.
+// Lines are encouraging / motivational rather than just naming the clear,
+// since the MP3 already says "Single!" / "TETRIS!". Heavily throttled
+// because iOS Safari's SpeechSynthesis briefly ducks Web Audio while
+// speaking — we want the dim rare, not constant.
 const playerVoice = (() => {
-  const SINGLE_LINES = ['single', 'one', 'clear'];
-  const DOUBLE_LINES = ['double', 'two lines', 'nice'];
-  const TRIPLE_LINES = ['triple', 'three lines', 'oh yes'];
-  const TETRIS_LINES = ['tetris!', "let's go", 'beautiful', 'tetris'];
-  const COMBO_LINES  = ['combo', 'on a roll', 'rolling', 'sweet', "let's go", 'unstoppable'];
+  const SINGLE_LINES = ['nice', 'keep going', 'good', 'stay focused'];
+  const DOUBLE_LINES = ['nice clear', "you've got this", 'keep it up', 'stay sharp'];
+  const TRIPLE_LINES = ["you're cooking", 'show him', "don't let up", 'beautiful'];
+  const TETRIS_LINES = ['take that, alfred', 'destroy him', "you're winning", 'go go go'];
+  const COMBO_LINES  = ['on fire', 'unstoppable', 'beat alfred', 'crush him', "in the zone"];
 
   let voice = null;
   let _lastSpoken = 0;
@@ -1327,17 +1352,20 @@ const playerVoice = (() => {
   function speak(text) {
     if (!window.speechSynthesis) return;
     if (!voiceEnabled) return;
+    // Same 6s throttle as Alfred — keeps iOS speech-ducking rare. Plus we
+    // skip ~30% of opportunities so Oracle isn't predictably chatty.
     const now = performance.now();
-    if (now - _lastSpoken < 600) return;
+    if (now - _lastSpoken < 6000) return;
+    if (Math.random() < 0.3) return;
     _lastSpoken = now;
     try {
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       const v = pickVoice();
       if (v) u.voice = v;
-      u.rate = 1.05;
-      u.pitch = 1.15;     // slightly higher than default
-      u.volume = 0.7;     // a touch under full so it sits in the mix
+      u.rate = 1.1;
+      u.pitch = 1.15;
+      u.volume = 0.7;
       speechSynthesis.speak(u);
     } catch {}
   }
@@ -1414,19 +1442,21 @@ const alfredVoice = (() => {
   function speak(text) {
     if (!window.speechSynthesis) return;
     if (!voiceEnabled) return;
-    // Throttle so back-to-back clears don't queue up a monologue.
+    // Aggressive throttle — iOS Safari's SpeechSynthesis briefly ducks
+    // Web Audio while speaking. 6s min gap means most clears stay silent
+    // and only the occasional one earns a trash-talk, so the music
+    // interruption is rare instead of constant.
     const now = performance.now();
-    if (now - _lastSpoken < 600) return;
+    if (now - _lastSpoken < 6000) return;
     _lastSpoken = now;
     try {
-      // Cancel anything already speaking — fresh hit takes priority.
       speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(text);
       const v = pickVoice();
       if (v) u.voice = v;
-      u.rate = 1.05;       // slight pace up — feels confident
-      u.pitch = 0.85;      // a touch deeper than default to read as "Alfred"
-      u.volume = 0.7;      // toned down per user — sits in the mix, not over it
+      u.rate = 1.1;        // slightly faster — shorter dim window
+      u.pitch = 0.85;      // deeper than default to read as "Alfred"
+      u.volume = 0.7;
       speechSynthesis.speak(u);
     } catch {}
   }
@@ -3536,13 +3566,14 @@ function showCombo(cleared) {
     return; // don't paint the player's centered combo display for AI clears
   }
   if (!activePlayer || !activePlayer.isRemote) {
-    // In vs-Alfred mode, the player gets a female TTS voice so the two
-    // sides are sonically distinct. Other modes (solo, vs-friend) keep the
-    // existing MP3 announcer the user is used to.
+    // Always run the MP3 announcer ("Single!", "TETRIS!"). It plays through
+    // Web Audio so it doesn't dim the music.
+    voiceEngine.announceClear(cleared, combo + 1);
+    // In vs-Alfred mode, Oracle (the female TTS coach) layers encouraging
+    // lines on top — heavily throttled so the iOS speech-ducking is rare
+    // instead of every clear.
     if (gameMode === 'vs') {
       playerVoice.announceClear(cleared, combo + 1);
-    } else {
-      voiceEngine.announceClear(cleared, combo + 1);
     }
   }
   const el = document.getElementById('combo-display');
@@ -4170,11 +4201,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   context.fillStyle = 'rgba(0,0,0,0.2)';
   context.fillRect(x + 1, y + size - 3, size - 2, 2);
   context.fillRect(x + size - 3, y + 1, 2, size - 2);
-  context.shadowColor = color;
-  context.shadowBlur = theme ? theme.blockGlow : 8;
-  context.fillStyle = 'rgba(0,0,0,0)';
-  context.fillRect(x, y, size, size);
-  context.shadowBlur = 0;
+  // Glow halo dropped — see drawBlockTE comment. Was cost #1 in render loop.
   context.globalAlpha = 1;
 }
 
@@ -4218,12 +4245,9 @@ function drawBlockTE(context, x, y, color, size, alpha = 1) {
   // Embossed glyph based on piece type — drawn dark with a 1px highlight
   // beneath for the engraved-into-the-face look from the photo.
   if (type && size >= 14) drawBlockGlyph(context, fx, fy, fs, type);
-  // Outer glow halo (uses face colour so every piece glows the same hue)
-  context.shadowColor = faceColor;
-  context.shadowBlur = theme ? theme.blockGlow : 10;
-  context.fillStyle = 'rgba(0,0,0,0)';
-  context.fillRect(x, y, size, size);
-  context.shadowBlur = 0;
+  // Glow halo intentionally dropped — `shadowBlur` per block was the single
+  // biggest cost in the frame loop (200+ filled cells × shadow render). The
+  // bevel + shimmer pass already give the blocks plenty of dimensionality.
   context.globalAlpha = 1;
 }
 
@@ -4512,10 +4536,10 @@ function ensureCrowd() {
   const boardCx = w / 2;
   const floorY = h - 70;
   const tiers = [];
-  // Bigger crowd per user — packed dance floor. Back row roughly 1 person
-  // per 9px of bg width (was 14). Slight Y-jitter so they don't form
-  // a perfect line.
-  const backCount = Math.floor(w / 9);
+  // Crowd density tuned for performance — denser than the original but
+  // not so dense it tanks the framerate on mid-tier phones. 1 per 12px
+  // (was 9) for back row.
+  const backCount = Math.floor(w / 12);
   for (let i = 0; i < backCount; i++) {
     tiers.push({
       x: (i + 0.5) * (w / backCount) + (Math.random() - 0.5) * 4,
@@ -4534,8 +4558,8 @@ function ensureCrowd() {
       skinHint: Math.random(),
     });
   }
-  // Mid row also denser — 1 per 18px (was 28).
-  const midCount = Math.floor(w / 18);
+  // Mid row 1 per 22px.
+  const midCount = Math.floor(w / 22);
   for (let i = 0; i < midCount; i++) {
     tiers.push({
       x: (i + 0.5) * (w / midCount) + (Math.random() - 0.5) * 8,
@@ -4892,9 +4916,16 @@ function drawLasers(w, h, trussY, now, accentRgb, energy) {
     grad.addColorStop(0,   `rgba(${las.hue[0]},${las.hue[1]},${las.hue[2]},${0.85 * intensity})`);
     grad.addColorStop(1,   `rgba(${las.hue[0]},${las.hue[1]},${las.hue[2]},0)`);
     bgCtx.strokeStyle = grad;
+    // Two passes for laser glow (cheaper than shadowBlur which retraces
+    // the stroke per frame): a thin core line + a wider faint underglow.
+    bgCtx.lineWidth = las.thickness + 3;
+    bgCtx.globalAlpha = 0.35;
+    bgCtx.beginPath();
+    bgCtx.moveTo(las.ax, trussY + 6);
+    bgCtx.lineTo(tx, ty);
+    bgCtx.stroke();
+    bgCtx.globalAlpha = 1;
     bgCtx.lineWidth = las.thickness;
-    bgCtx.shadowColor = `rgba(${las.hue[0]},${las.hue[1]},${las.hue[2]},${intensity})`;
-    bgCtx.shadowBlur = 8;
     bgCtx.beginPath();
     bgCtx.moveTo(las.ax, trussY + 6);
     bgCtx.lineTo(tx, ty);
