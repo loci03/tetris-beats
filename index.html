@@ -1801,11 +1801,10 @@ function computeCellSize() {
   //   panels strip ~82px, touch controls ~130px (after tightening),
   //   safe-area home indicator ~30px, 4px buffer.
   const maxW = Math.max(220, vw - 20);
-  // In vs mode we stack Alfred's mini board above P1's. Keep the reserve
-  // lean — ~130px for a small mini + its label + a one-line score — so the
-  // player's own board gets the bulk of the screen.
-  const vsExtra = gameMode === 'vs' ? 130 : 0;
-  const reservedH = 82 + 130 + 30 + 4 + vsExtra;
+  // Alfred's monitor is now absolute-positioned to the right of the player's
+  // board (out of flow), so vs-mode no longer needs to reserve vertical
+  // space for it — player's board reads the same size in solo and vs.
+  const reservedH = 82 + 130 + 30 + 4;
   const maxH = Math.max(240, vh - reservedH);
   const byW = Math.floor(maxW / COLS);
   const byH = Math.floor(maxH / ROWS);
@@ -1839,9 +1838,10 @@ function resizeCanvases() {
   const vw = window.innerWidth;
   // Alfred's mini board — small on mobile so P1's board gets the real
   // estate, closer to P1 size on desktop where there's room to spare.
-  // Mobile: bumped to ~35% of P1 CELL (was 25%) so Alfred's monitor is
-  // actually readable above the player's board.
-  const p2Cell = vw <= 720 ? Math.max(7,  Math.floor(p1Cell * 0.35))
+  // Mobile: ~25% of P1 CELL — small picture-in-picture of Alfred's board
+  // tucked into the right margin beside the player's main canvas. Keeps
+  // the monitor visible at all times without eating into the play field.
+  const p2Cell = vw <= 720 ? Math.max(5,  Math.floor(p1Cell * 0.25))
                            : Math.max(14, Math.floor(p1Cell * 0.85));
   if (p2Main) {
     p2Main.width  = COLS * p2Cell;
@@ -1868,6 +1868,9 @@ function resizeCanvases() {
   const vvh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
   bgCanvas.width  = vvw;
   bgCanvas.height = vvh;
+  // After all canvases are sized, reposition Alfred's monitor to track the
+  // (now-final) main canvas position. Cheap — a few style writes.
+  if (typeof positionP2Monitor === 'function') positionP2Monitor();
 }
 resizeCanvases();
 window.addEventListener('resize', scheduleResize);
@@ -6007,47 +6010,59 @@ setInterval(() => {
   if (startVisible) refreshSharedLeaderboard();
 }, 30_000);
 
-// Move the Alfred monitor into the right spot for the current mode/viewport.
-// On mobile vs-mode we want it to sit between the score panel row and the
-// main canvas (so it doesn't cover the player's HOLD/score/NEXT). On desktop
-// or non-vs modes we put it back as a sibling of #p1-wrap inside game-container.
+// Position the Alfred monitor for the current mode/viewport.
+// On mobile vs-mode we anchor it absolutely to the right side of the player's
+// main canvas — small picture-in-picture, vertically aligned with the top of
+// the board, doesn't fight the HUD or eat into the play area. On desktop or
+// non-vs modes we restore it as a sibling of #p1-wrap inside game-container
+// where the existing flex CSS handles layout.
 function positionP2Monitor() {
   const p2Wrap = document.getElementById('p2-wrap');
-  const p1Wrap = document.getElementById('p1-wrap');
   const main = document.getElementById('main-canvas');
   const container = document.getElementById('game-container');
-  if (!p2Wrap || !p1Wrap || !main || !container) return;
+  if (!p2Wrap || !main || !container) return;
   const isMobile = window.innerWidth <= 720 ||
     ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
   const inVs = document.body.classList.contains('vs-mode');
   if (inVs && isMobile) {
-    // Move into p1-wrap, just before the main canvas. Side panels (HOLD,
-    // score, NEXT) wrap to the row above; Alfred lands underneath them.
-    if (p2Wrap.parentElement !== p1Wrap || p2Wrap.nextSibling !== main) {
-      p1Wrap.insertBefore(p2Wrap, main);
-    }
-    p2Wrap.style.order = '2';
-    p2Wrap.style.flex = '0 0 auto';
-    p2Wrap.style.width = '100%';
-    p2Wrap.style.alignItems = 'center';
+    // Pin Alfred to the right side of the player's main board.
+    p2Wrap.style.position = 'absolute';
+    p2Wrap.style.zIndex = '4';
+    const mainRect = main.getBoundingClientRect();
+    // Position relative to viewport (position:fixed-style via the wrap
+    // being a child of body). Use page coords so it scrolls with the
+    // layout if anything ever adds scrolling.
+    p2Wrap.style.position = 'fixed';
+    // Right-edge of the player's board, plus a small gap.
+    p2Wrap.style.left = (mainRect.right + 6) + 'px';
+    // Vertical: top of the player's board.
+    p2Wrap.style.top  = (mainRect.top + 4) + 'px';
+    // Cap width so it doesn't overflow the viewport on smaller phones.
+    const maxW = Math.max(60, window.innerWidth - mainRect.right - 12);
+    p2Wrap.style.maxWidth = maxW + 'px';
+    p2Wrap.style.transform = '';
+    if (p2Wrap.parentElement !== container) container.appendChild(p2Wrap);
   } else {
-    // Restore: sibling of p1-wrap, second child of game-container.
-    if (p2Wrap.parentElement !== container) {
-      container.appendChild(p2Wrap);
-    }
-    p2Wrap.style.order = '';
-    p2Wrap.style.flex = '';
-    p2Wrap.style.width = '';
-    p2Wrap.style.alignItems = '';
+    // Restore default layout for desktop / non-vs modes.
+    p2Wrap.style.position = '';
+    p2Wrap.style.zIndex = '';
+    p2Wrap.style.left = '';
+    p2Wrap.style.top = '';
+    p2Wrap.style.maxWidth = '';
+    p2Wrap.style.transform = '';
+    if (p2Wrap.parentElement !== container) container.appendChild(p2Wrap);
   }
   // Force a canvas resize so the bg + main canvases recompute against the
-  // new layout (otherwise mobile vs-mode would leave too much vertical room).
+  // new layout (otherwise mobile vs-mode could leave residual padding).
   if (typeof scheduleResize === 'function') scheduleResize();
 }
 
 // Reposition on viewport resize too, in case the user rotates / shows the
 // keyboard / etc.
 window.addEventListener('resize', () => positionP2Monitor());
+// Reposition every animation frame's resize (debounced via scheduleResize)
+// — needed because the main-canvas position can change as the board cell
+// size recomputes after the bg-particle init.
 
 // Mode selector (Solo / Vs Alfred / Vs Friend) on the start screen.
 // Also reveals/hides the Alfred difficulty picker depending on which mode
