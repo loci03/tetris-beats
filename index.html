@@ -926,7 +926,7 @@
         <div id="score-display">0</div>
         <div id="level-display">Level 1</div>
         <div id="lines-display">Lines: 0</div>
-        <div id="next-level-display">10 to L2</div>
+        <div id="next-level-display">15 to L2</div>
         <div id="era-display">The College Dropout</div>
       </div>
       <div class="panel-box">
@@ -1502,6 +1502,11 @@ function getTheme(lvl) {
   return LEVEL_THEMES[idx];
 }
 
+// Lines required to advance one level. Bumped 10 → 15 so each level lasts
+// long enough for the player to actually settle into its music + visuals
+// before the era flips.
+const LINES_PER_LEVEL = 15;
+
 // Difficulty curve. Old curve flat-lined at 50ms by level 13, so levels 14-19
 // were identical in feel. New curve: -60ms/level through L13 (matches old
 // behaviour for muscle memory), then a steeper ramp 14→19 down to 35ms (≈3
@@ -1662,6 +1667,12 @@ var shakeMag = 0;
 // dancer arm-raise + extra stage-light intensity in the warehouse scene.
 // 0 = idle, 1 = peak cheer.
 var cheerPulse = 0;
+// Stage flash: full white-pulse overlay set on triple/tetris, decays in
+// render(). Fires on top of the bg canvas so it bathes the venue in light.
+var stageFlash = 0;
+// Confetti pieces. Each has x, y, vx, vy, rot, rotV, color, size, life.
+// Spawned in batches by clearLines based on cleared count.
+var confetti = [];
 
 // ─── VS-mode plumbing ────────────────────────────────────────────
 var gameMode = 'solo';    // 'solo' | 'vs'
@@ -1990,6 +2001,16 @@ function clearLines() {
       const cheerBase = [0, 0.35, 0.55, 0.78, 1.0][cleared] || 1.0;
       const cheerComboBoost = Math.min(0.4, Math.max(0, combo) * 0.12);
       cheerPulse = Math.min(1.2, Math.max(cheerPulse, cheerBase + cheerComboBoost));
+      // Confetti + stage flash on Underground (and any future Tetris-Effect
+      // styled level). Volume scales with line count + combo.
+      if (theme && theme.blockStyle === 'tetrisEffect') {
+        const pieces = [0, 12, 22, 36, 60][cleared] || 60;
+        const totalPieces = pieces + Math.max(0, combo) * 8;
+        spawnConfetti(totalPieces, theme);
+        // Stage flash: small for single, big for triple/tetris/combo
+        const flashStrength = [0, 0.15, 0.35, 0.6, 0.85][cleared] || 0.85;
+        stageFlash = Math.max(stageFlash, flashStrength + Math.min(0.3, Math.max(0, combo) * 0.08));
+      }
     }
     for (const r of clearRows.sort((a, b) => a - b)) {
       board.splice(r, 1);
@@ -1999,7 +2020,7 @@ function clearLines() {
     const basePoints = [0, 100, 300, 500, 800];
     score += (basePoints[cleared] || 800) * level * (1 + combo * 0.5);
     lines += cleared;
-    const newLevel = Math.floor(lines / 10) + 1;
+    const newLevel = Math.floor(lines / LINES_PER_LEVEL) + 1;
     if (newLevel !== level) {
       prevLevel = level;
       level = newLevel;
@@ -2909,7 +2930,7 @@ const audioEngine = {
         this._loadSfx(theme.moveSfx);
         return; // skip this trigger; next move will play once buffer's ready
       }
-      if (this._fireSfx(theme.moveSfx, 0.2)) {
+      if (this._fireSfx(theme.moveSfx, 0.03)) {
         this._lastMoveSfxAt = now;
         return;
       }
@@ -3970,6 +3991,45 @@ let _crowd = null;
 let _crowdBgW = 0;
 let _crowdBgH = 0;
 
+// Crowd member styles: each one's persistent identity (hair, hat, phone)
+// and gesture. Drawn proportional to stake — most people are plain, a few
+// have phones, a few have hands permanently up, etc.
+//   - hair:    'plain' | 'mohawk' | 'bun' | 'long' | 'cap' | 'beanie'
+//   - gesture: 'sway'  | 'phone'  | 'handsUp' | 'headbang' | 'normal'
+//   - skinHint: small hue offset on the head silhouette so the wall isn't
+//     uniform black-on-black. Faint.
+function rollHair() {
+  const r = Math.random();
+  if (r < 0.35) return 'plain';
+  if (r < 0.55) return 'cap';
+  if (r < 0.70) return 'long';
+  if (r < 0.82) return 'beanie';
+  if (r < 0.92) return 'bun';
+  return 'mohawk';
+}
+function rollGesture(tier) {
+  const r = Math.random();
+  // Front-row: more dramatic gestures (they're the visible ones)
+  if (tier === 'front') {
+    if (r < 0.30) return 'phone';
+    if (r < 0.55) return 'handsUp';
+    if (r < 0.75) return 'headbang';
+    return 'normal';
+  }
+  // Mid: mix of phones and raised hands
+  if (tier === 'mid') {
+    if (r < 0.20) return 'phone';
+    if (r < 0.40) return 'handsUp';
+    if (r < 0.55) return 'headbang';
+    if (r < 0.75) return 'sway';
+    return 'normal';
+  }
+  // Back: mostly normal bobbers, occasional phone
+  if (r < 0.10) return 'phone';
+  if (r < 0.18) return 'handsUp';
+  return 'normal';
+}
+
 function ensureCrowd() {
   if (_crowd && _crowdBgW === bgCanvas.width && _crowdBgH === bgCanvas.height) return;
   _crowdBgW = bgCanvas.width;
@@ -3988,12 +4048,14 @@ function ensureCrowd() {
       tier: 'back',
       phase: Math.random() * Math.PI * 2,
       armPhase: Math.random() * Math.PI * 2,
-      // Random subset gets flagged for camera flashes (phones taking pics)
-      // and big jumps. Keeps reactivity tied to specific people instead of
-      // making the whole wall flash at once.
       flashRoll: Math.random(),
       jumper: Math.random() < 0.04,
       jumpY: 0,
+      hair: rollHair(),
+      gesture: rollGesture('back'),
+      // Skin tone hint: faint warm offset on the head so silhouettes aren't
+      // identical. 0..1 scalar mixed into the head fill.
+      skinHint: Math.random(),
     });
   }
   const midCount = Math.floor(w / 28);
@@ -4008,6 +4070,9 @@ function ensureCrowd() {
       flashRoll: Math.random(),
       jumper: Math.random() < 0.07,
       jumpY: 0,
+      hair: rollHair(),
+      gesture: rollGesture('mid'),
+      skinHint: Math.random(),
     });
   }
   const sideStrip = (w - boardW) / 2;
@@ -4029,12 +4094,13 @@ function ensureCrowd() {
         flashRoll: Math.random(),
         jumper: false,
         jumpY: 0,
+        hair: rollHair(),
+        gesture: rollGesture('front'),
+        skinHint: Math.random(),
       });
     }
   }
   _crowd = tiers;
-  // Cache the brick wall pattern to an offscreen canvas — drawing 100s of
-  // little rectangles per frame is wasteful since the bricks don't move.
   _brickPattern = null;
 }
 
@@ -4202,6 +4268,17 @@ function drawWarehouseScene(theme, now) {
   //     phones taking pictures. Tiny so they don't dominate, frequent
   //     enough that there's always something popping.
   drawCameraFlashes(now);
+
+  // 11. CONFETTI — falls from the truss after line clears. Drawn after
+  //     the crowd so pieces appear in front of dancers.
+  drawConfetti();
+
+  // 12. STAGE FLASH — full-bg white pulse on triple/tetris. Drawn last so
+  //     it bathes everything (and the front-row dancer rim glow) at once.
+  if (stageFlash > 0) {
+    bgCtx.fillStyle = `rgba(255,255,255,${stageFlash * 0.45})`;
+    bgCtx.fillRect(0, 0, w, h);
+  }
 }
 
 // Subwoofer-pulsing speaker stack. cx is center x, baseY is floor.
@@ -4317,6 +4394,58 @@ function drawLasers(w, h, trussY, now, accentRgb, energy) {
   bgCtx.restore();
 }
 
+// Spawn n confetti pieces from along the truss line. Each piece falls
+// under gravity with a tumble and a random color from the theme palette.
+function spawnConfetti(n, theme) {
+  const w = bgCanvas.width;
+  const trussY = Math.max(40, bgCanvas.height * 0.08) + 6;
+  const palette = [
+    theme && theme.colors ? theme.colors.accent : '#00d4ff',
+    theme && theme.colors ? theme.colors.glow : '#33eeff',
+    '#ffffff',
+    '#ff66cc',
+    '#ffcc44',
+  ];
+  for (let i = 0; i < n; i++) {
+    confetti.push({
+      x: Math.random() * w,
+      y: trussY + (Math.random() - 0.5) * 8,
+      vx: (Math.random() - 0.5) * 1.6,
+      vy: 0.5 + Math.random() * 1.8,
+      rot: Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.25,
+      size: 4 + Math.random() * 4,
+      color: palette[Math.floor(Math.random() * palette.length)],
+      life: 1,
+    });
+  }
+  // Cap total — old pieces get culled if a player chain-clears like crazy.
+  if (confetti.length > 600) confetti.splice(0, confetti.length - 600);
+}
+
+function drawConfetti() {
+  if (!confetti.length) return;
+  const h = bgCanvas.height;
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const p = confetti[i];
+    p.vy += 0.04;            // gravity
+    p.vx *= 0.995;           // slight air drag
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rot += p.rotV;
+    // Fade once below the floor or after ~5s
+    if (p.y > h - 30) p.life -= 0.04;
+    if (p.life <= 0 || p.y > h + 30) { confetti.splice(i, 1); continue; }
+    bgCtx.save();
+    bgCtx.globalAlpha = p.life;
+    bgCtx.translate(p.x, p.y);
+    bgCtx.rotate(p.rot);
+    bgCtx.fillStyle = p.color;
+    bgCtx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+    bgCtx.restore();
+  }
+}
+
 // Camera flashes — short-lived bright dots positioned over crowd members
 // who rolled in their flashRoll lottery this tick. Visual: random pop of
 // white that decays in ~120ms.
@@ -4351,80 +4480,126 @@ function drawCameraFlashes(now) {
 function drawCrowdDancer(d, beatT, accentRgb, energy, cheer) {
   const s = d.scale;
   const bobAmp = (4 + energy * 6 + cheer * 4) * s;
-  const bob = Math.abs(Math.sin(beatT)) * bobAmp;
-  // Jumper envelope: rises fast, decays. Curve is sin(life*PI) so the figure
-  // arcs up and back down rather than just floating.
+  // Sway gesture: side-to-side instead of pure up-down. Headbang: slight
+  // forward head tilt timed off-beat. Both small variations, big payoff in
+  // making the crowd not look uniform.
+  const isSway = d.gesture === 'sway';
+  const isBang = d.gesture === 'headbang';
+  const sway = isSway ? Math.sin(beatT * 0.5) * 4 * s : 0;
+  const bob = Math.abs(Math.sin(beatT)) * bobAmp * (isSway ? 0.3 : 1);
   const jump = d.jumpY > 0 ? Math.sin((1 - d.jumpY) * Math.PI) * 30 * s : 0;
-  const cx = d.x, cy = d.y - bob - jump;
+  const cx = d.x + sway, cy = d.y - bob - jump;
+  // Skin-tinted body: most folks are near-black silhouettes, but a faint warm
+  // hint on the head makes the wall feel like real people, not a stencil.
+  const skinR = 18 + d.skinHint * 30;
+  const skinG = 12 + d.skinHint * 18;
+  const skinB = 14 + d.skinHint * 14;
+  const headFill = `rgba(${skinR},${skinG},${skinB},${d.tier === 'back' ? 0.7 : 0.95})`;
+  const bodyFill = 'rgba(2,4,10,0.95)';
+  const headOff = isBang ? Math.sin(beatT) * 4 * s : 0; // headbang = head jerks
   bgCtx.save();
-  bgCtx.fillStyle = 'rgba(2,4,10,0.95)';
-  bgCtx.strokeStyle = 'rgba(2,4,10,0.95)';
+  bgCtx.fillStyle = bodyFill;
+  bgCtx.strokeStyle = bodyFill;
   bgCtx.lineCap = 'round';
 
+  // ── BACK TIER: head + shoulders only ────────────────────────────
   if (d.tier === 'back') {
-    // Just a head bobbing in the wall — alpha-modulated by tier.
-    bgCtx.globalAlpha = 0.65;
-    bgCtx.beginPath();
-    bgCtx.arc(cx, cy, 6 * s, 0, Math.PI * 2);
-    bgCtx.fill();
-    // Hint of shoulders below to thicken the wall
+    bgCtx.globalAlpha = 0.7;
+    // Shoulders / torso hint
     bgCtx.fillRect(cx - 7 * s, cy + 4 * s, 14 * s, 8 * s);
-  } else if (d.tier === 'mid') {
-    bgCtx.globalAlpha = 0.85;
-    // Head
-    bgCtx.beginPath();
-    bgCtx.arc(cx, cy - 18 * s, 7 * s, 0, Math.PI * 2);
-    bgCtx.fill();
-    // Torso (stubby — not legs visible at this distance)
-    bgCtx.fillRect(cx - 8 * s, cy - 11 * s, 16 * s, 22 * s);
-    // Arms — when cheering, a fraction of mid-row raise both arms
-    if (cheer > 0.3 && Math.sin(d.armPhase) > 0) {
-      const reach = (12 + cheer * 8) * s;
-      bgCtx.lineWidth = 4 * s;
+    // Head with hair
+    drawHead(cx, cy + headOff, 6 * s, headFill, d.hair, s);
+    // Some back-row people also hold phones up high
+    if (d.gesture === 'phone') drawPhone(cx, cy - 7 * s, s, accentRgb);
+    // Or wave both arms up
+    else if (d.gesture === 'handsUp') drawHandsUp(cx, cy - 2 * s, 10 * s, s);
+  }
+  // ── MID TIER: head + torso + arms with gesture ──────────────────
+  else if (d.tier === 'mid') {
+    bgCtx.globalAlpha = 0.88;
+    // Torso (varied width per scale gives a body-type mix)
+    const tw = 14 * s + Math.sin(d.phase * 7) * 2 * s;
+    bgCtx.fillRect(cx - tw / 2, cy - 11 * s, tw, 22 * s);
+    drawHead(cx, cy - 18 * s + headOff, 7 * s, headFill, d.hair, s);
+    // Gesture-driven arms
+    if (d.gesture === 'phone') {
+      drawPhone(cx + 4 * s, cy - 24 * s, s, accentRgb);
+      // Free arm hangs at side
+      bgCtx.lineWidth = 3.5 * s;
       bgCtx.beginPath();
-      bgCtx.moveTo(cx - 6 * s, cy - 8 * s);
-      bgCtx.lineTo(cx - 6 * s, cy - 8 * s - reach);
-      bgCtx.moveTo(cx + 6 * s, cy - 8 * s);
-      bgCtx.lineTo(cx + 6 * s, cy - 8 * s - reach);
+      bgCtx.moveTo(cx - 6 * s, cy - 9 * s);
+      bgCtx.lineTo(cx - 9 * s, cy + 2 * s);
       bgCtx.stroke();
+    } else if (d.gesture === 'handsUp' || (cheer > 0.3 && Math.sin(d.armPhase) > 0)) {
+      const reach = (14 + cheer * 8) * s;
+      drawHandsUp(cx, cy - 8 * s, reach, s);
+    } else {
+      // Default: arms swinging at sides
+      const armSwing = Math.sin(beatT + d.armPhase) * 0.6;
+      bgCtx.lineWidth = 3.5 * s;
+      const arm = (sign) => {
+        const ax = cx + sign * (7 + Math.cos(armSwing) * 4) * s;
+        const ay = cy - 6 * s + Math.abs(Math.sin(armSwing)) * 6 * s;
+        bgCtx.beginPath();
+        bgCtx.moveTo(cx + sign * 6 * s, cy - 10 * s);
+        bgCtx.lineTo(ax, ay);
+        bgCtx.stroke();
+      };
+      arm(1); arm(-1);
     }
-  } else { // front
-    // Rim glow so the front-row figures pop
+  }
+  // ── FRONT TIER: full figure with rim glow + gesture ─────────────
+  else {
     const rim = bgCtx.createRadialGradient(cx, cy - 25 * s, 0, cx, cy - 25 * s, 50 * s);
     rim.addColorStop(0, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.35 + cheer * 0.25})`);
     rim.addColorStop(1, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0)`);
     bgCtx.fillStyle = rim;
     bgCtx.fillRect(cx - 60 * s, cy - 80 * s, 120 * s, 110 * s);
-    bgCtx.fillStyle = 'rgba(2,4,10,0.95)';
+    bgCtx.fillStyle = bodyFill;
     bgCtx.lineWidth = 5 * s;
-    // Head
-    bgCtx.beginPath();
-    bgCtx.arc(cx, cy - 38 * s, 8 * s, 0, Math.PI * 2);
-    bgCtx.fill();
     // Torso
     bgCtx.beginPath();
     bgCtx.moveTo(cx, cy - 28 * s);
     bgCtx.lineTo(cx, cy + 4 * s);
     bgCtx.stroke();
-    // Arms — cheer raises them straight up; otherwise they swing
-    const armUp = cheer * Math.min(1, cheer * 1.5);
-    const armSwing = Math.sin(beatT + d.armPhase) * 0.7;
-    const armDir = (sign) => {
-      // Blend swing with up-raise based on cheer strength
-      const upX = sign * 6 * s;
-      const upY = -28 * s;
-      const swingX = sign * Math.cos(armSwing) * 18 * s;
-      const swingY = -22 * s + Math.abs(Math.sin(armSwing)) * -10 * s;
-      const ax = cx + (swingX * (1 - armUp) + upX * armUp);
-      const ay = cy + (swingY * (1 - armUp) + upY * armUp);
+    drawHead(cx, cy - 38 * s + headOff, 8 * s, headFill, d.hair, s);
+    // Gesture-driven arms
+    if (d.gesture === 'phone') {
+      drawPhone(cx + 8 * s, cy - 50 * s, s, accentRgb);
+      bgCtx.lineWidth = 5 * s;
+      // Phone arm bent up
       bgCtx.beginPath();
       bgCtx.moveTo(cx, cy - 22 * s);
-      bgCtx.lineTo(ax, ay);
+      bgCtx.lineTo(cx + 14 * s, cy - 38 * s);
+      bgCtx.lineTo(cx + 8 * s, cy - 48 * s);
       bgCtx.stroke();
-    };
-    armDir(1); armDir(-1);
-    // Legs
-    const bend = Math.abs(Math.sin(beatT)) * 6 * s;
+      // Free arm at side
+      bgCtx.beginPath();
+      bgCtx.moveTo(cx, cy - 22 * s);
+      bgCtx.lineTo(cx - 12 * s, cy - 6 * s);
+      bgCtx.stroke();
+    } else if (d.gesture === 'handsUp') {
+      drawHandsUp(cx, cy - 22 * s, 28 * s, s);
+    } else {
+      // Default cheer-blendable swinging arms
+      const armUp = cheer * Math.min(1, cheer * 1.5);
+      const armSwing = Math.sin(beatT + d.armPhase) * 0.7;
+      const armDir = (sign) => {
+        const upX = sign * 6 * s;
+        const upY = -28 * s;
+        const swingX = sign * Math.cos(armSwing) * 18 * s;
+        const swingY = -22 * s + Math.abs(Math.sin(armSwing)) * -10 * s;
+        const ax = cx + (swingX * (1 - armUp) + upX * armUp);
+        const ay = cy + (swingY * (1 - armUp) + upY * armUp);
+        bgCtx.beginPath();
+        bgCtx.moveTo(cx, cy - 22 * s);
+        bgCtx.lineTo(ax, ay);
+        bgCtx.stroke();
+      };
+      armDir(1); armDir(-1);
+    }
+    // Legs — bend on bounce or jump
+    const bend = Math.abs(Math.sin(beatT)) * 6 * s + (d.jumpY > 0 ? 6 * s : 0);
     const legDir = (sign) => {
       bgCtx.beginPath();
       bgCtx.moveTo(cx, cy + 4 * s);
@@ -4433,6 +4608,125 @@ function drawCrowdDancer(d, beatT, accentRgb, energy, cheer) {
     };
     legDir(1); legDir(-1);
   }
+  bgCtx.restore();
+}
+
+// Draw a head with a hair style on top. Head is a circle in skinFill, hair
+// is a darker silhouette layered on. Each style is just a few rectangles
+// or arcs — cheap.
+function drawHead(cx, cy, r, skinFill, hair, scale) {
+  bgCtx.save();
+  // Head
+  bgCtx.fillStyle = skinFill;
+  bgCtx.beginPath();
+  bgCtx.arc(cx, cy, r, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Hair on top
+  bgCtx.fillStyle = 'rgba(2,4,10,0.98)';
+  switch (hair) {
+    case 'cap': {
+      // Baseball cap — half-circle on top + brim sticking forward
+      bgCtx.beginPath();
+      bgCtx.arc(cx, cy, r * 1.05, Math.PI, 0);
+      bgCtx.fill();
+      bgCtx.fillRect(cx - r * 0.2, cy, r * 1.4, r * 0.35);
+      break;
+    }
+    case 'beanie': {
+      // Knit cap — taller dome, slight pom on top
+      bgCtx.beginPath();
+      bgCtx.arc(cx, cy + r * 0.1, r * 1.1, Math.PI, 0);
+      bgCtx.fill();
+      bgCtx.beginPath();
+      bgCtx.arc(cx, cy - r * 0.7, r * 0.25, 0, Math.PI * 2);
+      bgCtx.fill();
+      break;
+    }
+    case 'long': {
+      // Long hair — extends below the head silhouette
+      bgCtx.beginPath();
+      bgCtx.arc(cx, cy, r * 1.1, Math.PI, 0);
+      bgCtx.fill();
+      bgCtx.fillRect(cx - r * 1.05, cy, r * 0.3, r * 1.6);
+      bgCtx.fillRect(cx + r * 0.75, cy, r * 0.3, r * 1.6);
+      break;
+    }
+    case 'bun': {
+      // Hair tied up in a bun on top
+      bgCtx.beginPath();
+      bgCtx.arc(cx, cy, r * 1.05, Math.PI, 0);
+      bgCtx.fill();
+      bgCtx.beginPath();
+      bgCtx.arc(cx, cy - r * 1.0, r * 0.45, 0, Math.PI * 2);
+      bgCtx.fill();
+      break;
+    }
+    case 'mohawk': {
+      // Tall fin sticking up
+      bgCtx.beginPath();
+      bgCtx.moveTo(cx - r * 0.3, cy - r * 0.6);
+      bgCtx.lineTo(cx + r * 0.3, cy - r * 0.6);
+      bgCtx.lineTo(cx + r * 0.15, cy - r * 1.8);
+      bgCtx.lineTo(cx - r * 0.15, cy - r * 1.8);
+      bgCtx.closePath();
+      bgCtx.fill();
+      break;
+    }
+    case 'plain':
+    default: {
+      // Short hair — just a cap of darkness on top
+      bgCtx.beginPath();
+      bgCtx.arc(cx, cy - r * 0.15, r * 0.95, Math.PI, 0);
+      bgCtx.fill();
+      break;
+    }
+  }
+  bgCtx.restore();
+}
+
+// Both hands raised straight up. baseY is shoulder line.
+function drawHandsUp(cx, baseY, reach, scale) {
+  bgCtx.save();
+  bgCtx.strokeStyle = 'rgba(2,4,10,0.95)';
+  bgCtx.lineWidth = 3.5 * scale;
+  bgCtx.lineCap = 'round';
+  // Left arm
+  bgCtx.beginPath();
+  bgCtx.moveTo(cx - 5 * scale, baseY);
+  bgCtx.lineTo(cx - 7 * scale, baseY - reach);
+  bgCtx.stroke();
+  // Right arm
+  bgCtx.beginPath();
+  bgCtx.moveTo(cx + 5 * scale, baseY);
+  bgCtx.lineTo(cx + 7 * scale, baseY - reach);
+  bgCtx.stroke();
+  // Hand circles at the tips
+  bgCtx.fillStyle = 'rgba(40,28,22,0.9)';
+  bgCtx.beginPath();
+  bgCtx.arc(cx - 7 * scale, baseY - reach, 2.2 * scale, 0, Math.PI * 2);
+  bgCtx.arc(cx + 7 * scale, baseY - reach, 2.2 * scale, 0, Math.PI * 2);
+  bgCtx.fill();
+  bgCtx.restore();
+}
+
+// Draw a phone held up with a glowing screen, plus the bent arm holding it.
+function drawPhone(handX, handY, scale, accentRgb) {
+  const w = 4 * scale, h = 7 * scale;
+  bgCtx.save();
+  // Phone body
+  bgCtx.fillStyle = 'rgba(2,4,10,0.98)';
+  bgCtx.fillRect(handX - w / 2, handY - h, w, h);
+  // Screen glow — bright accent
+  bgCtx.fillStyle = `rgba(255,255,255,0.9)`;
+  bgCtx.fillRect(handX - w / 2 + 0.5, handY - h + 0.5, w - 1, h - 1.5);
+  // Tiny accent tint inside (suggests photo subject color)
+  bgCtx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.6)`;
+  bgCtx.fillRect(handX - w / 2 + 0.5, handY - h * 0.6, w - 1, h * 0.4);
+  // Hand holding it
+  bgCtx.fillStyle = 'rgba(40,28,22,0.9)';
+  bgCtx.beginPath();
+  bgCtx.arc(handX, handY, 1.8 * scale, 0, Math.PI * 2);
+  bgCtx.fill();
   bgCtx.restore();
 }
 
@@ -4591,7 +4885,7 @@ function updateUI() {
     if (level >= maxLevel) {
       nextLevelEl.textContent = 'MAX LEVEL';
     } else {
-      const remaining = 10 - (lines % 10);
+      const remaining = LINES_PER_LEVEL - (lines % LINES_PER_LEVEL);
       nextLevelEl.textContent = `${remaining} to L${level + 1}`;
     }
   }
@@ -4759,6 +5053,8 @@ function render(timestamp) {
   // Cheer pulse decays each frame (rises only on line clears in clearLines()).
   // Linear decay over ~1.4s feels right against a 4-beat cheer at 100 bpm.
   if (cheerPulse > 0) cheerPulse = Math.max(0, cheerPulse - 0.012);
+  // Stage flash decays faster — should feel like a camera flash, not a fade.
+  if (stageFlash > 0) stageFlash = Math.max(0, stageFlash - 0.05);
   drawBackground();
   // Screen-shake decay applied via CSS transform on the main canvas. Cheaper
   // than redrawing into a translated context, and respects the per-player
