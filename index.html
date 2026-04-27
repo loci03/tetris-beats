@@ -391,6 +391,30 @@
     margin-bottom: 36px;
     line-height: 1.7;
     letter-spacing: 1px;
+    max-width: 560px;
+  }
+  #vs-result-sub .vs-flavor {
+    font-size: 22px;
+    line-height: 1.35;
+    margin-bottom: 24px;
+    color: rgba(255,255,255,0.92);
+    letter-spacing: 0.5px;
+  }
+  #vs-result-sub .vs-flavor-who {
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #ff6688;
+    margin-right: 6px;
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  /* When the player won, recolor Oracle's name */
+  #vs-result-title:not(.lose) ~ #vs-result-sub .vs-flavor-who { color: #66ddff; }
+  #vs-result-sub .vs-flavor-line { font-style: italic; }
+  #vs-result-sub .vs-score-row {
+    font-size: 14px;
+    color: rgba(255,255,255,0.55);
   }
   #vs-replay-btn {
     padding: 16px 48px;
@@ -3561,20 +3585,17 @@ function showCombo(cleared) {
   //    near his monitor (so the player's HUD isn't hijacked by AI clears)
   //  - Remote opponent → silent here (their client narrates on their end)
   if (activePlayer && activePlayer.isAI) {
-    alfredVoice.trashTalk(cleared, combo + 1);
+    // Alfred's clear: just the visual banner, no in-game TTS — iOS dimming
+    // the music every time Alfred clears was throwing off the player. He
+    // gets to talk on the end screen instead.
     showAlfredClearBanner(text);
-    return; // don't paint the player's centered combo display for AI clears
+    return;
   }
   if (!activePlayer || !activePlayer.isRemote) {
-    // Always run the MP3 announcer ("Single!", "TETRIS!"). It plays through
-    // Web Audio so it doesn't dim the music.
+    // MP3 announcer only — runs through Web Audio so the music never dims.
+    // Oracle's TTS encouragement during play caused iOS speech-ducking; we
+    // moved her to the end screen too, where one short line is acceptable.
     voiceEngine.announceClear(cleared, combo + 1);
-    // In vs-Alfred mode, Oracle (the female TTS coach) layers encouraging
-    // lines on top — heavily throttled so the iOS speech-ducking is rare
-    // instead of every clear.
-    if (gameMode === 'vs') {
-      playerVoice.announceClear(cleared, combo + 1);
-    }
   }
   const el = document.getElementById('combo-display');
   el.textContent = text;
@@ -4137,11 +4158,57 @@ function showVsResult() {
   const title = document.getElementById('vs-result-title');
   title.textContent = youWon ? 'YOU WIN' : 'ALFRED WINS';
   title.classList.toggle('lose', !youWon);
+  // Pick a flavor line: when player lost, Alfred dunks on them; when player
+  // won, Oracle congratulates. Subtitle line goes on its own row above the
+  // existing score breakdown so it reads as the announcer's quote.
+  const VICTORY_TAUNTS = [
+    'You suck — go back to the gym.',
+    'Was that supposed to be hard?',
+    'Don\'t quit your day job.',
+    'I barely tried.',
+    'Practice. A lot.',
+    'Maybe stick to solo.',
+  ];
+  const VICTORY_PRAISE = [
+    'You destroyed him.',
+    'Take that, Alfred.',
+    'You earned it.',
+    'Champion.',
+    'Beautifully done.',
+  ];
+  const flavor = youWon
+    ? VICTORY_PRAISE[Math.floor(Math.random() * VICTORY_PRAISE.length)]
+    : VICTORY_TAUNTS[Math.floor(Math.random() * VICTORY_TAUNTS.length)];
+  const speakerLabel = youWon ? '🦉 ORACLE' : '🦇 ALFRED';
   document.getElementById('vs-result-sub').innerHTML =
-    `You: ${Math.floor(p1.score).toLocaleString()} · ${p1.lines} lines<br>` +
-    `Alfred: ${Math.floor(p2.score).toLocaleString()} · ${p2.lines} lines`;
+    `<div class="vs-flavor"><span class="vs-flavor-who">${speakerLabel}:</span> ` +
+    `<span class="vs-flavor-line">"${flavor}"</span></div>` +
+    `<div class="vs-score-row">You: ${Math.floor(p1.score).toLocaleString()} · ${p1.lines} lines</div>` +
+    `<div class="vs-score-row">Alfred: ${Math.floor(p2.score).toLocaleString()} · ${p2.lines} lines</div>`;
   document.getElementById('vs-result-screen').style.display = 'flex';
   audioEngine.stop();
+  // Speak the flavor line a beat after the screen appears so the audio
+  // matches the visual punch. Bypass the Alfred trash-talk throttle by
+  // calling speechSynthesis directly via the same picker — this is a
+  // climactic moment, not a chatter spam.
+  setTimeout(() => {
+    if (!voiceEnabled || !window.speechSynthesis) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(flavor);
+      // Reuse whichever voice each module already picked.
+      const v = (youWon ? playerVoice : alfredVoice).pickedVoice;
+      if (v) {
+        const all = speechSynthesis.getVoices();
+        const match = all.find(x => x.name === v);
+        if (match) u.voice = match;
+      }
+      u.rate = 1.0;
+      u.pitch = youWon ? 1.15 : 0.85;
+      u.volume = 0.85;
+      speechSynthesis.speak(u);
+    } catch {}
+  }, 400);
 }
 
 // ============================================================
@@ -4160,14 +4227,18 @@ function shadeColor(color, percent) {
 // Proper ghost: dashed outline with a very faint fill, no gradient / no
 // highlight so it reads as "outline of where the piece will land" instead of
 // a washed-out twin of the real piece.
+//
+// On Tetris-Effect levels (Underground), every block face is the theme's
+// accent color regardless of piece type — so the ghost should match. Other
+// levels keep the piece-colored ghost for clarity.
 function drawGhostBlock(context, x, y, color, size) {
+  const theme = getTheme(level);
+  const useThemeColor = theme && theme.blockStyle === 'tetrisEffect';
+  const outlineColor = useThemeColor ? theme.colors.accent : color;
   context.save();
-  const [r, g, b] = hexToRgb(color);
-  // Faint interior tint — enough to distinguish at a glance, dim enough not
-  // to compete with the active piece or locked blocks.
+  const [r, g, b] = hexToRgb(outlineColor);
   context.fillStyle = `rgba(${r},${g},${b},0.08)`;
   context.fillRect(x + 2, y + 2, size - 4, size - 4);
-  // Dashed outline in the piece colour.
   context.strokeStyle = `rgba(${r},${g},${b},0.85)`;
   context.lineWidth = 1.5;
   context.setLineDash([4, 3]);
