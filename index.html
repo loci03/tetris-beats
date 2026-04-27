@@ -1334,199 +1334,107 @@ const voiceEngine = (() => {
 })();
 
 // ============================================================
-// ORACLE — encouraging female coach voice in vs-Alfred mode
+// PRE-RENDERED CHARACTER VOICES — Alfred + Oracle
 // ============================================================
-// Layered on top of the MP3 announcer to coach the player against Alfred.
-// Lines are encouraging / motivational rather than just naming the clear,
-// since the MP3 already says "Single!" / "TETRIS!". Heavily throttled
-// because iOS Safari's SpeechSynthesis briefly ducks Web Audio while
-// speaking — we want the dim rare, not constant.
-const playerVoice = (() => {
-  const SINGLE_LINES = ['nice', 'keep going', 'good', 'stay focused'];
-  const DOUBLE_LINES = ['nice clear', "you've got this", 'keep it up', 'stay sharp'];
-  const TRIPLE_LINES = ["you're cooking", 'show him', "don't let up", 'beautiful'];
-  const TETRIS_LINES = ['take that, alfred', 'destroy him', "you're winning", 'go go go'];
-  const COMBO_LINES  = ['on fire', 'unstoppable', 'beat alfred', 'crush him', "in the zone"];
+// Both modules play short pre-recorded MP3 clips through the existing Web
+// Audio graph (audioEngine.masterGain). This bypasses SpeechSynthesis
+// entirely — which means no iOS music ducking, no startup delay, no
+// browser-voice variability. Clips were generated locally with macOS `say`
+// (Daniel for Alfred, Samantha for Oracle) and live under audio/voice/<name>/.
+//
+// The factory below builds either module from a folder + line pool config.
+function makeClipVoice(folder, pools, defaultGain) {
+  const buffers = {};
+  const all = Array.from(new Set(Object.values(pools).flat()));
+  let _loadPromise = null;
+  let _lastPlayedAt = 0;
 
-  let voice = null;
-  let _lastSpoken = 0;
-  let _unlocked = false;
-
-  function pickVoice() {
-    if (voice) return voice;
-    if (!window.speechSynthesis) return null;
-    const all = speechSynthesis.getVoices();
-    if (!all || !all.length) return null;
-    // Female English voices commonly available across browsers.
-    const preferred = [
-      'Samantha', 'Karen', 'Ava', 'Tessa', 'Moira', 'Allison', 'Susan', 'Joanna',
-      'Microsoft Zira', 'Microsoft Aria', 'Microsoft Jenny',
-      'Google UK English Female', 'Google US English Female',
-    ];
-    for (const name of preferred) {
-      const v = all.find(x => x.name && x.name.includes(name));
-      if (v) return (voice = v);
-    }
-    // Heuristic fallback: many systems mark gender in name; prefer not the
-    // default that alfredVoice picked.
-    const eng = all.filter(x => x.lang && x.lang.startsWith('en'));
-    return (voice = eng.find(x => /female|woman|girl/i.test(x.name)) || eng[0] || all[0]);
-  }
-
-  function speak(text) {
-    if (!window.speechSynthesis) return;
-    if (!voiceEnabled) return;
-    // Same 6s throttle as Alfred — keeps iOS speech-ducking rare. Plus we
-    // skip ~30% of opportunities so Oracle isn't predictably chatty.
-    const now = performance.now();
-    if (now - _lastSpoken < 6000) return;
-    if (Math.random() < 0.3) return;
-    _lastSpoken = now;
-    try {
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      const v = pickVoice();
-      if (v) u.voice = v;
-      u.rate = 1.1;
-      u.pitch = 1.15;
-      u.volume = 0.7;
-      speechSynthesis.speak(u);
-    } catch {}
+  function load() {
+    if (_loadPromise) return _loadPromise;
+    if (!audioEngine.ctx) return Promise.resolve();
+    _loadPromise = (async () => {
+      await Promise.all(all.map(async (name) => {
+        if (buffers[name]) return;
+        try {
+          const r = await fetch(`audio/voice/${folder}/${name}.mp3`, { cache: 'force-cache' });
+          if (!r.ok) return;
+          const ab = await r.arrayBuffer();
+          buffers[name] = await audioEngine.ctx.decodeAudioData(ab);
+        } catch (e) {
+          console.warn(`[${folder}] failed to load`, name, e);
+        }
+      }));
+    })();
+    return _loadPromise;
   }
 
   function pick(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
 
-  return {
-    prime() {
-      if (!window.speechSynthesis) return;
-      try {
-        speechSynthesis.getVoices();
-        speechSynthesis.addEventListener('voiceschanged', pickVoice, { once: true });
-        if (!_unlocked) {
-          const u = new SpeechSynthesisUtterance(' ');
-          u.volume = 0;
-          speechSynthesis.speak(u);
-          _unlocked = true;
-        }
-      } catch {}
-    },
-    announceClear(cleared, combo) {
-      let line;
-      if (combo >= 2) line = pick(COMBO_LINES);
-      else if (cleared >= 4) line = pick(TETRIS_LINES);
-      else if (cleared === 3) line = pick(TRIPLE_LINES);
-      else if (cleared === 2) line = pick(DOUBLE_LINES);
-      else line = pick(SINGLE_LINES);
-      // Music ducking intentionally removed per user — track stays at full
-      // volume; the voice rides on top.
-      speak(line);
-    },
-    get pickedVoice() { return voice && voice.name; },
-  };
-})();
-
-// ============================================================
-// ALFRED VOICE — Web Speech API trash talk
-// ============================================================
-// Built on `speechSynthesis` (no MP3s needed). Picks a deeper male voice
-// when one is available to differentiate Alfred from the player's existing
-// MP3 announcer. Lines are tier'd by what just happened: a brag for plain
-// clears, a flex for tetris/combo, an apology line if Alfred himself just
-// got hit by garbage.
-const alfredVoice = (() => {
-  const SINGLE_LINES = ['easy', 'too easy', 'come on', 'try harder', 'slow', 'wake up', 'pace yourself', 'is that all', 'mhm'];
-  const DOUBLE_LINES = ['nice try', 'getting closer', 'still mine', 'not bad, but', 'cute', 'okay then', 'almost'];
-  const TRIPLE_LINES = ['stacking up', "alright now", 'feeling it', "you're cooked", 'three deep', 'on fire', 'watch me'];
-  const TETRIS_LINES = ['massacre', 'cleaned house', 'tetris baby', 'ah, perfection', 'demolished', 'pack it up', 'next victim'];
-  const COMBO_LINES  = ['rolling', 'on a wave', 'unstoppable', 'cooking', 'in the zone', "can't stop me"];
-
-  let voice = null;
-  let _lastSpoken = 0;
-
-  function pickVoice() {
-    if (voice) return voice;
-    if (!window.speechSynthesis) return null;
-    const all = speechSynthesis.getVoices();
-    if (!all || !all.length) return null;
-    // Prefer a recognisably "deep / male" English voice when available, with
-    // sane fallbacks. Names vary across browsers; covering the common ones.
-    const preferred = [
-      'Daniel', 'Aaron', 'Fred', 'Arthur', 'Rishi', 'Bruce',
-      'Microsoft Mark', 'Microsoft Guy', 'Google UK English Male',
-      'Google US English',
-    ];
-    for (const name of preferred) {
-      const v = all.find(x => x.name && x.name.includes(name));
-      if (v) return (voice = v);
-    }
-    // Fallback: any English voice
-    return (voice = all.find(x => x.lang && x.lang.startsWith('en')) || all[0]);
+  function play(name, gain) {
+    if (!audioEngine.ctx || !audioEngine.masterGain) return false;
+    const buf = buffers[name];
+    if (!buf) { load(); return false; }
+    const src = audioEngine.ctx.createBufferSource();
+    src.buffer = buf;
+    const g = audioEngine.ctx.createGain();
+    g.gain.value = (gain != null ? gain : defaultGain);
+    src.connect(g);
+    g.connect(audioEngine.masterGain);
+    src.start();
+    return true;
   }
 
-  function speak(text) {
-    if (!window.speechSynthesis) return;
+  // Pick a tier'd pool based on cleared/combo and play one of its clips,
+  // with throttling so the same voice doesn't fire on every input.
+  function tieredAnnounce(cleared, combo, throttleMs) {
     if (!voiceEnabled) return;
-    // Aggressive throttle — iOS Safari's SpeechSynthesis briefly ducks
-    // Web Audio while speaking. 6s min gap means most clears stay silent
-    // and only the occasional one earns a trash-talk, so the music
-    // interruption is rare instead of constant.
     const now = performance.now();
-    if (now - _lastSpoken < 6000) return;
-    _lastSpoken = now;
-    try {
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      const v = pickVoice();
-      if (v) u.voice = v;
-      u.rate = 1.1;        // slightly faster — shorter dim window
-      u.pitch = 0.85;      // deeper than default to read as "Alfred"
-      u.volume = 0.7;
-      speechSynthesis.speak(u);
-    } catch {}
+    if (now - _lastPlayedAt < (throttleMs || 1500)) return;
+    let pool;
+    if (combo >= 3 && pools.combo) pool = pools.combo;
+    else if (cleared >= 4 && pools.tetris) pool = pools.tetris;
+    else if (cleared === 3 && pools.triple) pool = pools.triple;
+    else if (cleared === 2 && pools.double) pool = pools.double;
+    else pool = pools.single;
+    if (!pool || !pool.length) return;
+    if (play(pick(pool))) _lastPlayedAt = now;
   }
 
-  function pick(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
-
-  let _unlocked = false;
-
   return {
-    // Prime: most browsers need a user gesture before speak() will produce
-    // sound. Just calling getVoices() doesn't count — iOS Safari requires
-    // an actual speak() invocation to "unlock" the synthesis context. We
-    // do a silent (volume 0) priming utterance inside the click handler.
-    prime() {
-      if (!window.speechSynthesis) return;
-      try {
-        speechSynthesis.getVoices();
-        speechSynthesis.addEventListener('voiceschanged', pickVoice, { once: true });
-        if (!_unlocked) {
-          // Silent unlock utterance — empty string with volume 0 satisfies
-          // iOS Safari's user-gesture requirement without making noise.
-          const u = new SpeechSynthesisUtterance(' ');
-          u.volume = 0;
-          u.rate = 1;
-          speechSynthesis.speak(u);
-          _unlocked = true;
-        }
-      } catch {}
+    prime() { load(); },
+    announceClear(cleared, combo) { tieredAnnounce(cleared, combo, 1500); },
+    speakOneOf(poolName, gain) {
+      const pool = pools[poolName];
+      if (!pool || !pool.length) return;
+      play(pick(pool), gain);
     },
-    trashTalk(cleared, combo) {
-      // Pick a line by line-clear count — combo overrides if it's flexing.
-      let line;
-      if (combo >= 3) line = pick(COMBO_LINES);
-      else if (cleared >= 4) line = pick(TETRIS_LINES);
-      else if (cleared === 3) line = pick(TRIPLE_LINES);
-      else if (cleared === 2) line = pick(DOUBLE_LINES);
-      else line = pick(SINGLE_LINES);
-      // Music ducking intentionally removed per user — track stays at full
-      // volume; Alfred's voice rides on top.
-      speak(line);
-    },
-    // Expose the unlocked flag for debugging (used by the preview check).
-    get unlocked() { return _unlocked; },
-    get pickedVoice() { return voice && voice.name; },
+    get loaded() { return Object.keys(buffers).length; },
   };
-})();
+}
+
+// Oracle: encouraging female coach (Samantha) — fires on player clears in
+// vs-Alfred mode (layered on top of the MP3 announcer).
+const playerVoice = makeClipVoice('oracle', {
+  single: ['nice', 'keep-going', 'good', 'stay-focused'],
+  double: ['nice-clear', 'you-got-this', 'stay-sharp'],
+  triple: ['youre-cooking', 'show-him', 'dont-let-up'],
+  tetris: ['take-that', 'destroy-him', 'youre-winning', 'go-go-go'],
+  combo:  ['on-fire', 'unstoppable-o', 'beat-alfred', 'crush-him'],
+  praise: ['praise-destroyed', 'praise-take-that', 'praise-earned', 'praise-champion'],
+}, 0.85);
+
+// Alfred: deep British trash-talker (Daniel) — fires on Alfred's clears.
+const alfredVoice = makeClipVoice('alfred', {
+  single: ['easy', 'too-easy', 'come-on', 'try-harder', 'slow', 'is-that-all'],
+  double: ['nice-try', 'getting-closer', 'still-mine'],
+  triple: ['stacking-up', 'youre-cooked', 'watch-me'],
+  tetris: ['massacre', 'cleaned-house', 'tetris-baby', 'demolished'],
+  combo:  ['rolling', 'unstoppable'],
+  dunk:   ['dunk-gym', 'dunk-day-job', 'dunk-practice', 'dunk-barely', 'dunk-solo', 'dunk-hard'],
+}, 0.95);
+
+// Backward-compatible aliases for existing call sites.
+alfredVoice.trashTalk = (cleared, combo) => alfredVoice.announceClear(cleared, combo);
 
 let showGhost = (() => {
   try { const v = localStorage.getItem('tetris.showGhost'); return v === null ? true : v === 'true'; }
@@ -3585,17 +3493,20 @@ function showCombo(cleared) {
   //    near his monitor (so the player's HUD isn't hijacked by AI clears)
   //  - Remote opponent → silent here (their client narrates on their end)
   if (activePlayer && activePlayer.isAI) {
-    // Alfred's clear: just the visual banner, no in-game TTS — iOS dimming
-    // the music every time Alfred clears was throwing off the player. He
-    // gets to talk on the end screen instead.
+    // Alfred's clear: red banner + a pre-rendered trash-talk clip routed
+    // through Web Audio (no iOS speech ducking, no startup delay).
     showAlfredClearBanner(text);
+    alfredVoice.trashTalk(cleared, combo + 1);
     return;
   }
   if (!activePlayer || !activePlayer.isRemote) {
-    // MP3 announcer only — runs through Web Audio so the music never dims.
-    // Oracle's TTS encouragement during play caused iOS speech-ducking; we
-    // moved her to the end screen too, where one short line is acceptable.
+    // Player clear: MP3 announcer ("Single!" / "TETRIS!") always.
     voiceEngine.announceClear(cleared, combo + 1);
+    // In vs-Alfred, Oracle layers encouragement on top — also pre-rendered
+    // clips, so no music dim. Throttled inside the module.
+    if (gameMode === 'vs') {
+      playerVoice.announceClear(cleared, combo + 1);
+    }
   }
   const el = document.getElementById('combo-display');
   el.textContent = text;
@@ -4187,27 +4098,12 @@ function showVsResult() {
     `<div class="vs-score-row">Alfred: ${Math.floor(p2.score).toLocaleString()} · ${p2.lines} lines</div>`;
   document.getElementById('vs-result-screen').style.display = 'flex';
   audioEngine.stop();
-  // Speak the flavor line a beat after the screen appears so the audio
-  // matches the visual punch. Bypass the Alfred trash-talk throttle by
-  // calling speechSynthesis directly via the same picker — this is a
-  // climactic moment, not a chatter spam.
+  // Play a pre-rendered flavor clip 400ms after the screen appears so the
+  // audio matches the visual punch. Routed through Web Audio — no iOS
+  // music ducking, instant start, consistent voice.
   setTimeout(() => {
-    if (!voiceEnabled || !window.speechSynthesis) return;
-    try {
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(flavor);
-      // Reuse whichever voice each module already picked.
-      const v = (youWon ? playerVoice : alfredVoice).pickedVoice;
-      if (v) {
-        const all = speechSynthesis.getVoices();
-        const match = all.find(x => x.name === v);
-        if (match) u.voice = match;
-      }
-      u.rate = 1.0;
-      u.pitch = youWon ? 1.15 : 0.85;
-      u.volume = 0.85;
-      speechSynthesis.speak(u);
-    } catch {}
+    if (youWon) playerVoice.speakOneOf('praise', 0.95);
+    else alfredVoice.speakOneOf('dunk', 0.95);
   }, 400);
 }
 
@@ -6008,9 +5904,11 @@ function startGame() {
 
   resizeCanvases();
   audioEngine.init();
-  // Now that the AudioContext exists, kick off voice-engine MP3 preload so
-  // the first Tetris clear doesn't miss its announcer callout waiting on fetch.
+  // Now that the AudioContext exists, kick off MP3 preloads so the first
+  // clear doesn't have to wait on fetch + decode.
   voiceEngine.prime();
+  alfredVoice.prime();
+  playerVoice.prime();
   // iOS Safari: AudioContext starts "suspended" and needs a user gesture.
   // resume() is async — we must await it before the scheduler starts, otherwise
   // notes get scheduled on a context that isn't running yet and nothing plays.
