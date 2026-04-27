@@ -387,6 +387,32 @@
     0%, 100% { filter: brightness(1) saturate(1.1) hue-rotate(0deg); }
     50%      { filter: brightness(1.15) saturate(1.4) hue-rotate(-8deg); }
   }
+  #alfred-clear-banner {
+    position: fixed;
+    z-index: 999;          /* above the score panels + monitor frame */
+    pointer-events: none;
+    left: 50%;
+    top: 38%;              /* center of the player's view, no fight with HUD */
+    transform: translateX(-50%) scale(0.7);
+    opacity: 0;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-size: 18px;
+    padding: 6px 16px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255,40,68,0.95), rgba(255,140,40,0.95));
+    color: #fff;
+    box-shadow: 0 4px 18px rgba(255,40,68,0.6), 0 0 24px rgba(255,40,68,0.4);
+    /* No incoming transition — show instantly. Outgoing transition handled
+       inline by the hide timer for a clean fade-out. */
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    white-space: nowrap;
+  }
+  #alfred-clear-banner.shown {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
   #zone-active-badge {
     position: fixed;
     top: 12px;
@@ -1081,8 +1107,8 @@
      that movement is gestural now. -->
 <div id="touch-controls">
   <div class="tc-row">
-    <button class="tc-btn tc-action" data-action="hold" aria-label="Hold">HOLD</button>
     <button class="tc-btn tc-zone tc-wide" data-action="zone" aria-label="Zone">ZONE</button>
+    <button class="tc-btn tc-action" data-action="hold" aria-label="Hold">HOLD</button>
     <button class="tc-btn tc-drop tc-wide" data-action="harddrop" aria-label="Hard drop">↓ DROP</button>
     <button class="tc-btn tc-pause" data-action="pause" aria-label="Pause">II</button>
   </div>
@@ -1306,15 +1332,27 @@ const alfredVoice = (() => {
 
   function pick(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
 
+  let _unlocked = false;
+
   return {
-    // Prime: most browsers need a user gesture before getVoices() is populated.
-    // Voices arrive async via the `voiceschanged` event — listening here so
-    // the first trash-talk has a real voice instead of the default robotic.
+    // Prime: most browsers need a user gesture before speak() will produce
+    // sound. Just calling getVoices() doesn't count — iOS Safari requires
+    // an actual speak() invocation to "unlock" the synthesis context. We
+    // do a silent (volume 0) priming utterance inside the click handler.
     prime() {
       if (!window.speechSynthesis) return;
       try {
         speechSynthesis.getVoices();
         speechSynthesis.addEventListener('voiceschanged', pickVoice, { once: true });
+        if (!_unlocked) {
+          // Silent unlock utterance — empty string with volume 0 satisfies
+          // iOS Safari's user-gesture requirement without making noise.
+          const u = new SpeechSynthesisUtterance(' ');
+          u.volume = 0;
+          u.rate = 1;
+          speechSynthesis.speak(u);
+          _unlocked = true;
+        }
       } catch {}
     },
     trashTalk(cleared, combo) {
@@ -1325,8 +1363,14 @@ const alfredVoice = (() => {
       else if (cleared === 3) line = pick(TRIPLE_LINES);
       else if (cleared === 2) line = pick(DOUBLE_LINES);
       else line = pick(SINGLE_LINES);
+      // Duck the backing track so Alfred cuts through the music — same
+      // pattern as the player's voice clears. ~1.4s covers the trash line.
+      try { if (audioEngine && audioEngine.duckTrack) audioEngine.duckTrack(1.4); } catch {}
       speak(line);
     },
+    // Expose the unlocked flag for debugging (used by the preview check).
+    get unlocked() { return _unlocked; },
+    get pickedVoice() { return voice && voice.name; },
   };
 })();
 
@@ -3345,25 +3389,59 @@ function initBgParticles() {
 }
 
 function showCombo(cleared) {
-  const el = document.getElementById('combo-display');
   const theme = getTheme(level);
   const names = ['', 'Single', 'Double', 'Triple', 'TETRIS!'];
   let text = names[cleared] || 'TETRIS!';
   if (combo > 0) text += ` x${combo + 1}`;
-  el.textContent = text;
+
   // Voice callout — split by who's clearing:
-  //  - Local human → existing voiceEngine MP3 callouts ("Single!" / "TETRIS!")
-  //  - AI (Alfred) → Web Speech API trash talk in his own voice
-  //  - Remote opponent → silent (their client narrates on their end)
+  //  - Local human → MP3 announcer ("Single!" / "TETRIS!") + center banner
+  //  - AI (Alfred) → Web Speech API trash talk + separate red Alfred banner
+  //    near his monitor (so the player's HUD isn't hijacked by AI clears)
+  //  - Remote opponent → silent here (their client narrates on their end)
   if (activePlayer && activePlayer.isAI) {
     alfredVoice.trashTalk(cleared, combo + 1);
-  } else if (!activePlayer || !activePlayer.isRemote) {
+    showAlfredClearBanner(text);
+    return; // don't paint the player's centered combo display for AI clears
+  }
+  if (!activePlayer || !activePlayer.isRemote) {
     voiceEngine.announceClear(cleared, combo + 1);
   }
+  const el = document.getElementById('combo-display');
+  el.textContent = text;
   el.style.color = theme.colors.accent;
   el.style.textShadow = `0 0 20px ${theme.colors.accent}`;
   el.style.opacity = 1;
   setTimeout(() => el.style.opacity = 0, 1200);
+}
+
+// Alfred-specific clear banner. Different visual treatment from the player's
+// centered combo display: parks itself at the top-center, paints in a hot
+// red/orange so the player can tell at a glance who just cleared.
+//
+// Uses a class toggle (`.shown`) instead of inline opacity transitions,
+// because the inline-style transition path was being clobbered by an outer
+// styling rule and the banner stayed at 0 opacity.
+function showAlfredClearBanner(text) {
+  let el = document.getElementById('alfred-clear-banner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'alfred-clear-banner';
+    document.body.appendChild(el);
+  }
+  el.textContent = `🦇 ALFRED · ${text}`;
+  // Use direct inline-style setting to dodge any specificity-based override
+  // of the .shown class. This is the bulletproof path: paint the visible
+  // state inline, then schedule the hide back to invisible.
+  el.style.transition = 'none';
+  el.style.opacity = '1';
+  el.style.transform = 'translateX(-50%) scale(1)';
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(() => {
+    el.style.transition = 'opacity 0.25s ease-in, transform 0.25s ease-in';
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(-50%) scale(0.7)';
+  }, 1300);
 }
 
 // ============================================================
@@ -5614,6 +5692,10 @@ function startGame() {
   } else {
     document.body.classList.remove('vs-mode');
   }
+  // Position Alfred's monitor: in vs-mode mobile, sit it BETWEEN the score
+  // panels (top of #p1-wrap) and the main canvas, so it doesn't cover the
+  // player's HUD. In other modes / desktop, the CSS layout takes over.
+  positionP2Monitor();
 
   // Initialise each player's game state.
   for (const p of players) {
@@ -5924,6 +6006,48 @@ setInterval(() => {
   const startVisible = document.getElementById('start-screen').style.display !== 'none';
   if (startVisible) refreshSharedLeaderboard();
 }, 30_000);
+
+// Move the Alfred monitor into the right spot for the current mode/viewport.
+// On mobile vs-mode we want it to sit between the score panel row and the
+// main canvas (so it doesn't cover the player's HOLD/score/NEXT). On desktop
+// or non-vs modes we put it back as a sibling of #p1-wrap inside game-container.
+function positionP2Monitor() {
+  const p2Wrap = document.getElementById('p2-wrap');
+  const p1Wrap = document.getElementById('p1-wrap');
+  const main = document.getElementById('main-canvas');
+  const container = document.getElementById('game-container');
+  if (!p2Wrap || !p1Wrap || !main || !container) return;
+  const isMobile = window.innerWidth <= 720 ||
+    ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  const inVs = document.body.classList.contains('vs-mode');
+  if (inVs && isMobile) {
+    // Move into p1-wrap, just before the main canvas. Side panels (HOLD,
+    // score, NEXT) wrap to the row above; Alfred lands underneath them.
+    if (p2Wrap.parentElement !== p1Wrap || p2Wrap.nextSibling !== main) {
+      p1Wrap.insertBefore(p2Wrap, main);
+    }
+    p2Wrap.style.order = '2';
+    p2Wrap.style.flex = '0 0 auto';
+    p2Wrap.style.width = '100%';
+    p2Wrap.style.alignItems = 'center';
+  } else {
+    // Restore: sibling of p1-wrap, second child of game-container.
+    if (p2Wrap.parentElement !== container) {
+      container.appendChild(p2Wrap);
+    }
+    p2Wrap.style.order = '';
+    p2Wrap.style.flex = '';
+    p2Wrap.style.width = '';
+    p2Wrap.style.alignItems = '';
+  }
+  // Force a canvas resize so the bg + main canvases recompute against the
+  // new layout (otherwise mobile vs-mode would leave too much vertical room).
+  if (typeof scheduleResize === 'function') scheduleResize();
+}
+
+// Reposition on viewport resize too, in case the user rotates / shows the
+// keyboard / etc.
+window.addEventListener('resize', () => positionP2Monitor());
 
 // Mode selector (Solo / Vs Alfred / Vs Friend) on the start screen.
 // Also reveals/hides the Alfred difficulty picker depending on which mode
