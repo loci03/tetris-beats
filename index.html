@@ -1644,6 +1644,10 @@ var shockwaves = [];
 // Screen shake: number of frames remaining + magnitude in px. Decays each frame.
 var shakeFrames = 0;
 var shakeMag = 0;
+// Crowd cheer pulse — bumped on line clear, decays each frame. Drives
+// dancer arm-raise + extra stage-light intensity in the warehouse scene.
+// 0 = idle, 1 = peak cheer.
+var cheerPulse = 0;
 
 // ─── VS-mode plumbing ────────────────────────────────────────────
 var gameMode = 'solo';    // 'solo' | 'vs'
@@ -1967,6 +1971,11 @@ function clearLines() {
         shakeMag = mag;
         shakeFrames = Math.min(28, 8 + cleared * 3 + Math.max(0, combo) * 2);
       }
+      // Crowd reaction. Stronger clears → bigger cheer that lasts longer.
+      // Stacks with combo so a 3-combo Tetris really pops the crowd.
+      const cheerBase = [0, 0.35, 0.55, 0.78, 1.0][cleared] || 1.0;
+      const cheerComboBoost = Math.min(0.4, Math.max(0, combo) * 0.12);
+      cheerPulse = Math.min(1.2, Math.max(cheerPulse, cheerBase + cheerComboBoost));
     }
     for (const r of clearRows.sort((a, b) => a - b)) {
       board.splice(r, 1);
@@ -2113,6 +2122,26 @@ const audioEngine = {
     this.trackGain = this.ctx.createGain();
     this.trackGain.gain.value = this.TRACK_LEVEL;
     this.trackGain.connect(this.masterGain);
+    // Analyser tap — non-destructive split off trackGain to read real-time
+    // amplitude. Used by the warehouse scene to drive crowd + lights so the
+    // visuals actually move with the music rather than just the BPM clock.
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 64;
+    this.analyser.smoothingTimeConstant = 0.72;
+    this._analyserBuf = new Uint8Array(this.analyser.frequencyBinCount);
+    this.trackGain.connect(this.analyser);
+  },
+
+  // Returns smoothed amplitude 0..1 for visuals. Cheap (TypedArray reuse).
+  // Returns 0 if context isn't running yet.
+  getAudioEnergy() {
+    if (!this.analyser) return 0;
+    this.analyser.getByteFrequencyData(this._analyserBuf);
+    // Average the lower half of the spectrum — kicks/bass dominate visuals.
+    let sum = 0;
+    const half = Math.floor(this._analyserBuf.length / 2);
+    for (let i = 0; i < half; i++) sum += this._analyserBuf[i];
+    return Math.min(1, sum / (half * 200));
   },
 
   // Load and decode the named MP3 from /audio/levels/. Cached, so subsequent
@@ -2866,7 +2895,7 @@ const audioEngine = {
         this._loadSfx(theme.moveSfx);
         return; // skip this trigger; next move will play once buffer's ready
       }
-      if (this._fireSfx(theme.moveSfx, 0.5)) {
+      if (this._fireSfx(theme.moveSfx, 0.4)) {
         this._lastMoveSfxAt = now;
         return;
       }
@@ -3738,7 +3767,17 @@ function glyphPath(context, cx, cy, r, type) {
 function drawBoard() {
   const theme = getTheme(level);
   const [r, g, b] = hexToRgb(theme.colors.bg2);
-  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  // Underground (Tetris-Effect style) renders the board background semi-
+  // translucent so the warehouse crowd shows through the empty cells. Other
+  // levels keep the opaque fill so their procedural backdrops aren't fighting
+  // the play area. Translucent fills require clearing first, otherwise the
+  // previous frame's pixels leak through and stack into a smear over time.
+  if (theme && theme.blockStyle === 'tetrisEffect') {
+    ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+    ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
+  } else {
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+  }
   ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
 
   // Grid
@@ -3901,154 +3940,250 @@ function drawNext() {
 }
 
 // ============================================================
-// WAREHOUSE SCENE (Underground / Level 1)
+// UNDERGROUND CONCERT SCENE (Level 1)
 // ============================================================
-// Lazily-initialised dancer state. Re-initialised when bgCanvas resizes.
-let _dancers = null;
-let _dancersBgW = 0;
-function ensureDancers() {
-  if (_dancers && _dancersBgW === bgCanvas.width) return;
-  _dancersBgW = bgCanvas.width;
-  // Place dancers in the strips of bg-canvas BESIDE the board (not below it,
-  // since the touch controls + safe area cover the bottom). Board is centered
-  // horizontally with width COLS*CELL. We leave room for the side panels and
-  // park dancers outside that zone.
+// A packed crowd at a basement show, drawn in three depth tiers behind +
+// flanking the board. Front-row dancers are big and detailed, mid-row are
+// medium silhouettes, back-row is a solid wall of heads to suggest a much
+// larger audience than we actually render.
+//
+// Reactivity:
+//   - Bobbing speed/amplitude scales with the BPM clock + audio energy.
+//   - cheerPulse (set by clearLines) raises arms simultaneously across all
+//     dancers and brightens stage lights for a celebratory beat.
+//   - Strobe lights on top pulse on every kick (beatPhase % 4 === 0).
+let _crowd = null;
+let _crowdBgW = 0;
+let _crowdBgH = 0;
+
+function ensureCrowd() {
+  if (_crowd && _crowdBgW === bgCanvas.width && _crowdBgH === bgCanvas.height) return;
+  _crowdBgW = bgCanvas.width;
+  _crowdBgH = bgCanvas.height;
   const w = bgCanvas.width, h = bgCanvas.height;
   const boardW = COLS * CELL;
   const boardCx = w / 2;
+  // Crowd occupies the bottom 40% of the bg canvas. Front row sits just
+  // above the touch-controls strip on mobile / the bottom on desktop.
+  const floorY = h - 70;
+  // Distribute across the FULL width — including in front of the board, since
+  // we made the board background translucent and the heads peek through.
+  // Each tier is densest near the center stage and thins toward the edges.
+  const tiers = [];
+  // Back row: many small heads in a dense bobbing wall
+  const backCount = Math.floor(w / 14);
+  for (let i = 0; i < backCount; i++) {
+    tiers.push({
+      x: (i + 0.5) * (w / backCount) + (Math.random() - 0.5) * 4,
+      y: floorY - 110 + (Math.random() - 0.5) * 6,
+      scale: 0.36 + Math.random() * 0.08,
+      tier: 'back',
+      phase: Math.random() * Math.PI * 2,
+      armPhase: Math.random() * Math.PI * 2,
+    });
+  }
+  // Mid row: medium silhouettes, fewer
+  const midCount = Math.floor(w / 28);
+  for (let i = 0; i < midCount; i++) {
+    tiers.push({
+      x: (i + 0.5) * (w / midCount) + (Math.random() - 0.5) * 8,
+      y: floorY - 60 + (Math.random() - 0.5) * 4,
+      scale: 0.6 + Math.random() * 0.18,
+      tier: 'mid',
+      phase: Math.random() * Math.PI * 2,
+      armPhase: Math.random() * Math.PI * 2,
+    });
+  }
+  // Front row: fewer big dancers, parked in the side strips so we don't
+  // bury the board itself behind a big silhouette.
   const sideStrip = (w - boardW) / 2;
-  // If the side strip is too narrow (mobile portrait), skip dancers entirely
-  // — there's no room without overlapping the board, and the layout would
-  // look cramped.
-  if (sideStrip < 90) { _dancers = []; return; }
-  // Two on each side, vertically positioned around the lower-mid of the
-  // board area so they read as standing on the warehouse floor near the cut
-  // crates rather than floating in space.
-  const yBase = Math.min(h - 80, h * 0.72);
-  const offsets = [
-    { side: -1, dx: -0.55 }, { side: -1, dx: -0.85 },
-    { side: +1, dx:  0.55 }, { side: +1, dx:  0.85 },
-  ];
-  _dancers = offsets.map((o, i) => ({
-    x: boardCx + o.side * boardW / 2 + o.dx * sideStrip,
-    yBase,
-    phase: (i * 0.6) % (Math.PI * 2),
-    armPhase: i * 0.9,
-    scale: 0.95 + (i % 2) * 0.25,
-  }));
+  if (sideStrip > 70) {
+    const frontXs = [
+      boardCx - boardW / 2 - sideStrip * 0.45,
+      boardCx - boardW / 2 - sideStrip * 0.85,
+      boardCx + boardW / 2 + sideStrip * 0.45,
+      boardCx + boardW / 2 + sideStrip * 0.85,
+    ];
+    for (let i = 0; i < frontXs.length; i++) {
+      tiers.push({
+        x: frontXs[i],
+        y: floorY,
+        scale: 1.05 + (i % 2) * 0.2,
+        tier: 'front',
+        phase: (i * 0.6) % (Math.PI * 2),
+        armPhase: i * 0.9,
+      });
+    }
+  }
+  _crowd = tiers;
 }
 
 function drawWarehouseScene(theme, now) {
   const w = bgCanvas.width, h = bgCanvas.height;
-  // Concrete vignette: deep gradient pulling toward the centre, slightly
-  // pulsing on each beat so the room feels lived-in.
-  const beatPulse = 1 + (beatPhase % 4 === 0 ? 0.06 : 0) * Math.max(0, Math.sin(beatPhase / 4 * Math.PI * 2));
-  const cg = bgCtx.createRadialGradient(w / 2, h * 0.55, 0, w / 2, h * 0.55, w * 0.75);
+  const accentRgb = hexToRgb(theme.colors.glow);
+  const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+  // Beat onset detection from the procedural scheduler — kicks are at steps
+  // 0 and 8 in the Underground pattern, so beatPhase 0 + 8 = downbeats.
+  const onBeat = (beatPhase % 4 === 0);
+  const cheer = cheerPulse;
+
+  // 1. CONCRETE BACKDROP — deep gradient + faint horizontal light streaks
+  //    suggesting concrete walls and overhead trusses.
+  const cg = bgCtx.createRadialGradient(w / 2, h * 0.55, 0, w / 2, h * 0.55, w * 0.85);
   cg.addColorStop(0, 'rgba(20,28,42,0.55)');
-  cg.addColorStop(0.55, 'rgba(8,12,20,0.65)');
-  cg.addColorStop(1, 'rgba(0,2,6,0.85)');
+  cg.addColorStop(0.5, 'rgba(8,12,20,0.7)');
+  cg.addColorStop(1, 'rgba(0,2,6,0.92)');
   bgCtx.fillStyle = cg;
   bgCtx.fillRect(0, 0, w, h);
 
-  // Overhead spotlight cone lighting the play field. Two soft cones on the
-  // sides paint where the dancers stand. All three pulse with the kick.
-  const accentRgb = hexToRgb(theme.colors.glow);
-  const coneAlpha = 0.18 * beatPulse;
-  const drawCone = (cx, top, baseW, color, alpha) => {
-    const g = bgCtx.createLinearGradient(cx, top, cx, h);
-    g.addColorStop(0, `rgba(${color[0]},${color[1]},${color[2]},${alpha})`);
-    g.addColorStop(1, `rgba(${color[0]},${color[1]},${color[2]},0)`);
-    bgCtx.fillStyle = g;
+  // 2. STAGE TRUSS — horizontal beam near the top with hanging strobes.
+  //    Strobes flash on every downbeat + react to audio energy + cheer.
+  const trussY = Math.max(40, h * 0.08);
+  bgCtx.fillStyle = 'rgba(2,4,10,0.95)';
+  bgCtx.fillRect(0, trussY, w, 6);
+  // Hanging cables
+  bgCtx.strokeStyle = 'rgba(2,4,10,0.7)';
+  bgCtx.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    const x = (i + 0.5) * (w / 8);
     bgCtx.beginPath();
-    bgCtx.moveTo(cx - 8, top);
-    bgCtx.lineTo(cx + 8, top);
-    bgCtx.lineTo(cx + baseW / 2, h);
-    bgCtx.lineTo(cx - baseW / 2, h);
-    bgCtx.closePath();
-    bgCtx.fill();
-  };
-  drawCone(w * 0.5,  -10, w * 0.55, accentRgb, coneAlpha);
-  drawCone(w * 0.15, -10, w * 0.18, accentRgb, coneAlpha * 0.7);
-  drawCone(w * 0.85, -10, w * 0.18, accentRgb, coneAlpha * 0.7);
-
-  // Industrial silhouettes along the bottom edge — stacked crates that
-  // anchor the dancers and give a sense of depth.
-  bgCtx.fillStyle = 'rgba(0,3,10,0.75)';
-  bgCtx.fillRect(0, h - 24, w, 24);
-  // Random-ish crate stacks (deterministic so they don't shimmer)
-  const stacks = [
-    { x: 0.06, w: 60, h: 50 }, { x: 0.28, w: 80, h: 65 },
-    { x: 0.66, w: 70, h: 55 }, { x: 0.92, w: 50, h: 45 },
-  ];
-  for (const s of stacks) {
-    const sx = s.x * w - s.w / 2;
-    bgCtx.fillRect(sx, h - 24 - s.h, s.w, s.h);
-    // Crate edges
-    bgCtx.strokeStyle = 'rgba(20,30,45,0.6)';
-    bgCtx.lineWidth = 1;
-    bgCtx.strokeRect(sx + 0.5, h - 24 - s.h + 0.5, s.w - 1, s.h - 1);
+    bgCtx.moveTo(x, 0);
+    bgCtx.lineTo(x, trussY);
+    bgCtx.stroke();
+  }
+  // Strobe lamps along the truss
+  const strobeIntensity = Math.max(onBeat ? 0.85 : 0, energy * 0.7, cheer * 0.9);
+  for (let i = 0; i < 5; i++) {
+    const x = (i + 0.5) * (w / 5);
+    const alt = i % 2 === 0;
+    // Lamp body
+    bgCtx.fillStyle = 'rgba(8,12,18,0.95)';
+    bgCtx.fillRect(x - 6, trussY + 6, 12, 8);
+    // Beam
+    if (strobeIntensity > 0.05) {
+      const beamLen = h - trussY;
+      const sweep = Math.sin(now / 700 + i) * 30;
+      const bg = bgCtx.createLinearGradient(x, trussY + 14, x + sweep, trussY + 14 + beamLen);
+      const beamAlpha = strobeIntensity * (alt ? 0.32 : 0.22);
+      bg.addColorStop(0, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${beamAlpha})`);
+      bg.addColorStop(1, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0)`);
+      bgCtx.fillStyle = bg;
+      bgCtx.beginPath();
+      bgCtx.moveTo(x - 4, trussY + 14);
+      bgCtx.lineTo(x + 4, trussY + 14);
+      bgCtx.lineTo(x + sweep + 60, h);
+      bgCtx.lineTo(x + sweep - 60, h);
+      bgCtx.closePath();
+      bgCtx.fill();
+    }
   }
 
-  // Dancing silhouettes
-  ensureDancers();
+  // 3. STAGE FLOOR HAZE — wide soft glow along the floor that pulses with
+  //    audio energy. Sells the sense of a smoke-machine-fed venue.
+  const hazeAlpha = 0.12 + energy * 0.18 + cheer * 0.22;
+  const haze = bgCtx.createLinearGradient(0, h - 200, 0, h);
+  haze.addColorStop(0, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0)`);
+  haze.addColorStop(1, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${hazeAlpha})`);
+  bgCtx.fillStyle = haze;
+  bgCtx.fillRect(0, h - 200, w, 200);
+
+  // 4. CROWD — three tiers, drawn back-to-front so closer dancers occlude
+  //    farther ones. Cheer raises arms, energy bumps bob amplitude.
+  ensureCrowd();
   const bpm = theme.bpm || 100;
   const beatMs = 60000 / bpm;
-  for (const d of _dancers) {
-    const t = (now / beatMs) * Math.PI + d.phase;
-    drawDancer(d, t, theme.colors.glow);
+  const baseT = (now / beatMs) * Math.PI;
+  // Sort already implicit because we pushed back→mid→front
+  for (const d of _crowd) {
+    const t = baseT + d.phase;
+    drawCrowdDancer(d, t, accentRgb, energy, cheer);
   }
 }
 
-// One silhouette figure: head, torso, arms, legs. Bobs on every beat,
-// arms swing to a slightly slower rhythm so it doesn't look mechanical.
-function drawDancer(d, beatT, glowHex) {
-  const bob = Math.abs(Math.sin(beatT)) * 8 * d.scale;
-  const cx = d.x;
-  const cy = d.yBase - bob;
+// Render one figure. `tier` decides level of detail — back row is heads only,
+// mid row is head+torso, front row is full body with arms + legs.
+function drawCrowdDancer(d, beatT, accentRgb, energy, cheer) {
   const s = d.scale;
+  const bobAmp = (4 + energy * 6 + cheer * 4) * s;
+  const bob = Math.abs(Math.sin(beatT)) * bobAmp;
+  const cx = d.x, cy = d.y - bob;
   bgCtx.save();
-  // Rim glow behind the figure so it pops off the warehouse backdrop
-  const [gr, gg, gb] = hexToRgb(glowHex);
-  const rim = bgCtx.createRadialGradient(cx, cy - 18 * s, 0, cx, cy - 18 * s, 36 * s);
-  rim.addColorStop(0, `rgba(${gr},${gg},${gb},0.35)`);
-  rim.addColorStop(1, `rgba(${gr},${gg},${gb},0)`);
-  bgCtx.fillStyle = rim;
-  bgCtx.fillRect(cx - 50 * s, cy - 70 * s, 100 * s, 110 * s);
-  // Silhouette body — solid near-black so the figure reads cleanly against
-  // the lit warehouse floor.
-  bgCtx.fillStyle = 'rgba(2,5,12,0.95)';
-  bgCtx.strokeStyle = 'rgba(2,5,12,0.95)';
-  bgCtx.lineWidth = 5 * s;
+  bgCtx.fillStyle = 'rgba(2,4,10,0.95)';
+  bgCtx.strokeStyle = 'rgba(2,4,10,0.95)';
   bgCtx.lineCap = 'round';
-  // Head
-  bgCtx.beginPath();
-  bgCtx.arc(cx, cy - 38 * s, 8 * s, 0, Math.PI * 2);
-  bgCtx.fill();
-  // Torso
-  bgCtx.beginPath();
-  bgCtx.moveTo(cx, cy - 28 * s);
-  bgCtx.lineTo(cx, cy + 4 * s);
-  bgCtx.stroke();
-  // Arms — wave with a separate phase, slight up/out swing
-  const armSwing = Math.sin(beatT + d.armPhase) * 0.7;
-  const arm = (dir) => {
-    const ax = cx + dir * Math.cos(armSwing) * 18 * s;
-    const ay = cy - 22 * s + Math.abs(Math.sin(armSwing)) * -10 * s;
+
+  if (d.tier === 'back') {
+    // Just a head bobbing in the wall — alpha-modulated by tier.
+    bgCtx.globalAlpha = 0.65;
     bgCtx.beginPath();
-    bgCtx.moveTo(cx, cy - 22 * s);
-    bgCtx.lineTo(ax, ay);
-    bgCtx.stroke();
-  };
-  arm(1); arm(-1);
-  // Legs — slight bend on each bounce so it reads as actually dancing
-  const bend = Math.abs(Math.sin(beatT)) * 6 * s;
-  const leg = (dir) => {
+    bgCtx.arc(cx, cy, 6 * s, 0, Math.PI * 2);
+    bgCtx.fill();
+    // Hint of shoulders below to thicken the wall
+    bgCtx.fillRect(cx - 7 * s, cy + 4 * s, 14 * s, 8 * s);
+  } else if (d.tier === 'mid') {
+    bgCtx.globalAlpha = 0.85;
+    // Head
     bgCtx.beginPath();
-    bgCtx.moveTo(cx, cy + 4 * s);
-    bgCtx.lineTo(cx + dir * 7 * s, cy + 22 * s - bend);
+    bgCtx.arc(cx, cy - 18 * s, 7 * s, 0, Math.PI * 2);
+    bgCtx.fill();
+    // Torso (stubby — not legs visible at this distance)
+    bgCtx.fillRect(cx - 8 * s, cy - 11 * s, 16 * s, 22 * s);
+    // Arms — when cheering, a fraction of mid-row raise both arms
+    if (cheer > 0.3 && Math.sin(d.armPhase) > 0) {
+      const reach = (12 + cheer * 8) * s;
+      bgCtx.lineWidth = 4 * s;
+      bgCtx.beginPath();
+      bgCtx.moveTo(cx - 6 * s, cy - 8 * s);
+      bgCtx.lineTo(cx - 6 * s, cy - 8 * s - reach);
+      bgCtx.moveTo(cx + 6 * s, cy - 8 * s);
+      bgCtx.lineTo(cx + 6 * s, cy - 8 * s - reach);
+      bgCtx.stroke();
+    }
+  } else { // front
+    // Rim glow so the front-row figures pop
+    const rim = bgCtx.createRadialGradient(cx, cy - 25 * s, 0, cx, cy - 25 * s, 50 * s);
+    rim.addColorStop(0, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.35 + cheer * 0.25})`);
+    rim.addColorStop(1, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0)`);
+    bgCtx.fillStyle = rim;
+    bgCtx.fillRect(cx - 60 * s, cy - 80 * s, 120 * s, 110 * s);
+    bgCtx.fillStyle = 'rgba(2,4,10,0.95)';
+    bgCtx.lineWidth = 5 * s;
+    // Head
+    bgCtx.beginPath();
+    bgCtx.arc(cx, cy - 38 * s, 8 * s, 0, Math.PI * 2);
+    bgCtx.fill();
+    // Torso
+    bgCtx.beginPath();
+    bgCtx.moveTo(cx, cy - 28 * s);
+    bgCtx.lineTo(cx, cy + 4 * s);
     bgCtx.stroke();
-  };
-  leg(1); leg(-1);
+    // Arms — cheer raises them straight up; otherwise they swing
+    const armUp = cheer * Math.min(1, cheer * 1.5);
+    const armSwing = Math.sin(beatT + d.armPhase) * 0.7;
+    const armDir = (sign) => {
+      // Blend swing with up-raise based on cheer strength
+      const upX = sign * 6 * s;
+      const upY = -28 * s;
+      const swingX = sign * Math.cos(armSwing) * 18 * s;
+      const swingY = -22 * s + Math.abs(Math.sin(armSwing)) * -10 * s;
+      const ax = cx + (swingX * (1 - armUp) + upX * armUp);
+      const ay = cy + (swingY * (1 - armUp) + upY * armUp);
+      bgCtx.beginPath();
+      bgCtx.moveTo(cx, cy - 22 * s);
+      bgCtx.lineTo(ax, ay);
+      bgCtx.stroke();
+    };
+    armDir(1); armDir(-1);
+    // Legs
+    const bend = Math.abs(Math.sin(beatT)) * 6 * s;
+    const legDir = (sign) => {
+      bgCtx.beginPath();
+      bgCtx.moveTo(cx, cy + 4 * s);
+      bgCtx.lineTo(cx + sign * 7 * s, cy + 22 * s - bend);
+      bgCtx.stroke();
+    };
+    legDir(1); legDir(-1);
+  }
   bgCtx.restore();
 }
 
@@ -4360,6 +4495,9 @@ function update(timestamp) {
 
 function render(timestamp) {
   animFrame = requestAnimationFrame(render);
+  // Cheer pulse decays each frame (rises only on line clears in clearLines()).
+  // Linear decay over ~1.4s feels right against a 4-beat cheer at 100 bpm.
+  if (cheerPulse > 0) cheerPulse = Math.max(0, cheerPulse - 0.012);
   drawBackground();
   // Screen-shake decay applied via CSS transform on the main canvas. Cheaper
   // than redrawing into a translated context, and respects the per-player
