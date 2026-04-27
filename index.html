@@ -1273,6 +1273,93 @@ const voiceEngine = (() => {
 })();
 
 // ============================================================
+// PLAYER FEMALE VOICE — Web Speech API
+// ============================================================
+// Used in vs-Alfred mode so the player's clears narrate in a distinct voice
+// from Alfred's deeper male voice. Solo mode keeps the existing MP3 announcer
+// (which the user has been happy with). Picks the first available female
+// English voice; pitch + rate tuned to read clearly over the music.
+const playerVoice = (() => {
+  const SINGLE_LINES = ['single', 'one', 'clear'];
+  const DOUBLE_LINES = ['double', 'two lines', 'nice'];
+  const TRIPLE_LINES = ['triple', 'three lines', 'oh yes'];
+  const TETRIS_LINES = ['tetris!', "let's go", 'beautiful', 'tetris'];
+  const COMBO_LINES  = ['combo', 'on a roll', 'rolling', 'sweet', "let's go", 'unstoppable'];
+
+  let voice = null;
+  let _lastSpoken = 0;
+  let _unlocked = false;
+
+  function pickVoice() {
+    if (voice) return voice;
+    if (!window.speechSynthesis) return null;
+    const all = speechSynthesis.getVoices();
+    if (!all || !all.length) return null;
+    // Female English voices commonly available across browsers.
+    const preferred = [
+      'Samantha', 'Karen', 'Ava', 'Tessa', 'Moira', 'Allison', 'Susan', 'Joanna',
+      'Microsoft Zira', 'Microsoft Aria', 'Microsoft Jenny',
+      'Google UK English Female', 'Google US English Female',
+    ];
+    for (const name of preferred) {
+      const v = all.find(x => x.name && x.name.includes(name));
+      if (v) return (voice = v);
+    }
+    // Heuristic fallback: many systems mark gender in name; prefer not the
+    // default that alfredVoice picked.
+    const eng = all.filter(x => x.lang && x.lang.startsWith('en'));
+    return (voice = eng.find(x => /female|woman|girl/i.test(x.name)) || eng[0] || all[0]);
+  }
+
+  function speak(text) {
+    if (!window.speechSynthesis) return;
+    if (!voiceEnabled) return;
+    const now = performance.now();
+    if (now - _lastSpoken < 600) return;
+    _lastSpoken = now;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const v = pickVoice();
+      if (v) u.voice = v;
+      u.rate = 1.05;
+      u.pitch = 1.15;     // slightly higher than default
+      u.volume = 1.0;
+      speechSynthesis.speak(u);
+    } catch {}
+  }
+
+  function pick(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
+
+  return {
+    prime() {
+      if (!window.speechSynthesis) return;
+      try {
+        speechSynthesis.getVoices();
+        speechSynthesis.addEventListener('voiceschanged', pickVoice, { once: true });
+        if (!_unlocked) {
+          const u = new SpeechSynthesisUtterance(' ');
+          u.volume = 0;
+          speechSynthesis.speak(u);
+          _unlocked = true;
+        }
+      } catch {}
+    },
+    announceClear(cleared, combo) {
+      let line;
+      if (combo >= 2) line = pick(COMBO_LINES);
+      else if (cleared >= 4) line = pick(TETRIS_LINES);
+      else if (cleared === 3) line = pick(TRIPLE_LINES);
+      else if (cleared === 2) line = pick(DOUBLE_LINES);
+      else line = pick(SINGLE_LINES);
+      try { if (audioEngine && audioEngine.duckTrack) audioEngine.duckTrack(1.2); } catch {}
+      speak(line);
+    },
+    get pickedVoice() { return voice && voice.name; },
+  };
+})();
+
+// ============================================================
 // ALFRED VOICE — Web Speech API trash talk
 // ============================================================
 // Built on `speechSynthesis` (no MP3s needed). Picks a deeper male voice
@@ -3408,7 +3495,14 @@ function showCombo(cleared) {
     return; // don't paint the player's centered combo display for AI clears
   }
   if (!activePlayer || !activePlayer.isRemote) {
-    voiceEngine.announceClear(cleared, combo + 1);
+    // In vs-Alfred mode, the player gets a female TTS voice so the two
+    // sides are sonically distinct. Other modes (solo, vs-friend) keep the
+    // existing MP3 announcer the user is used to.
+    if (gameMode === 'vs') {
+      playerVoice.announceClear(cleared, combo + 1);
+    } else {
+      voiceEngine.announceClear(cleared, combo + 1);
+    }
   }
   const el = document.getElementById('combo-display');
   el.textContent = text;
@@ -5892,6 +5986,7 @@ function leaveCurrentRoom() {
 function primeVoiceOnClick() {
   try { voiceEngine.prime(); } catch {}
   try { alfredVoice.prime(); } catch {}
+  try { playerVoice.prime(); } catch {}
 }
 document.getElementById('start-btn').addEventListener('click', () => { primeVoiceOnClick(); startGame(); });
 document.getElementById('start-btn-2').addEventListener('click', () => { primeVoiceOnClick(); startGame(); });
