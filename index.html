@@ -1512,22 +1512,31 @@ const LEVEL_THEMES = [
     chords: [[220, 261.63, 329.63], [196, 246.94, 293.66], [174.61, 220, 261.63]],
     synthType: 'strings',
   },
-  { // Level 3 - Graduation
-    name: 'Graduation',
-    bpm: 100,
-    colors: { bg1: '#0f0028', bg2: '#000a1a', accent: '#cc00ff', glow: '#ff00ff' },
-    particleHue: 280,
-    particleStyle: 'diamonds', // geometric diamonds
+  { // Level 3 - Falling Violins (Suno track + gold/yellow concert hall aesthetic)
+    name: 'Falling Violins',
+    // Mid-tempo guess; nudge if visual beat-pulse drifts from the track.
+    bpm: 96,
+    track: 'falling-violins.mp3',
+    // Gold face, lemon-yellow highlight. tetrisEffect block style paints every
+    // block in `colors.accent` with a top gradient that lifts toward the
+    // shadeColor(+50) of accent — for #ffd700 that lands close to bright yellow,
+    // and the white bevel on top reads as a yellow rim over the gold.
+    colors: { bg1: '#1a1200', bg2: '#0a0700', accent: '#ffd700', glow: '#ffeb3b' },
+    particleHue: 50,
+    particleStyle: 'violins', // violin silhouettes raining from the sky, reactive
+    blockStyle: 'tetrisEffect',
     blockGlow: 14,
-    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,1, 0,0,0,0],
+    // Procedural fallback drum/bass — used only if falling-violins.mp3 fails to
+    // load. Soft pizzicato-ish pattern so the level still feels orchestral.
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-    hh:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
     hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
     bass:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
     bassNote: 55,
     scale: [329.63, 369.99, 415.30, 440, 493.88, 523.25, 587.33, 659.25],
     chords: [[329.63, 415.30, 493.88], [349.23, 440, 523.25], [392, 493.88, 587.33]],
-    synthType: 'synthArp',
+    synthType: 'strings',
   },
   { // Level 4 - 808s & Heartbreak
     name: '808s & Heartbreak',
@@ -5300,6 +5309,21 @@ function drawBackground() {
         p.y -= p.speed * 0.4;
         p.x += Math.sin(now / 4000 + p.phase) * 0.5;
         break;
+      case 'violins': {
+        // Falling violins rain down from the sky. cheerPulse (line clears) +
+        // stageFlash (Tetris-Effect FX) accelerate the fall and add a sway,
+        // so a Tetris combo literally pours violins past the player.
+        const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
+        const flash = (typeof stageFlash === 'number') ? stageFlash : 0;
+        const fallBoost = 1 + cheer * 2.4 + flash * 1.6;
+        p.y += p.speed * 1.3 * fallBoost;
+        // Gentle pendulum sway, amplified on big clears.
+        p.x += Math.sin(now / 1800 + p.phase) * (0.5 + cheer * 1.2);
+        // Slow tumble; spins faster on the kick beat for a downbeat snap.
+        const beatKick = (beatPhase % 4 === 0) ? 0.04 : 0.012;
+        p.rot += beatKick + cheer * 0.05;
+        break;
+      }
       default:
         p.y -= p.speed;
     }
@@ -5343,6 +5367,53 @@ function drawBackground() {
       case 'rays':
         bgCtx.fillRect(-0.5, 0, 1, p.size * beatBump * 15);
         break;
+      case 'violins': {
+        // Stylised violin silhouette: curvy hourglass body, slim neck, scroll
+        // peg-box. Painted in warm gold + a yellow rim so it sits inside the
+        // Falling Violins palette rather than the default hue-rotated dot.
+        // Beat-pulse scales the whole instrument up on the kick; cheerPulse
+        // raises alpha + glow so a Tetris really lights the rain up.
+        const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
+        const flash = (typeof stageFlash === 'number') ? stageFlash : 0;
+        const beatScale = beatBump;
+        const reactive = 1 + cheer * 0.45;
+        const vSize = p.size * 4 * beatScale * reactive;
+        bgCtx.rotate(p.rot);
+        bgCtx.globalAlpha = Math.min(1, a * 1.2 + flash * 0.4);
+        // Body — symmetric "8" shape via two stacked ovals with a pinched waist
+        bgCtx.fillStyle = `rgba(255,200,40,${0.55 + cheer * 0.35})`;
+        bgCtx.strokeStyle = `rgba(255,235,80,${0.85})`;
+        bgCtx.lineWidth = 0.8;
+        bgCtx.beginPath();
+        bgCtx.ellipse(0, vSize * 0.6, vSize * 0.7, vSize * 0.95, 0, 0, Math.PI * 2);
+        bgCtx.fill(); bgCtx.stroke();
+        bgCtx.beginPath();
+        bgCtx.ellipse(0, -vSize * 0.4, vSize * 0.55, vSize * 0.75, 0, 0, Math.PI * 2);
+        bgCtx.fill(); bgCtx.stroke();
+        // Pinched waist cover — dark slits hint at the C-bouts + f-holes
+        bgCtx.fillStyle = `rgba(80,40,0,${0.55})`;
+        bgCtx.fillRect(-vSize * 0.08, vSize * 0.05, vSize * 0.06, vSize * 0.5);
+        bgCtx.fillRect(vSize * 0.02, vSize * 0.05, vSize * 0.06, vSize * 0.5);
+        // Neck + fingerboard
+        bgCtx.fillStyle = `rgba(40,20,0,${0.8})`;
+        bgCtx.fillRect(-vSize * 0.08, -vSize * 1.6, vSize * 0.16, vSize * 1.3);
+        // Scroll peg-box (small spiral knob at the top)
+        bgCtx.fillStyle = `rgba(255,210,60,${0.85 + cheer * 0.15})`;
+        bgCtx.beginPath();
+        bgCtx.arc(0, -vSize * 1.7, vSize * 0.18, 0, Math.PI * 2);
+        bgCtx.fill();
+        // Strings — four faint lines from peg-box across the body
+        bgCtx.strokeStyle = `rgba(255,255,200,${0.35 + flash * 0.5})`;
+        bgCtx.lineWidth = 0.5;
+        for (let s = -1.5; s <= 1.5; s++) {
+          bgCtx.beginPath();
+          bgCtx.moveTo(s * vSize * 0.05, -vSize * 1.55);
+          bgCtx.lineTo(s * vSize * 0.05, vSize * 1.2);
+          bgCtx.stroke();
+        }
+        bgCtx.globalAlpha = a;
+        break;
+      }
       case 'snow':
         bgCtx.globalAlpha = a;
         bgCtx.beginPath();
