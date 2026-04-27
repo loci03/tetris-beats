@@ -1616,22 +1616,30 @@ const LEVEL_THEMES = [
     chords: [[196, 261.63, 329.63], [220, 293.66, 349.23], [174.61, 261.63, 329.63]],
     synthType: 'synthArp',
   },
-  { // Level 5 - My Beautiful Dark Twisted Fantasy
-    name: 'Dark Twisted Fantasy',
-    bpm: 96,
-    colors: { bg1: '#1a0008', bg2: '#0a0015', accent: '#ff0055', glow: '#ff0044' },
-    particleHue: 340,
-    particleStyle: 'rings', // expanding baroque rings
-    blockGlow: 16,
+  { // Level 5 - White Rabbit (Suno track + purple Matrix variant of L4)
+    name: 'White Rabbit',
+    // Mid-tempo guess; nudge if visual beat-pulse drifts from the track.
+    bpm: 100,
+    track: 'white-rabbit.mp3',
+    // Purple twin of Back for More — the matrix renderer pulls accent +
+    // glow + bg2 from these colours, so the rain + block faces + sweep
+    // band all switch to magenta-violet without forking the renderer.
+    colors: { bg1: '#0a0014', bg2: '#04000a', accent: '#c440ff', glow: '#e090ff' },
+    particleHue: 285,
+    particleStyle: 'matrix-rain',
+    blockStyle: 'matrix',
+    blockGlow: 14,
+    // Procedural fallback drum/bass — mirrors L4 since the level shares
+    // L4's tempo + matrix aesthetic; only the palette differs.
     kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
-    snare: [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
-    hh:    [1,1,1,1, 1,0,1,1, 1,1,1,1, 1,0,1,1],
-    hhOpen:[0,0,0,0, 0,1,0,0, 0,0,0,0, 0,1,0,0],
-    bass:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
-    bassNote: 55,
-    scale: [261.63, 311.13, 329.63, 392, 415.30, 523.25],
-    chords: [[261.63, 311.13, 392], [220, 277.18, 349.23], [246.94, 311.13, 369.99], [261.63, 329.63, 392]],
-    synthType: 'power',
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [1,0,1,1, 1,0,1,0, 1,0,1,1, 1,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    bassNote: 49.0, // G1
+    scale: [196, 220, 261.63, 293.66, 329.63, 392, 440, 523.25],
+    chords: [[196, 261.63, 329.63], [220, 293.66, 349.23], [174.61, 261.63, 329.63]],
+    synthType: 'synthArp',
   },
   { // Level 6 - Yeezus
     name: 'Yeezus',
@@ -3575,10 +3583,11 @@ function initBgParticles() {
       // Bumped 0.5–3.5 → 14–28 for violins so the silhouette renders large
       // enough to read as a violin (not a smudge).
       size: isViolins ? 14 + Math.random() * 14 : Math.random() * 3 + 0.5,
-      // Violins reduced again — Sir says still too fast. Now 0.08–0.18 raw
-      // × 0.7 mult ≈ 5–12 px/s baseline; a violin takes 30–60 s to cross
-      // the screen. Plenty of time to admire the silhouette.
-      speed: isViolins ? 0.08 + Math.random() * 0.10 : Math.random() * 0.5 + 0.1,
+      // Violins reduced once more — Sir kept asking for slower. Now
+      // 0.04–0.09 raw × 0.7 mult ≈ 2.5–6 px/s baseline; a violin takes
+      // 60–120 s to cross the screen. Reads as a gentle, almost still
+      // shower instead of a fall.
+      speed: isViolins ? 0.04 + Math.random() * 0.05 : Math.random() * 0.5 + 0.1,
       alpha: isViolins ? 0.6 + Math.random() * 0.3 : Math.random() * 0.4 + 0.1,
       phase: Math.random() * Math.PI * 2,
       // Violins stay nearly upright (gentle wobble); others keep full spin.
@@ -4551,12 +4560,15 @@ function drawBoard() {
     const phase = (Date.now() % cycle) / cycle;
     const bandH = h * 0.28;
     const cyPos = -bandH + (h + bandH * 2) * phase;
+    // Shimmer band uses the theme accent so White Rabbit (purple) gets
+    // a purple sweep and Back for More (green) keeps the green sweep.
+    const [sr, sg2, sb] = hexToRgb(theme.colors.accent);
     ctx.save();
     ctx.globalCompositeOperation = 'source-atop';
     const sg = ctx.createLinearGradient(0, cyPos, 0, cyPos + bandH);
-    sg.addColorStop(0,   'rgba(0,255,90,0)');
-    sg.addColorStop(0.5, 'rgba(0,255,90,0.22)');
-    sg.addColorStop(1,   'rgba(0,255,90,0)');
+    sg.addColorStop(0,   `rgba(${sr},${sg2},${sb},0)`);
+    sg.addColorStop(0.5, `rgba(${sr},${sg2},${sb},0.22)`);
+    sg.addColorStop(1,   `rgba(${sr},${sg2},${sb},0)`);
     ctx.fillStyle = sg;
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
@@ -5512,11 +5524,17 @@ function drawMatrixRain(theme, now, playRects) {
   const flash = (typeof stageFlash  === 'number') ? stageFlash  : 0;
   const onKick = (beatPhase % 4 === 0);
   const fallBoost = 1 + cheer * 1.6 + flash * 0.6;
-  // Trail-fade pass — translucent black over the whole bg canvas so
-  // previous frames' tails dim down. The base bg fill at the top of
-  // drawBackground already cleared most of it; this just deepens the
-  // last few frames so heads have a longer-feeling glow trail.
-  bgCtx.fillStyle = 'rgba(0,4,2,0.32)';
+  // Theme-driven palette: head/glow/trail colours are derived from
+  // the level theme so the same renderer can re-skin between L4 (green
+  // Back for More) and L5 (purple White Rabbit) — and any future
+  // matrix-style era — without forking the code.
+  const accentRgb = hexToRgb(theme.colors.accent);
+  const glowRgb   = hexToRgb(theme.colors.glow);
+  const bg2Rgb    = hexToRgb(theme.colors.bg2);
+  // Trail-fade pass — translucent theme-bg over the whole bg canvas so
+  // previous frames' tails dim down. Slight alpha (0.32) so heads leave
+  // a faint trail-glow even though we redraw the full trail this frame.
+  bgCtx.fillStyle = `rgba(${bg2Rgb[0]},${bg2Rgb[1]},${bg2Rgb[2]},0.32)`;
   bgCtx.fillRect(0, 0, w, h);
   // Periodic flicker pings on random columns (movePulse-driven). Picks
   // a few columns each frame proportional to movePulse so a quick
@@ -5562,9 +5580,15 @@ function drawMatrixRain(theme, now, playRects) {
     if (!_hidden(cx, headY)) {
       const headBright = onKick ? 1 : 0.92;
       const headGlow = onKick ? Math.max(6, cellH * 0.55) : Math.max(3, cellH * 0.3);
-      bgCtx.shadowColor = '#7fff9f';
+      // Glow ring uses the theme's `glow` colour (light tint of accent).
+      bgCtx.shadowColor = theme.colors.glow;
       bgCtx.shadowBlur = headGlow + flash * 14;
-      bgCtx.fillStyle = `rgba(220,255,225,${Math.min(1, headBright + flick * 0.2)})`;
+      // Head fill: a near-white wash of the glow colour so the head
+      // pops out as the brightest pixel in the column on every theme.
+      const hr = Math.min(255, glowRgb[0] + 60);
+      const hg = Math.min(255, glowRgb[1] + 60);
+      const hb = Math.min(255, glowRgb[2] + 60);
+      bgCtx.fillStyle = `rgba(${hr},${hg},${hb},${Math.min(1, headBright + flick * 0.2)})`;
       const headCh = _matrixGlyphAt(i, headRow);
       bgCtx.fillText(headCh, cx, headY);
       bgCtx.shadowBlur = 0;
@@ -5580,9 +5604,12 @@ function drawMatrixRain(theme, now, playRects) {
       if (_hidden(cx, py)) continue;
       const fade = (1 - t / col.len);
       const a = Math.min(1, fade * 0.85 + flick * 0.25);
-      // Bright phosphor green with a hue lift on a kick beat.
-      const g = Math.floor(255 * (0.55 + 0.45 * fade));
-      bgCtx.fillStyle = `rgba(0,${g},${Math.floor(60 * fade)},${a})`;
+      // Trail glyphs interpolate accent → black as they recede so green
+      // themes glow green and purple themes glow purple — same renderer.
+      const tr = Math.floor(accentRgb[0] * fade);
+      const tg = Math.floor(accentRgb[1] * fade);
+      const tb = Math.floor(accentRgb[2] * fade);
+      bgCtx.fillStyle = `rgba(${tr},${tg},${tb},${a})`;
       const ch = _matrixGlyphAt(i, row);
       bgCtx.fillText(ch, cx, py);
     }
