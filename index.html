@@ -282,6 +282,52 @@
     background: rgba(0,255,170,0.12);
     box-shadow: 0 0 12px rgba(0,255,170,0.3);
   }
+  /* Level picker — same chip language as the difficulty buttons. The grid
+     is wide (one chip per era) so we wrap and shrink the chips to keep
+     the picker from blowing past the start-screen width on mobile. */
+  #level-select {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; margin: -8px 0 24px;
+    max-width: 360px;
+  }
+  #level-select .lvl-label {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+  }
+  #level-select .lvl-grid {
+    display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  }
+  .lvl-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    background: transparent;
+    color: rgba(255,255,255,0.55);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-width: 32px;
+  }
+  .lvl-btn:hover { color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.4); }
+  .lvl-btn.lvl-active {
+    color: #fff;
+    border-color: #ffd700;
+    background: rgba(255,215,0,0.15);
+    box-shadow: 0 0 12px rgba(255,215,0,0.35);
+  }
+  /* Selected era name preview underneath the grid so the player knows what
+     they're picking before they commit. */
+  #level-select .lvl-preview {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: rgba(255,215,0,0.85);
+    text-transform: uppercase;
+    min-height: 14px;
+  }
   .mode-btn {
     padding: 10px 24px;
     font-size: 12px;
@@ -1011,6 +1057,13 @@
       <button class="diff-btn" data-diff="medium">MEDIUM</button>
       <button class="diff-btn" data-diff="hard">HARD</button>
     </div>
+  </div>
+  <!-- Level picker — chips populated from LEVEL_THEMES at boot so the labels
+       always match the actual eras + tracks. Persists in localStorage. -->
+  <div id="level-select">
+    <div class="lvl-label">START LEVEL</div>
+    <div class="lvl-grid"></div>
+    <div class="lvl-preview"></div>
   </div>
   <button id="start-btn">DROP THE BEAT</button>
   <div class="controls-info desktop-only">
@@ -2027,6 +2080,22 @@ function setAiDifficulty(v) {
   if (!AI_DIFFICULTIES[v]) return;
   aiDifficulty = v;
   try { localStorage.setItem('tetris.aiDifficulty', v); } catch {}
+}
+
+// Starting-level selection. Persists across sessions so the player who likes
+// Falling Violins can drop straight into L3 every match. Clamped to the
+// theme range at read-time in case LEVEL_THEMES shrinks in a future build.
+let startLevel = (() => {
+  try {
+    const v = parseInt(localStorage.getItem('tetris.startLevel'), 10);
+    return (Number.isFinite(v) && v >= 1) ? v : 1;
+  } catch { return 1; }
+})();
+function setStartLevel(v) {
+  v = parseInt(v, 10);
+  if (!Number.isFinite(v) || v < 1) return;
+  startLevel = v;
+  try { localStorage.setItem('tetris.startLevel', String(v)); } catch {}
 }
 
 // Fields that live in the globals and belong to whichever player is currently
@@ -3476,16 +3545,31 @@ function spawnParticles(x, y, color, count) {
 function initBgParticles() {
   bgParticles = [];
   const theme = getTheme(level);
-  const count = theme.particleStyle === 'dots' ? 30 : 80;
+  // Violins are large physical objects (not motes), so we render fewer of
+  // them at a much bigger base size — the screen would otherwise feel like
+  // a violin warehouse explosion. Donda stays minimal at 30 dots.
+  const count = theme.particleStyle === 'dots' ? 30
+              : theme.particleStyle === 'violins' ? 18
+              : 80;
+  const isViolins = theme.particleStyle === 'violins';
   for (let i = 0; i < count; i++) {
     bgParticles.push({
       x: Math.random() * bgCanvas.width,
-      y: Math.random() * bgCanvas.height,
-      size: Math.random() * 3 + 0.5,
-      speed: Math.random() * 0.5 + 0.1,
-      alpha: Math.random() * 0.4 + 0.1,
+      // Stagger the initial Y across a taller-than-screen range so violins
+      // are already mid-fall on first frame instead of dumping in a row.
+      y: isViolins
+         ? Math.random() * bgCanvas.height * 2 - bgCanvas.height * 0.5
+         : Math.random() * bgCanvas.height,
+      // Bumped 0.5–3.5 → 14–28 for violins so the silhouette renders large
+      // enough to read as a violin (not a smudge).
+      size: isViolins ? 14 + Math.random() * 14 : Math.random() * 3 + 0.5,
+      speed: isViolins ? 0.7 + Math.random() * 0.9 : Math.random() * 0.5 + 0.1,
+      alpha: isViolins ? 0.6 + Math.random() * 0.3 : Math.random() * 0.4 + 0.1,
       phase: Math.random() * Math.PI * 2,
-      rot: Math.random() * Math.PI * 2,
+      // Violins fall mostly upright with only a small wobble, so they read
+      // as falling instruments not spinning shrapnel. Other particle styles
+      // keep their full random rotation.
+      rot: isViolins ? (Math.random() - 0.5) * 0.6 : Math.random() * Math.PI * 2,
     });
   }
 }
@@ -5319,9 +5403,10 @@ function drawBackground() {
         p.y += p.speed * 1.3 * fallBoost;
         // Gentle pendulum sway, amplified on big clears.
         p.x += Math.sin(now / 1800 + p.phase) * (0.5 + cheer * 1.2);
-        // Slow tumble; spins faster on the kick beat for a downbeat snap.
-        const beatKick = (beatPhase % 4 === 0) ? 0.04 : 0.012;
-        p.rot += beatKick + cheer * 0.05;
+        // Subtle wobble around upright — never a full tumble, so the violin
+        // stays readable as an instrument instead of spinning shrapnel.
+        // Cheer flicks the wobble harder on big clears.
+        p.rot = Math.sin(now / 1100 + p.phase) * (0.18 + cheer * 0.35);
         break;
       }
       default:
@@ -5368,47 +5453,108 @@ function drawBackground() {
         bgCtx.fillRect(-0.5, 0, 1, p.size * beatBump * 15);
         break;
       case 'violins': {
-        // Stylised violin silhouette: curvy hourglass body, slim neck, scroll
-        // peg-box. Painted in warm gold + a yellow rim so it sits inside the
-        // Falling Violins palette rather than the default hue-rotated dot.
-        // Beat-pulse scales the whole instrument up on the kick; cheerPulse
-        // raises alpha + glow so a Tetris really lights the rain up.
+        // Recognisable violin silhouette built from primitives. Drawn at
+        // p.size (already 14–28 from initBgParticles) so it reads as a
+        // physical instrument instead of a smudge. Beat-pulse scales it on
+        // the kick; cheerPulse from line clears brightens the gold and adds
+        // glow; stageFlash on Tetris/big combos lights the strings up.
         const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
         const flash = (typeof stageFlash === 'number') ? stageFlash : 0;
-        const beatScale = beatBump;
-        const reactive = 1 + cheer * 0.45;
-        const vSize = p.size * 4 * beatScale * reactive;
+        const reactive = 1 + cheer * 0.35;
+        const S = p.size * beatBump * reactive;        // body width unit
         bgCtx.rotate(p.rot);
-        bgCtx.globalAlpha = Math.min(1, a * 1.2 + flash * 0.4);
-        // Body — symmetric "8" shape via two stacked ovals with a pinched waist
-        bgCtx.fillStyle = `rgba(255,200,40,${0.55 + cheer * 0.35})`;
-        bgCtx.strokeStyle = `rgba(255,235,80,${0.85})`;
-        bgCtx.lineWidth = 0.8;
+        bgCtx.globalAlpha = Math.min(1, a * 1.4 + flash * 0.4);
+
+        // ─── Drop shadow underneath body so the violin pops off the bg ───
+        bgCtx.shadowColor = `rgba(255,200,40,${0.45 + cheer * 0.4})`;
+        bgCtx.shadowBlur = 12 + cheer * 18 + flash * 14;
+
+        // ─── BODY: figure-8 from two ellipses + a connecting waist rect ──
+        // Lower bout (large) + upper bout (smaller) overlap at the waist;
+        // the rect inside fills the C-bout pinch so the silhouette reads
+        // as one continuous body, not two stacked eggs.
+        const gold = `rgba(255,200,30,${0.95})`;
+        const goldRim = `rgba(255,240,120,${0.95})`;
+        bgCtx.fillStyle = gold;
+        bgCtx.strokeStyle = goldRim;
+        bgCtx.lineWidth = 1.4;
+        // Lower bout
         bgCtx.beginPath();
-        bgCtx.ellipse(0, vSize * 0.6, vSize * 0.7, vSize * 0.95, 0, 0, Math.PI * 2);
-        bgCtx.fill(); bgCtx.stroke();
-        bgCtx.beginPath();
-        bgCtx.ellipse(0, -vSize * 0.4, vSize * 0.55, vSize * 0.75, 0, 0, Math.PI * 2);
-        bgCtx.fill(); bgCtx.stroke();
-        // Pinched waist cover — dark slits hint at the C-bouts + f-holes
-        bgCtx.fillStyle = `rgba(80,40,0,${0.55})`;
-        bgCtx.fillRect(-vSize * 0.08, vSize * 0.05, vSize * 0.06, vSize * 0.5);
-        bgCtx.fillRect(vSize * 0.02, vSize * 0.05, vSize * 0.06, vSize * 0.5);
-        // Neck + fingerboard
-        bgCtx.fillStyle = `rgba(40,20,0,${0.8})`;
-        bgCtx.fillRect(-vSize * 0.08, -vSize * 1.6, vSize * 0.16, vSize * 1.3);
-        // Scroll peg-box (small spiral knob at the top)
-        bgCtx.fillStyle = `rgba(255,210,60,${0.85 + cheer * 0.15})`;
-        bgCtx.beginPath();
-        bgCtx.arc(0, -vSize * 1.7, vSize * 0.18, 0, Math.PI * 2);
+        bgCtx.ellipse(0, S * 0.55, S * 0.95, S * 0.85, 0, 0, Math.PI * 2);
         bgCtx.fill();
-        // Strings — four faint lines from peg-box across the body
-        bgCtx.strokeStyle = `rgba(255,255,200,${0.35 + flash * 0.5})`;
-        bgCtx.lineWidth = 0.5;
-        for (let s = -1.5; s <= 1.5; s++) {
+        // Upper bout
+        bgCtx.beginPath();
+        bgCtx.ellipse(0, -S * 0.55, S * 0.75, S * 0.7, 0, 0, Math.PI * 2);
+        bgCtx.fill();
+        // Waist filler — slim rect bridging the two bouts so the C-bout
+        // dip looks like a curve, not two missing chunks.
+        bgCtx.fillRect(-S * 0.5, -S * 0.55, S, S * 1.1);
+        // Outline pass over the whole assembled body.
+        bgCtx.beginPath();
+        bgCtx.ellipse(0, S * 0.55, S * 0.95, S * 0.85, 0, 0, Math.PI * 2);
+        bgCtx.stroke();
+        bgCtx.beginPath();
+        bgCtx.ellipse(0, -S * 0.55, S * 0.75, S * 0.7, 0, 0, Math.PI * 2);
+        bgCtx.stroke();
+
+        // Drop the shadow now that the body is laid down — the inner
+        // details would otherwise smear into a glowing blob.
+        bgCtx.shadowBlur = 0;
+
+        // ─── F-HOLES: two stylised slashes flanking the waist ───────────
+        bgCtx.strokeStyle = `rgba(60,30,0,0.85)`;
+        bgCtx.lineWidth = Math.max(1, S * 0.06);
+        bgCtx.lineCap = 'round';
+        for (const xs of [-1, 1]) {
           bgCtx.beginPath();
-          bgCtx.moveTo(s * vSize * 0.05, -vSize * 1.55);
-          bgCtx.lineTo(s * vSize * 0.05, vSize * 1.2);
+          bgCtx.moveTo(xs * S * 0.32, S * 0.05);
+          bgCtx.lineTo(xs * S * 0.32, S * 0.55);
+          bgCtx.stroke();
+        }
+
+        // ─── BRIDGE: small brown notch sitting between the f-holes ──────
+        bgCtx.fillStyle = `rgba(80,40,10,0.9)`;
+        bgCtx.fillRect(-S * 0.22, S * 0.55, S * 0.44, S * 0.08);
+
+        // ─── TAILPIECE: dark trapezoid below the bridge anchoring strings
+        bgCtx.fillStyle = `rgba(30,15,0,0.95)`;
+        bgCtx.beginPath();
+        bgCtx.moveTo(-S * 0.18, S * 0.7);
+        bgCtx.lineTo(S * 0.18, S * 0.7);
+        bgCtx.lineTo(S * 0.13, S * 1.15);
+        bgCtx.lineTo(-S * 0.13, S * 1.15);
+        bgCtx.closePath();
+        bgCtx.fill();
+
+        // ─── NECK + FINGERBOARD: dark slim rect rising out of upper bout
+        bgCtx.fillStyle = `rgba(35,18,0,0.95)`;
+        bgCtx.fillRect(-S * 0.13, -S * 1.7, S * 0.26, S * 1.2);
+        // Fingerboard highlight (thin gold line down the centre)
+        bgCtx.fillStyle = `rgba(255,220,80,0.35)`;
+        bgCtx.fillRect(-S * 0.015, -S * 1.7, S * 0.03, S * 1.2);
+
+        // ─── SCROLL/PEG-BOX: spiral knob at top of neck. Two arcs sells
+        //   the wound-curl shape better than a flat circle.
+        bgCtx.fillStyle = `rgba(255,210,60,0.95)`;
+        bgCtx.strokeStyle = `rgba(120,60,0,0.9)`;
+        bgCtx.lineWidth = 1;
+        bgCtx.beginPath();
+        bgCtx.arc(0, -S * 1.8, S * 0.22, 0, Math.PI * 2);
+        bgCtx.fill();
+        bgCtx.stroke();
+        // Inner curl
+        bgCtx.beginPath();
+        bgCtx.arc(S * 0.05, -S * 1.78, S * 0.09, 0, Math.PI * 2);
+        bgCtx.stroke();
+
+        // ─── STRINGS: four bright filaments from peg-box → tailpiece ────
+        // Brightness tied to stageFlash so a Tetris really lights them up.
+        bgCtx.strokeStyle = `rgba(255,255,220,${0.55 + flash * 0.45})`;
+        bgCtx.lineWidth = Math.max(0.6, S * 0.025);
+        for (let i = -1.5; i <= 1.5; i++) {
+          bgCtx.beginPath();
+          bgCtx.moveTo(i * S * 0.07, -S * 1.65);
+          bgCtx.lineTo(i * S * 0.07, S * 1.05);
           bgCtx.stroke();
         }
         bgCtx.globalAlpha = a;
@@ -5950,11 +6096,20 @@ function startGame() {
   // player's HUD. In other modes / desktop, the CSS layout takes over.
   positionP2Monitor();
 
-  // Initialise each player's game state.
+  // Initialise each player's game state. Honour the start-screen level
+  // picker by seeding `level` and `lines` so progression keeps working
+  // (clearLines computes newLevel from `lines`, so lines must agree).
+  // VS modes start both players at L1 to keep the match symmetric — the
+  // start-level picker is a solo convenience, not a handicap knob.
+  const maxLvl = LEVEL_THEMES.length - 1;
+  const seedLevel = (gameMode === 'solo')
+    ? Math.max(1, Math.min(maxLvl, startLevel | 0))
+    : 1;
+  const seedLines = (seedLevel - 1) * LINES_PER_LEVEL;
   for (const p of players) {
     setActivePlayer(p);
     initBoard();
-    score = 0; lines = 0; level = 1; prevLevel = 1; combo = -1;
+    score = 0; lines = seedLines; level = seedLevel; prevLevel = seedLevel; combo = -1;
     zoneEnergy = 0; zoneActive = false;
     holdPieceType = null; bag = []; nextQueue = [];
     gameOver = false;
@@ -5969,7 +6124,9 @@ function startGame() {
   paused = false;
   beatPhase = 0;
 
-  const theme = getTheme(1);
+  // Theme + canvas glow follow the seeded level so the HUD, boxShadow, and
+  // (further down) audio track all match the picker on the very first frame.
+  const theme = getTheme(level);
   document.getElementById('era-display').textContent = theme.name;
   mainCanvas.style.boxShadow = `0 0 60px ${theme.colors.glow}33, 0 0 120px ${theme.colors.glow}15`;
 
@@ -6343,6 +6500,53 @@ window.addEventListener('resize', () => positionP2Monitor());
     refresh();
   }));
   refresh();
+})();
+
+// Level picker — populated from LEVEL_THEMES so chip labels stay in sync
+// with whatever eras + tracks exist in the build. Only meaningful in solo
+// mode (vs modes start symmetric at L1) — the picker hides itself in vs.
+(function wireLevelSelect() {
+  const wrap = document.getElementById('level-select');
+  const grid = wrap && wrap.querySelector('.lvl-grid');
+  const preview = wrap && wrap.querySelector('.lvl-preview');
+  if (!grid) return;
+  const maxLvl = LEVEL_THEMES.length - 1;
+  // Build chips lazily once; each chip shows the level number, with the era
+  // name surfaced in the preview line on hover/select so we don't bloat the
+  // chip itself on mobile.
+  for (let lv = 1; lv <= maxLvl; lv++) {
+    const btn = document.createElement('button');
+    btn.className = 'lvl-btn';
+    btn.dataset.lvl = String(lv);
+    btn.textContent = String(lv);
+    const t = LEVEL_THEMES[lv];
+    btn.title = (t && t.name) ? `Level ${lv} — ${t.name}` : `Level ${lv}`;
+    grid.appendChild(btn);
+  }
+  const btns = grid.querySelectorAll('.lvl-btn');
+  const refresh = () => {
+    btns.forEach(b => b.classList.toggle('lvl-active', Number(b.dataset.lvl) === startLevel));
+    const t = LEVEL_THEMES[startLevel];
+    if (preview) preview.textContent = t ? t.name : '';
+  };
+  btns.forEach(b => {
+    b.addEventListener('click', () => { setStartLevel(Number(b.dataset.lvl)); refresh(); });
+    b.addEventListener('mouseenter', () => {
+      const t = LEVEL_THEMES[Number(b.dataset.lvl)];
+      if (preview && t) preview.textContent = t.name;
+    });
+    b.addEventListener('mouseleave', refresh);
+  });
+  refresh();
+  // Hide the picker in vs modes — the seeded-level escape hatch above forces
+  // both players to L1 so the match stays fair.
+  const modeBtns = document.querySelectorAll('.mode-btn');
+  const sync = () => {
+    const isVs = (gameMode === 'vs' || gameMode === 'human');
+    wrap.style.display = isVs ? 'none' : 'flex';
+  };
+  modeBtns.forEach(mb => mb.addEventListener('click', sync));
+  sync();
 })();
 
 // Sync voice toggle with saved preference and wire the checkbox.
