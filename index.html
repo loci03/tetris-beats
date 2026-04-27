@@ -51,16 +51,42 @@
      layout is untouched. */
   #p2-wrap { display: none; }
   body.vs-mode #p2-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .p2-header {
-    font-size: 11px;
-    letter-spacing: 3px;
-    color: rgba(255,255,255,0.55);
-    text-transform: uppercase;
-    display: flex; align-items: center; gap: 10px;
+  /* Monitor frame: chunky bezel with a "REC" dot + name plate underneath
+     so the opponent feed reads like a stream cam mounted in the venue,
+     not a stray mini canvas. */
+  .p2-monitor {
+    position: relative;
+    padding: 6px 6px 0 6px;
+    background: linear-gradient(180deg, rgba(20,20,28,0.92), rgba(8,8,14,0.92));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    box-shadow: 0 6px 30px rgba(0,0,0,0.45), 0 0 24px rgba(0, 220, 255, 0.12);
   }
+  .p2-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 4px 6px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.7);
+    text-transform: uppercase;
+  }
+  .p2-rec {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #ff3344;
+    box-shadow: 0 0 6px rgba(255,40,68,0.9);
+    animation: rec-blink 1.2s ease-in-out infinite;
+  }
+  @keyframes rec-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+  }
+  .p2-name { font-weight: 700; color: rgba(255,255,255,0.9); letter-spacing: 3px; }
   #p2-stats {
     font-family: 'Segoe UI', system-ui, sans-serif;
-    font-size: 11px;
+    font-size: 10px;
     letter-spacing: 1px;
     color: rgba(255,255,255,0.75);
     text-transform: none;
@@ -68,9 +94,10 @@
   #p2-stats #p2-score { color: #fff; font-weight: 700; }
   #main-canvas-2 {
     border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 4px;
+    border-radius: 3px;
     image-rendering: pixelated;
     box-shadow: 0 0 30px rgba(255, 60, 60, 0.15);
+    display: block;
   }
   .side-panel {
     display: flex;
@@ -198,6 +225,38 @@
   #mode-select {
     display: flex; gap: 12px; margin-bottom: 24px;
   }
+  #difficulty-select {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px; margin: -8px 0 24px;
+  }
+  #difficulty-select .diff-label {
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: rgba(255,255,255,0.5);
+    text-transform: uppercase;
+  }
+  #difficulty-select .diff-btns {
+    display: flex; gap: 8px;
+  }
+  .diff-btn {
+    padding: 6px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .diff-btn:hover { color: rgba(255,255,255,0.85); }
+  .diff-btn.diff-active {
+    color: #fff;
+    border-color: #00ffaa;
+    background: rgba(0,255,170,0.12);
+    box-shadow: 0 0 12px rgba(0,255,170,0.3);
+  }
   .mode-btn {
     padding: 10px 24px;
     font-size: 12px;
@@ -322,7 +381,30 @@
   }
   .zone-active #main-canvas {
     box-shadow: 0 0 80px rgba(0,255,255,0.4), 0 0 160px rgba(255,0,255,0.3) !important;
+    animation: zone-pulse 1.4s ease-in-out infinite;
   }
+  @keyframes zone-pulse {
+    0%, 100% { filter: brightness(1) saturate(1.1) hue-rotate(0deg); }
+    50%      { filter: brightness(1.15) saturate(1.4) hue-rotate(-8deg); }
+  }
+  #zone-active-badge {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%) scale(0);
+    z-index: 9;
+    pointer-events: none;
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    color: #fff;
+    font-weight: 900;
+    font-size: 13px;
+    letter-spacing: 5px;
+    padding: 6px 18px;
+    border-radius: 20px;
+    box-shadow: 0 0 24px rgba(0, 220, 255, 0.55);
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .zone-active #zone-active-badge { transform: translateX(-50%) scale(1); }
   #combo-display {
     position: fixed;
     font-size: 24px;
@@ -381,14 +463,33 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 6px;
+    gap: 8px;
+    margin-bottom: 4px;
   }
   #touch-controls .tc-row:last-child { margin-bottom: 0; }
   #touch-controls .tc-group {
     display: flex;
     gap: 6px;
     align-items: center;
+  }
+  #touch-controls .tc-hint {
+    text-align: center;
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    color: rgba(255,255,255,0.35);
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+  .tc-btn.tc-action {
+    flex: 0 0 auto;
+    font-size: 12px;
+    letter-spacing: 2px;
+    padding: 0 14px;
+  }
+  .tc-btn.tc-pause {
+    flex: 0 0 auto;
+    min-width: 44px;
+    font-size: 16px;
   }
   .tc-btn {
     background: rgba(20, 20, 35, 0.85);
@@ -814,6 +915,17 @@
     <button class="mode-btn" data-mode="vs">VS ALFRED</button>
     <button class="mode-btn" data-mode="human">VS FRIEND</button>
   </div>
+  <!-- Difficulty picker — visible only when "VS ALFRED" mode is selected.
+       Three tiers wired to AI_DIFFICULTIES presets in JS. Persists across
+       sessions in localStorage. -->
+  <div id="difficulty-select" style="display:none;">
+    <div class="diff-label">ALFRED'S DIFFICULTY</div>
+    <div class="diff-btns">
+      <button class="diff-btn" data-diff="easy">EASY</button>
+      <button class="diff-btn" data-diff="medium">MEDIUM</button>
+      <button class="diff-btn" data-diff="hard">HARD</button>
+    </div>
+  </div>
   <button id="start-btn">DROP THE BEAT</button>
   <div class="controls-info desktop-only">
     Arrow Keys / WASD - Move & Rotate<br>
@@ -942,35 +1054,39 @@
       </div>
     </div>
   </div>
-  <!-- Player 2 (Alfred) — hidden until vs mode is active. -->
+  <!-- Player 2 (Alfred) — hidden until vs mode is active. Styled as a
+       venue stream cam: a framed monitor floating above the player's
+       playfield, with Alfred's name + live stats. -->
   <div class="player-wrap" id="p2-wrap">
-    <div class="p2-header">
-      🦇 ALFRED
-      <span id="p2-stats"><span id="p2-score">0</span> · <span id="p2-lines">0</span>L</span>
+    <div class="p2-monitor">
+      <canvas id="main-canvas-2"></canvas>
+      <div class="p2-meta">
+        <span class="p2-rec"></span>
+        <span class="p2-name">🦇 ALFRED</span>
+        <span id="p2-stats"><span id="p2-score">0</span> · <span id="p2-lines">0</span>L</span>
+      </div>
     </div>
-    <canvas id="main-canvas-2"></canvas>
   </div>
 </div>
 <div id="combo-display"></div>
 <div id="level-announce"></div>
+<div id="zone-active-badge">ZONE × 2.5</div>
 
+<!-- Touch HUD: minimal — swipe handles left/right/down + hard-drop, tap rotates.
+     The remaining buttons are the ones that don't have a natural gesture: HOLD
+     (held while keeping your finger off the board), ZONE (special activation),
+     DROP (precise hard-drop without flicking), PAUSE.
+
+     A small "swipe to play" hint underneath teaches first-time mobile users
+     that movement is gestural now. -->
 <div id="touch-controls">
   <div class="tc-row">
-    <div class="tc-group">
-      <button class="tc-btn" data-action="left" aria-label="Move left">◀</button>
-      <button class="tc-btn" data-action="down" aria-label="Soft drop">▼</button>
-      <button class="tc-btn" data-action="right" aria-label="Move right">▶</button>
-    </div>
-    <div class="tc-group">
-      <button class="tc-btn" data-action="rotate" aria-label="Rotate">↻</button>
-      <button class="tc-btn" data-action="hold" aria-label="Hold">⇧</button>
-    </div>
-  </div>
-  <div class="tc-row">
+    <button class="tc-btn tc-action" data-action="hold" aria-label="Hold">HOLD</button>
     <button class="tc-btn tc-zone tc-wide" data-action="zone" aria-label="Zone">ZONE</button>
-    <button class="tc-btn tc-drop tc-wide" data-action="harddrop" aria-label="Hard drop">⤓ DROP</button>
-    <button class="tc-btn" data-action="pause" aria-label="Pause">II</button>
+    <button class="tc-btn tc-drop tc-wide" data-action="harddrop" aria-label="Hard drop">↓ DROP</button>
+    <button class="tc-btn tc-pause" data-action="pause" aria-label="Pause">II</button>
   </div>
+  <div class="tc-hint">SWIPE TO MOVE · TAP TO ROTATE</div>
 </div>
 
 <script>
@@ -1126,6 +1242,90 @@ const voiceEngine = (() => {
         const comboName = pick(comboPool);
         setTimeout(() => play(comboName), 350);
       }
+    },
+  };
+})();
+
+// ============================================================
+// ALFRED VOICE — Web Speech API trash talk
+// ============================================================
+// Built on `speechSynthesis` (no MP3s needed). Picks a deeper male voice
+// when one is available to differentiate Alfred from the player's existing
+// MP3 announcer. Lines are tier'd by what just happened: a brag for plain
+// clears, a flex for tetris/combo, an apology line if Alfred himself just
+// got hit by garbage.
+const alfredVoice = (() => {
+  const SINGLE_LINES = ['easy', 'too easy', 'come on', 'try harder', 'slow', 'wake up', 'pace yourself', 'is that all', 'mhm'];
+  const DOUBLE_LINES = ['nice try', 'getting closer', 'still mine', 'not bad, but', 'cute', 'okay then', 'almost'];
+  const TRIPLE_LINES = ['stacking up', "alright now", 'feeling it', "you're cooked", 'three deep', 'on fire', 'watch me'];
+  const TETRIS_LINES = ['massacre', 'cleaned house', 'tetris baby', 'ah, perfection', 'demolished', 'pack it up', 'next victim'];
+  const COMBO_LINES  = ['rolling', 'on a wave', 'unstoppable', 'cooking', 'in the zone', "can't stop me"];
+
+  let voice = null;
+  let _lastSpoken = 0;
+
+  function pickVoice() {
+    if (voice) return voice;
+    if (!window.speechSynthesis) return null;
+    const all = speechSynthesis.getVoices();
+    if (!all || !all.length) return null;
+    // Prefer a recognisably "deep / male" English voice when available, with
+    // sane fallbacks. Names vary across browsers; covering the common ones.
+    const preferred = [
+      'Daniel', 'Aaron', 'Fred', 'Arthur', 'Rishi', 'Bruce',
+      'Microsoft Mark', 'Microsoft Guy', 'Google UK English Male',
+      'Google US English',
+    ];
+    for (const name of preferred) {
+      const v = all.find(x => x.name && x.name.includes(name));
+      if (v) return (voice = v);
+    }
+    // Fallback: any English voice
+    return (voice = all.find(x => x.lang && x.lang.startsWith('en')) || all[0]);
+  }
+
+  function speak(text) {
+    if (!window.speechSynthesis) return;
+    if (!voiceEnabled) return;
+    // Throttle so back-to-back clears don't queue up a monologue.
+    const now = performance.now();
+    if (now - _lastSpoken < 600) return;
+    _lastSpoken = now;
+    try {
+      // Cancel anything already speaking — fresh hit takes priority.
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const v = pickVoice();
+      if (v) u.voice = v;
+      u.rate = 1.05;       // slight pace up — feels confident
+      u.pitch = 0.85;      // a touch deeper than default to read as "Alfred"
+      u.volume = 0.95;
+      speechSynthesis.speak(u);
+    } catch {}
+  }
+
+  function pick(pool) { return pool[Math.floor(Math.random() * pool.length)]; }
+
+  return {
+    // Prime: most browsers need a user gesture before getVoices() is populated.
+    // Voices arrive async via the `voiceschanged` event — listening here so
+    // the first trash-talk has a real voice instead of the default robotic.
+    prime() {
+      if (!window.speechSynthesis) return;
+      try {
+        speechSynthesis.getVoices();
+        speechSynthesis.addEventListener('voiceschanged', pickVoice, { once: true });
+      } catch {}
+    },
+    trashTalk(cleared, combo) {
+      // Pick a line by line-clear count — combo overrides if it's flexing.
+      let line;
+      if (combo >= 3) line = pick(COMBO_LINES);
+      else if (cleared >= 4) line = pick(TETRIS_LINES);
+      else if (cleared === 3) line = pick(TRIPLE_LINES);
+      else if (cleared === 2) line = pick(DOUBLE_LINES);
+      else line = pick(SINGLE_LINES);
+      speak(line);
     },
   };
 })();
@@ -1595,8 +1795,10 @@ function resizeCanvases() {
   const vw = window.innerWidth;
   // Alfred's mini board — small on mobile so P1's board gets the real
   // estate, closer to P1 size on desktop where there's room to spare.
-  const p2Cell = vw <= 720 ? Math.max(5,  Math.floor(p1Cell * 0.25))   // mobile: ~25% of P1 CELL
-                           : Math.max(14, Math.floor(p1Cell * 0.85));  // desktop: nearly P1 size
+  // Mobile: bumped to ~35% of P1 CELL (was 25%) so Alfred's monitor is
+  // actually readable above the player's board.
+  const p2Cell = vw <= 720 ? Math.max(7,  Math.floor(p1Cell * 0.35))
+                           : Math.max(14, Math.floor(p1Cell * 0.85));
   if (p2Main) {
     p2Main.width  = COLS * p2Cell;
     p2Main.height = ROWS * p2Cell;
@@ -1679,6 +1881,25 @@ var gameMode = 'solo';    // 'solo' | 'vs'
 var players = [];          // populated in startGame()
 var activePlayer = null;   // whichever player's fields currently live in globals
 
+// AI difficulty presets — tuning per profile. EASY plays slowly with frequent
+// misplays so a beginner can win; HARD is dialed near-optimal with rare
+// mistakes for someone wanting a real fight. Selected via the start-screen
+// dropdown; persisted in localStorage so the choice sticks.
+const AI_DIFFICULTIES = {
+  easy:   { thinkPause: 30, movePause: 12, dropPause: 50, mistakeChance: 0.35 },
+  medium: { thinkPause: 18, movePause: 8,  dropPause: 32, mistakeChance: 0.15 },
+  hard:   { thinkPause: 8,  movePause: 4,  dropPause: 16, mistakeChance: 0.04 },
+};
+let aiDifficulty = (() => {
+  try { const v = localStorage.getItem('tetris.aiDifficulty'); return AI_DIFFICULTIES[v] ? v : 'medium'; }
+  catch { return 'medium'; }
+})();
+function setAiDifficulty(v) {
+  if (!AI_DIFFICULTIES[v]) return;
+  aiDifficulty = v;
+  try { localStorage.setItem('tetris.aiDifficulty', v); } catch {}
+}
+
 // Fields that live in the globals and belong to whichever player is currently
 // "active". Swapped by setActivePlayer().
 const PLAYER_FIELDS = [
@@ -1713,20 +1934,13 @@ function createPlayer({ id, isAI, name, mainCanvas: mc, holdCanvas: hc, nextCanv
     particles: [],
     levelTransitionAlpha: 0, levelTransitionColor: '#fff',
     incomingGarbage: 0,         // reserved for Turn 2 (garbage exchange)
-    // AI difficulty tuning lives on this object so it's easy to expose a
-    // difficulty selector later without rewriting the aiTick loop.
-    ai: isAI ? {
+    // AI difficulty tuning. Pulled from a preset in AI_DIFFICULTIES keyed on
+    // the global aiDifficulty (set via the start-screen selector).
+    ai: isAI ? Object.assign({
       plan: null,
       stepCooldown: 0,
       postDropPause: 0,
-      // Tuning dialed in against user feedback: default "Alfred" plays at
-      // ~half the speed of the unrestrained AI with a ~1-in-7 misplay rate.
-      // Feels beatable but still punishes sloppy play.
-      thinkPause: 18,     // frames before first move after piece spawn (was 10)
-      movePause: 8,       // frames between individual moves (was 5)
-      dropPause: 32,      // frames after hard-drop before next plan (was 20)
-      mistakeChance: 0.15, // ~1 in 7 placements takes a sub-optimal spot
-    } : null,
+    }, AI_DIFFICULTIES[aiDifficulty] || AI_DIFFICULTIES.medium) : null,
   };
 }
 
@@ -2018,7 +2232,11 @@ function clearLines() {
     }
     combo++;
     const basePoints = [0, 100, 300, 500, 800];
-    score += (basePoints[cleared] || 800) * level * (1 + combo * 0.5);
+    // Zone mode multiplies line-clear score 2.5×. Combined with combo this
+    // means a Tetris-while-Zoned with a 3-combo is huge — exactly the burst
+    // of points the user is supposed to want from chaining clears.
+    const zoneMul = zoneActive ? 2.5 : 1;
+    score += (basePoints[cleared] || 800) * level * (1 + combo * 0.5) * zoneMul;
     lines += cleared;
     const newLevel = Math.floor(lines / LINES_PER_LEVEL) + 1;
     if (newLevel !== level) {
@@ -2062,6 +2280,21 @@ function activateZone() {
   zoneEnergy = 0;
   document.getElementById('game-container').classList.add('zone-active');
   audioEngine.playZone();
+  // "In the zone" — slow the backing track to ~65% so the music goes
+  // underwater and the player can feel time dilate. Restored on exit.
+  if (audioEngine && audioEngine.setTrackPlaybackRate) {
+    audioEngine.setTrackPlaybackRate(0.65);
+  }
+}
+
+// Reverse of activateZone — called from the game-loop tick when the timer
+// expires. Restores audio playback rate and clears the body/container class.
+function deactivateZone() {
+  zoneActive = false;
+  document.getElementById('game-container').classList.remove('zone-active');
+  if (audioEngine && audioEngine.setTrackPlaybackRate) {
+    audioEngine.setTrackPlaybackRate(1.0);
+  }
 }
 
 function onLevelChange() {
@@ -2263,6 +2496,23 @@ const audioEngine = {
     g.connect(this.compressor);
     src.start();
     return true;
+  },
+
+  // Time-dilate the backing track. Used by Zone mode to drop playback to
+  // ~65% (everything sounds underwater). Ramped to avoid an audio click;
+  // also pitches the audio down (BufferSource playbackRate is sample-rate
+  // multiplied), which is the desired "deep / slow" effect.
+  setTrackPlaybackRate(rate) {
+    if (!this._trackSource || !this._trackSource.node) return;
+    try {
+      const node = this._trackSource.node;
+      // playbackRate.linearRampToValueAtTime smooths the change so it doesn't
+      // pop. AudioParam exists on AudioBufferSourceNode.
+      const t = this.ctx.currentTime;
+      node.playbackRate.cancelScheduledValues(t);
+      node.playbackRate.setValueAtTime(node.playbackRate.value, t);
+      node.playbackRate.linearRampToValueAtTime(rate, t + 0.25);
+    } catch {}
   },
 
   // Briefly lower the backing track so a voice callout cuts through. Mirrors
@@ -3101,9 +3351,13 @@ function showCombo(cleared) {
   let text = names[cleared] || 'TETRIS!';
   if (combo > 0) text += ` x${combo + 1}`;
   el.textContent = text;
-  // Voice callout — only on the local player's board so a remote opponent's
-  // clears don't narrate over the human player.
-  if (!activePlayer || !activePlayer.isRemote) {
+  // Voice callout — split by who's clearing:
+  //  - Local human → existing voiceEngine MP3 callouts ("Single!" / "TETRIS!")
+  //  - AI (Alfred) → Web Speech API trash talk in his own voice
+  //  - Remote opponent → silent (their client narrates on their end)
+  if (activePlayer && activePlayer.isAI) {
+    alfredVoice.trashTalk(cleared, combo + 1);
+  } else if (!activePlayer || !activePlayer.isRemote) {
     voiceEngine.announceClear(cleared, combo + 1);
   }
   el.style.color = theme.colors.accent;
@@ -5044,7 +5298,7 @@ function update(timestamp) {
   }
   if (zoneActive) {
     zoneTimer -= 16.67;
-    if (zoneTimer <= 0) { zoneActive = false; document.getElementById('game-container').classList.remove('zone-active'); }
+    if (zoneTimer <= 0) deactivateZone();
   }
 }
 
@@ -5550,7 +5804,10 @@ function leaveCurrentRoom() {
 // Prime the voice engine on any user gesture that starts a game session —
 // Safari/iOS require at least one speak() call inside a real click handler
 // before it will play audio from async contexts (the game loop).
-function primeVoiceOnClick() { try { voiceEngine.prime(); } catch {} }
+function primeVoiceOnClick() {
+  try { voiceEngine.prime(); } catch {}
+  try { alfredVoice.prime(); } catch {}
+}
 document.getElementById('start-btn').addEventListener('click', () => { primeVoiceOnClick(); startGame(); });
 document.getElementById('start-btn-2').addEventListener('click', () => { primeVoiceOnClick(); startGame(); });
 document.getElementById('vs-replay-btn').addEventListener('click', () => {
@@ -5668,13 +5925,29 @@ setInterval(() => {
   if (startVisible) refreshSharedLeaderboard();
 }, 30_000);
 
-// Mode selector (Solo / Vs Alfred) on the start screen.
+// Mode selector (Solo / Vs Alfred / Vs Friend) on the start screen.
+// Also reveals/hides the Alfred difficulty picker depending on which mode
+// is active.
 (function wireModeSelect() {
   const btns = document.querySelectorAll('.mode-btn');
+  const diff = document.getElementById('difficulty-select');
   btns.forEach(btn => btn.addEventListener('click', () => {
     gameMode = btn.dataset.mode;
     btns.forEach(b => b.classList.toggle('mode-active', b === btn));
+    if (diff) diff.style.display = (gameMode === 'vs') ? 'flex' : 'none';
   }));
+})();
+
+// Difficulty picker — reflects + writes aiDifficulty.
+(function wireDifficultySelect() {
+  const btns = document.querySelectorAll('.diff-btn');
+  if (!btns.length) return;
+  const refresh = () => btns.forEach(b => b.classList.toggle('diff-active', b.dataset.diff === aiDifficulty));
+  btns.forEach(btn => btn.addEventListener('click', () => {
+    setAiDifficulty(btn.dataset.diff);
+    refresh();
+  }));
+  refresh();
 })();
 
 // Sync voice toggle with saved preference and wire the checkbox.
