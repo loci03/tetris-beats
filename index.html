@@ -1158,6 +1158,11 @@ const LEVEL_THEMES = [
     // drums/bass/synth. Other levels without `track` keep their procedural
     // sound — lets us add Suno tracks one level at a time.
     track: 'underground.mp3',
+    // Optional per-theme move SFX. When set, audioEngine.playMove() plays the
+    // loaded sample (cached) instead of the synth click. Polyphony is rate-
+    // limited inside playMove so DAS-stutter doesn't pile snares on top of
+    // each other.
+    moveSfx: 'snare.mp3',
     colors: { bg1: '#0a0c10', bg2: '#05060a', accent: '#00d4ff', glow: '#33eeff' },
     particleHue: 195,
     particleStyle: 'warehouse', // dancing silhouette figures over warehouse bg
@@ -2069,6 +2074,8 @@ const audioEngine = {
   _trackSource: null,     // current AudioBufferSourceNode (looping)
   _trackName: null,       // currently-playing filename (for swap detection)
   _trackBuffers: {},      // decoded-buffer cache keyed on filename
+  _sfxBuffers: {},        // decoded SFX buffers (snare, etc.)
+  _lastMoveSfxAt: 0,      // throttle: piece movement can fire rapidly via DAS
   isPlaying: false,
   currentStep: 0,
   nextStepTime: 0,
@@ -2160,6 +2167,40 @@ const audioEngine = {
     this._trackName = null;
   },
 
+  // Load + decode an SFX file from /audio/sfx/. Cached. Used by per-theme
+  // move sounds (e.g. the snare on Underground).
+  async _loadSfx(name) {
+    if (this._sfxBuffers[name]) return this._sfxBuffers[name];
+    if (!this.ctx) return null;
+    try {
+      const r = await fetch('audio/sfx/' + name, { cache: 'force-cache' });
+      if (!r.ok) return null;
+      const ab = await r.arrayBuffer();
+      const buf = await this.ctx.decodeAudioData(ab);
+      this._sfxBuffers[name] = buf;
+      return buf;
+    } catch (e) {
+      console.warn('[audio] failed to load sfx', name, e);
+      return null;
+    }
+  },
+
+  // Fire a one-shot SFX at given gain. Caller must have already loaded the
+  // buffer via _loadSfx — falls back to no-op if missing so nothing surprising
+  // happens during the load.
+  _fireSfx(name, gain = 0.55) {
+    const buf = this._sfxBuffers[name];
+    if (!buf || !this.ctx) return false;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    const g = this.ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g);
+    g.connect(this.compressor);
+    src.start();
+    return true;
+  },
+
   // Briefly lower the backing track so a voice callout cuts through. Mirrors
   // the bass-duck pattern but on the trackGain. Call from voiceEngine.
   duckTrack(durationSec) {
@@ -2246,6 +2287,9 @@ const audioEngine = {
     // Kick off the per-level backing track if the current theme has one.
     const theme = getTheme(level);
     if (theme && theme.track) this._playTrack(theme.track);
+    // Preload per-theme move SFX so the very first piece movement plays the
+    // real sample instead of falling back to the synth click.
+    if (theme && theme.moveSfx) this._loadSfx(theme.moveSfx);
   },
 
   _schedule() {
@@ -2279,6 +2323,7 @@ const audioEngine = {
     } else {
       this._stopTrack(0.6);
     }
+    if (theme && theme.moveSfx) this._loadSfx(theme.moveSfx);
   },
 
   _playStep(step, time) {
@@ -2809,8 +2854,25 @@ const audioEngine = {
   },
   playMove() {
     if (this._isAiPlayer()) return;
-    const t = this.ctx.currentTime;
     const theme = getTheme(level);
+    // Per-theme move SFX (Underground uses the snare). Throttled so DAS-stutter
+    // — pieces sliding at the auto-shift rate — doesn't pile snare triggers
+    // on top of each other into a buzz. 70ms minimum gap = max ~14/sec.
+    if (theme && theme.moveSfx) {
+      const now = performance.now();
+      if (now - this._lastMoveSfxAt < 70) return;
+      // Lazy-load on first use; once decoded it lives in _sfxBuffers.
+      if (!this._sfxBuffers[theme.moveSfx]) {
+        this._loadSfx(theme.moveSfx);
+        return; // skip this trigger; next move will play once buffer's ready
+      }
+      if (this._fireSfx(theme.moveSfx, 0.5)) {
+        this._lastMoveSfxAt = now;
+        return;
+      }
+    }
+    // Default synth click
+    const t = this.ctx.currentTime;
     const o = this.ctx.createOscillator();
     const g = this.ctx.createGain();
     o.type = 'sine';
