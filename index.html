@@ -1080,18 +1080,10 @@
       </div>
     </div>
   </div>
-  <!-- Player 2 (Alfred) — hidden until vs mode is active. Styled as a
-       venue stream cam: a framed monitor floating above the player's
-       playfield, with Alfred's name + live stats. -->
+  <!-- Player 2 (Alfred) — hidden until vs mode is active. Bare canvas
+       only per user request (no bezel, name, REC dot, or stats). -->
   <div class="player-wrap" id="p2-wrap">
-    <div class="p2-monitor">
-      <canvas id="main-canvas-2"></canvas>
-      <div class="p2-meta">
-        <span class="p2-rec"></span>
-        <span class="p2-name">🦇 ALFRED</span>
-        <span id="p2-stats"><span id="p2-score">0</span> · <span id="p2-lines">0</span>L</span>
-      </div>
-    </div>
+    <canvas id="main-canvas-2"></canvas>
   </div>
 </div>
 <div id="combo-display"></div>
@@ -1252,14 +1244,8 @@ const voiceEngine = (() => {
       if (!voiceEnabled) return;
       const pool = CLEAR_FILES[cleared] || CLEAR_FILES[4];
       play(pick(pool));
-      // Duck the backing track so the voice cuts through. Combo callout
-      // extends the duck. Length tuned to match "Triple! ... On fire!"
-      // (~1.2s for single, ~1.7s with combo).
-      try {
-        if (audioEngine && audioEngine.duckTrack) {
-          audioEngine.duckTrack(combo > 1 ? 1.7 : 1.2);
-        }
-      } catch {}
+      // (Music ducking intentionally removed — user wants the track at full
+      // volume during clears. Voices play over the music.)
       // Stack the combo line ~350ms later so it reads as "Triple! ... On fire!"
       // with a natural announcer beat, not slurred together.
       if (combo > 1) {
@@ -1352,7 +1338,8 @@ const playerVoice = (() => {
       else if (cleared === 3) line = pick(TRIPLE_LINES);
       else if (cleared === 2) line = pick(DOUBLE_LINES);
       else line = pick(SINGLE_LINES);
-      try { if (audioEngine && audioEngine.duckTrack) audioEngine.duckTrack(1.2); } catch {}
+      // Music ducking intentionally removed per user — track stays at full
+      // volume; the voice rides on top.
       speak(line);
     },
     get pickedVoice() { return voice && voice.name; },
@@ -1450,9 +1437,8 @@ const alfredVoice = (() => {
       else if (cleared === 3) line = pick(TRIPLE_LINES);
       else if (cleared === 2) line = pick(DOUBLE_LINES);
       else line = pick(SINGLE_LINES);
-      // Duck the backing track so Alfred cuts through the music — same
-      // pattern as the player's voice clears. ~1.4s covers the trash line.
-      try { if (audioEngine && audioEngine.duckTrack) audioEngine.duckTrack(1.4); } catch {}
+      // Music ducking intentionally removed per user — track stays at full
+      // volume; Alfred's voice rides on top.
       speak(line);
     },
     // Expose the unlocked flag for debugging (used by the preview check).
@@ -1888,10 +1874,12 @@ function computeCellSize() {
   //   panels strip ~82px, touch controls ~130px (after tightening),
   //   safe-area home indicator ~30px, 4px buffer.
   const maxW = Math.max(220, vw - 20);
-  // Alfred's monitor is now absolute-positioned to the right of the player's
-  // board (out of flow), so vs-mode no longer needs to reserve vertical
-  // space for it — player's board reads the same size in solo and vs.
-  const reservedH = 82 + 130 + 30 + 4;
+  // Alfred's monitor is absolute-positioned to the right of the player's
+  // board, so vs-mode reserves no extra vertical space.
+  // Touch controls dropped 130px → ~80px after we removed the directional
+  // button row (now just HOLD/ZONE/DROP/pause + hint). Reclaim those ~50px
+  // for the play field — board reads bigger.
+  const reservedH = 82 + 80 + 30 + 4;
   const maxH = Math.max(240, vh - reservedH);
   const byW = Math.floor(maxW / COLS);
   const byH = Math.floor(maxH / ROWS);
@@ -1925,11 +1913,16 @@ function resizeCanvases() {
   const vw = window.innerWidth;
   // Alfred's mini board — small on mobile so P1's board gets the real
   // estate, closer to P1 size on desktop where there's room to spare.
-  // Mobile: ~25% of P1 CELL — small picture-in-picture of Alfred's board
-  // tucked into the right margin beside the player's main canvas. Keeps
-  // the monitor visible at all times without eating into the play field.
-  const p2Cell = vw <= 720 ? Math.max(5,  Math.floor(p1Cell * 0.25))
-                           : Math.max(14, Math.floor(p1Cell * 0.85));
+  // Mobile: scale Alfred's CELL to fit cleanly in the side strip beside
+  // the player's board (with a small margin). Falls back to ~20% of P1
+  // CELL if the strip is generous. Floor at 4px so it stays legible.
+  let p2Cell;
+  if (vw <= 720) {
+    const sideStripPx = (vw - COLS * p1Cell) / 2 - 8; // px available on right side
+    p2Cell = Math.max(4, Math.min(Math.floor(sideStripPx / COLS), Math.floor(p1Cell * 0.25)));
+  } else {
+    p2Cell = Math.max(14, Math.floor(p1Cell * 0.85));
+  }
   if (p2Main) {
     p2Main.width  = COLS * p2Cell;
     p2Main.height = ROWS * p2Cell;
@@ -6120,21 +6113,24 @@ function positionP2Monitor() {
     ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
   const inVs = document.body.classList.contains('vs-mode');
   if (inVs && isMobile) {
-    // Pin Alfred to the right side of the player's main board.
-    p2Wrap.style.position = 'absolute';
+    // Pin Alfred flush to the right edge of the viewport, vertically aligned
+    // with the top of the player's main canvas. We compute Alfred's actual
+    // rendered width and right-anchor it so it never overflows; on phones
+    // where the player's board fills most of the width, this lets Alfred
+    // and the player share the right margin cleanly without overlap (and
+    // if there is a tiny overlap, it sits over the empty edge of the
+    // mostly-empty board, not over active pieces).
+    p2Wrap.style.position = 'fixed';
     p2Wrap.style.zIndex = '4';
     const mainRect = main.getBoundingClientRect();
-    // Position relative to viewport (position:fixed-style via the wrap
-    // being a child of body). Use page coords so it scrolls with the
-    // layout if anything ever adds scrolling.
-    p2Wrap.style.position = 'fixed';
-    // Right-edge of the player's board, plus a small gap.
-    p2Wrap.style.left = (mainRect.right + 6) + 'px';
-    // Vertical: top of the player's board.
+    // Use the canvas width (set by resizeCanvases) instead of the wrap
+    // width — the wrap may be 0px wide before its child canvas paints.
+    const p2Canvas = document.getElementById('main-canvas-2');
+    const p2W = (p2Canvas && p2Canvas.width) || 60;
+    const margin = 4;
+    p2Wrap.style.left = Math.max(0, window.innerWidth - p2W - margin) + 'px';
     p2Wrap.style.top  = (mainRect.top + 4) + 'px';
-    // Cap width so it doesn't overflow the viewport on smaller phones.
-    const maxW = Math.max(60, window.innerWidth - mainRect.right - 12);
-    p2Wrap.style.maxWidth = maxW + 'px';
+    p2Wrap.style.maxWidth = p2W + 'px';
     p2Wrap.style.transform = '';
     if (p2Wrap.parentElement !== container) container.appendChild(p2Wrap);
   } else {
