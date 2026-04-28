@@ -1641,16 +1641,17 @@ const LEVEL_THEMES = [
     chords: [[196, 261.63, 329.63], [220, 293.66, 349.23], [174.61, 261.63, 329.63]],
     synthType: 'synthArp',
   },
-  { // Level 6 - Ferrari Window (Suno track + tire blocks + highway scene)
+  { // Level 6 - Ferrari Window (Suno track + tire blocks + window-glass scene)
     name: 'Ferrari Window',
     bpm: 118,
     track: 'ferrari-window.mp3',
-    // Night-drive palette: deep midnight bg, Ferrari-red accent for the
-    // tire rim glow + line-clear FX, warm headlight glow.
-    colors: { bg1: '#0a0810', bg2: '#040308', accent: '#ff2030', glow: '#ff5060' },
-    particleHue: 0,
-    particleStyle: 'ferrari-highway', // perspective road + scrolling Ferrari
-    blockStyle: 'tires',              // black rubber donut with chrome rim
+    // Window-glass blue: looking through a tinted Ferrari window. Cool
+    // teal-blue background lets the dark tire silhouettes read clearly,
+    // Ferrari-red accent kept for tire rim glow + line-clear drive-by.
+    colors: { bg1: '#0a2540', bg2: '#06182d', accent: '#ff2030', glow: '#ff5060' },
+    particleHue: 200,
+    particleStyle: 'ferrari-window', // glass bokeh + on-clear drive-by Ferrari
+    blockStyle: 'tires',             // black rubber donut with chrome rim
     blockGlow: 8,
     // Procedural fallback drum/bass — used only if ferrari-window.mp3
     // fails to load. Mid-tempo highway-cruise pattern.
@@ -1664,19 +1665,26 @@ const LEVEL_THEMES = [
     chords: [[220, 261.63, 329.63], [196, 246.94, 293.66], [261.63, 329.63, 392]],
     synthType: 'autotune',
   },
-  { // Level 7 - The Life of Pablo
-    name: 'The Life of Pablo',
+  { // Level 7 - Mac & Cheese (Suno track + macaroni blocks + cheese-whips bg)
+    name: 'Mac & Cheese',
     bpm: 105,
-    colors: { bg1: '#1a0f00', bg2: '#0a0800', accent: '#ffaa33', glow: '#ff8800' },
+    track: 'mac-and-cheese.mp3',
+    // Warm cheese-and-pasta palette. Yellow accent so the ghost piece
+    // (which uses theme.accent for tetrisEffect/matrix/tires/macncheese
+    // block styles) renders as a yellow guide outline — Sir asked for
+    // yellow ghost pieces specifically. Glow brightens to gold.
+    colors: { bg1: '#3a1c00', bg2: '#1a0f00', accent: '#ffcc33', glow: '#ffe070' },
     particleHue: 40,
-    particleStyle: 'rays', // rising light rays
-    blockGlow: 12,
+    particleStyle: 'cheese-whips', // dripping cheese ribbons + bubbles
+    blockStyle: 'macncheese',      // elbow macaroni in melted cheese sauce
+    blockGlow: 14,
+    // Procedural fallback drum/bass.
     kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
     hh:    [1,0,1,1, 1,0,1,1, 1,0,1,1, 1,0,1,1],
     hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
     bass:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0],
-    bassNote: 49.0, // G1
+    bassNote: 49.0,
     scale: [261.63, 293.66, 329.63, 392, 440, 523.25],
     chords: [[261.63, 329.63, 392], [349.23, 440, 523.25], [293.66, 349.23, 440]],
     synthType: 'gospel',
@@ -2452,11 +2460,18 @@ function clearLines() {
       const cheerBase = [0, 0.35, 0.55, 0.78, 1.0][cleared] || 1.0;
       const cheerComboBoost = Math.min(0.4, Math.max(0, combo) * 0.12);
       cheerPulse = Math.min(1.2, Math.max(cheerPulse, cheerBase + cheerComboBoost));
+      // Ferrari Window: trigger a drive-by sports car on every line clear
+      // so the player sees a red Ferrari shoot across the background as
+      // their reward. Bigger clears scale the car up (handled in
+      // drawFerrariWindow). Only on the human player's clears.
+      if (theme && theme.particleStyle === 'ferrari-window') {
+        triggerFerrariDriveBy(cleared);
+      }
       // Confetti + stage flash on Underground (and any future Tetris-Effect
       // styled level — matrix + tires count as visually-rich for these FX
       // too, so a Tetris on Back for More / Ferrari Window gets the same
       // shockwave/flash treatment). Volume scales with line count + combo.
-      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires')) {
+      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese')) {
         const pieces = [0, 12, 22, 36, 60][cleared] || 60;
         const totalPieces = pieces + Math.max(0, combo) * 8;
         spawnConfetti(totalPieces, theme);
@@ -3574,7 +3589,8 @@ function initBgParticles() {
   // manage their own scene state (no per-particle loop), so 0 particles
   // for those. Donda stays minimal at 30 dots.
   const count = theme.particleStyle === 'matrix-rain' ? 0
-              : theme.particleStyle === 'ferrari-highway' ? 0
+              : theme.particleStyle === 'ferrari-window' ? 0
+              : theme.particleStyle === 'cheese-whips' ? 0
               : theme.particleStyle === 'dots' ? 30
               : theme.particleStyle === 'violins' ? 18
               : 80;
@@ -4251,11 +4267,12 @@ function shadeColor(color, percent) {
 // levels keep the piece-colored ghost for clarity.
 function drawGhostBlock(context, x, y, color, size) {
   const theme = getTheme(level);
-  // tetrisEffect (Falling Violins), matrix (Back for More / White Rabbit),
-  // and tires (Ferrari Window) all override face colour, so the ghost
-  // piece should also outline in the theme accent — otherwise the dashed
-  // ghost reads as a different piece type than what's actually about to lock.
-  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires');
+  // tetrisEffect, matrix, tires, and macncheese all override face colour,
+  // so the ghost piece should outline in the theme accent — otherwise the
+  // dashed ghost reads as a different piece type than what's about to
+  // lock. For Mac & Cheese the accent is yellow, which means the ghost
+  // automatically renders as the yellow guide outline Sir asked for.
+  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese');
   const outlineColor = useThemeColor ? theme.colors.accent : color;
   context.save();
   const [r, g, b] = hexToRgb(outlineColor);
@@ -4288,6 +4305,10 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   }
   if (theme && theme.blockStyle === 'tires') {
     drawBlockTires(context, x, y, color, size, alpha, theme);
+    return;
+  }
+  if (theme && theme.blockStyle === 'macncheese') {
+    drawBlockMacNCheese(context, x, y, color, size, alpha, theme);
     return;
   }
   context.globalAlpha = alpha;
@@ -4443,23 +4464,23 @@ function drawBlockTires(context, x, y, color, size, alpha, theme) {
   const accent = theme.colors.accent;       // Ferrari red
   const [ar, ag, ab] = hexToRgb(accent);
   context.globalAlpha = alpha;
-  // Tarmac base — lets adjacent tires read as separate units rather than
-  // a continuous black wall. Slight blue-grey tint so the road colour
-  // stays visible in the inter-cell seam.
-  context.fillStyle = '#0a0a12';
+  // Cell base — slightly lighter blue-tinted backing so adjacent tires
+  // read as separate units against the window-glass-blue background.
+  // (Was near-black; the tires would disappear into the dark bg.)
+  context.fillStyle = '#13283f';
   context.fillRect(x, y, size, size);
   const cx = x + size / 2, cy = y + size / 2;
   const outerR = size * 0.46;     // rubber outer edge
   const treadR = size * 0.40;     // tread groove
   const sideR  = size * 0.32;     // inner sidewall
   const hubR   = size * 0.18;     // chrome hub
-  // ─── Rubber tire body — radial gradient from edge (matte black) to
-  //   the inner sidewall (warm Ferrari-red glow), so the centre of every
-  //   tire pulses with the night-drive accent.
+  // ─── Rubber tire body — radial gradient from inner Ferrari-red glow
+  //   out to a charcoal edge. Softer black (#22) instead of pure #04 so
+  //   tire silhouette reads clearly against the lighter blue bg.
   const rubber = context.createRadialGradient(cx, cy, hubR, cx, cy, outerR);
-  rubber.addColorStop(0, `rgba(${Math.min(255,ar+30)},${ag},${ab},0.55)`);
-  rubber.addColorStop(0.55, '#1a1015');
-  rubber.addColorStop(1, '#040406');
+  rubber.addColorStop(0, `rgba(${Math.min(255,ar+30)},${ag},${ab},0.6)`);
+  rubber.addColorStop(0.55, '#2a1a20');
+  rubber.addColorStop(1, '#161214');
   context.fillStyle = rubber;
   context.beginPath();
   context.arc(cx, cy, outerR, 0, Math.PI * 2);
@@ -4531,6 +4552,101 @@ function drawBlockTires(context, x, y, color, size, alpha, theme) {
   context.globalAlpha = 1;
 }
 
+// Mac & Cheese block (Mac & Cheese level): each cell is an elbow-macaroni
+// noodle sitting in a pool of melted cheese sauce. The cheese fills the
+// cell with a warm orange-yellow gradient + a few darker cheesy specks;
+// the noodle is a thick golden-cream curved tube ("C" shape) drawn on top
+// with a darker ring giving it the hollow pasta tube look. Per-piece
+// native-colour tick stays in the corner so I/O/T/etc. are still
+// recognisable at a glance.
+function drawBlockMacNCheese(context, x, y, color, size, alpha, theme) {
+  const type = COLOR_TO_TYPE[color];
+  const cx = x + size / 2, cy = y + size / 2;
+  context.globalAlpha = alpha;
+  // ─── Cheese sauce base — warm radial gradient pooled in the cell.
+  //   Brighter centre, deeper crust at the edges, so a wall of cells
+  //   reads as bubbly molten cheese instead of a flat grid.
+  const cheese = context.createRadialGradient(cx, cy, size * 0.1, cx, cy, size * 0.7);
+  cheese.addColorStop(0,   '#ffd966');
+  cheese.addColorStop(0.6, '#f0a830');
+  cheese.addColorStop(1,   '#9a5a10');
+  context.fillStyle = cheese;
+  context.fillRect(x, y, size, size);
+  // Darker cheese flecks — deterministic per-cell hash so they don't
+  // strobe between frames. A few tiny specks sell the texture.
+  const cellH = ((Math.round(x / size) * 374761393) ^ (Math.round(y / size) * 668265263)) >>> 0;
+  if (size >= 14) {
+    context.fillStyle = 'rgba(140,70,10,0.45)';
+    for (let i = 0; i < 4; i++) {
+      const h2 = (cellH + i * 1640531513) >>> 0;
+      const sx = x + 4 + (h2 % (size - 8));
+      const sy = y + 4 + ((h2 >>> 8) % (size - 8));
+      const sr = 0.8 + ((h2 >>> 16) % 100) / 100 * 1.2;
+      context.beginPath();
+      context.arc(sx, sy, sr, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+  // ─── Macaroni noodle — fat "C" tube. Outer arc filled in pasta cream,
+  //   inner arc punched out with the cheese colour for the hollow look.
+  const radOuter = size * 0.36;
+  const radInner = size * 0.20;
+  // Outer noodle (golden cream)
+  const noodle = context.createRadialGradient(cx - size * 0.05, cy - size * 0.05, 1, cx, cy, radOuter);
+  noodle.addColorStop(0,   '#fff1bf');
+  noodle.addColorStop(0.7, '#f4d29a');
+  noodle.addColorStop(1,   '#c08a3a');
+  context.fillStyle = noodle;
+  // Open elbow: arc from ~30° to ~330° (leaving a gap at the right side
+  // for the elbow opening). Stroke a thick path then fill instead.
+  context.lineCap = 'round';
+  context.strokeStyle = noodle;
+  context.lineWidth = (radOuter - radInner) + 1;
+  context.beginPath();
+  // Two arcs forming an open horseshoe — start at upper-right, sweep
+  // counter-clockwise around to lower-right, leaving the right side open.
+  context.arc(cx, cy, (radOuter + radInner) / 2, -Math.PI * 0.30, Math.PI * 1.30, false);
+  context.stroke();
+  // Inner shadow ring on the underside of the noodle (gives the tube
+  // its volume — light from upper-left, shadow on lower-right).
+  context.strokeStyle = 'rgba(140,80,20,0.55)';
+  context.lineWidth = (radOuter - radInner) * 0.55;
+  context.beginPath();
+  context.arc(cx + size * 0.04, cy + size * 0.04,
+              (radOuter + radInner) / 2, -Math.PI * 0.10, Math.PI * 1.10, false);
+  context.stroke();
+  // Bright top highlight on the noodle (light on top-left of the curl).
+  context.strokeStyle = 'rgba(255,250,220,0.7)';
+  context.lineWidth = Math.max(1, (radOuter - radInner) * 0.22);
+  context.beginPath();
+  context.arc(cx - size * 0.05, cy - size * 0.05,
+              (radOuter + radInner) / 2, Math.PI * 0.55, Math.PI * 1.20, false);
+  context.stroke();
+  // ── End-cap circles at the two ends of the elbow showing the
+  //    pasta-tube hollow opening (small dark dot inside a cream ring).
+  const angles = [-Math.PI * 0.30, Math.PI * 1.30];
+  for (const ang of angles) {
+    const ex = cx + Math.cos(ang) * (radOuter + radInner) / 2;
+    const ey = cy + Math.sin(ang) * (radOuter + radInner) / 2;
+    context.fillStyle = '#f4d29a';
+    context.beginPath();
+    context.arc(ex, ey, (radOuter - radInner) * 0.55, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = '#7a4a1c';
+    context.beginPath();
+    context.arc(ex, ey, (radOuter - radInner) * 0.30, 0, Math.PI * 2);
+    context.fill();
+  }
+  // Per-piece native-colour tick in the top-right corner.
+  if (type && color) {
+    const [pr, pg, pb] = hexToRgb(color);
+    context.fillStyle = `rgba(${pr},${pg},${pb},0.95)`;
+    const tick = Math.max(2, size * 0.12);
+    context.fillRect(x + size - tick - 2, y + 2, tick, tick);
+  }
+  context.globalAlpha = 1;
+}
+
 // Per-piece glyph carved into the block face. Same shape language as the
 // Tetris Effect blocks: a small geometric mark hinting at the piece's
 // silhouette. Now sized large enough (~half the face) and double-stamped
@@ -4596,7 +4712,7 @@ function drawBoard() {
   // and tires (Ferrari Window) all use a semi-translucent board so their
   // reactive backgrounds (violins / matrix-rain / Ferrari highway) read
   // through the empty cells. Other levels stay opaque.
-  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires')) {
+  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese')) {
     ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
     ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
   } else {
@@ -4679,6 +4795,24 @@ function drawBoard() {
     sg.addColorStop(0,   `rgba(${sr},${sg2},${sb},0)`);
     sg.addColorStop(0.5, `rgba(${sr},${sg2},${sb},0.22)`);
     sg.addColorStop(1,   `rgba(${sr},${sg2},${sb},0)`);
+    ctx.fillStyle = sg;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
+  // Mac & Cheese shimmer pass — slow warm-glaze sheen sweeping diagonally
+  // over the noodle wall, like cheese sauce catching kitchen light.
+  if (theme && theme.blockStyle === 'macncheese') {
+    const w = mainCanvas.width, h = mainCanvas.height;
+    const cycle = 3200;
+    const phase = (Date.now() % cycle) / cycle;
+    const stripeW = w * 0.4;
+    const cxPos = -stripeW + (w + stripeW * 2) * phase;
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-atop';
+    const sg = ctx.createLinearGradient(cxPos, 0, cxPos + stripeW, h);
+    sg.addColorStop(0,    'rgba(255,235,140,0)');
+    sg.addColorStop(0.5,  'rgba(255,235,140,0.28)');
+    sg.addColorStop(1,    'rgba(255,235,140,0)');
     ctx.fillStyle = sg;
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
@@ -5748,20 +5882,31 @@ function drawMatrixRain(theme, now, playRects) {
   }
 }
 
-// Ferrari Window scene: a perspective night highway with dashed lane
-// markers scrolling toward the viewer + a red Ferrari cruising slowly in
-// the centre lane. Reactive to gameplay:
-//   - cheerPulse (line clears)  → engine roar (Ferrari surges forward,
-//                                  lane markers race past faster)
-//   - movePulse  (piece moves)  → Ferrari swerves slightly between lanes
-//   - kick beat                 → headlights flash brighter
-//   - stageFlash (Tetris-FX)    → whole road brightens momentarily
+// Ferrari Window scene: looking out a tinted-blue Ferrari window at city
+// lights streaking past. The constant-Ferrari highway scene was hard to
+// see and made the tire blocks blend in — Sir asked for a clean glass
+// background that lets the tires read, with a sports car only when a
+// line is cleared. Reactive to gameplay:
+//   - cheerPulse (line clears)  → triggers a red Ferrari drive-by (set
+//                                  from clearLines via the trigger
+//                                  helper at the bottom of this file)
+//   - movePulse  (piece moves)  → bokeh dots wobble + brighten briefly
+//   - kick beat                 → city-light streaks pulse brighter
+//   - stageFlash (Tetris-FX)    → whole window brightens
 //
-// Like drawMatrixRain, owns its own scene state on closure-static vars.
-let _ferrariMarkerScroll = 0;
-let _ferrariCarLaneOffset = 0;   // smoothed sideways position
-let _ferrariCarBob = 0;          // smoothed vertical bob from beat
-function drawFerrariHighway(theme, now, playRects) {
+// Owns its own scene state on closure-static vars. _ferrariDriveByT is
+// the drive-by animation progress (-1 = inactive, 0..1 = animating).
+let _ferrariStreakScroll = 0;
+let _ferrariDriveByT = -1;
+let _ferrariDriveByLines = 0;
+function triggerFerrariDriveBy(cleared) {
+  // Bigger / faster sports car for bigger clears. Combo also handled by
+  // the caller bumping cleared. Restarts mid-flight if a player chains
+  // clears so the car doesn't snap mid-screen.
+  _ferrariDriveByT = 0;
+  _ferrariDriveByLines = Math.max(1, cleared | 0);
+}
+function drawFerrariWindow(theme, now, playRects) {
   const w = bgCanvas.width, h = bgCanvas.height;
   if (w <= 0 || h <= 0) return;
   const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
@@ -5770,224 +5915,344 @@ function drawFerrariHighway(theme, now, playRects) {
   const onKick = (beatPhase % 4 === 0);
   const accent = theme.colors.accent;
   const [ar, ag, ab] = hexToRgb(accent);
+  const [b1r, b1g, b1b] = hexToRgb(theme.colors.bg1);
+  const [b2r, b2g, b2b] = hexToRgb(theme.colors.bg2);
 
-  // ─── SKY: deep night gradient (already faintly washed by drawBackground
-  //   base fill, but we re-paint solidly here so the road perspective
-  //   sits on a known dark backdrop instead of bleeding old frames).
-  const sky = bgCtx.createLinearGradient(0, 0, 0, h * 0.55);
-  sky.addColorStop(0,    '#02020a');
-  sky.addColorStop(0.7,  '#0a0816');
-  sky.addColorStop(1,    '#181024');
+  // ─── BLUE WINDOW GLASS BACKDROP ──────────────────────────────────
+  // Repaint solidly with a vertical teal-blue gradient so the tires
+  // sit in front of a clean, readable backdrop instead of the busy
+  // highway. Slightly lighter at the top (sky-through-glass), darker
+  // at the bottom (dashboard line of sight).
+  const sky = bgCtx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0,   `rgba(${b1r + 25},${b1g + 30},${b1b + 40},1)`);
+  sky.addColorStop(0.5, `rgba(${b1r},${b1g},${b1b},1)`);
+  sky.addColorStop(1,   `rgba(${b2r},${b2g},${b2b},1)`);
   bgCtx.fillStyle = sky;
-  bgCtx.fillRect(0, 0, w, h * 0.55);
+  bgCtx.fillRect(0, 0, w, h);
 
-  // Sparse stars — deterministic from a hash so they don't flicker.
-  bgCtx.fillStyle = 'rgba(220,220,255,0.55)';
-  for (let i = 0; i < 60; i++) {
-    const sx = ((i * 9173) % 1000) / 1000 * w;
-    const sy = ((i * 6151) % 1000) / 1000 * h * 0.45;
-    const sz = ((i * 4099) % 100) / 100 * 1.2 + 0.4;
-    bgCtx.fillRect(sx, sy, sz, sz);
+  // ─── HORIZONTAL CITY-LIGHT STREAKS — long faint horizontal lines
+  //   moving right→left, evoking the view through a side window of a
+  //   car cruising past city lights. Pulse brighter on every kick.
+  _ferrariStreakScroll = (_ferrariStreakScroll + 1.4 + cheer * 4) % w;
+  const streakA = (onKick ? 0.18 : 0.10) + flash * 0.12;
+  bgCtx.strokeStyle = `rgba(180,220,255,${streakA})`;
+  bgCtx.lineWidth = 1;
+  for (let i = 0; i < 9; i++) {
+    // Deterministic hash → stable Y per row, varying speed factor per row.
+    const yFrac = ((i * 6151) % 1000) / 1000;
+    const speedF = 0.5 + ((i * 4099) % 100) / 100;
+    const ly = yFrac * h;
+    const off = (_ferrariStreakScroll * speedF) % w;
+    bgCtx.beginPath();
+    bgCtx.moveTo(-off, ly);
+    bgCtx.lineTo(w * 1.5 - off, ly);
+    bgCtx.stroke();
   }
 
-  // ─── HORIZON GLOW: faint warm strip where the road meets the sky.
-  const horizonY = h * 0.55;
-  const hgrad = bgCtx.createLinearGradient(0, horizonY - 30, 0, horizonY + 4);
-  hgrad.addColorStop(0,   `rgba(${ar},${ag},${ab},0)`);
-  hgrad.addColorStop(0.7, `rgba(${ar},${ag},${ab},0.18)`);
-  hgrad.addColorStop(1,   `rgba(${ar},${ag},${ab},0.32)`);
-  bgCtx.fillStyle = hgrad;
-  bgCtx.fillRect(0, horizonY - 30, w, 34);
-
-  // ─── ROAD: trapezoid in perspective. Vanishing point at horizon centre,
-  //   widens to fill the bottom of the screen. Shoulder strips on either
-  //   side break the asphalt edge from the surrounding ground.
-  const vpx = w / 2, vpy = horizonY;
-  const roadBaseHalfW = w * 0.95;
-  const roadTopHalfW  = w * 0.04;
-
-  // Asphalt
-  bgCtx.fillStyle = '#0e0d12';
-  bgCtx.beginPath();
-  bgCtx.moveTo(vpx - roadTopHalfW, vpy);
-  bgCtx.lineTo(vpx + roadTopHalfW, vpy);
-  bgCtx.lineTo(vpx + roadBaseHalfW, h);
-  bgCtx.lineTo(vpx - roadBaseHalfW, h);
-  bgCtx.closePath();
-  bgCtx.fill();
-
-  // Road shoulder lines (yellow/red strips along the edges)
-  bgCtx.strokeStyle = `rgba(${ar},${ag},${ab},0.6)`;
-  bgCtx.lineWidth = 2;
-  bgCtx.beginPath();
-  bgCtx.moveTo(vpx - roadTopHalfW, vpy);
-  bgCtx.lineTo(vpx - roadBaseHalfW, h);
-  bgCtx.moveTo(vpx + roadTopHalfW, vpy);
-  bgCtx.lineTo(vpx + roadBaseHalfW, h);
-  bgCtx.stroke();
-
-  // ─── DASHED LANE MARKERS: scrolling perspective lines down the centre.
-  //   Centre line + two outer lane separators. Scroll speed reacts to
-  //   cheer/flash so a Tetris combo feels like flooring it briefly.
-  const scrollSpeed = 1.6 + cheer * 6 + flash * 3;
-  _ferrariMarkerScroll = (_ferrariMarkerScroll + scrollSpeed) % 60;
-
-  // Helper: project a point at distance t (0=horizon, 1=screen bottom)
-  // onto the perspective road. laneX: -1 (left edge) → +1 (right edge).
-  const project = (t, laneX) => {
-    const halfW = roadTopHalfW + (roadBaseHalfW - roadTopHalfW) * t;
-    return { x: vpx + laneX * halfW, y: vpy + (h - vpy) * t };
-  };
-
-  // Draw dashed markers at intervals along the road. Distance grows
-  // exponentially toward the horizon so the markers cluster at the top
-  // (matching real perspective).
-  const drawDashedLine = (laneX, color, alpha) => {
-    bgCtx.strokeStyle = `rgba(${color[0]},${color[1]},${color[2]},${alpha})`;
-    for (let i = 0; i < 18; i++) {
-      // Map i to a curved t: dashes are denser near the horizon.
-      const t0 = Math.pow((i + (_ferrariMarkerScroll / 60)) / 18, 1.6);
-      const t1 = Math.pow((i + 0.45 + (_ferrariMarkerScroll / 60)) / 18, 1.6);
-      if (t0 > 1) break;
-      if (t1 > 1) continue;
-      const a = project(t0, laneX);
-      const b = project(t1, laneX);
-      bgCtx.lineWidth = 1 + t1 * 5;
-      bgCtx.beginPath();
-      bgCtx.moveTo(a.x, a.y);
-      bgCtx.lineTo(b.x, b.y);
-      bgCtx.stroke();
-    }
-  };
-  drawDashedLine(0,    [255, 235, 180], 0.85);  // centre yellow
-  drawDashedLine(-0.55, [220, 220, 230], 0.5);  // left lane
-  drawDashedLine( 0.55, [220, 220, 230], 0.5);  // right lane
-
-  // ─── ROADSIDE STREETLIGHTS: warm dots receding into the distance on
-  //   both shoulders, evenly spaced + scroll-synced for cruising motion.
-  const lightSpacing = 60;
-  for (let side = -1; side <= 1; side += 2) {
-    bgCtx.fillStyle = 'rgba(255,210,140,0.85)';
-    bgCtx.shadowColor = 'rgba(255,210,140,0.6)';
-    for (let i = 0; i < 14; i++) {
-      const t0 = Math.pow((i + (_ferrariMarkerScroll / lightSpacing)) / 14, 1.7);
-      if (t0 > 1) break;
-      const pt = project(t0, side * 1.05);
-      const r = 1 + t0 * 4.5;
-      bgCtx.shadowBlur = 4 + t0 * 8;
-      bgCtx.beginPath();
-      bgCtx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
-      bgCtx.fill();
-    }
-    bgCtx.shadowBlur = 0;
+  // ─── BOKEH CITY LIGHTS — soft glowing dots scattered through the
+  //   glass like out-of-focus streetlights. Hue picked from the warm/
+  //   cool gradient so they don't all blob into one colour. movePulse
+  //   wobbles + brightens them so piece moves twinkle the field.
+  const wob = move * 4;
+  for (let i = 0; i < 28; i++) {
+    const bx = ((i * 9173) % 1000) / 1000 * w;
+    const by = ((i * 6673) % 1000) / 1000 * h;
+    const br = 4 + ((i * 4099) % 100) / 100 * 14;
+    const hueShift = (i % 3 === 0) ? 35 : (i % 3 === 1) ? 200 : 320;
+    const a = 0.18 + ((i * 7919) % 100) / 100 * 0.18 + move * 0.25;
+    bgCtx.fillStyle = `hsla(${hueShift}, 80%, 70%, ${a})`;
+    bgCtx.shadowColor = `hsla(${hueShift}, 80%, 70%, 0.7)`;
+    bgCtx.shadowBlur = 12 + cheer * 10;
+    bgCtx.beginPath();
+    bgCtx.arc(
+      bx + Math.sin(now / 1800 + i) * wob,
+      by + Math.cos(now / 2200 + i) * wob,
+      br * (1 + flash * 0.4),
+      0, Math.PI * 2
+    );
+    bgCtx.fill();
   }
-
-  // ─── FERRARI: cruising in the centre lane, viewed from behind. Lerp
-  //   sideways toward a movePulse-driven target so piece moves nudge the
-  //   car between lanes. Slight vertical bob on every kick beat.
-  const swayDir = (Math.sin(now / 1100) >= 0) ? 1 : -1;
-  const targetLane = swayDir * move * 0.35;
-  _ferrariCarLaneOffset += (targetLane - _ferrariCarLaneOffset) * 0.18;
-  const bobTarget = onKick ? -3 : 0;
-  _ferrariCarBob += (bobTarget - _ferrariCarBob) * 0.25;
-
-  // Car footprint (in screen pixels) — scaled by viewport so it stays
-  // a sensible chunk of the road regardless of resolution.
-  const carScale = Math.max(0.7, w / 1400) * (1 + cheer * 0.12);
-  const carW = 220 * carScale;
-  const carH = 150 * carScale;
-  const carBase = project(0.78, _ferrariCarLaneOffset * 0.6);
-  const cx = carBase.x;
-  const cy = carBase.y - carH * 0.35 + _ferrariCarBob;
-
-  bgCtx.save();
-  bgCtx.translate(cx, cy);
-
-  // ── Ground shadow under the car
-  bgCtx.fillStyle = 'rgba(0,0,0,0.55)';
-  bgCtx.beginPath();
-  bgCtx.ellipse(0, carH * 0.48, carW * 0.55, carH * 0.13, 0, 0, Math.PI * 2);
-  bgCtx.fill();
-
-  // ── Headlight cones reaching forward (toward viewer is "behind" the
-  //   car since we're looking at it from a chase angle). We render the
-  //   cones spilling behind the rear of the car for a passing-glow.
-  const headlightStrength = (onKick ? 1 : 0.7) + cheer * 0.4 + flash * 0.5;
-  const coneGrad = bgCtx.createRadialGradient(0, carH * 0.2, 5, 0, carH * 0.2, carW * 1.1);
-  coneGrad.addColorStop(0,   `rgba(255,220,160,${0.45 * headlightStrength})`);
-  coneGrad.addColorStop(1,   'rgba(255,220,160,0)');
-  bgCtx.fillStyle = coneGrad;
-  bgCtx.beginPath();
-  bgCtx.arc(0, carH * 0.2, carW * 1.1, 0, Math.PI * 2);
-  bgCtx.fill();
-
-  // ── Body — chassis silhouette in two stacked shapes: low wide hood +
-  //   slightly narrower roof. Painted Ferrari red with a top highlight.
-  // Hood
-  const bodyGrad = bgCtx.createLinearGradient(0, -carH * 0.05, 0, carH * 0.4);
-  bodyGrad.addColorStop(0, `rgba(${Math.min(255,ar+40)},${ag},${ab},1)`);
-  bodyGrad.addColorStop(1, `rgba(${Math.max(0,ar-60)},0,0,1)`);
-  bgCtx.fillStyle = bodyGrad;
-  // Lower chassis (rounded rectangle)
-  const bw = carW * 0.92, bh = carH * 0.4;
-  bgCtx.beginPath();
-  bgCtx.moveTo(-bw/2 + 12, carH * 0.05);
-  bgCtx.lineTo(bw/2 - 12, carH * 0.05);
-  bgCtx.quadraticCurveTo(bw/2, carH * 0.05, bw/2, carH * 0.05 + 12);
-  bgCtx.lineTo(bw/2, carH * 0.05 + bh - 12);
-  bgCtx.quadraticCurveTo(bw/2, carH * 0.05 + bh, bw/2 - 12, carH * 0.05 + bh);
-  bgCtx.lineTo(-bw/2 + 12, carH * 0.05 + bh);
-  bgCtx.quadraticCurveTo(-bw/2, carH * 0.05 + bh, -bw/2, carH * 0.05 + bh - 12);
-  bgCtx.lineTo(-bw/2, carH * 0.05 + 12);
-  bgCtx.quadraticCurveTo(-bw/2, carH * 0.05, -bw/2 + 12, carH * 0.05);
-  bgCtx.closePath();
-  bgCtx.fill();
-
-  // Roof / cabin — narrower trapezoid sitting on top
-  bgCtx.beginPath();
-  bgCtx.moveTo(-carW * 0.32, -carH * 0.05);
-  bgCtx.lineTo(carW * 0.32, -carH * 0.05);
-  bgCtx.lineTo(carW * 0.38, carH * 0.05);
-  bgCtx.lineTo(-carW * 0.38, carH * 0.05);
-  bgCtx.closePath();
-  bgCtx.fill();
-
-  // ── Rear window — tinted dark band across the cabin
-  bgCtx.fillStyle = 'rgba(20,12,20,0.85)';
-  bgCtx.fillRect(-carW * 0.28, -carH * 0.02, carW * 0.56, carH * 0.06);
-
-  // ── Tail lights — two glowing red strips on the rear.
-  const tailA = onKick ? 1 : (0.85 + cheer * 0.15);
-  bgCtx.fillStyle = `rgba(255,${40 + cheer * 80},${40 + cheer * 50},${tailA})`;
-  bgCtx.shadowColor = 'rgba(255,40,40,0.9)';
-  bgCtx.shadowBlur = 10 + cheer * 14;
-  bgCtx.fillRect(-carW * 0.45, carH * 0.18, carW * 0.18, carH * 0.06);
-  bgCtx.fillRect( carW * 0.27, carH * 0.18, carW * 0.18, carH * 0.06);
   bgCtx.shadowBlur = 0;
 
-  // ── Exhaust glow (only when cheer is hot — line-clear acceleration)
-  if (cheer > 0.05) {
-    bgCtx.fillStyle = `rgba(255,180,80,${0.5 + cheer * 0.4})`;
+  // ─── GLASS RAIN STREAKS — sparse vertical drips along the window
+  //   give the surface a tactile feel. Static; deterministic positions.
+  bgCtx.strokeStyle = 'rgba(180,210,240,0.10)';
+  bgCtx.lineWidth = 1;
+  for (let i = 0; i < 14; i++) {
+    const dx = ((i * 5237) % 1000) / 1000 * w;
+    const dyTop = ((i * 8861) % 1000) / 1000 * h * 0.6;
     bgCtx.beginPath();
-    bgCtx.arc(-carW * 0.18, carH * 0.42, 6 + cheer * 8, 0, Math.PI * 2);
-    bgCtx.arc( carW * 0.18, carH * 0.42, 6 + cheer * 8, 0, Math.PI * 2);
+    bgCtx.moveTo(dx, dyTop);
+    bgCtx.lineTo(dx + 1, dyTop + 30 + (i % 5) * 8);
+    bgCtx.stroke();
+  }
+
+  // ─── DRIVE-BY FERRARI ────────────────────────────────────────────
+  // Triggered from clearLines via triggerFerrariDriveBy. Animation is a
+  // single right→left pass over ~2.4 s. Bigger clears = bigger car +
+  // brighter glow so a Tetris really sells the moment.
+  if (_ferrariDriveByT >= 0) {
+    // Advance — assume ~60 fps; advancing 1/144 per frame ≈ 2.4 s pass.
+    _ferrariDriveByT += 1 / 144;
+    if (_ferrariDriveByT >= 1) {
+      _ferrariDriveByT = -1;
+      _ferrariDriveByLines = 0;
+    } else {
+      const t = _ferrariDriveByT;
+      // Ease the position so the car eases in and out at the edges
+      // (cubic in/out) instead of moving at a constant pixel rate.
+      const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      // Right edge → left edge.
+      const carScale = Math.max(0.7, w / 1400) * (1 + (_ferrariDriveByLines - 1) * 0.18);
+      const carW = 240 * carScale;
+      const carH = 95  * carScale;
+      const cx = w + carW * 0.6 - (w + carW * 1.2) * ease;
+      const cy = h * 0.62;
+      bgCtx.save();
+      bgCtx.translate(cx, cy);
+
+      // Speed-streak motion lines trailing the car (right side, since
+      // it's moving left → trail is to the right of the car's body).
+      bgCtx.strokeStyle = 'rgba(255,210,210,0.55)';
+      bgCtx.lineWidth = 2;
+      for (let s = 0; s < 6; s++) {
+        const sy = -carH * 0.2 + s * (carH * 0.1);
+        bgCtx.beginPath();
+        bgCtx.moveTo(carW * 0.55, sy);
+        bgCtx.lineTo(carW * 0.55 + 60 + s * 8, sy);
+        bgCtx.stroke();
+      }
+
+      // Ground shadow
+      bgCtx.fillStyle = 'rgba(0,0,0,0.55)';
+      bgCtx.beginPath();
+      bgCtx.ellipse(0, carH * 0.55, carW * 0.5, carH * 0.18, 0, 0, Math.PI * 2);
+      bgCtx.fill();
+
+      // Ferrari body — side-view low-slung sports car silhouette.
+      // Hood line: long sweeping curve from front nose up to roof to
+      // a short back end. Single Path then filled with red gradient.
+      const bodyGrad = bgCtx.createLinearGradient(0, -carH * 0.6, 0, carH * 0.5);
+      bodyGrad.addColorStop(0, `rgba(${Math.min(255,ar+50)},${Math.min(120,ag+30)},${Math.min(120,ab+30)},1)`);
+      bodyGrad.addColorStop(1, `rgba(${Math.max(0,ar-80)},0,0,1)`);
+      bgCtx.fillStyle = bodyGrad;
+      bgCtx.beginPath();
+      // Start at front-bottom (front-left wheel area, left = front since car drives left)
+      bgCtx.moveTo(-carW * 0.5, carH * 0.35);
+      // Front nose curve up
+      bgCtx.quadraticCurveTo(-carW * 0.55, -carH * 0.05, -carW * 0.32, -carH * 0.15);
+      // Hood up to windshield base
+      bgCtx.lineTo(-carW * 0.05, -carH * 0.18);
+      // Windshield slope up
+      bgCtx.quadraticCurveTo(carW * 0.05, -carH * 0.55, carW * 0.20, -carH * 0.55);
+      // Roof flat
+      bgCtx.lineTo(carW * 0.30, -carH * 0.52);
+      // Rear window slope down
+      bgCtx.quadraticCurveTo(carW * 0.43, -carH * 0.18, carW * 0.50, -carH * 0.10);
+      // Rear bumper
+      bgCtx.lineTo(carW * 0.50, carH * 0.30);
+      // Underside back to start
+      bgCtx.lineTo(-carW * 0.5, carH * 0.30);
+      bgCtx.closePath();
+      bgCtx.fill();
+
+      // Side-window tint
+      bgCtx.fillStyle = 'rgba(15,20,35,0.85)';
+      bgCtx.beginPath();
+      bgCtx.moveTo(-carW * 0.02, -carH * 0.18);
+      bgCtx.quadraticCurveTo(carW * 0.06, -carH * 0.50, carW * 0.20, -carH * 0.50);
+      bgCtx.lineTo(carW * 0.27, -carH * 0.48);
+      bgCtx.quadraticCurveTo(carW * 0.40, -carH * 0.20, carW * 0.42, -carH * 0.18);
+      bgCtx.closePath();
+      bgCtx.fill();
+
+      // Tail light (rear)
+      bgCtx.fillStyle = `rgba(255,80,80,${0.95 + cheer * 0.05})`;
+      bgCtx.shadowColor = 'rgba(255,60,60,0.95)';
+      bgCtx.shadowBlur = 14 + cheer * 16;
+      bgCtx.fillRect(carW * 0.42, -carH * 0.05, carW * 0.07, carH * 0.10);
+      bgCtx.shadowBlur = 0;
+
+      // Headlight (front) — bright cone projecting left
+      bgCtx.fillStyle = 'rgba(255,235,180,0.95)';
+      bgCtx.shadowColor = 'rgba(255,220,140,0.85)';
+      bgCtx.shadowBlur = 18;
+      bgCtx.fillRect(-carW * 0.50, -carH * 0.05, carW * 0.06, carH * 0.10);
+      bgCtx.shadowBlur = 0;
+      // Headlight beam — long thin cone
+      const beamGrad = bgCtx.createLinearGradient(-carW * 0.5, 0, -carW * 1.5, 0);
+      beamGrad.addColorStop(0, 'rgba(255,235,180,0.4)');
+      beamGrad.addColorStop(1, 'rgba(255,235,180,0)');
+      bgCtx.fillStyle = beamGrad;
+      bgCtx.beginPath();
+      bgCtx.moveTo(-carW * 0.5, -carH * 0.05);
+      bgCtx.lineTo(-carW * 1.6, -carH * 0.4);
+      bgCtx.lineTo(-carW * 1.6,  carH * 0.4);
+      bgCtx.lineTo(-carW * 0.5,  carH * 0.05);
+      bgCtx.closePath();
+      bgCtx.fill();
+
+      // Wheels — two black circles peeking under the body
+      bgCtx.fillStyle = '#06060a';
+      const wheelR = carH * 0.22;
+      bgCtx.beginPath();
+      bgCtx.arc(-carW * 0.32, carH * 0.32, wheelR, 0, Math.PI * 2);
+      bgCtx.arc( carW * 0.30, carH * 0.32, wheelR, 0, Math.PI * 2);
+      bgCtx.fill();
+      // Chrome rim hint
+      bgCtx.fillStyle = 'rgba(200,205,215,0.85)';
+      bgCtx.beginPath();
+      bgCtx.arc(-carW * 0.32, carH * 0.32, wheelR * 0.4, 0, Math.PI * 2);
+      bgCtx.arc( carW * 0.30, carH * 0.32, wheelR * 0.4, 0, Math.PI * 2);
+      bgCtx.fill();
+
+      bgCtx.restore();
+    }
+  }
+
+  // ─── Mask off the play area so the bokeh + drive-by Ferrari don't
+  //   read through the semi-translucent tire-block board.
+  if (playRects.length) {
+    bgCtx.save();
+    bgCtx.globalCompositeOperation = 'destination-out';
+    bgCtx.fillStyle = 'rgba(0,0,0,1)';
+    for (const r of playRects) bgCtx.fillRect(r.x, r.y, r.w, r.h);
+    bgCtx.restore();
+  }
+}
+
+// Mac & Cheese background: thick cheese ribbons ooze down from the top
+// edge of the screen like cheese pulled off a slice of pizza, with a
+// few lazy cheese bubbles drifting up. Reactive to gameplay:
+//   - cheerPulse (line clears)  → drips lengthen + bubbles pop bigger
+//   - movePulse  (piece moves)  → drips wobble sideways
+//   - kick beat                 → bubble glints brighter
+//
+// Owns its own state on closure-static vars: a fixed array of drip
+// columns initialised on first call (or viewport resize) so positions
+// stay stable frame-to-frame instead of strobing.
+let _cheeseDrips = null;
+let _cheeseBubbles = null;
+let _cheeseSceneW = 0;
+function drawCheeseWhips(theme, now, playRects) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (w <= 0 || h <= 0) return;
+  const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
+  const move  = (typeof movePulse  === 'number') ? movePulse  : 0;
+  const onKick = (beatPhase % 4 === 0);
+
+  // Rebuild on first run or viewport resize.
+  if (!_cheeseDrips || _cheeseSceneW !== w) {
+    _cheeseSceneW = w;
+    const dripCount = Math.max(8, Math.floor(w / 90));
+    _cheeseDrips = [];
+    for (let i = 0; i < dripCount; i++) {
+      _cheeseDrips.push({
+        x: (i + 0.5) * (w / dripCount) + (Math.random() - 0.5) * 30,
+        baseLen: 60 + Math.random() * 220,    // resting length from top
+        width: 14 + Math.random() * 22,       // ribbon width
+        wobblePhase: Math.random() * Math.PI * 2,
+      });
+    }
+    _cheeseBubbles = [];
+    const bubbleCount = 14;
+    for (let i = 0; i < bubbleCount; i++) {
+      _cheeseBubbles.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: 6 + Math.random() * 18,
+        speed: 0.15 + Math.random() * 0.45,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  // ─── Warm cheesy backdrop ─────────────────────────────────────────
+  const sky = bgCtx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0,    '#5a2a06');
+  sky.addColorStop(0.45, '#3a1a02');
+  sky.addColorStop(1,    '#180a00');
+  bgCtx.fillStyle = sky;
+  bgCtx.fillRect(0, 0, w, h);
+
+  // ─── DRIPS — thick cheese ribbons hanging from the top edge.
+  //   Each drip is a curving teardrop body widened toward the top
+  //   (where it meets the "ceiling") and ending in a hanging blob.
+  for (let i = 0; i < _cheeseDrips.length; i++) {
+    const d = _cheeseDrips[i];
+    // Length pulses with cheer + slight breathing — drips literally
+    // stretch down on a Tetris combo.
+    const breathe = Math.sin(now / 1800 + d.wobblePhase) * 8;
+    const len = d.baseLen + breathe + cheer * 80;
+    // Sideways wobble from movePulse (per-drip phase so they don't
+    // all swing together in lockstep).
+    const swayDir = Math.sin(d.wobblePhase * 3.7) >= 0 ? 1 : -1;
+    const cx = d.x + Math.sin(now / 2200 + d.wobblePhase) * 4 + swayDir * move * 8;
+    // Ribbon body — outline a teardrop using two side curves meeting
+    // at a rounded blob at the bottom.
+    const wTop = d.width;
+    const wMid = d.width * 0.85;
+    const wBot = d.width * 0.55;
+    const blobR = wBot * 1.05;
+    const grad = bgCtx.createLinearGradient(cx, 0, cx, len);
+    grad.addColorStop(0,    '#ffd34a');
+    grad.addColorStop(0.55, '#f0a830');
+    grad.addColorStop(1,    '#c87010');
+    bgCtx.fillStyle = grad;
+    bgCtx.beginPath();
+    bgCtx.moveTo(cx - wTop, 0);
+    // Left side curve
+    bgCtx.bezierCurveTo(cx - wTop, len * 0.35, cx - wMid, len * 0.55, cx - wBot, len - blobR);
+    // Bottom hanging blob
+    bgCtx.arc(cx, len - blobR, blobR, Math.PI, 0, false);
+    // Right side curve back to top
+    bgCtx.bezierCurveTo(cx + wMid, len * 0.55, cx + wTop, len * 0.35, cx + wTop, 0);
+    bgCtx.closePath();
+    bgCtx.fill();
+    // Bright highlight stripe down the centre — sells the shiny molten
+    // surface of the cheese.
+    bgCtx.fillStyle = 'rgba(255,250,210,0.45)';
+    bgCtx.beginPath();
+    bgCtx.moveTo(cx - wTop * 0.3, 0);
+    bgCtx.bezierCurveTo(cx - wMid * 0.3, len * 0.4, cx - wBot * 0.3, len * 0.6, cx - wBot * 0.2, len - blobR);
+    bgCtx.lineTo(cx + wBot * 0.05, len - blobR);
+    bgCtx.bezierCurveTo(cx + wBot * 0.05, len * 0.6, cx + wTop * 0.05, len * 0.4, cx + wTop * 0.05, 0);
+    bgCtx.closePath();
+    bgCtx.fill();
+    // Bottom blob highlight (small white-cream dot)
+    bgCtx.fillStyle = 'rgba(255,250,200,0.5)';
+    bgCtx.beginPath();
+    bgCtx.arc(cx - blobR * 0.3, len - blobR * 1.1, blobR * 0.35, 0, Math.PI * 2);
     bgCtx.fill();
   }
 
-  // ── Wheels peeking out from under the body (just two arcs at the bottom)
-  bgCtx.fillStyle = '#06060a';
-  bgCtx.beginPath();
-  bgCtx.arc(-carW * 0.32, carH * 0.4, carH * 0.1, 0, Math.PI, true);
-  bgCtx.arc( carW * 0.32, carH * 0.4, carH * 0.1, 0, Math.PI, true);
-  bgCtx.fill();
+  // ─── BUBBLES — drift slowly upward, wrap to bottom when off-screen.
+  //   Glint brightens on every kick beat so bubbles visually pop with
+  //   the music.
+  for (const b of _cheeseBubbles) {
+    b.y -= b.speed * (1 + cheer * 0.8);
+    if (b.y < -b.r) {
+      b.y = h + b.r;
+      b.x = Math.random() * w;
+    }
+    const r = b.r * (1 + (onKick ? 0.12 : 0) + cheer * 0.18);
+    // Bubble body (translucent cream)
+    bgCtx.fillStyle = 'rgba(255,225,150,0.55)';
+    bgCtx.shadowColor = 'rgba(255,210,120,0.6)';
+    bgCtx.shadowBlur = 6 + cheer * 8;
+    bgCtx.beginPath();
+    bgCtx.arc(b.x + Math.sin(now / 1900 + b.phase) * 4, b.y, r, 0, Math.PI * 2);
+    bgCtx.fill();
+    bgCtx.shadowBlur = 0;
+    // Bubble glint
+    bgCtx.fillStyle = `rgba(255,250,220,${0.7 + (onKick ? 0.25 : 0)})`;
+    bgCtx.beginPath();
+    bgCtx.arc(b.x - r * 0.35 + Math.sin(now / 1900 + b.phase) * 4, b.y - r * 0.35, r * 0.25, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
 
-  bgCtx.restore();
-
-  // ─── Mask off the play area: erase any of the above that overlaps it
-  //   so the road + Ferrari don't bleed through the semi-translucent
-  //   tire-block board. Using globalCompositeOperation 'destination-out'
-  //   to punch a hole, with a slight inset so the masked rect matches
-  //   the existing 12px exclusion margin in playRects.
+  // ─── Mask off the play area so the drips/bubbles don't read through
+  //   the semi-translucent macncheese board.
   if (playRects.length) {
     bgCtx.save();
     bgCtx.globalCompositeOperation = 'destination-out';
@@ -6016,7 +6281,7 @@ function drawBackground() {
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
   const playRects = [];
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-window' || style === 'cheese-whips');
   if (gameStarted && usesPlayAreaMask) {
     const c1 = document.getElementById('main-canvas');
     if (c1) {
@@ -6064,11 +6329,17 @@ function drawBackground() {
     drawMatrixRain(theme, now, playRects);
     return;
   }
-  // Ferrari highway (Ferrari Window): perspective night road with scrolling
-  // lane markers + a Ferrari cruising in the centre lane. Same scene-style
-  // pattern — owns its own state, returns early.
-  if (style === 'ferrari-highway') {
-    drawFerrariHighway(theme, now, playRects);
+  // Ferrari Window: looking through tinted blue glass at city lights
+  // streaking past. A Ferrari only drives across when the player clears
+  // a line (triggered from clearLines via _ferrariDriveByT).
+  if (style === 'ferrari-window') {
+    drawFerrariWindow(theme, now, playRects);
+    return;
+  }
+  // Mac & Cheese: oozing cheese ribbons dripping down from the top
+  // edge + lazy floating cheese bubbles. Reactive to game events.
+  if (style === 'cheese-whips') {
+    drawCheeseWhips(theme, now, playRects);
     return;
   }
 
