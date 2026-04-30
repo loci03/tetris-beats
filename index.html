@@ -209,7 +209,12 @@
   #start-screen {
     position: fixed;
     top: 0; left: 0;
-    width: 100%; height: 100%;
+    width: 100%;
+    /* `dvh` follows the actually-visible viewport on iOS as the URL bar
+       slides; `vh` would leave the title clipped under the status bar /
+       dynamic island. Fallback to vh on browsers that don't grok dvh. */
+    height: 100vh;
+    height: 100dvh;
     z-index: 10;
     display: flex;
     flex-direction: column;
@@ -217,6 +222,15 @@
     align-items: center;
     background: rgba(5,5,15,0.95);
     backdrop-filter: blur(20px);
+    /* Honour iOS safe areas so the title isn't hidden behind the notch /
+       dynamic island and so the high-scores list isn't behind the home
+       indicator. */
+    padding: max(20px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom));
+    box-sizing: border-box;
+    /* If the content is taller than the viewport (small phones, large
+       leaderboards), let the user scroll instead of clipping the title. */
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   #start-screen h1 {
     font-size: 64px;
@@ -825,8 +839,8 @@
     #hold-canvas { width: 56px; height: 40px; }
     #next-canvas { width: 56px; height: 40px; }
     #touch-controls { display: block; }
-    #start-screen h1 { font-size: 44px; letter-spacing: 2px; }
-    #start-screen .sub { font-size: 13px; letter-spacing: 3px; margin-bottom: 24px; }
+    #start-screen h1 { font-size: 38px; letter-spacing: 2px; margin-top: 0; margin-bottom: 6px; }
+    #start-screen .sub { font-size: 12px; letter-spacing: 3px; margin-bottom: 18px; }
     #start-btn, #start-btn-2 { padding: 14px 36px; font-size: 15px; }
     .controls-info { font-size: 11px; padding: 0 20px; }
     #combo-display { font-size: 20px; top: 35%; }
@@ -1775,7 +1789,7 @@ const LEVEL_THEMES = [
   { // Level 9 - Relax Your Mind (Suno track + brain blocks + chill zen scene)
     name: 'Relax Your Mind',
     bpm: 78,
-    track: 'audio/levels/relax-your-mind.mp3',
+    track: 'relax-your-mind.mp3',
     colors: { bg1: '#1a0e2e', bg2: '#0c0820', accent: '#c89bff', glow: '#ff9ed8' },
     particleHue: 285,
     // Lavender gyri rendered through drawBlockBrain. Uses the same opt-out
@@ -1796,21 +1810,26 @@ const LEVEL_THEMES = [
     chords: [[220, 277.18, 329.63], [246.94, 293.66, 369.99], [196, 246.94, 293.66]],
     synthType: 'choir',
   },
-  { // Level 10 - Vultures 1
-    name: 'Vultures 1',
-    bpm: 125,
-    colors: { bg1: '#1a0510', bg2: '#0d0008', accent: '#ffaa00', glow: '#ff8800' },
-    particleHue: 45,
-    particleStyle: 'smoke', // drifting smoke/volatile aesthetic
-    blockGlow: 7,
+  { // Level 10 - Trumpets Please (Suno track + trumpet pieces + jazz-club scene)
+    name: 'Trumpets Please',
+    bpm: 110,
+    track: 'trumpets-please.mp3',
+    // Brass + plum: warm gold trumpet body against a deep velvet stage.
+    // Trumpet block uses theme accent for the bell flare.
+    colors: { bg1: '#1c0820', bg2: '#0a0410', accent: '#f5b829', glow: '#ffd166' },
+    particleHue: 42,
+    blockStyle: 'trumpet',
+    particleStyle: 'jazz-club', // velvet-curtain stage, smoke rings, spotlights
+    blockGlow: 6,
+    // Procedural-fallback swing pattern in case the MP3 fails to load.
     kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     snare: [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
-    hh:    [1,0,1,1, 1,0,1,0, 1,0,1,1, 1,0,1,0],
+    hh:    [1,0,1,1, 1,0,1,1, 1,0,1,1, 1,0,1,1],
     hhOpen:[0,0,0,0, 0,1,0,0, 0,0,0,0, 0,1,0,0],
-    bass:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,1],
-    bassNote: 44.45, // F1
-    scale: [174.61, 196, 220, 261.63, 293.66, 349.23, 392, 440],
-    chords: [[174.61, 220, 293.66], [196, 261.63, 349.23], [220, 293.66, 392]],
+    bass:  [1,0,0,0, 0,0,0,1, 1,0,0,0, 0,0,0,1],
+    bassNote: 65.41, // C2 - warm walking-bass root
+    scale: [261.63, 293.66, 311.13, 349.23, 392, 415.30, 466.16, 523.25],
+    chords: [[261.63, 311.13, 392], [293.66, 349.23, 440], [196, 246.94, 293.66]],
     synthType: 'gospel',
   },
   { // Level 11 - Vultures 2
@@ -2560,7 +2579,7 @@ function clearLines() {
       // styled level - matrix + tires count as visually-rich for these FX
       // too, so a Tetris on Back for More / Ferrari Window gets the same
       // shockwave/flash treatment). Volume scales with line count + combo.
-      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain')) {
+      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet')) {
         const pieces = [0, 12, 22, 36, 60][cleared] || 60;
         const totalPieces = pieces + Math.max(0, combo) * 8;
         spawnConfetti(totalPieces, theme);
@@ -3682,6 +3701,7 @@ function initBgParticles() {
               : theme.particleStyle === 'cheese-whips' ? 0
               : theme.particleStyle === 'dancehall' ? 0
               : theme.particleStyle === 'zen-drift' ? 0
+              : theme.particleStyle === 'jazz-club' ? 0
               : theme.particleStyle === 'dots' ? 30
               : theme.particleStyle === 'violins' ? 18
               : 80;
@@ -4363,7 +4383,7 @@ function drawGhostBlock(context, x, y, color, size) {
   // dashed ghost reads as a different piece type than what's about to
   // lock. For Mac & Cheese the accent is yellow, which means the ghost
   // automatically renders as the yellow guide outline Sir asked for.
-  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain');
+  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet');
   const outlineColor = useThemeColor ? theme.colors.accent : color;
   context.save();
   const [r, g, b] = hexToRgb(outlineColor);
@@ -4408,6 +4428,10 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   }
   if (theme && theme.blockStyle === 'brain') {
     drawBlockBrain(context, x, y, color, size, alpha, theme);
+    return;
+  }
+  if (theme && theme.blockStyle === 'trumpet') {
+    drawBlockTrumpet(context, x, y, color, size, alpha, theme);
     return;
   }
   context.globalAlpha = alpha;
@@ -4798,15 +4822,17 @@ function drawBoard() {
   // and tires (Ferrari Window) all use a semi-translucent board so their
   // reactive backgrounds (violins / matrix-rain / Ferrari highway) read
   // through the empty cells. Other levels stay opaque.
-  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain')) {
+  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet')) {
     ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
     // Tires (L6) use a darker / more opaque board fill so the tire
     // silhouettes read on top - the highway scene is too busy to let
     // 55% alpha through. Brain (L9) keeps the dreamy zen scene visible
-    // through the empty cells - nice and translucent. Other shaped-piece
+    // through the empty cells - nice and translucent. Trumpet (L10)
+    // keeps the velvet stage glowing through. Other shaped-piece
     // styles stay translucent.
     const fillAlpha = (theme.blockStyle === 'tires') ? 0.82
                     : (theme.blockStyle === 'brain') ? 0.42
+                    : (theme.blockStyle === 'trumpet') ? 0.50
                     : 0.55;
     ctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
   } else {
@@ -7774,6 +7800,373 @@ function drawBlockBrain(context, x, y, color, size, alpha, theme) {
   context.globalAlpha = 1;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TRUMPET BLOCK (Level 10 - Trumpets Please)
+// Stylised trumpet silhouette: a brass-coloured circle for the bell + a
+// small bend connecting to the lead pipe + three pistons stacked across the
+// top. No cell-box; reads as a row of trumpets when stacked. Bell flares
+// in the theme accent (warm gold) so the playfield glows like a brass band.
+// ─────────────────────────────────────────────────────────────────────────────
+function drawBlockTrumpet(context, x, y, color, size, alpha, theme) {
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  const r  = size * 0.38;
+
+  context.globalAlpha = alpha;
+  context.save();
+  // Drop shadow so brass pops on the velvet board fill.
+  context.shadowColor = 'rgba(120,60,0,0.55)';
+  context.shadowBlur  = Math.min(8, size * 0.18);
+  context.shadowOffsetX = 1;
+  context.shadowOffsetY = 2;
+
+  // ── Bell: warm-gold gradient with bright highlight ──
+  const [ar, ag, ab] = hexToRgb(theme.colors.accent || '#f5b829');
+  const bell = context.createRadialGradient(
+    cx - r * 0.30, cy - r * 0.35, r * 0.10,
+    cx, cy, r * 1.05
+  );
+  bell.addColorStop(0,    `rgba(${Math.min(255, ar+60)},${Math.min(255, ag+45)},${Math.min(255, ab+15)},1)`);
+  bell.addColorStop(0.45, `rgb(${ar},${ag},${ab})`);
+  bell.addColorStop(1,    `rgb(${Math.max(0, ar-90)},${Math.max(0, ag-80)},${Math.max(0, ab-50)})`);
+  context.fillStyle = bell;
+  context.beginPath();
+  context.arc(cx, cy, r, 0, Math.PI * 2);
+  context.fill();
+
+  context.restore();
+  context.save();
+
+  // ── Bell rim (darker ring) ──
+  context.strokeStyle = `rgba(${Math.max(0, ar-70)},${Math.max(0, ag-60)},${Math.max(0, ab-30)},0.85)`;
+  context.lineWidth = Math.max(1, size * 0.05);
+  context.beginPath();
+  context.arc(cx, cy, r * 0.92, 0, Math.PI * 2);
+  context.stroke();
+
+  // ── Inner bell shadow (a small darker disc giving depth) ──
+  context.fillStyle = `rgba(${Math.max(0, ar-110)},${Math.max(0, ag-90)},${Math.max(0, ab-60)},0.55)`;
+  context.beginPath();
+  context.arc(cx + r * 0.12, cy + r * 0.10, r * 0.42, 0, Math.PI * 2);
+  context.fill();
+
+  // ── Three valve pistons across the top of the cell ──
+  // Tiny rounded rectangles - read as the trumpet's piston caps even at
+  // small CELL sizes. Centred horizontally above the bell.
+  const pistonY = y + size * 0.16;
+  const pistonW = size * 0.10;
+  const pistonH = size * 0.16;
+  const pistonGap = size * 0.04;
+  const totalPistonW = pistonW * 3 + pistonGap * 2;
+  const pistonStartX = cx - totalPistonW / 2;
+  const pistonGrad = context.createLinearGradient(0, pistonY, 0, pistonY + pistonH);
+  pistonGrad.addColorStop(0, `rgb(${Math.min(255, ar+30)},${Math.min(255, ag+20)},${ab})`);
+  pistonGrad.addColorStop(1, `rgb(${Math.max(0, ar-50)},${Math.max(0, ag-40)},${Math.max(0, ab-20)})`);
+  for (let p = 0; p < 3; p++) {
+    const px = pistonStartX + p * (pistonW + pistonGap);
+    context.fillStyle = pistonGrad;
+    context.beginPath();
+    if (context.roundRect) context.roundRect(px, pistonY, pistonW, pistonH, pistonW * 0.35);
+    else context.rect(px, pistonY, pistonW, pistonH);
+    context.fill();
+    // Cap highlight
+    context.fillStyle = 'rgba(255,240,200,0.55)';
+    context.beginPath();
+    context.arc(px + pistonW / 2, pistonY + pistonW * 0.30, pistonW * 0.25, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  // ── Soft warm gloss on the top-left of the bell ──
+  const gloss = context.createRadialGradient(
+    cx - r * 0.30, cy - r * 0.40, 1,
+    cx - r * 0.20, cy - r * 0.30, r * 0.55
+  );
+  gloss.addColorStop(0, 'rgba(255,250,210,0.58)');
+  gloss.addColorStop(1, 'rgba(255,250,210,0)');
+  context.fillStyle = gloss;
+  context.beginPath();
+  context.arc(cx, cy, r * 0.95, 0, Math.PI * 2);
+  context.fill();
+
+  context.restore();
+  context.globalAlpha = 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JAZZ CLUB SCENE (Level 10 - Trumpets Please)
+// A smoky upscale jazz lounge. Layered:
+//   1. Dim velvet gradient sky/wall
+//   2. Backlit stage curtains (vertical drape gradient on left + right)
+//   3. Pinpoint stage lights (bulbs along top valance)
+//   4. Two warm spotlights swinging slowly across the stage on the beat
+//   5. Subtle smoke rings drifting up from a neon sign
+//   6. Silhouette band: bassist + drummer + saxophonist outlines
+//   7. Floor reflection
+// Reactive: spotlights swing wider and brighter on cheer; smoke rings spawn
+// faster on movePulse; the neon sign flickers on hardDrop.
+// ─────────────────────────────────────────────────────────────────────────────
+let _jzScene = null, _jzSceneW = 0;
+
+function _initJazzScene(w, h) {
+  _jzScene = {
+    bulbs: [],
+    smoke: [],
+    lastMove: 0,
+    flicker: 0,
+    // Two spotlights swing across the stage (swingPhase advances per frame
+    // by their own rate, modulated by beat).
+    spots: [
+      { phase: 0, baseX: w * 0.30, hue: 38, baseT: 0 },
+      { phase: Math.PI, baseX: w * 0.70, hue: 28, baseT: 0 },
+    ],
+    floorY: h * 0.78,
+  };
+  _jzSceneW = w;
+  // Stage-valance bulbs: strung across the top in a slight catenary
+  const bulbCount = Math.max(8, Math.floor(w / 60));
+  for (let i = 0; i < bulbCount; i++) {
+    const t = i / (bulbCount - 1);
+    _jzScene.bulbs.push({
+      x: w * 0.06 + t * w * 0.88,
+      y: h * 0.10 + Math.sin(t * Math.PI) * 14,
+      r: 2.2 + (i % 3) * 0.6,
+      hue: 36 + (i % 3) * 8,
+      phase: i * 0.4,
+    });
+  }
+}
+
+function drawJazzClubScene(theme, now, playRects) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (w <= 0 || h <= 0) return;
+  if (!_jzScene || _jzSceneW !== w) _initJazzScene(w, h);
+
+  const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
+  const move  = (typeof movePulse === 'number') ? movePulse : 0;
+  const dropP = (typeof boardDropPulse === 'number') ? boardDropPulse : 0;
+  const onBeat = (beatPhase % 4 === 0);
+  const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+  const [ar, ag, ab] = hexToRgb(theme.colors.accent);
+
+  // ── 1. VELVET BACKDROP ── deep plum→burgundy gradient
+  const sky = bgCtx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0,    '#1c0820');
+  sky.addColorStop(0.55, '#330c2a');
+  sky.addColorStop(1,    '#0a0410');
+  bgCtx.fillStyle = sky;
+  bgCtx.fillRect(0, 0, w, h);
+
+  // ── 2. CURTAINS ── two vertical drapes on the sides with vertical pleats
+  bgCtx.save();
+  for (const side of [0, 1]) {
+    const cx0 = side === 0 ? 0 : w - w * 0.18;
+    const cwd = w * 0.18;
+    const drapeGrad = bgCtx.createLinearGradient(cx0, 0, cx0 + cwd, 0);
+    if (side === 0) {
+      drapeGrad.addColorStop(0, '#5a0e2e');
+      drapeGrad.addColorStop(1, '#1a0410');
+    } else {
+      drapeGrad.addColorStop(0, '#1a0410');
+      drapeGrad.addColorStop(1, '#5a0e2e');
+    }
+    bgCtx.fillStyle = drapeGrad;
+    bgCtx.fillRect(cx0, 0, cwd, h * 0.85);
+    // Vertical pleats: a few darker stripes
+    bgCtx.fillStyle = 'rgba(0,0,0,0.18)';
+    for (let p = 0; p < 4; p++) {
+      const px = cx0 + (p / 4 + 0.05) * cwd;
+      bgCtx.fillRect(px, 0, 2, h * 0.85);
+    }
+  }
+  bgCtx.restore();
+
+  // ── 3. VALANCE BULBS ── steady warm pinpoints, brighter on beat
+  bgCtx.save();
+  const beatBoost = onBeat ? 1.4 : 1;
+  for (const b of _jzScene.bulbs) {
+    const tw = 0.7 + Math.sin(now / 600 + b.phase) * 0.2;
+    bgCtx.globalAlpha = 0.85 * tw;
+    bgCtx.shadowColor = `hsl(${b.hue},90%,72%)`;
+    bgCtx.shadowBlur  = Math.min(10, b.r * beatBoost * 3);
+    bgCtx.fillStyle = `hsl(${b.hue},85%,${72 + (onBeat ? 6 : 0)}%)`;
+    bgCtx.beginPath();
+    bgCtx.arc(b.x, b.y, b.r * beatBoost, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.restore();
+
+  // ── 4. SPOTLIGHTS ── warm cones that sweep across the stage on the beat
+  bgCtx.save();
+  bgCtx.globalCompositeOperation = 'lighter';
+  for (const s of _jzScene.spots) {
+    s.phase += 0.006 + cheer * 0.012;
+    const sweep = Math.sin(s.phase) * (w * 0.12);
+    const tipX = s.baseX + sweep;
+    const tipY = h * 0.16;
+    const beamLen = h * 0.55;
+    const beamHalf = w * 0.04 + cheer * w * 0.02;
+    const grad = bgCtx.createLinearGradient(tipX, tipY, tipX, tipY + beamLen);
+    grad.addColorStop(0, `hsla(${s.hue},90%,75%,${0.36 + cheer * 0.20})`);
+    grad.addColorStop(1, `hsla(${s.hue},90%,40%,0)`);
+    bgCtx.fillStyle = grad;
+    bgCtx.beginPath();
+    bgCtx.moveTo(tipX, tipY);
+    bgCtx.lineTo(tipX - beamHalf, tipY + beamLen);
+    bgCtx.lineTo(tipX + beamHalf, tipY + beamLen);
+    bgCtx.closePath();
+    bgCtx.fill();
+  }
+  bgCtx.restore();
+
+  // ── 5. NEON SIGN (TRUMPETS PLEASE) ── Glowing pink script tucked top-left
+  bgCtx.save();
+  bgCtx.globalAlpha = 0.85;
+  // Slight per-frame flicker on hardDrop
+  if (dropP > _jzScene.flicker + 0.10) _jzScene.flicker = dropP;
+  const flickerOff = _jzScene.flicker > 0 && Math.random() < 0.30;
+  _jzScene.flicker = Math.max(0, _jzScene.flicker - 0.04);
+  if (!flickerOff) {
+    bgCtx.shadowColor = 'rgba(255,80,200,0.95)';
+    bgCtx.shadowBlur  = 12;
+    bgCtx.fillStyle   = '#ff66c8';
+    bgCtx.font        = `italic ${Math.max(14, Math.floor(w * 0.022))}px "Pacifico", "Brush Script MT", cursive`;
+    bgCtx.textAlign   = 'left';
+    bgCtx.textBaseline = 'top';
+    bgCtx.fillText('Trumpets, Please', w * 0.05, h * 0.04);
+  }
+  bgCtx.restore();
+
+  // ── 6. SMOKE RINGS ── drift up from the neon sign; spawn faster on movePulse
+  if (move > _jzScene.lastMove + 0.06 || Math.random() < 0.04) {
+    _jzScene.smoke.push({
+      x: w * 0.18 + (Math.random() - 0.5) * w * 0.06,
+      y: h * 0.10,
+      r: 4 + Math.random() * 5,
+      vy: -0.25 - Math.random() * 0.25,
+      alpha: 0.30 + move * 0.20,
+      twist: (Math.random() - 0.5) * 0.4,
+    });
+    if (_jzScene.smoke.length > 18) _jzScene.smoke.shift();
+  }
+  _jzScene.lastMove = move;
+  bgCtx.save();
+  for (let i = _jzScene.smoke.length - 1; i >= 0; i--) {
+    const s = _jzScene.smoke[i];
+    s.y += s.vy;
+    s.r += 0.25;
+    s.alpha -= 0.005;
+    s.x += Math.sin(s.y * 0.04) * 0.2 + s.twist * 0.04;
+    if (s.alpha <= 0) { _jzScene.smoke.splice(i, 1); continue; }
+    bgCtx.strokeStyle = `rgba(220,210,230,${s.alpha})`;
+    bgCtx.lineWidth = 1.4;
+    bgCtx.beginPath();
+    bgCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    bgCtx.stroke();
+  }
+  bgCtx.restore();
+
+  // ── 7. SILHOUETTE BAND ── three musicians along the stage floor
+  // Cheap silhouettes: filled black-purple shapes, no per-frame randomness.
+  // Slight per-musician sway driven by movePulse + beat.
+  const floorY = _jzScene.floorY;
+  bgCtx.save();
+  bgCtx.fillStyle = 'rgba(8,3,14,0.95)';
+  // Bassist (left): tall figure with an upright bass silhouette
+  const sway = Math.sin(now / 600) * 3 + (onBeat ? 4 : 0);
+  _drawJazzBassist(w * 0.25, floorY, sway);
+  // Drummer (centre): figure behind a drum kit
+  _drawJazzDrummer(w * 0.50, floorY, sway * 0.6, onBeat);
+  // Saxophonist (right): figure raising a sax to the spotlights
+  _drawJazzSaxophonist(w * 0.74, floorY, sway, cheer);
+  bgCtx.restore();
+
+  // ── 8. FLOOR REFLECTION ── thin horizontal bar of ambient warm glow
+  const floorGrad = bgCtx.createLinearGradient(0, floorY, 0, h);
+  floorGrad.addColorStop(0, `rgba(${ar},${ag},${ab},${0.04 + energy * 0.05})`);
+  floorGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
+  bgCtx.fillStyle = floorGrad;
+  bgCtx.fillRect(0, floorY, w, h - floorY);
+
+  // ── 9. PLAY-AREA MASK ── punch hole over the player's board
+  if (playRects.length) {
+    bgCtx.save();
+    bgCtx.globalCompositeOperation = 'destination-out';
+    for (const pr of playRects) {
+      bgCtx.fillStyle = '#000';
+      bgCtx.fillRect(pr.x, pr.y, pr.w, pr.h);
+    }
+    bgCtx.restore();
+  }
+}
+
+// ── Tiny helpers for the band silhouettes (cheap, no per-frame allocations) ──
+function _drawJazzBassist(cx, baseY, sway) {
+  // Body
+  bgCtx.beginPath();
+  bgCtx.ellipse(cx + sway * 0.3, baseY - 24, 6, 16, 0, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Head
+  bgCtx.beginPath();
+  bgCtx.arc(cx + sway * 0.3, baseY - 46, 5, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Upright bass (large teardrop body next to bassist)
+  bgCtx.beginPath();
+  bgCtx.ellipse(cx + 14, baseY - 28, 10, 22, 0.15, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Bass neck
+  bgCtx.fillRect(cx + 12, baseY - 76, 2, 40);
+  bgCtx.fillRect(cx + 11, baseY - 80, 4, 6);
+}
+
+function _drawJazzDrummer(cx, baseY, sway, onBeat) {
+  // Kit base
+  bgCtx.beginPath();
+  bgCtx.ellipse(cx, baseY - 12, 28, 12, 0, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Snare to the left
+  bgCtx.beginPath();
+  bgCtx.ellipse(cx - 18, baseY - 18, 8, 4, 0, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Bass drum (dark big circle in front)
+  bgCtx.beginPath();
+  bgCtx.arc(cx, baseY - 14, 14, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Drummer head + arms peeking over
+  bgCtx.beginPath();
+  bgCtx.arc(cx + sway * 0.3, baseY - 44, 5, 0, Math.PI * 2);
+  bgCtx.fill();
+  bgCtx.beginPath();
+  bgCtx.ellipse(cx + sway * 0.3, baseY - 28, 8, 10, 0, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Sticks (slight raise on beat)
+  const stickRaise = onBeat ? -4 : 0;
+  bgCtx.fillStyle = 'rgba(220,200,180,0.55)';
+  bgCtx.fillRect(cx - 22, baseY - 28 + stickRaise, 14, 1.4);
+  bgCtx.fillRect(cx + 8,  baseY - 28 + stickRaise, 14, 1.4);
+  bgCtx.fillStyle = 'rgba(8,3,14,0.95)';
+}
+
+function _drawJazzSaxophonist(cx, baseY, sway, cheer) {
+  // Body leaning slightly back
+  bgCtx.beginPath();
+  bgCtx.ellipse(cx + sway * 0.4, baseY - 26, 6, 16, -0.06, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Head tilted up
+  bgCtx.beginPath();
+  bgCtx.arc(cx + sway * 0.4 - 1, baseY - 46, 5, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Sax body (curved shape) - bell pointed up-right toward the spotlight
+  const bellLift = 2 + cheer * 4;
+  bgCtx.beginPath();
+  bgCtx.moveTo(cx + 4, baseY - 24);
+  bgCtx.quadraticCurveTo(cx + 10, baseY - 20, cx + 16, baseY - 32);
+  bgCtx.quadraticCurveTo(cx + 22, baseY - 44 - bellLift, cx + 14, baseY - 50 - bellLift);
+  bgCtx.quadraticCurveTo(cx + 6, baseY - 50 - bellLift, cx + 6, baseY - 40 - bellLift);
+  bgCtx.lineWidth = 4;
+  bgCtx.strokeStyle = 'rgba(8,3,14,0.95)';
+  bgCtx.stroke();
+}
+
 function drawBackground() {
   const theme = getTheme(level);
   const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
@@ -7793,7 +8186,7 @@ function drawBackground() {
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
   const playRects = [];
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club');
   if (gameStarted && usesPlayAreaMask) {
     const c1 = document.getElementById('main-canvas');
     if (c1) {
@@ -7867,6 +8260,14 @@ function drawBackground() {
   // input + brainwave pulse on line clears. Reactive but never busy.
   if (style === 'zen-drift') {
     drawZenScene(theme, now, playRects);
+    return;
+  }
+  // Trumpets Please (Level 10): velvet jazz-club stage with backlit
+  // curtains, a saxophone-shaped silhouette band, drifting smoke rings
+  // from a neon sign, and brass-coloured spotlight cones that swing
+  // across the stage on every beat.
+  if (style === 'jazz-club') {
+    drawJazzClubScene(theme, now, playRects);
     return;
   }
 
