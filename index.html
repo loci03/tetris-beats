@@ -4497,21 +4497,29 @@ function drawBlockTires(context, x, y, color, size, alpha, theme) {
   const treadR = size * 0.40;     // tread groove
   const sideR  = size * 0.32;     // inner sidewall
   const hubR   = size * 0.18;     // chrome hub
-  // ─── Rubber tire body - radial gradient from inner Ferrari-red glow
-  //   out to a softer charcoal edge so the tire silhouette reads against
-  //   the dark asphalt highway behind it.
+  // Wheel-arch glow - bright pale ring just outside the rubber so the
+  // tire silhouette reads on the dark highway. Tires were rendering
+  // dark-on-dark and disappearing; this is the fix Sir asked for.
+  context.strokeStyle = `rgba(${Math.min(255,ar+50)},${Math.min(255,ag+80)},${Math.min(255,ab+80)},0.65)`;
+  context.lineWidth = Math.max(2, size * 0.08);
+  context.beginPath();
+  context.arc(cx, cy, outerR + size * 0.04, 0, Math.PI * 2);
+  context.stroke();
+  // ─── Rubber tire body - radial gradient. Lifted both stops so the
+  //   silhouette reads against the night highway (was near-black so
+  //   invisible against the dimmed-asphalt play area fill).
   const rubber = context.createRadialGradient(cx, cy, hubR, cx, cy, outerR);
-  rubber.addColorStop(0, `rgba(${Math.min(255,ar+30)},${ag},${ab},0.7)`);
-  rubber.addColorStop(0.55, '#3a2228');
-  rubber.addColorStop(1, '#1a1418');
+  rubber.addColorStop(0, `rgba(${Math.min(255,ar+50)},${ag+10},${ab+10},0.85)`);
+  rubber.addColorStop(0.55, '#5a3a44');
+  rubber.addColorStop(1, '#382830');
   context.fillStyle = rubber;
   context.beginPath();
   context.arc(cx, cy, outerR, 0, Math.PI * 2);
   context.fill();
-  // Outer rubber rim outline so the tire's silhouette has a clean edge
-  // separating it from neighbouring tires + the road bg.
-  context.strokeStyle = 'rgba(0,0,0,0.85)';
-  context.lineWidth = Math.max(1, size * 0.05);
+  // Bright cool-grey outer rim outline (was pure black at 0.85; was
+  // disappearing on the dim play-area fill).
+  context.strokeStyle = 'rgba(200,210,225,0.85)';
+  context.lineWidth = Math.max(1, size * 0.06);
   context.beginPath();
   context.arc(cx, cy, outerR, 0, Math.PI * 2);
   context.stroke();
@@ -4714,7 +4722,11 @@ function drawBoard() {
   // through the empty cells. Other levels stay opaque.
   if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty')) {
     ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
-    ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
+    // Tires (L6) use a darker / more opaque board fill so the tire
+    // silhouettes read on top - the highway scene is too busy to let
+    // 55% alpha through. Other shaped-piece styles stay translucent.
+    const fillAlpha = (theme.blockStyle === 'tires') ? 0.82 : 0.55;
+    ctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
   } else {
     ctx.fillStyle = `rgb(${r},${g},${b})`;
   }
@@ -6390,7 +6402,11 @@ function _initDancehallScene(w, h, theme) {
     { skin: '#4A2C0A', shirt: '#EE82EE', pants: '#1C1C1C' },
     { skin: '#D2691E', shirt: '#FF4500', pants: '#00008B' },
   ];
-  const count = Math.max(12, Math.floor(w / 50));
+  // Dancer count capped at 8 (was up to ~26 on wide viewports). The
+  // photo backdrop already has dozens of dancers in it; a small number
+  // of foreground silhouettes is all we need for the on-beat / on-clear
+  // reactions. Was the main source of L8 lag.
+  const count = Math.min(8, Math.max(4, Math.floor(w / 160)));
   _dhScene.dancers = [];
   for (let i = 0; i < count; i++) {
     const palette = DANCER_PALETTES[i % DANCER_PALETTES.length];
@@ -6417,7 +6433,10 @@ function _initDancehallScene(w, h, theme) {
   for (let a = 0; a < _dhScene.lightAnchors.length - 1; a++) {
     const ax1 = _dhScene.lightAnchors[a], ax2 = _dhScene.lightAnchors[a + 1];
     const segLen = ax2 - ax1;
-    const bulbCount = Math.max(4, Math.floor(segLen / 24));
+    // Bulb spacing 24 → 48 cuts ~40 bulbs per frame down to ~20 (each
+    // one renders with shadowBlur which is very expensive). Halved the
+    // budget; the chaser pattern still reads.
+    const bulbCount = Math.max(3, Math.floor(segLen / 48));
     for (let b = 0; b < bulbCount; b++) {
       const t = b / (bulbCount - 1);
       const bx = ax1 + t * segLen;
@@ -6649,10 +6668,12 @@ function drawDancehallScene(theme, now, playRects) {
     bgCtx.quadraticCurveTo((ax1 + ax2) / 2, _dhScene.lightAnchorY + 28, ax2, _dhScene.lightAnchorY);
     bgCtx.stroke();
   }
-  // Chaser bulbs - cycling brightness along each string
+  // Chaser bulbs - cycling brightness along each string. Dim bulbs skip
+  // the shadowBlur entirely (shadowBlur is the single most expensive
+  // canvas op; was the dominant cost in L8 lag). Only bright/chaser-on
+  // bulbs get the glow.
   const chaserT = (now / 400) % (Math.PI * 2);
   for (const li of _dhScene.lights) {
-    // Chaser: a wave of brightness travels along each string segment
     const chaserOn = Math.sin(chaserT - li.chaserPhase) > 0.3;
     const chaserBright = chaserOn ? 1 : 0.22;
     const beatBoost = onBeat ? 1.7 : 1;
@@ -6660,8 +6681,10 @@ function drawDancehallScene(theme, now, playRects) {
     const alpha = 0.3 + chaserBright * 0.65;
     bgCtx.save();
     bgCtx.globalAlpha = alpha;
-    bgCtx.shadowColor = `hsl(${li.hue},100%,${chaserOn ? 75 : 40}%)`;
-    bgCtx.shadowBlur = r2 * (chaserOn ? 5 : 1.2);
+    if (chaserOn) {
+      bgCtx.shadowColor = `hsl(${li.hue},100%,75%)`;
+      bgCtx.shadowBlur = r2 * 5;
+    }
     bgCtx.fillStyle = `hsl(${li.hue},100%,${chaserOn ? 80 : 45}%)`;
     bgCtx.beginPath();
     bgCtx.arc(li.x, li.y, r2, 0, Math.PI * 2);
