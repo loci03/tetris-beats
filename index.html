@@ -262,7 +262,15 @@
     transition: transform 0.2s, box-shadow 0.2s;
   }
   #mode-select {
-    display: flex; gap: 12px; margin-bottom: 24px;
+    display: flex; gap: 10px; margin-bottom: 24px;
+    flex-wrap: wrap; justify-content: center; max-width: 92%;
+  }
+  .mode-btn[data-mode="marathon"].mode-active,
+  .mode-btn[data-mode="sprint"].mode-active,
+  .mode-btn[data-mode="ultra"].mode-active {
+    /* Distinct hue per competitive mode so the picker reads like a menu of
+       different challenges, not "another VS". */
+    border-color: #ffd166; background: rgba(255,209,102,0.12);
   }
   #difficulty-select {
     display: flex; flex-direction: column; align-items: center;
@@ -518,6 +526,22 @@
     white-space: nowrap;
     max-width: 140px;
     text-align: center;
+  }
+  #mode-hud {
+    position: fixed; top: 12px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 50; pointer-events: none;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-weight: 800; letter-spacing: 4px; font-size: 16px;
+    color: #fff; padding: 8px 16px;
+    background: rgba(8,8,16,0.78);
+    border: 1px solid rgba(255,209,102,0.45);
+    border-radius: 18px;
+    box-shadow: 0 0 18px rgba(255,209,102,0.30);
+    text-shadow: 0 0 10px rgba(255,209,102,0.55);
+  }
+  @media (max-width: 720px) {
+    #mode-hud { font-size: 13px; padding: 6px 12px; letter-spacing: 2px; }
   }
   #zone-active-badge {
     position: fixed;
@@ -866,6 +890,12 @@
     padding: 14px 18px;
     backdrop-filter: blur(10px);
   }
+  .leaderboard h3 .lb-mode {
+    margin-left: 8px; font-size: 10px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.50); padding: 2px 6px;
+    border: 1px solid rgba(255,255,255,0.20); border-radius: 8px;
+    vertical-align: middle;
+  }
   .leaderboard h3 {
     font-size: 11px;
     letter-spacing: 3px;
@@ -1113,7 +1143,10 @@
 <div id="start-screen">
   <h1>TETRIS BEATS</h1>
   <div id="mode-select">
-    <button class="mode-btn mode-active" data-mode="solo">SOLO</button>
+    <button class="mode-btn mode-active" data-mode="solo" title="Pick any of the 19 themed levels — each with its own track + visual scene.">STORY</button>
+    <button class="mode-btn" data-mode="marathon" title="Endless run from L1 → L19. Highest score wins. End on top out.">MARATHON</button>
+    <button class="mode-btn" data-mode="sprint" title="Clear 40 lines as fast as possible. Best time wins.">SPRINT</button>
+    <button class="mode-btn" data-mode="ultra" title="Score as much as possible in 2 minutes flat.">ULTRA</button>
     <button class="mode-btn" data-mode="vs">VS ALFRED</button>
     <button class="mode-btn" data-mode="human">VS FRIEND</button>
   </div>
@@ -1155,7 +1188,7 @@
     <span>Line-clear voice <span class="opt-hint">(V)</span></span>
   </label>
   <div id="start-leaderboard" class="leaderboard" aria-live="polite">
-    <h3>High Scores</h3>
+    <h3>High Scores <span class="lb-mode" id="lb-mode-label">STORY</span></h3>
     <div class="lb-body"></div>
   </div>
 </div>
@@ -1276,6 +1309,9 @@
 </div>
 <div id="combo-display"></div>
 <div id="level-announce"></div>
+<!-- Sprint lines-left / Ultra time-left HUD. Single floating chip above
+     the play area; visible only during those modes. Driven by updateUI(). -->
+<div id="mode-hud" style="display:none;"></div>
 <div id="zone-active-badge">ZONE × 2.5</div>
 
 <!-- Touch HUD: minimal - swipe handles left/right/down + hard-drop, tap rotates.
@@ -2172,6 +2208,15 @@ var levelTransitionColor = '#fff';
 // `var` so inspection tooling and cross-frame code can reach them via
 // globalThis, matching the pattern used by per-player fields above.
 var paused, gameStarted, animFrame;
+// ─── MODE STATE — Sprint / Ultra / Marathon ────────────────────────────
+// `_modeStartTime`: performance.now() when the round started — used as the
+// clock reference for all timed modes.
+// `_modeFinishTime`: stamped when Sprint completes its 40-line target so
+// the elapsed time freezes (instead of climbing while the result screen
+// is being rendered).
+// `_ultraTimeLimit`: ms before Ultra ends. 120000 in ultra, 0 elsewhere.
+// `_sprintTarget`: line count to clear in Sprint. 40 in sprint, 0 elsewhere.
+var _modeStartTime = 0, _modeFinishTime = null, _ultraTimeLimit = 0, _sprintTarget = 0;
 var bgParticles;
 var beatPhase = 0;
 // ─── Tetris Effect-style FX (shared, not per-player) ──────────────
@@ -2374,9 +2419,29 @@ function handleTopOut() {
     // Show local result overlay (loser side). Opponent sees YOU WIN via their
     // own `result` handler.
     handleNetworkResult({ youWon: false, reason: 'topout' });
+  } else if (gameMode === 'sprint') {
+    // Topping out in sprint = failed run. Don't post a time. Show game over
+    // with no leaderboard entry path.
+    handleModeFinish('sprint', /* failed */ true);
+  } else if (gameMode === 'ultra') {
+    // Topping out in ultra short-circuits the timer but still records the
+    // score the player accumulated.
+    handleModeFinish('ultra', false);
   } else {
+    // story / marathon: standard score-chase top-out.
     showGameOver();
   }
+}
+
+// Sprint / Ultra finishers — share the score-screen flow but pre-stamp the
+// metric so the leaderboard saves the right value.
+function handleModeFinish(mode, failedSprint) {
+  if (activePlayer) {
+    for (const f of PLAYER_FIELDS) activePlayer[f] = globalThis[f];
+  }
+  // Stop the music + scheduler the same way showGameOver does.
+  audioEngine.stop();
+  showGameOver();
 }
 
 function collides(piece, px, py) {
@@ -4142,56 +4207,101 @@ function lobbyLeave() {
 // here - the Alfred matchup is its own thing and a leaderboard of solo-only
 // runs stays comparable. Shape: [{ name, score, lines, level, date }, ...]
 // sorted high-to-low, capped at MAX_ENTRIES.
-const LB_KEY = 'tetris.leaderboard.v1';
+// Per-mode local leaderboards. Keyed on the mode name so STORY / MARATHON /
+// SPRINT / ULTRA each get their own ranked list. The legacy v1 key (without
+// a mode suffix) is still read on first load + migrated to STORY for
+// backwards compatibility — old players' best runs aren't lost.
+const LB_KEY_BASE = 'tetris.leaderboard.v1';
 const LB_MAX = 10;
-
-function loadLeaderboard() {
+const LB_MODES = ['story', 'marathon', 'sprint', 'ultra'];
+function lbKeyFor(mode) {
+  // 'solo' is the original (story) mode. Map it to 'story' so the menu
+  // labels match the storage keys.
+  if (mode === 'solo') mode = 'story';
+  return LB_KEY_BASE + '.' + mode;
+}
+// Currently-displayed leaderboard mode on the start screen (defaults to
+// the active gameMode-mapped key).
+let _currentLbMode = 'story';
+// One-time migration: any data at the legacy key becomes STORY mode.
+(function migrateLegacyLb() {
   try {
-    const raw = localStorage.getItem(LB_KEY);
+    const legacy = localStorage.getItem(LB_KEY_BASE);
+    if (legacy && !localStorage.getItem(lbKeyFor('story'))) {
+      localStorage.setItem(lbKeyFor('story'), legacy);
+    }
+  } catch {}
+})();
+
+// Lower-is-better when the mode's primary metric is TIME (sprint). All
+// other modes are higher-is-better on `score`. Sprint stores the elapsed
+// milliseconds in `timeMs` and uses that for sort + qualification.
+function isLowerBetterMode(mode) { return mode === 'sprint'; }
+function loadLeaderboard(mode) {
+  mode = mode || _currentLbMode;
+  try {
+    const raw = localStorage.getItem(lbKeyFor(mode));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(e => e && typeof e.score === 'number').slice(0, LB_MAX);
+    return parsed.filter(e => e && (typeof e.score === 'number' || typeof e.timeMs === 'number')).slice(0, LB_MAX);
   } catch { return []; }
 }
-function saveLeaderboard(list) {
-  try { localStorage.setItem(LB_KEY, JSON.stringify(list.slice(0, LB_MAX))); } catch {}
+function saveLeaderboard(list, mode) {
+  mode = mode || _currentLbMode;
+  try { localStorage.setItem(lbKeyFor(mode), JSON.stringify(list.slice(0, LB_MAX))); } catch {}
 }
-// Returns the 1-based rank the given score would earn (1..LB_MAX), or null if
-// it wouldn't make the cut. Qualifies if board has fewer than LB_MAX entries
-// OR score strictly beats the lowest.
-function qualifiesForLeaderboard(score) {
-  if (score <= 0) return null;
-  const list = loadLeaderboard();
+// Returns the 1-based rank the given metric would earn, or null if it
+// wouldn't make the cut. For sprint, lower timeMs is better; for others,
+// higher score is better.
+function qualifiesForLeaderboard(metric, mode) {
+  mode = mode || _currentLbMode;
+  if (metric == null) return null;
+  const lowerBetter = isLowerBetterMode(mode);
+  if (lowerBetter) {
+    if (metric <= 0) return null;
+  } else {
+    if (metric <= 0) return null;
+  }
+  const list = loadLeaderboard(mode);
+  const cmp = lowerBetter
+    ? (a, b) => a < b
+    : (a, b) => a > b;
+  const get = (e) => lowerBetter ? e.timeMs : e.score;
   if (list.length < LB_MAX) {
     let rank = list.length + 1;
     for (let i = 0; i < list.length; i++) {
-      if (score > list[i].score) { rank = i + 1; break; }
+      if (cmp(metric, get(list[i]))) { rank = i + 1; break; }
     }
     return rank;
   }
-  if (score > list[list.length - 1].score) {
+  if (cmp(metric, get(list[list.length - 1]))) {
     let rank = LB_MAX;
     for (let i = 0; i < list.length; i++) {
-      if (score > list[i].score) { rank = i + 1; break; }
+      if (cmp(metric, get(list[i]))) { rank = i + 1; break; }
     }
     return rank;
   }
   return null;
 }
-function addLeaderboardEntry(name, score, linesVal, levelVal) {
-  const list = loadLeaderboard();
+function addLeaderboardEntry(name, scoreVal, linesVal, levelVal, mode, timeMs) {
+  mode = mode || _currentLbMode;
+  const lowerBetter = isLowerBetterMode(mode);
+  const list = loadLeaderboard(mode);
   const entry = {
     name: (name || 'AAA').toUpperCase().slice(0, 3),
-    score: Math.floor(score),
+    score: Math.floor(scoreVal || 0),
     lines: linesVal | 0,
     level: levelVal | 0,
     date: Date.now(),
   };
+  if (lowerBetter && typeof timeMs === 'number') entry.timeMs = timeMs | 0;
   list.push(entry);
-  list.sort((a, b) => b.score - a.score);
+  list.sort((a, b) => lowerBetter
+    ? (a.timeMs - b.timeMs)
+    : (b.score - a.score));
   const trimmed = list.slice(0, LB_MAX);
-  saveLeaderboard(trimmed);
+  saveLeaderboard(trimmed, mode);
   return { list: trimmed, entry };
 }
 function formatLbDate(ts) {
@@ -4199,11 +4309,21 @@ function formatLbDate(ts) {
   const m = d.getMonth() + 1, day = d.getDate(), y = String(d.getFullYear()).slice(2);
   return `${m}/${day}/${y}`;
 }
-function renderLeaderboardInto(container, highlightEntry) {
+function fmtSprintTime(ms) {
+  if (ms == null || !isFinite(ms)) return '--:--.--';
+  const totalCs = Math.round(ms / 10);
+  const m = Math.floor(totalCs / 6000);
+  const s = Math.floor((totalCs % 6000) / 100);
+  const cs = totalCs % 100;
+  return `${m}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+}
+function renderLeaderboardInto(container, highlightEntry, modeOverride) {
   if (!container) return;
   const body = container.querySelector('.lb-body');
   if (!body) return;
-  const list = loadLeaderboard();
+  const mode = modeOverride || _currentLbMode;
+  const lowerBetter = isLowerBetterMode(mode);
+  const list = loadLeaderboard(mode);
   if (list.length === 0) {
     body.innerHTML = '<div class="lb-empty">No scores yet - drop the beat.</div>';
     return;
@@ -4211,13 +4331,20 @@ function renderLeaderboardInto(container, highlightEntry) {
   body.innerHTML = list.map((e, i) => {
     const isNew = highlightEntry &&
       e.name === highlightEntry.name &&
-      e.score === highlightEntry.score &&
-      e.date === highlightEntry.date;
+      e.date === highlightEntry.date &&
+      (lowerBetter ? e.timeMs === highlightEntry.timeMs : e.score === highlightEntry.score);
+    // Sprint shows time as the primary metric; other modes show score.
+    const metric = lowerBetter
+      ? fmtSprintTime(e.timeMs)
+      : e.score.toLocaleString();
+    const meta = lowerBetter
+      ? `${e.lines}ln`
+      : `L${e.level} · ${e.lines}ln`;
     return `<div class="lb-row${isNew ? ' is-new' : ''}">` +
       `<span class="lb-rank">${i + 1}</span>` +
       `<span class="lb-name">${e.name}</span>` +
-      `<span class="lb-score">${e.score.toLocaleString()}</span>` +
-      `<span class="lb-meta">L${e.level} · ${e.lines}ln</span>` +
+      `<span class="lb-score">${metric}</span>` +
+      `<span class="lb-meta">${meta}</span>` +
     `</div>`;
   }).join('');
 }
@@ -4237,9 +4364,17 @@ async function refreshSharedLeaderboard() {
     updateSyncBadge('offline');
     return;
   }
-  saveLeaderboard(remote);
-  renderLeaderboardInto(document.getElementById('start-leaderboard'));
-  renderLeaderboardInto(document.getElementById('gameover-leaderboard'));
+  // Shared cross-device board today is STORY only. Always write it to the
+  // STORY key (NOT _currentLbMode — that would clobber ULTRA / SPRINT /
+  // MARATHON local boards with story scores when the user happens to be
+  // viewing one of those when sync fires).
+  saveLeaderboard(remote, 'story');
+  // Only re-render the visible leaderboard if the user is currently viewing
+  // STORY; otherwise leave their selected mode's board on screen.
+  if (_currentLbMode === 'story') {
+    renderLeaderboardInto(document.getElementById('start-leaderboard'));
+    renderLeaderboardInto(document.getElementById('gameover-leaderboard'));
+  }
   updateSyncBadge('synced');
 }
 
@@ -4248,6 +4383,8 @@ async function refreshSharedLeaderboard() {
 // button hidden until the player has either saved or skipped entry, so a
 // stray Enter-press doesn't restart mid-input.
 let _pendingRank = null;
+let _pendingMode = 'story';
+let _pendingTimeMs = null;
 async function showGameOver() {
   const finalScore = Math.floor(score);
   const banner = document.getElementById('new-hs-banner');
@@ -4255,17 +4392,42 @@ async function showGameOver() {
   const replayBtn = document.getElementById('start-btn-2');
   const finalLine = document.getElementById('final-score');
 
-  finalLine.textContent = `Score: ${finalScore.toLocaleString()} · Lines: ${lines} · Level: ${level}`;
+  // Resolve the leaderboard mode for THIS run + the metric to rank by.
+  _pendingMode = (gameMode === 'marathon') ? 'marathon'
+               : (gameMode === 'sprint') ? 'sprint'
+               : (gameMode === 'ultra')  ? 'ultra'
+               : 'story';
+  _currentLbMode = _pendingMode;
+  let rankMetric = finalScore;
+  let resultLine;
+  if (_pendingMode === 'sprint') {
+    const elapsed = (_modeFinishTime || performance.now()) - _modeStartTime;
+    _pendingTimeMs = (lines >= _sprintTarget) ? Math.round(elapsed) : null;
+    rankMetric = _pendingTimeMs;
+    resultLine = (_pendingTimeMs != null)
+      ? `Sprint · ${fmtSprintTime(_pendingTimeMs)} · ${lines}/${_sprintTarget}ln`
+      : `Sprint · failed at ${lines}/${_sprintTarget}ln`;
+  } else if (_pendingMode === 'ultra') {
+    _pendingTimeMs = null;
+    resultLine = `Ultra · ${finalScore.toLocaleString()} · ${lines}ln · 2:00`;
+  } else {
+    _pendingTimeMs = null;
+    resultLine = `Score: ${finalScore.toLocaleString()} · Lines: ${lines} · Level: ${level}`;
+  }
+  finalLine.textContent = resultLine;
   document.getElementById('game-over-screen').style.display = 'flex';
   audioEngine.stop();
 
   // Cross-device source-of-truth: pull the live server leaderboard FIRST so
   // the rank check matches what every other device sees. Falls back to the
-  // local cache if the server is unreachable (offline play).
-  const remote = await fetchSharedScores();
-  if (remote) saveLeaderboard(remote);
+  // local cache if the server is unreachable (offline play). Only the STORY
+  // mode is shared cross-device today; per-mode shared boards are a follow-up.
+  if (_pendingMode === 'story') {
+    const remote = await fetchSharedScores();
+    if (remote) saveLeaderboard(remote, 'story');
+  }
 
-  const rank = qualifiesForLeaderboard(finalScore);
+  const rank = qualifiesForLeaderboard(rankMetric, _pendingMode);
   _pendingRank = rank;
 
   if (rank) {
@@ -4292,26 +4454,27 @@ async function submitInitials() {
   const input = document.getElementById('initials-input');
   const raw = (input.value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3);
   const name = raw.length > 0 ? raw.padEnd(3, ' ').trimEnd() : 'AAA';
-  const { entry } = addLeaderboardEntry(name, score, lines, level);
+  const { entry } = addLeaderboardEntry(name, score, lines, level, _pendingMode, _pendingTimeMs);
   _pendingRank = null;
   document.getElementById('initials-entry').classList.add('hidden');
   document.getElementById('new-hs-banner').classList.add('hidden');
   document.getElementById('start-btn-2').style.display = '';
   renderLeaderboardInto(document.getElementById('gameover-leaderboard'), entry);
   renderStartLeaderboard();
-  // Post to the shared server leaderboard (best effort). If it comes back
-  // with an authoritative list, overwrite the local cache so every client on
+  // Post to the shared server leaderboard (best effort, story mode only —
+  // per-mode shared boards are a follow-up). If it comes back with an
+  // authoritative list, overwrite the local STORY cache so every client on
   // the network sees the same board.
-  const result = await submitSharedScore(name, score, lines, level);
-  if (result && Array.isArray(result.scores)) {
-    saveLeaderboard(result.scores);
-    // Re-render with the new shared list, keeping our fresh entry highlighted
-    // if it survived the merge.
-    const kept = result.scores.find(e =>
-      e.name === entry.name && e.score === entry.score
-    );
-    renderLeaderboardInto(document.getElementById('gameover-leaderboard'), kept);
-    renderLeaderboardInto(document.getElementById('start-leaderboard'), kept);
+  if (_pendingMode === 'story') {
+    const result = await submitSharedScore(name, score, lines, level);
+    if (result && Array.isArray(result.scores)) {
+      saveLeaderboard(result.scores, 'story');
+      const kept = result.scores.find(e =>
+        e.name === entry.name && e.score === entry.score
+      );
+      renderLeaderboardInto(document.getElementById('gameover-leaderboard'), kept);
+      renderLeaderboardInto(document.getElementById('start-leaderboard'), kept);
+    }
   }
 }
 
@@ -7933,12 +8096,15 @@ function drawBlockTrumpet(context, x, y, color, size, alpha, theme) {
   context.shadowOffsetX = 1;
   context.shadowOffsetY = 1.5;
 
-  // ── 1. BELL (right side) — flares out, the most recognisable trumpet feature
-  // Bell = a triangle-with-rounded-end pointing right, with a circular rim disc.
-  const bellTipX = x + size * 0.92;
+  // ── 1. BELL (LEFT side) — flares out, the most recognisable trumpet feature.
+  // Sir noted the prior orientation read as "backwards"; trumpets in art /
+  // emoji are conventionally drawn with the bell on the left, mouthpiece
+  // on the right (the way a player faces forward and lifts the bell to
+  // their left side). Mirrored all X coords.
+  const bellTipX = x + size * 0.08;
   const bellTopY = cy - size * 0.30;
   const bellBotY = cy + size * 0.30;
-  const bellNeckX = x + size * 0.62;
+  const bellNeckX = x + size * 0.38;
   const bellNeckHalf = size * 0.10;
 
   context.fillStyle = goldMid;
@@ -7971,11 +8137,11 @@ function drawBlockTrumpet(context, x, y, color, size, alpha, theme) {
   context.restore();
   context.save();
 
-  // ── 2. LEAD PIPE — thin horizontal tube from mouthpiece to bell neck
+  // ── 2. LEAD PIPE — thin horizontal tube from bell neck to mouthpiece
   const pipeY  = cy - size * 0.04;
   const pipeH  = size * 0.12;
-  const pipeX0 = x + size * 0.16;
-  const pipeX1 = bellNeckX;
+  const pipeX0 = bellNeckX;     // tube starts at the bell neck (left)
+  const pipeX1 = x + size * 0.84; // tube ends at the mouthpiece (right)
   const pipeGrad = context.createLinearGradient(0, pipeY, 0, pipeY + pipeH);
   pipeGrad.addColorStop(0, goldLite);
   pipeGrad.addColorStop(0.5, goldMid);
@@ -7983,14 +8149,14 @@ function drawBlockTrumpet(context, x, y, color, size, alpha, theme) {
   context.fillStyle = pipeGrad;
   context.fillRect(pipeX0, pipeY, pipeX1 - pipeX0, pipeH);
 
-  // ── 3. MOUTHPIECE — small cup at the left end, slightly larger than the pipe
+  // ── 3. MOUTHPIECE — small cup at the right end, slightly larger than the pipe
   context.fillStyle = goldMid;
   context.beginPath();
-  context.ellipse(pipeX0, cy + size * 0.02, size * 0.07, size * 0.10, 0, 0, Math.PI * 2);
+  context.ellipse(pipeX1, cy + size * 0.02, size * 0.07, size * 0.10, 0, 0, Math.PI * 2);
   context.fill();
   context.fillStyle = goldDark;
   context.beginPath();
-  context.ellipse(pipeX0 - size * 0.02, cy + size * 0.02, size * 0.025, size * 0.06, 0, 0, Math.PI * 2);
+  context.ellipse(pipeX1 + size * 0.02, cy + size * 0.02, size * 0.025, size * 0.06, 0, 0, Math.PI * 2);
   context.fill();
 
   // ── 4. THREE VALVES — short vertical cylinders rising from the lead pipe
@@ -8000,7 +8166,10 @@ function drawBlockTrumpet(context, x, y, color, size, alpha, theme) {
   const valveW = size * 0.10;
   const valveH = size * 0.30;
   const valveSpacing = size * 0.13;
-  const valveStartX = x + size * 0.32;
+  // Valve cluster sits between the bell neck and the mouthpiece, biased
+  // toward the bell so the silhouette reads as a real trumpet (valves are
+  // closer to the bell than the mouthpiece on a real horn).
+  const valveStartX = x + size * 0.45;
   const valveTopY = pipeY - valveH + size * 0.04;
   const valveGrad = context.createLinearGradient(0, valveTopY, 0, valveTopY + valveH);
   valveGrad.addColorStop(0, goldLite);
@@ -9137,6 +9306,25 @@ function updateUI() {
   }
   document.getElementById('zone-bar').style.width = zoneEnergy + '%';
 
+  // ── Mode HUD (Sprint lines-left / Ultra time-left) ─────────────────────
+  // Rendered as a single floating overlay above the play area so it reads
+  // even on mobile where the side panels are tiny.
+  const modeHud = document.getElementById('mode-hud');
+  if (modeHud) {
+    if (gameMode === 'sprint' && _sprintTarget > 0) {
+      const remain = Math.max(0, _sprintTarget - lines);
+      const elapsed = ((_modeFinishTime || performance.now()) - _modeStartTime);
+      modeHud.textContent = `${remain} LINES · ${fmtSprintTime(elapsed)}`;
+      modeHud.style.display = '';
+    } else if (gameMode === 'ultra' && _ultraTimeLimit > 0) {
+      const remainMs = Math.max(0, _ultraTimeLimit - (performance.now() - _modeStartTime));
+      modeHud.textContent = `${fmtSprintTime(remainMs)} · ${Math.floor(score).toLocaleString()}`;
+      modeHud.style.display = '';
+    } else {
+      modeHud.style.display = 'none';
+    }
+  }
+
   // ── Touch-controls Zone button visualisation ───────────────────────────
   // Three states: charging (energy %), ready (energy=100), active (drain).
   // The CSS variable `--zone-fill` is the single source of truth. We also
@@ -9371,6 +9559,28 @@ function render(timestamp) {
   // drawing here - matches original behaviour (the start-screen overlay
   // hides the un-rendered canvas anyway).
   if (!gameStarted) return;
+
+  // ── Mode end-conditions ────────────────────────────────────────────
+  // Ultra: 2-minute timer; whoever has the most score at time-up wins.
+  // Sprint: clear 40 lines as fast as possible — Sir's clock stops the
+  //   moment the 40th line clears (handled in clearLines).
+  // Marathon / Story / VS: handled by the existing top-out path.
+  if (gameMode === 'ultra' && !gameOver) {
+    const elapsed = performance.now() - _modeStartTime;
+    if (elapsed >= _ultraTimeLimit) {
+      _modeFinishTime = performance.now();
+      gameOver = true;
+      handleModeFinish('ultra');
+      return;
+    }
+  } else if (gameMode === 'sprint' && !gameOver) {
+    if (lines >= _sprintTarget && _modeFinishTime == null) {
+      _modeFinishTime = performance.now();
+      gameOver = true;
+      handleModeFinish('sprint');
+      return;
+    }
+  }
   // Tick and draw each player in turn. Solo mode has one player so this
   // loop does a single iteration and behaves identically to before.
   for (const p of players) {
@@ -9669,6 +9879,12 @@ function startGame() {
     ? Math.max(1, Math.min(maxLvl, startLevel | 0))
     : 1;
   const seedLines = (seedLevel - 1) * LINES_PER_LEVEL;
+  // Mode-specific timer / target state. Reset every startGame so a player
+  // restarting Sprint right after a fail gets a clean clock.
+  _modeStartTime = performance.now();
+  _modeFinishTime = null;
+  _ultraTimeLimit = (gameMode === 'ultra') ? 120000 : 0; // 2 minutes
+  _sprintTarget   = (gameMode === 'sprint') ? 40 : 0;
   for (const p of players) {
     setActivePlayer(p);
     initBoard();
@@ -10046,11 +10262,34 @@ window.addEventListener('resize', () => positionP2Monitor());
 (function wireModeSelect() {
   const btns = document.querySelectorAll('.mode-btn');
   const diff = document.getElementById('difficulty-select');
+  const lbLabel = document.getElementById('lb-mode-label');
+  // Map gameMode → leaderboard mode key. solo→story (legacy alias);
+  // marathon/sprint/ultra each have their own; vs/human use story too
+  // (those are head-to-head matches not score chases).
+  const lbModeFor = (m) => {
+    if (m === 'marathon') return 'marathon';
+    if (m === 'sprint')   return 'sprint';
+    if (m === 'ultra')    return 'ultra';
+    return 'story';
+  };
+  const refreshLb = () => {
+    _currentLbMode = lbModeFor(gameMode);
+    if (lbLabel) lbLabel.textContent = _currentLbMode.toUpperCase() + (isLowerBetterMode(_currentLbMode) ? ' · TIME' : '');
+    if (typeof renderStartLeaderboard === 'function') renderStartLeaderboard();
+  };
   btns.forEach(btn => btn.addEventListener('click', () => {
     gameMode = btn.dataset.mode;
     btns.forEach(b => b.classList.toggle('mode-active', b === btn));
     if (diff) diff.style.display = (gameMode === 'vs') ? 'flex' : 'none';
+    // Hide the level picker for Marathon/Sprint/Ultra — those modes have
+    // their own seeded start (always L1) and a fixed challenge profile.
+    const levelSelect = document.getElementById('level-select');
+    const isFixedMode = (gameMode === 'marathon' || gameMode === 'sprint' || gameMode === 'ultra' || gameMode === 'vs' || gameMode === 'human');
+    if (levelSelect) levelSelect.style.display = isFixedMode ? 'none' : 'flex';
+    refreshLb();
   }));
+  // Init on first load so the leaderboard label matches the default mode.
+  refreshLb();
 })();
 
 // Difficulty picker - reflects + writes aiDifficulty.
@@ -10105,8 +10344,12 @@ window.addEventListener('resize', () => positionP2Monitor());
   // both players to L1 so the match stays fair.
   const modeBtns = document.querySelectorAll('.mode-btn');
   const sync = () => {
-    const isVs = (gameMode === 'vs' || gameMode === 'human');
-    wrap.style.display = isVs ? 'none' : 'flex';
+    // Hide the picker for any mode that doesn't honour startLevel: VS
+    // matches force L1 to stay symmetric, and Marathon/Sprint/Ultra each
+    // have their own fixed challenge profile that always begins at L1.
+    const isFixedStart = (gameMode === 'vs' || gameMode === 'human' ||
+                          gameMode === 'marathon' || gameMode === 'sprint' || gameMode === 'ultra');
+    wrap.style.display = isFixedStart ? 'none' : 'flex';
   };
   modeBtns.forEach(mb => mb.addEventListener('click', sync));
   sync();
