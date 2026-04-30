@@ -7,7 +7,7 @@
   Backend URL. Empty → use same-origin (local dev with `node server.js`).
   Set to your Cloudflare Worker URL (e.g. https://tetris-beats.<sub>.workers.dev)
   before pushing to GitHub Pages so the public site talks to the Worker.
-  The deploy GitHub Action substitutes this automatically — see DEPLOY.md.
+  The deploy GitHub Action substitutes this automatically - see DEPLOY.md.
 -->
 <meta name="api-base" content="">
 <title>TETRIS BEATS</title>
@@ -51,7 +51,7 @@
      layout is untouched. */
   #p2-wrap { display: none; }
   body.vs-mode #p2-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  /* Tiny stats line under Alfred's bare canvas — visible enough to read
+  /* Tiny stats line under Alfred's bare canvas - visible enough to read
      score/level at a glance without ballooning the monitor frame. */
   .p2-stats-line {
     text-align: center;
@@ -282,7 +282,7 @@
     background: rgba(0,255,170,0.12);
     box-shadow: 0 0 12px rgba(0,255,170,0.3);
   }
-  /* Level picker — same chip language as the difficulty buttons. The grid
+  /* Level picker - same chip language as the difficulty buttons. The grid
      is wide (one chip per era) so we wrap and shrink the chips to keep
      the picker from blowing past the start-screen width on mobile. */
   #level-select {
@@ -402,7 +402,7 @@
     color: rgba(255,255,255,0.6);
     margin-bottom: 32px;
   }
-  /* Vs-mode result overlay — same layout as game-over, different copy. */
+  /* Vs-mode result overlay - same layout as game-over, different copy. */
   #vs-result-screen {
     position: fixed;
     top: 0; left: 0;
@@ -716,7 +716,7 @@
       order: 3;
       /* flex-basis:100% used to force wrap but also stretched the canvas width
          to 100% of container, which made the browser scale the height to keep
-         the bitmap aspect ratio — pushing the bottom of the board behind the
+         the bitmap aspect ratio - pushing the bottom of the board behind the
          touch controls on iPhones. The side-panels already fill the first row
          via flex:1 1 auto, so flex:0 0 auto lets the canvas wrap naturally at
          its intrinsic CELL*COLS × CELL*ROWS size. */
@@ -727,7 +727,7 @@
       max-width: 100%;
     }
     /* Vs mode on mobile: Alfred's mini board stacks at the top, your full
-       board (p1-wrap) lives below — matches the "your board big, Alfred mini"
+       board (p1-wrap) lives below - matches the "your board big, Alfred mini"
        layout the user picked. Solo mode keeps the existing wrap layout. */
     body.vs-mode #game-container { flex-direction: column; align-items: center; gap: 4px; }
     body.vs-mode #p2-wrap { order: -1; margin-bottom: 4px; }
@@ -1047,7 +1047,7 @@
     <button class="mode-btn" data-mode="vs">VS ALFRED</button>
     <button class="mode-btn" data-mode="human">VS FRIEND</button>
   </div>
-  <!-- Difficulty picker — visible only when "VS ALFRED" mode is selected.
+  <!-- Difficulty picker - visible only when "VS ALFRED" mode is selected.
        Three tiers wired to AI_DIFFICULTIES presets in JS. Persists across
        sessions in localStorage. -->
   <div id="difficulty-select" style="display:none;">
@@ -1058,7 +1058,7 @@
       <button class="diff-btn" data-diff="hard">HARD</button>
     </div>
   </div>
-  <!-- Level picker — chips populated from LEVEL_THEMES at boot so the labels
+  <!-- Level picker - chips populated from LEVEL_THEMES at boot so the labels
        always match the actual eras + tracks. Persists in localStorage. -->
   <div id="level-select">
     <div class="lvl-label">START LEVEL</div>
@@ -1090,9 +1090,9 @@
   </div>
 </div>
 
-<!-- PvP lobby — shown when mode=human, replaces direct game start -->
+<!-- PvP lobby - shown when mode=human, replaces direct game start -->
 <div id="lobby-screen">
-  <div id="lobby-connection-badge">connecting…</div>
+  <div id="lobby-connection-badge">connecting...</div>
   <h2>VS FRIEND</h2>
   <div class="lobby-mode-btns">
     <button class="lm-btn active" data-lm="create">CREATE ROOM</button>
@@ -1117,9 +1117,9 @@
         </div>
       </div>
       <div id="lobby-create-live" style="display:none;">
-        <div class="hint">Room code — share with your opponent</div>
-        <div id="lobby-room-code">————</div>
-        <div class="lobby-peer" id="lobby-peer-status">Waiting for opponent…</div>
+        <div class="hint">Room code - share with your opponent</div>
+        <div id="lobby-room-code">----</div>
+        <div class="lobby-peer" id="lobby-peer-status">Waiting for opponent...</div>
         <div class="lobby-btn-row">
           <button class="lobby-btn secondary" id="lobby-cancel-btn">CANCEL</button>
           <button class="lobby-btn" id="lobby-start-btn" disabled>START MATCH</button>
@@ -1131,7 +1131,7 @@
       <div class="hint">Enter the 4-character code from your opponent</div>
       <input id="lobby-join-input" type="text" maxlength="4"
              autocomplete="off" autocapitalize="characters" spellcheck="false"
-             placeholder="————">
+             placeholder="----">
       <div class="lobby-btn-row">
         <button class="lobby-btn secondary" id="lobby-cancel-btn-2">CANCEL</button>
         <button class="lobby-btn" id="lobby-join-btn">JOIN</button>
@@ -1159,7 +1159,7 @@
   <button id="start-btn-2">REPLAY</button>
 </div>
 
-<!-- Vs-mode result overlay — appears when either player tops out. -->
+<!-- Vs-mode result overlay - appears when either player tops out. -->
 <div id="vs-result-screen">
   <div id="vs-result-title">YOU WIN</div>
   <div id="vs-result-sub"></div>
@@ -1193,7 +1193,7 @@
       </div>
     </div>
   </div>
-  <!-- Player 2 (Alfred) — bare canvas + a tiny stats line underneath so
+  <!-- Player 2 (Alfred) - bare canvas + a tiny stats line underneath so
        you can see his score/level/lines without expanding the panel. -->
   <div class="player-wrap" id="p2-wrap">
     <canvas id="main-canvas-2"></canvas>
@@ -1208,14 +1208,14 @@
 <div id="level-announce"></div>
 <div id="zone-active-badge">ZONE × 2.5</div>
 
-<!-- Touch HUD: minimal — swipe handles left/right/down + hard-drop, tap rotates.
+<!-- Touch HUD: minimal - swipe handles left/right/down + hard-drop, tap rotates.
      The remaining buttons are the ones that don't have a natural gesture: HOLD
      (held while keeping your finger off the board), ZONE (special activation),
      DROP (precise hard-drop without flicking), PAUSE.
 
      A small "swipe to play" hint underneath teaches first-time mobile users
      that movement is gestural now. -->
-<!-- Touch HUD — minimal: ZONE / HOLD / PAUSE. Hard-drop is a swipe-up
+<!-- Touch HUD - minimal: ZONE / HOLD / PAUSE. Hard-drop is a swipe-up
      gesture, soft-drop is swipe-down, left/right is swipe, rotate is tap. -->
 <div id="touch-controls">
   <div class="tc-row">
@@ -1249,7 +1249,7 @@ var CELL = 30;
 // the current piece will land on hard-drop; some players prefer it off for
 // a harder challenge.
 // ============================================================
-// VOICE CALLOUTS — "Single / Double / Triple / Tetris" on line clears
+// VOICE CALLOUTS - "Single / Double / Triple / Tetris" on line clears
 // ============================================================
 // Uses the browser's built-in SpeechSynthesis (Web Speech API). Zero assets,
 // works offline, Safari/iOS supported. We pick an English voice with a
@@ -1287,7 +1287,7 @@ function setVoiceEnabled(v) {
 
 const voiceEngine = (() => {
   // Pre-rendered announcer MP3s under /audio/voice/. Playing through the
-  // game's Web Audio masterGain means they're just another SFX — no OS-level
+  // game's Web Audio masterGain means they're just another SFX - no OS-level
   // ducking (unlike SpeechSynthesis, which shares the Siri/VoiceOver channel
   // and causes macOS/iOS to duck all other audio).
   const CLEAR_FILES = {
@@ -1317,7 +1317,7 @@ const voiceEngine = (() => {
 
   // Load on first use (or via explicit prime). Requires audioEngine.ctx which
   // startGame() initialises. Calling load() before the ctx exists is a no-op
-  // — we retry on next prime/announceClear.
+  // - we retry on next prime/announceClear.
   async function load() {
     if (loadPromise) return loadPromise;
     if (!audioEngine.ctx) return null;
@@ -1341,7 +1341,7 @@ const voiceEngine = (() => {
     if (!ctx || !audioEngine.masterGain) return;
     const buf = buffers[name];
     if (!buf) {
-      // Not loaded yet — kick off load, skip this one. Next call will have it.
+      // Not loaded yet - kick off load, skip this one. Next call will have it.
       if (!loadStarted) load();
       return;
     }
@@ -1372,7 +1372,7 @@ const voiceEngine = (() => {
       if (!voiceEnabled) return;
       const pool = CLEAR_FILES[cleared] || CLEAR_FILES[4];
       play(pick(pool));
-      // (Music ducking intentionally removed — user wants the track at full
+      // (Music ducking intentionally removed - user wants the track at full
       // volume during clears. Voices play over the music.)
       // Stack the combo line ~350ms later so it reads as "Triple! ... On fire!"
       // with a natural announcer beat, not slurred together.
@@ -1387,11 +1387,11 @@ const voiceEngine = (() => {
 })();
 
 // ============================================================
-// PRE-RENDERED CHARACTER VOICES — Alfred + Oracle
+// PRE-RENDERED CHARACTER VOICES - Alfred + Oracle
 // ============================================================
 // Both modules play short pre-recorded MP3 clips through the existing Web
 // Audio graph (audioEngine.masterGain). This bypasses SpeechSynthesis
-// entirely — which means no iOS music ducking, no startup delay, no
+// entirely - which means no iOS music ducking, no startup delay, no
 // browser-voice variability. Clips were generated locally with macOS `say`
 // (Daniel for Alfred, Samantha for Oracle) and live under audio/voice/<name>/.
 //
@@ -1465,7 +1465,7 @@ function makeClipVoice(folder, pools, defaultGain) {
   };
 }
 
-// Oracle: encouraging female coach (Samantha) — fires on player clears in
+// Oracle: encouraging female coach (Samantha) - fires on player clears in
 // vs-Alfred mode (layered on top of the MP3 announcer).
 const playerVoice = makeClipVoice('oracle', {
   single: ['nice', 'keep-going', 'good', 'stay-focused'],
@@ -1476,7 +1476,7 @@ const playerVoice = makeClipVoice('oracle', {
   praise: ['praise-destroyed', 'praise-take-that', 'praise-earned', 'praise-champion'],
 }, 0.85);
 
-// Alfred: deep British trash-talker (Daniel) — fires on Alfred's clears.
+// Alfred: deep British trash-talker (Daniel) - fires on Alfred's clears.
 const alfredVoice = makeClipVoice('alfred', {
   single: ['easy', 'too-easy', 'come-on', 'try-harder', 'slow', 'is-that-all'],
   double: ['nice-try', 'getting-closer', 'still-mine'],
@@ -1524,7 +1524,7 @@ const LEVEL_THEMES = [
     bpm: 103,
     // When `track` is set, audioEngine plays the MP3 instead of the procedural
     // drums/bass/synth. Other levels without `track` keep their procedural
-    // sound — lets us add Suno tracks one level at a time.
+    // sound - lets us add Suno tracks one level at a time.
     track: 'underground.mp3',
     // Optional per-theme move SFX. When set, audioEngine.playMove() plays the
     // loaded sample (cached) instead of the synth click. Polyphony is rate-
@@ -1572,14 +1572,14 @@ const LEVEL_THEMES = [
     track: 'falling-violins.mp3',
     // Gold face, lemon-yellow highlight. tetrisEffect block style paints every
     // block in `colors.accent` with a top gradient that lifts toward the
-    // shadeColor(+50) of accent — for #ffd700 that lands close to bright yellow,
+    // shadeColor(+50) of accent - for #ffd700 that lands close to bright yellow,
     // and the white bevel on top reads as a yellow rim over the gold.
     colors: { bg1: '#1a1200', bg2: '#0a0700', accent: '#ffd700', glow: '#ffeb3b' },
     particleHue: 50,
     particleStyle: 'violins', // violin silhouettes raining from the sky, reactive
     blockStyle: 'tetrisEffect',
     blockGlow: 14,
-    // Procedural fallback drum/bass — used only if falling-violins.mp3 fails to
+    // Procedural fallback drum/bass - used only if falling-violins.mp3 fails to
     // load. Soft pizzicato-ish pattern so the level still feels orchestral.
     kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
@@ -1604,7 +1604,7 @@ const LEVEL_THEMES = [
     particleStyle: 'matrix-rain', // vertical katakana code rain (drawMatrixRain)
     blockStyle: 'matrix',         // dark cell + falling-code glyph (drawBlockMatrix)
     blockGlow: 12,
-    // Procedural fallback drum/bass — used only if back-for-more.mp3 fails
+    // Procedural fallback drum/bass - used only if back-for-more.mp3 fails
     // to load. Mid-tempo trap-leaning beat so the level still has a pulse.
     kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
@@ -1621,7 +1621,7 @@ const LEVEL_THEMES = [
     // Mid-tempo guess; nudge if visual beat-pulse drifts from the track.
     bpm: 100,
     track: 'white-rabbit.mp3',
-    // Purple twin of Back for More — the matrix renderer pulls accent +
+    // Purple twin of Back for More - the matrix renderer pulls accent +
     // glow + bg2 from these colours, so the rain + block faces + sweep
     // band all switch to magenta-violet without forking the renderer.
     colors: { bg1: '#0a0014', bg2: '#04000a', accent: '#c440ff', glow: '#e090ff' },
@@ -1629,7 +1629,7 @@ const LEVEL_THEMES = [
     particleStyle: 'matrix-rain',
     blockStyle: 'matrix',
     blockGlow: 14,
-    // Procedural fallback drum/bass — mirrors L4 since the level shares
+    // Procedural fallback drum/bass - mirrors L4 since the level shares
     // L4's tempo + matrix aesthetic; only the palette differs.
     kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
@@ -1641,19 +1641,20 @@ const LEVEL_THEMES = [
     chords: [[196, 261.63, 329.63], [220, 293.66, 349.23], [174.61, 261.63, 329.63]],
     synthType: 'synthArp',
   },
-  { // Level 6 - Ferrari Window (Suno track + tire blocks + window-glass scene)
+  { // Level 6 - Ferrari Window (Suno track + tire blocks + traffic highway)
     name: 'Ferrari Window',
     bpm: 118,
     track: 'ferrari-window.mp3',
-    // Window-glass blue: looking through a tinted Ferrari window. Cool
-    // teal-blue background lets the dark tire silhouettes read clearly,
-    // Ferrari-red accent kept for tire rim glow + line-clear drive-by.
-    colors: { bg1: '#0a2540', bg2: '#06182d', accent: '#ff2030', glow: '#ff5060' },
-    particleHue: 200,
-    particleStyle: 'ferrari-window', // glass bokeh + on-clear drive-by Ferrari
-    blockStyle: 'tires',             // black rubber donut with chrome rim
+    // Night-highway palette: deep midnight backdrop, asphalt road, with
+    // a Ferrari-red accent that's also the player's car colour. Tires
+    // render with no cell-box (just the silhouette) so the road behind
+    // the play area shows through.
+    colors: { bg1: '#0a0c14', bg2: '#040608', accent: '#ff2030', glow: '#ff5060' },
+    particleHue: 0,
+    particleStyle: 'ferrari-highway', // perspective road + traffic + red car
+    blockStyle: 'tires',
     blockGlow: 8,
-    // Procedural fallback drum/bass — used only if ferrari-window.mp3
+    // Procedural fallback drum/bass - used only if ferrari-window.mp3
     // fails to load. Mid-tempo highway-cruise pattern.
     kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
@@ -1671,7 +1672,7 @@ const LEVEL_THEMES = [
     track: 'mac-and-cheese.mp3',
     // Warm cheese-and-pasta palette. Yellow accent so the ghost piece
     // (which uses theme.accent for tetrisEffect/matrix/tires/macncheese
-    // block styles) renders as a yellow guide outline — Sir asked for
+    // block styles) renders as a yellow guide outline - Sir asked for
     // yellow ghost pieces specifically. Glow brightens to gold.
     colors: { bg1: '#3a1c00', bg2: '#1a0f00', accent: '#ffcc33', glow: '#ffe070' },
     particleHue: 40,
@@ -1689,22 +1690,31 @@ const LEVEL_THEMES = [
     chords: [[261.63, 329.63, 392], [349.23, 440, 523.25], [293.66, 349.23, 440]],
     synthType: 'gospel',
   },
-  { // Level 8+ - Donda
-    name: 'Donda',
-    bpm: 75,
-    colors: { bg1: '#080808', bg2: '#000000', accent: '#ffffff', glow: '#888888' },
-    particleHue: 0,
-    particleStyle: 'dots', // minimal floating dots, black & white
-    blockGlow: 3,
-    kick:  [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
-    hh:    [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
-    hhOpen:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    bass:  [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    bassNote: 32.70, // C1 - deep organ bass
-    scale: [130.81, 146.83, 164.81, 196, 220, 261.63],
-    chords: [[130.81, 164.81, 196], [146.83, 174.61, 220]],
-    synthType: 'organ',
+  { // Level 8 - Life is Good (Suno track + Jamaican dancehall scene + beef patties)
+    name: 'Life is Good',
+    bpm: 95,
+    track: 'life-is-good.mp3',
+    // Photo bg lives in tiles/. The .jpg suffix matches the actual file
+    // format (the original .png was a JPEG; renamed at copy time).
+    bgImage: 'tiles/level8-dancehall-bg.jpg',
+    // Jamaican Dancehall palette: warm Caribbean night sky, golden-green
+    // accent, patty-golden glow. The dancehall crowd + beef patty blocks
+    // pull from these values for their lighting and ghost-piece outline.
+    colors: { bg1: '#0d1a0a', bg2: '#060f04', accent: '#f0c830', glow: '#ffdd55' },
+    particleHue: 48,
+    particleStyle: 'dancehall',
+    blockStyle: 'beefpatty',
+    blockGlow: 10,
+    // Procedural fallback drum/bass — kept simple in case the MP3 fails to load.
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+    hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
+    bassNote: 49.0,
+    scale: [220, 246.94, 277.18, 329.63, 369.99, 440],
+    chords: [[220, 277.18, 329.63], [196, 246.94, 293.66], [261.63, 329.63, 392]],
+    synthType: 'gospel',
   },
   { // Level 9 - Donda 2
     name: 'Donda 2',
@@ -1876,7 +1886,7 @@ const LEVEL_THEMES = [
     chords: [[261.63, 329.63, 392], [349.23, 440, 523.25], [392, 493.88, 587.33], [440, 523.25, 659.25]],
     synthType: 'gospel',
   },
-  { // Level 19 - The Singularity (final boss, ALL eras collapse — frenetic, transcendent)
+  { // Level 19 - The Singularity (final boss, ALL eras collapse - frenetic, transcendent)
     name: 'The Singularity',
     bpm: 150,
     colors: { bg1: '#1a001a', bg2: '#0a000f', accent: '#ff00ff', glow: '#ffffff' },
@@ -1908,7 +1918,7 @@ const LINES_PER_LEVEL = 15;
 // Difficulty curve. Old curve flat-lined at 50ms by level 13, so levels 14-19
 // were identical in feel. New curve: -60ms/level through L13 (matches old
 // behaviour for muscle memory), then a steeper ramp 14→19 down to 35ms (≈3
-// rows/sec gravity at level 19 — fast but not impossible like the 25ms wall).
+// rows/sec gravity at level 19 - fast but not impossible like the 25ms wall).
 // Lock delay also tightens at high levels so you can't infinite-spin a piece
 // at the top once gravity is cooking.
 function computeDropInterval(lvl) {
@@ -1921,10 +1931,10 @@ function computeLockDelay(lvl) {
   if (lvl <= 10) return 500;
   if (lvl <= 15) return 400;
   if (lvl <= 18) return 300;
-  return 220; // level 19 — almost no breathing room
+  return 220; // level 19 - almost no breathing room
 }
 
-// Canvas setup — `var` (not let) so the vs-Alfred context swap can reassign
+// Canvas setup - `var` (not let) so the vs-Alfred context swap can reassign
 // them via globalThis['mainCanvas'] when switching between P1 and P2 turns
 // without having to thread a `p` argument through every draw function.
 var mainCanvas = document.getElementById('main-canvas');
@@ -1940,7 +1950,7 @@ const bgCtx = bgCanvas.getContext('2d');
 
 function computeCellSize() {
   const vw = window.innerWidth;
-  // Prefer visualViewport on mobile — it accounts for Safari's URL bar / bottom bar
+  // Prefer visualViewport on mobile - it accounts for Safari's URL bar / bottom bar
   // and the keyboard if it's open. Falls back to innerHeight on older browsers.
   const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
   const isMobile = vw <= 720 || IS_TOUCH;
@@ -1959,7 +1969,7 @@ function computeCellSize() {
   // board, so vs-mode reserves no extra vertical space.
   // Touch controls dropped 130px → ~80px after we removed the directional
   // button row (now just HOLD/ZONE/DROP/pause + hint). Reclaim those ~50px
-  // for the play field — board reads bigger.
+  // for the play field - board reads bigger.
   const reservedH = 82 + 80 + 30 + 4;
   const maxH = Math.max(240, vh - reservedH);
   const byW = Math.floor(maxW / COLS);
@@ -1969,7 +1979,7 @@ function computeCellSize() {
   return Math.max(12, Math.min(36, Math.min(byW, byH)));
 }
 
-// Throttle resizeCanvases triggers — iOS fires visualViewport `scroll` rapidly
+// Throttle resizeCanvases triggers - iOS fires visualViewport `scroll` rapidly
 // as the URL bar slides, so we coalesce to one rAF tick to avoid layout thrash.
 let _resizePending = false;
 function scheduleResize() {
@@ -1992,7 +2002,7 @@ function resizeCanvases() {
   p1Main.height = ROWS * p1Cell;
   const p2Main = document.getElementById('main-canvas-2');
   const vw = window.innerWidth;
-  // Alfred's mini board — small on mobile so P1's board gets the real
+  // Alfred's mini board - small on mobile so P1's board gets the real
   // estate, closer to P1 size on desktop where there's room to spare.
   // Mobile: scale Alfred's CELL to fit cleanly in the side strip beside
   // the player's board (with a small margin). Falls back to ~20% of P1
@@ -2030,7 +2040,7 @@ function resizeCanvases() {
   bgCanvas.width  = vvw;
   bgCanvas.height = vvh;
   // After all canvases are sized, reposition Alfred's monitor to track the
-  // (now-final) main canvas position. Cheap — a few style writes.
+  // (now-final) main canvas position. Cheap - a few style writes.
   if (typeof positionP2Monitor === 'function') positionP2Monitor();
 }
 resizeCanvases();
@@ -2046,7 +2056,7 @@ if (window.visualViewport) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// PER-PLAYER STATE — declared `var` so vs-Alfred mode can swap the
+// PER-PLAYER STATE - declared `var` so vs-Alfred mode can swap the
 // active player's fields in/out via globalThis[key] without a deep
 // refactor. In solo mode there is one player and these behave as
 // regular globals.
@@ -2073,11 +2083,11 @@ var shockwaves = [];
 // Screen shake: number of frames remaining + magnitude in px. Decays each frame.
 var shakeFrames = 0;
 var shakeMag = 0;
-// Crowd cheer pulse — bumped on line clear, decays each frame. Drives
+// Crowd cheer pulse - bumped on line clear, decays each frame. Drives
 // dancer arm-raise + extra stage-light intensity in the warehouse scene.
 // 0 = idle, 1 = peak cheer.
 var cheerPulse = 0;
-// Move pulse — small bump on every piece action (move/rotate/soft-drop),
+// Move pulse - small bump on every piece action (move/rotate/soft-drop),
 // bigger bump on hard-drop. Lets the crowd + DJ react to the player's
 // touch input itself, not just music + clears. Decays fast.
 var movePulse = 0;
@@ -2087,13 +2097,16 @@ var stageFlash = 0;
 // Confetti pieces. Each has x, y, vx, vy, rot, rotV, color, size, life.
 // Spawned in batches by clearLines based on cleared count.
 var confetti = [];
+// Board drop pulse - bumped on hardDrop, decays each frame. Drives a golden
+// glow ring around the play-area edge so every piece slam is visually felt.
+var boardDropPulse = 0;
 
 // ─── VS-mode plumbing ────────────────────────────────────────────
 var gameMode = 'solo';    // 'solo' | 'vs'
 var players = [];          // populated in startGame()
 var activePlayer = null;   // whichever player's fields currently live in globals
 
-// AI difficulty presets — tuning per profile. EASY plays slowly with frequent
+// AI difficulty presets - tuning per profile. EASY plays slowly with frequent
 // misplays so a beginner can win; HARD is dialed near-optimal with rare
 // mistakes for someone wanting a real fight. Selected via the start-screen
 // dropdown; persisted in localStorage so the choice sticks.
@@ -2149,7 +2162,7 @@ function createPlayer({ id, isAI, name, mainCanvas: mc, holdCanvas: hc, nextCanv
     holdCanvas: hc || null, holdCtx: hc ? hc.getContext('2d') : null,
     nextCanvas: nc || null, nextCtx: nc ? nc.getContext('2d') : null,
     CELL: 30, // filled in by resizeCanvases()
-    // Game state — initialised by startGame.
+    // Game state - initialised by startGame.
     board: null,
     currentPiece: null, currentX: 0, currentY: 0, currentType: null,
     holdPieceType: null, canHold: true,
@@ -2186,7 +2199,7 @@ function setActivePlayer(p) {
 
 // Seeded PRNG for deterministic 7-bag ordering across networked players.
 // Mulberry32: tiny, fast, good enough that both sides see the same pieces.
-// Not cryptographic — that's not the goal. Fed by the server-provided seed
+// Not cryptographic - that's not the goal. Fed by the server-provided seed
 // string (hex bytes) hashed to a uint32 on match start.
 let _netRand = null;
 function setNetworkSeed(seed) {
@@ -2209,7 +2222,7 @@ function _pieceRand() { return _netRand ? _netRand() : Math.random(); }
 
 function nextFromBag() {
   if (bag.length === 0) {
-    // Fisher–Yates shuffle using the active PRNG (seeded or Math.random).
+    // Fisher-Yates shuffle using the active PRNG (seeded or Math.random).
     bag = [...PIECE_KEYS];
     for (let i = bag.length - 1; i > 0; i--) {
       const j = Math.floor(_pieceRand() * (i + 1));
@@ -2294,7 +2307,7 @@ function rotatePiece(dir) {
   }
 }
 
-// `nudgeMovePulse(amt)` is gated to player moves only — Alfred's AI moves
+// `nudgeMovePulse(amt)` is gated to player moves only - Alfred's AI moves
 // shouldn't twitch the crowd (the crowd is reacting to the player at the
 // stage). Each call clamps to a max so the crowd doesn't go nuts on rapid
 // auto-repeat moves.
@@ -2325,6 +2338,9 @@ function hardDrop() {
   score += drop * 2;
   audioEngine.playHardDrop();
   nudgeMovePulse(0.4); // big crowd reaction on slam
+  // Board edge pulse — golden ring flash around the play area on every drop
+  // Only for human players; AI slams shouldn't strobe the screen
+  if (!activePlayer || !activePlayer.isAI) boardDropPulse = 1.0;
   lockPiece();
 }
 
@@ -2396,7 +2412,7 @@ function comboBonus(comboCount) {
 
 // Push `n` garbage rows up from the bottom of the current player's board.
 // Each garbage row is uniformly filled with a gray colour except for a
-// single column hole (the same column for all rows in this rise — PPT-style,
+// single column hole (the same column for all rows in this rise - PPT-style,
 // lets you dig through with one I-piece). If the rise would push any
 // locked block past the top of the field, flag gameOver.
 function riseGarbage(n) {
@@ -2460,18 +2476,18 @@ function clearLines() {
       const cheerBase = [0, 0.35, 0.55, 0.78, 1.0][cleared] || 1.0;
       const cheerComboBoost = Math.min(0.4, Math.max(0, combo) * 0.12);
       cheerPulse = Math.min(1.2, Math.max(cheerPulse, cheerBase + cheerComboBoost));
-      // Ferrari Window: trigger a drive-by sports car on every line clear
-      // so the player sees a red Ferrari shoot across the background as
-      // their reward. Bigger clears scale the car up (handled in
-      // drawFerrariWindow). Only on the human player's clears.
-      if (theme && theme.particleStyle === 'ferrari-window') {
-        triggerFerrariDriveBy(cleared);
+      // Ferrari Window: trigger a lane change / overtake on the player's
+      // red Ferrari for every line clear, so the highway visibly reacts
+      // to a clear. Bigger clears overtake more cars (handled in
+      // drawFerrariHighway). Only on the human player's clears.
+      if (theme && theme.particleStyle === 'ferrari-highway') {
+        triggerFerrariOvertake(cleared);
       }
       // Confetti + stage flash on Underground (and any future Tetris-Effect
-      // styled level — matrix + tires count as visually-rich for these FX
+      // styled level - matrix + tires count as visually-rich for these FX
       // too, so a Tetris on Back for More / Ferrari Window gets the same
       // shockwave/flash treatment). Volume scales with line count + combo.
-      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese')) {
+      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty')) {
         const pieces = [0, 12, 22, 36, 60][cleared] || 60;
         const totalPieces = pieces + Math.max(0, combo) * 8;
         spawnConfetti(totalPieces, theme);
@@ -2487,7 +2503,7 @@ function clearLines() {
     combo++;
     const basePoints = [0, 100, 300, 500, 800];
     // Zone mode multiplies line-clear score 2.5×. Combined with combo this
-    // means a Tetris-while-Zoned with a 3-combo is huge — exactly the burst
+    // means a Tetris-while-Zoned with a 3-combo is huge - exactly the burst
     // of points the user is supposed to want from chaining clears.
     const zoneMul = zoneActive ? 2.5 : 1;
     score += (basePoints[cleared] || 800) * level * (1 + combo * 0.5) * zoneMul;
@@ -2534,14 +2550,14 @@ function activateZone() {
   zoneEnergy = 0;
   document.getElementById('game-container').classList.add('zone-active');
   audioEngine.playZone();
-  // "In the zone" — slow the backing track to ~65% so the music goes
+  // "In the zone" - slow the backing track to ~65% so the music goes
   // underwater and the player can feel time dilate. Restored on exit.
   if (audioEngine && audioEngine.setTrackPlaybackRate) {
     audioEngine.setTrackPlaybackRate(0.65);
   }
 }
 
-// Reverse of activateZone — called from the game-loop tick when the timer
+// Reverse of activateZone - called from the game-loop tick when the timer
 // expires. Restores audio playback rate and clears the body/container class.
 function deactivateZone() {
   zoneActive = false;
@@ -2601,7 +2617,7 @@ const audioEngine = {
   // theme has a `track` field, the procedural drums/bass/synth bypass and
   // the loaded MP3 plays instead. Visual beat-pulse stays synced via the
   // procedural scheduler (it still runs and updates beatPhase).
-  trackGain: null,        // post-track, pre-master — duck under voice
+  trackGain: null,        // post-track, pre-master - duck under voice
   _trackSource: null,     // current AudioBufferSourceNode (looping)
   _trackName: null,       // currently-playing filename (for swap detection)
   _trackBuffers: {},      // decoded-buffer cache keyed on filename
@@ -2638,13 +2654,13 @@ const audioEngine = {
     this.bassDuckGain.connect(this.compressor);
     this.compressor.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
-    // Backing-track gain — connects directly to masterGain (bypasses the
+    // Backing-track gain - connects directly to masterGain (bypasses the
     // procedural compressor + delay so the mastered track keeps its own
     // dynamics). Also independently duckable when the announcer speaks.
     this.trackGain = this.ctx.createGain();
     this.trackGain.gain.value = this.TRACK_LEVEL;
     this.trackGain.connect(this.masterGain);
-    // Analyser tap — non-destructive split off trackGain to read real-time
+    // Analyser tap - non-destructive split off trackGain to read real-time
     // amplitude. Used by the warehouse scene to drive crowd + lights so the
     // visuals actually move with the music rather than just the BPM clock.
     this.analyser = this.ctx.createAnalyser();
@@ -2659,7 +2675,7 @@ const audioEngine = {
   getAudioEnergy() {
     if (!this.analyser) return 0;
     this.analyser.getByteFrequencyData(this._analyserBuf);
-    // Average the lower half of the spectrum — kicks/bass dominate visuals.
+    // Average the lower half of the spectrum - kicks/bass dominate visuals.
     let sum = 0;
     const half = Math.floor(this._analyserBuf.length / 2);
     for (let i = 0; i < half; i++) sum += this._analyserBuf[i];
@@ -2668,7 +2684,7 @@ const audioEngine = {
 
   // Load and decode the named MP3 from /audio/levels/. Cached, so subsequent
   // calls return instantly. Resolves to null if fetch/decode fails (e.g.
-  // file missing) — caller falls back to procedural audio.
+  // file missing) - caller falls back to procedural audio.
   async _loadTrack(name) {
     if (this._trackBuffers[name]) return this._trackBuffers[name];
     if (!this.ctx) return null;
@@ -2691,7 +2707,7 @@ const audioEngine = {
     if (!this.ctx) return;
     if (this._trackName === name && this._trackSource) return; // already on it
     const buf = await this._loadTrack(name);
-    if (!buf) return; // load failed — silently fall back
+    if (!buf) return; // load failed - silently fall back
     this._stopTrack(0.4); // crossfade out anything currently playing
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
@@ -2737,7 +2753,7 @@ const audioEngine = {
   },
 
   // Fire a one-shot SFX at given gain. Caller must have already loaded the
-  // buffer via _loadSfx — falls back to no-op if missing so nothing surprising
+  // buffer via _loadSfx - falls back to no-op if missing so nothing surprising
   // happens during the load.
   _fireSfx(name, gain = 0.55) {
     const buf = this._sfxBuffers[name];
@@ -2924,7 +2940,7 @@ const audioEngine = {
     }
     if (theme.hh[step]) this._hihat(t, theme.hhOpen[step] ? 0.18 : 0.05);
 
-    // Shaker on every offbeat for groove (skip Donda - it's minimal)
+    // Shaker on every offbeat for groove (skip Life is Good - it's minimal)
     if (theme.synthType !== 'organ' && step % 2 === 1) {
       this._shaker(t, theme.synthType === 'autotune' ? 0.035 : 0.05);
     }
@@ -3100,7 +3116,7 @@ const audioEngine = {
       o.frequency.exponentialRampToValueAtTime(baseFreq, time + 0.08);
     }
     o2.frequency.setValueAtTime(baseFreq * 2, time);
-    // 808s & Heartbreak and Donda get long sustain bass
+    // 808s & Heartbreak and Life is Good get long sustain bass
     const sustain = (theme.synthType === 'autotune' || theme.synthType === 'organ') ? 0.8 : 0.5;
     g.gain.setValueAtTime(0.5, time);
     g.gain.setValueAtTime(0.5, time + sustain * 0.4);
@@ -3424,7 +3440,7 @@ const audioEngine = {
     if (this._isAiPlayer()) return;
     const theme = getTheme(level);
     // Per-theme move SFX (Underground uses the snare). Throttled so DAS-stutter
-    // — pieces sliding at the auto-shift rate — doesn't pile snare triggers
+    // - pieces sliding at the auto-shift rate - doesn't pile snare triggers
     // on top of each other into a buzz. 70ms minimum gap = max ~14/sec.
     if (theme && theme.moveSfx) {
       const now = performance.now();
@@ -3587,10 +3603,11 @@ function initBgParticles() {
   // Violins are large physical objects (not motes), so we render fewer of
   // them at a much bigger base size. Matrix-rain + ferrari-highway each
   // manage their own scene state (no per-particle loop), so 0 particles
-  // for those. Donda stays minimal at 30 dots.
+  // for those. Life is Good stays minimal at 30 dots.
   const count = theme.particleStyle === 'matrix-rain' ? 0
-              : theme.particleStyle === 'ferrari-window' ? 0
+              : theme.particleStyle === 'ferrari-highway' ? 0
               : theme.particleStyle === 'cheese-whips' ? 0
+              : theme.particleStyle === 'dancehall' ? 0
               : theme.particleStyle === 'dots' ? 30
               : theme.particleStyle === 'violins' ? 18
               : 80;
@@ -3603,12 +3620,12 @@ function initBgParticles() {
       y: isViolins
          ? Math.random() * bgCanvas.height * 2 - bgCanvas.height * 0.5
          : Math.random() * bgCanvas.height,
-      // Bumped 0.5–3.5 → 14–28 for violins so the silhouette renders large
+      // Bumped 0.5-3.5 → 14-28 for violins so the silhouette renders large
       // enough to read as a violin (not a smudge).
       size: isViolins ? 14 + Math.random() * 14 : Math.random() * 3 + 0.5,
-      // Violins reduced once more — Sir kept asking for slower. Now
-      // 0.02–0.045 raw × 0.7 mult ≈ 1.4–3.1 px/s baseline; a violin takes
-      // 4–10 minutes to cross the screen. Reads as effectively suspended
+      // Violins reduced once more - Sir kept asking for slower. Now
+      // 0.02-0.045 raw × 0.7 mult ≈ 1.4-3.1 px/s baseline; a violin takes
+      // 4-10 minutes to cross the screen. Reads as effectively suspended
       // mid-air, drifting down only on cheer/flash boosts.
       speed: isViolins ? 0.02 + Math.random() * 0.025 : Math.random() * 0.5 + 0.1,
       alpha: isViolins ? 0.6 + Math.random() * 0.3 : Math.random() * 0.4 + 0.1,
@@ -3625,7 +3642,7 @@ function showCombo(cleared) {
   let text = names[cleared] || 'TETRIS!';
   if (combo > 0) text += ` x${combo + 1}`;
 
-  // Voice callout — split by who's clearing:
+  // Voice callout - split by who's clearing:
   //  - Local human → MP3 announcer ("Single!" / "TETRIS!") + center banner
   //  - AI (Alfred) → Web Speech API trash talk + separate red Alfred banner
   //    near his monitor (so the player's HUD isn't hijacked by AI clears)
@@ -3640,7 +3657,7 @@ function showCombo(cleared) {
   if (!activePlayer || !activePlayer.isRemote) {
     // Player clear: MP3 announcer ("Single!" / "TETRIS!") always.
     voiceEngine.announceClear(cleared, combo + 1);
-    // In vs-Alfred, Oracle layers encouragement on top — also pre-rendered
+    // In vs-Alfred, Oracle layers encouragement on top - also pre-rendered
     // clips, so no music dim. Throttled inside the module.
     if (gameMode === 'vs') {
       playerVoice.announceClear(cleared, combo + 1);
@@ -3665,7 +3682,7 @@ function showAlfredClearBanner(text) {
     document.body.appendChild(el);
   }
   el.textContent = text;
-  // Anchor below Alfred's monitor — read the current p2-wrap rect so the
+  // Anchor below Alfred's monitor - read the current p2-wrap rect so the
   // banner tracks the monitor's actual position (it floats per layout).
   const p2 = document.getElementById('p2-wrap');
   if (p2) {
@@ -3687,11 +3704,11 @@ function showAlfredClearBanner(text) {
 }
 
 // ============================================================
-// NETWORK CLIENT — shared leaderboard + PvP WebSocket
+// NETWORK CLIENT - shared leaderboard + PvP WebSocket
 // ============================================================
 // The page may be served from a static host (no backend) or from server.js
 // (has /api/scores + /ws). Feature-detect lazily so a file:// or
-// `python3 -m http.server` deploy still works — just without multiplayer or
+// `python3 -m http.server` deploy still works - just without multiplayer or
 // shared scores.
 const NET = {
   ws: null,
@@ -3710,7 +3727,7 @@ const NET = {
 // fetch('/api/scores') is relative. In production (GitHub Pages serving the
 // static page from <user>.github.io), point it at the Cloudflare Worker URL
 // via a <meta name="api-base" content="https://tetris-beats.<sub>.workers.dev">
-// tag in the HTML head — the Worker handles CORS and exposes the same routes.
+// tag in the HTML head - the Worker handles CORS and exposes the same routes.
 const API_BASE = (() => {
   const meta = document.querySelector('meta[name="api-base"]');
   const v = meta && meta.getAttribute('content');
@@ -3719,7 +3736,7 @@ const API_BASE = (() => {
 const apiUrl = (path) => `${API_BASE}${path}`;
 function wsUrl() {
   if (API_BASE) {
-    // Worker URL is https://… → wss://…/ws
+    // Worker URL is https://... → wss://.../ws
     const u = new URL(API_BASE);
     u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
     u.pathname = (u.pathname.replace(/\/$/, '')) + '/ws';
@@ -3749,9 +3766,9 @@ async function fetchSharedScores() {
   } catch { return null; }
 }
 
-// Push a score to the server. Server authoritative — response includes the
+// Push a score to the server. Server authoritative - response includes the
 // merged top-10 so we can refresh the local cache from it. If the server is
-// unreachable, the score is queued and retried on next refresh — without this,
+// unreachable, the score is queued and retried on next refresh - without this,
 // a flaky network would silently drop a hard-earned high score.
 const PENDING_KEY = 'tetris.pendingScores.v1';
 function loadPendingScores() {
@@ -3763,7 +3780,7 @@ function savePendingScores(list) {
 async function submitSharedScore(name, score, linesVal, levelVal) {
   const payload = { name, score: Math.floor(score), lines: linesVal|0, level: levelVal|0 };
   if (!(await probeServer())) {
-    // Server down — queue for next reachability cycle.
+    // Server down - queue for next reachability cycle.
     const q = loadPendingScores(); q.push(payload); savePendingScores(q);
     updateSyncBadge('offline');
     return null;
@@ -3833,10 +3850,10 @@ let _netConnectInflight = null;
 function netConnect(opts = {}) {
   if (NET.ws && NET.ws.readyState === 1) return Promise.resolve(NET.ws);
   if (_netConnectInflight) return _netConnectInflight;
-  // The Cloudflare Worker binds the room at WS-upgrade time via ?code=…, so
+  // The Cloudflare Worker binds the room at WS-upgrade time via ?code=..., so
   // we pass the desired code here (or "CREATE" to mint one). The local
   // Express server ignores the query string and waits for the {type:'create'}
-  // /{type:'join'} message instead — both backends end up calling the same
+  // /{type:'join'} message instead - both backends end up calling the same
   // protocol from this point on.
   let url = wsUrl();
   if (opts.code) url += (url.includes('?') ? '&' : '?') + 'code=' + encodeURIComponent(opts.code);
@@ -3907,7 +3924,7 @@ function handleNetMessage(msg) {
       NET.isHost = !!msg.host;
       const codeEl = document.getElementById('lobby-room-code');
       if (codeEl) codeEl.textContent = msg.code;
-      // Host view: swap Create panel from idle → live ("Waiting for opponent…").
+      // Host view: swap Create panel from idle → live ("Waiting for opponent...").
       // Guest view: we came in via JOIN, so `peer` will fire right after with
       // the host info and we don't need this toggle.
       if (msg.host) {
@@ -3923,7 +3940,7 @@ function handleNetMessage(msg) {
       if (msg.joined) {
         NET.opponentName = msg.name || 'OPPONENT';
         // Both players land on the "live" view once the peer joins. The
-        // guest is on the Join panel before this fires — flip them to
+        // guest is on the Join panel before this fires - flip them to
         // Create so the match status is visible and the Start button works.
         setLobbyPanel('create');
         const idle = document.getElementById('lobby-create-idle');
@@ -3934,13 +3951,13 @@ function handleNetMessage(msg) {
         if (status) status.innerHTML = `Opponent joined: <strong>${NET.opponentName}</strong>`;
         const startBtn = document.getElementById('lobby-start-btn');
         if (startBtn) startBtn.disabled = false;
-        // Hide the room-code line for the guest — they already joined it, it's
+        // Hide the room-code line for the guest - they already joined it, it's
         // just noise. Host keeps it so they can still read it aloud.
         const codeEl = document.getElementById('lobby-room-code');
         if (codeEl && !NET.isHost) codeEl.style.display = 'none';
       } else {
         const status = document.getElementById('lobby-peer-status');
-        if (status) status.textContent = 'Opponent left — waiting…';
+        if (status) status.textContent = 'Opponent left - waiting...';
         const startBtn = document.getElementById('lobby-start-btn');
         if (startBtn) startBtn.disabled = true;
         NET.opponentName = null;
@@ -3999,7 +4016,7 @@ async function lobbyJoinRoom(name, code) {
 }
 function lobbyStartMatch() {
   netSend({ type: 'ready' });
-  setLobbyStatus('Starting…');
+  setLobbyStatus('Starting...');
 }
 function lobbyLeave() {
   netSend({ type: 'leave' });
@@ -4013,7 +4030,7 @@ function lobbyLeave() {
 // LEADERBOARD (persistent top-10, keyed on solo runs only)
 // ============================================================
 // Scores live in localStorage so they survive reloads. VS mode doesn't write
-// here — the Alfred matchup is its own thing and a leaderboard of solo-only
+// here - the Alfred matchup is its own thing and a leaderboard of solo-only
 // runs stays comparable. Shape: [{ name, score, lines, level, date }, ...]
 // sorted high-to-low, capped at MAX_ENTRIES.
 const LB_KEY = 'tetris.leaderboard.v1';
@@ -4079,7 +4096,7 @@ function renderLeaderboardInto(container, highlightEntry) {
   if (!body) return;
   const list = loadLeaderboard();
   if (list.length === 0) {
-    body.innerHTML = '<div class="lb-empty">No scores yet — drop the beat.</div>';
+    body.innerHTML = '<div class="lb-empty">No scores yet - drop the beat.</div>';
     return;
   }
   body.innerHTML = list.map((e, i) => {
@@ -4211,7 +4228,7 @@ function showVsResult() {
   // won, Oracle congratulates. Subtitle line goes on its own row above the
   // existing score breakdown so it reads as the announcer's quote.
   const VICTORY_TAUNTS = [
-    'You suck — go back to the gym.',
+    'You suck - go back to the gym.',
     'Was that supposed to be hard?',
     'Don\'t quit your day job.',
     'I barely tried.',
@@ -4237,7 +4254,7 @@ function showVsResult() {
   document.getElementById('vs-result-screen').style.display = 'flex';
   audioEngine.stop();
   // Play a pre-rendered flavor clip 400ms after the screen appears so the
-  // audio matches the visual punch. Routed through Web Audio — no iOS
+  // audio matches the visual punch. Routed through Web Audio - no iOS
   // music ducking, instant start, consistent voice.
   setTimeout(() => {
     if (youWon) playerVoice.speakOneOf('praise', 0.95);
@@ -4263,16 +4280,16 @@ function shadeColor(color, percent) {
 // a washed-out twin of the real piece.
 //
 // On Tetris-Effect levels (Underground), every block face is the theme's
-// accent color regardless of piece type — so the ghost should match. Other
+// accent color regardless of piece type - so the ghost should match. Other
 // levels keep the piece-colored ghost for clarity.
 function drawGhostBlock(context, x, y, color, size) {
   const theme = getTheme(level);
   // tetrisEffect, matrix, tires, and macncheese all override face colour,
-  // so the ghost piece should outline in the theme accent — otherwise the
+  // so the ghost piece should outline in the theme accent - otherwise the
   // dashed ghost reads as a different piece type than what's about to
   // lock. For Mac & Cheese the accent is yellow, which means the ghost
   // automatically renders as the yellow guide outline Sir asked for.
-  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese');
+  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty');
   const outlineColor = useThemeColor ? theme.colors.accent : color;
   context.save();
   const [r, g, b] = hexToRgb(outlineColor);
@@ -4311,6 +4328,10 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
     drawBlockMacNCheese(context, x, y, color, size, alpha, theme);
     return;
   }
+  if (theme && theme.blockStyle === 'beefpatty') {
+    drawBlockBeefPatty(context, x, y, color, size, alpha, theme);
+    return;
+  }
   context.globalAlpha = alpha;
   const grad = context.createLinearGradient(x, y, x + size, y + size);
   grad.addColorStop(0, color);
@@ -4323,14 +4344,14 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   context.fillStyle = 'rgba(0,0,0,0.2)';
   context.fillRect(x + 1, y + size - 3, size - 2, 2);
   context.fillRect(x + size - 3, y + 1, 2, size - 2);
-  // Glow halo dropped — see drawBlockTE comment. Was cost #1 in render loop.
+  // Glow halo dropped - see drawBlockTE comment. Was cost #1 in render loop.
   context.globalAlpha = 1;
 }
 
 // Tetris Effect-style block: glossy 3D bevel (bright top-left highlight,
 // dark bottom-right shadow) over a deep gradient face, with an embossed
 // per-piece glyph in the centre. The face is painted in the theme's accent
-// colour rather than the piece's native colour — every piece looks the same
+// colour rather than the piece's native colour - every piece looks the same
 // uniform cyan, and the embossed glyph is what tells them apart (matches the
 // photo). Shimmer is drawn as a single overlay pass in drawBoard.
 function drawBlockTE(context, x, y, color, size, alpha = 1) {
@@ -4342,11 +4363,11 @@ function drawBlockTE(context, x, y, color, size, alpha = 1) {
   // same hue. Glyph (assigned above) still distinguishes piece types.
   const faceColor = (theme && theme.colors && theme.colors.accent) || color;
   context.globalAlpha = alpha;
-  // Outer ring — dark navy frame so neighbouring blocks have a clean seam,
+  // Outer ring - dark navy frame so neighbouring blocks have a clean seam,
   // matching the photo's slight separation between cells.
   context.fillStyle = 'rgba(0,8,20,0.85)';
   context.fillRect(x, y, size, size);
-  // Inner face — vertical gradient from highlight color to shadow color.
+  // Inner face - vertical gradient from highlight color to shadow color.
   const inset = Math.max(1, Math.floor(size * 0.08));
   const fx = x + inset, fy = y + inset, fs = size - inset * 2;
   const face = context.createLinearGradient(fx, fy, fx, fy + fs);
@@ -4355,7 +4376,7 @@ function drawBlockTE(context, x, y, color, size, alpha = 1) {
   face.addColorStop(1, shadeColor(faceColor, -55));
   context.fillStyle = face;
   context.fillRect(fx, fy, fs, fs);
-  // Per-piece tint glaze — paint the piece's NATIVE colour (cyan I, yellow
+  // Per-piece tint glaze - paint the piece's NATIVE colour (cyan I, yellow
   // O, purple T, etc.) at low alpha on top of the gold face, so each piece
   // type carries a slight hue signature. Together with the larger glyph
   // below this gives the same instant "that's a T-piece" recognition that
@@ -4375,10 +4396,10 @@ function drawBlockTE(context, x, y, color, size, alpha = 1) {
   context.fillStyle = 'rgba(0,0,0,0.55)';
   context.fillRect(fx, fy + fs - bevel, fs, bevel);          // bottom
   context.fillRect(fx + fs - bevel, fy, bevel, fs);          // right
-  // Embossed glyph based on piece type — drawn dark with a 1px highlight
+  // Embossed glyph based on piece type - drawn dark with a 1px highlight
   // beneath for the engraved-into-the-face look from the photo.
   if (type && size >= 14) drawBlockGlyph(context, fx, fy, fs, type);
-  // Glow halo intentionally dropped — `shadowBlur` per block was the single
+  // Glow halo intentionally dropped - `shadowBlur` per block was the single
   // biggest cost in the frame loop (200+ filled cells × shadow render). The
   // bevel + shimmer pass already give the blocks plenty of dimensionality.
   context.globalAlpha = 1;
@@ -4387,11 +4408,11 @@ function drawBlockTE(context, x, y, color, size, alpha = 1) {
 // Matrix-style block (Back for More): black cell with bright phosphor-green
 // trim, a katakana/digit glyph painted in the centre that cycles slowly so
 // the play area looks like a wall of falling code. Each board cell picks
-// its glyph deterministically from its (x,y) so they don't strobe — but
+// its glyph deterministically from its (x,y) so they don't strobe - but
 // they DO advance every ~600ms so the wall stays alive.
 const MATRIX_GLYPHS = [
-  'ﾊ','ﾐ','ﾋ','ｰ','ｳ','ｼ','ﾅ','ﾓ','ﾆ','ｻ','ﾜ','ﾂ','ｵ','ﾘ','ｱ','ﾎ',
-  'ﾃ','ﾏ','ｹ','ﾒ','ｴ','ｶ','ｷ','ﾑ','ﾕ','ﾗ','ｾ','ﾈ','ｽ','ﾀ','ﾇ','ﾍ',
+  'ハ','ミ','ヒ','ー','ウ','シ','ナ','モ','ニ','サ','ワ','ツ','オ','リ','ア','ホ',
+  'テ','マ','ケ','メ','エ','カ','キ','ム','ユ','ラ','セ','ネ','ス','タ','ヌ','ヘ',
   '0','1','2','3','4','5','6','7','8','9','Z',':','.','=','*','+'
 ];
 function _matrixGlyphAt(cellX, cellY) {
@@ -4407,13 +4428,13 @@ function drawBlockMatrix(context, x, y, color, size, alpha, theme) {
   const accent = theme.colors.accent;     // phosphor green
   const glow = theme.colors.glow;
   context.globalAlpha = alpha;
-  // Outer dark cell — near-black with a hint of green so the grid still
+  // Outer dark cell - near-black with a hint of green so the grid still
   // separates cleanly. Inset by 1px so adjacent blocks read as a digital
   // pixel wall rather than a smear.
   context.fillStyle = '#020806';
   context.fillRect(x, y, size, size);
   // Inner panel with a subtle vertical scan-line gradient (top brighter,
-  // bottom darker — sells the CRT phosphor look).
+  // bottom darker - sells the CRT phosphor look).
   const inset = Math.max(1, Math.floor(size * 0.06));
   const fx = x + inset, fy = y + inset, fs = size - inset * 2;
   const panel = context.createLinearGradient(fx, fy, fx, fy + fs);
@@ -4421,7 +4442,7 @@ function drawBlockMatrix(context, x, y, color, size, alpha, theme) {
   panel.addColorStop(1, 'rgba(0,12,5,0.95)');
   context.fillStyle = panel;
   context.fillRect(fx, fy, fs, fs);
-  // Bright phosphor border — the recognisable Matrix-cell trim. Thicker
+  // Bright phosphor border - the recognisable Matrix-cell trim. Thicker
   // on the bottom-right edge to fake a soft CRT bloom.
   const [ar, ag, ab] = hexToRgb(accent);
   context.strokeStyle = `rgba(${ar},${ag},${ab},0.95)`;
@@ -4460,38 +4481,47 @@ function drawBlockMatrix(context, x, y, color, size, alpha, theme) {
 // rubber on a dark road. Per-piece native colour gets a small tick in
 // the corner so I/O/T/etc. are still recognisable at a glance.
 function drawBlockTires(context, x, y, color, size, alpha, theme) {
-  const type = COLOR_TO_TYPE[color];
+  // No cell-box backing per Sir - each tire sits on the translucent
+  // play-area board with the highway showing through. No per-piece
+  // native-colour tick either; the silhouette is the silhouette.
   const accent = theme.colors.accent;       // Ferrari red
   const [ar, ag, ab] = hexToRgb(accent);
   context.globalAlpha = alpha;
-  // Cell base — slightly lighter blue-tinted backing so adjacent tires
-  // read as separate units against the window-glass-blue background.
-  // (Was near-black; the tires would disappear into the dark bg.)
-  context.fillStyle = '#13283f';
-  context.fillRect(x, y, size, size);
   const cx = x + size / 2, cy = y + size / 2;
+  // Subtle ground shadow under the tire so it pops off the road.
+  context.fillStyle = 'rgba(0,0,0,0.45)';
+  context.beginPath();
+  context.ellipse(cx + 1, cy + 2, size * 0.42, size * 0.12, 0, 0, Math.PI * 2);
+  context.fill();
   const outerR = size * 0.46;     // rubber outer edge
   const treadR = size * 0.40;     // tread groove
   const sideR  = size * 0.32;     // inner sidewall
   const hubR   = size * 0.18;     // chrome hub
-  // ─── Rubber tire body — radial gradient from inner Ferrari-red glow
-  //   out to a charcoal edge. Softer black (#22) instead of pure #04 so
-  //   tire silhouette reads clearly against the lighter blue bg.
+  // ─── Rubber tire body - radial gradient from inner Ferrari-red glow
+  //   out to a softer charcoal edge so the tire silhouette reads against
+  //   the dark asphalt highway behind it.
   const rubber = context.createRadialGradient(cx, cy, hubR, cx, cy, outerR);
-  rubber.addColorStop(0, `rgba(${Math.min(255,ar+30)},${ag},${ab},0.6)`);
-  rubber.addColorStop(0.55, '#2a1a20');
-  rubber.addColorStop(1, '#161214');
+  rubber.addColorStop(0, `rgba(${Math.min(255,ar+30)},${ag},${ab},0.7)`);
+  rubber.addColorStop(0.55, '#3a2228');
+  rubber.addColorStop(1, '#1a1418');
   context.fillStyle = rubber;
   context.beginPath();
   context.arc(cx, cy, outerR, 0, Math.PI * 2);
   context.fill();
-  // Tread groove — a thin darker ring just inside the outer edge.
+  // Outer rubber rim outline so the tire's silhouette has a clean edge
+  // separating it from neighbouring tires + the road bg.
+  context.strokeStyle = 'rgba(0,0,0,0.85)';
+  context.lineWidth = Math.max(1, size * 0.05);
+  context.beginPath();
+  context.arc(cx, cy, outerR, 0, Math.PI * 2);
+  context.stroke();
+  // Tread groove - a thin darker ring just inside the outer edge.
   context.strokeStyle = 'rgba(0,0,0,0.7)';
   context.lineWidth = Math.max(0.6, size * 0.04);
   context.beginPath();
   context.arc(cx, cy, treadR, 0, Math.PI * 2);
   context.stroke();
-  // Tiny tread blocks around the outer edge — 16 short radial strokes
+  // Tiny tread blocks around the outer edge - 16 short radial strokes
   // give the silhouette a little tire-pattern texture without busy detail.
   if (size >= 16) {
     context.strokeStyle = 'rgba(0,0,0,0.55)';
@@ -4535,19 +4565,11 @@ function drawBlockTires(context, x, y, color, size, alpha, theme) {
       context.lineTo(cx + Math.cos(ang) * sideR, cy + Math.sin(ang) * sideR);
       context.stroke();
     }
-    // Centre lug nut — small dark dot anchoring the spokes.
+    // Centre lug nut - small dark dot anchoring the spokes.
     context.fillStyle = '#202530';
     context.beginPath();
     context.arc(cx, cy, size * 0.05, 0, Math.PI * 2);
     context.fill();
-  }
-  // ─── Per-piece tick in the top-right corner so I/O/T/S/Z/J/L are
-  //   still recognisable at a glance even though every tire looks alike.
-  if (type && color) {
-    const [pr, pg, pb] = hexToRgb(color);
-    context.fillStyle = `rgba(${pr},${pg},${pb},0.9)`;
-    const tick = Math.max(2, size * 0.12);
-    context.fillRect(x + size - tick - 2, y + 2, tick, tick);
   }
   context.globalAlpha = 1;
 }
@@ -4560,34 +4582,19 @@ function drawBlockTires(context, x, y, color, size, alpha, theme) {
 // native-colour tick stays in the corner so I/O/T/etc. are still
 // recognisable at a glance.
 function drawBlockMacNCheese(context, x, y, color, size, alpha, theme) {
-  const type = COLOR_TO_TYPE[color];
+  // Per Sir: just the macaroni elbow - no cheese cell-box and no
+  // per-piece native-colour tick. The elbow sits on the translucent
+  // play-area board with the oozing cheese-whips background showing
+  // through. Adds a subtle drop shadow under each elbow so the noodle
+  // pops off the dark warm bg, like the reference photo.
   const cx = x + size / 2, cy = y + size / 2;
   context.globalAlpha = alpha;
-  // ─── Cheese sauce base — warm radial gradient pooled in the cell.
-  //   Brighter centre, deeper crust at the edges, so a wall of cells
-  //   reads as bubbly molten cheese instead of a flat grid.
-  const cheese = context.createRadialGradient(cx, cy, size * 0.1, cx, cy, size * 0.7);
-  cheese.addColorStop(0,   '#ffd966');
-  cheese.addColorStop(0.6, '#f0a830');
-  cheese.addColorStop(1,   '#9a5a10');
-  context.fillStyle = cheese;
-  context.fillRect(x, y, size, size);
-  // Darker cheese flecks — deterministic per-cell hash so they don't
-  // strobe between frames. A few tiny specks sell the texture.
-  const cellH = ((Math.round(x / size) * 374761393) ^ (Math.round(y / size) * 668265263)) >>> 0;
-  if (size >= 14) {
-    context.fillStyle = 'rgba(140,70,10,0.45)';
-    for (let i = 0; i < 4; i++) {
-      const h2 = (cellH + i * 1640531513) >>> 0;
-      const sx = x + 4 + (h2 % (size - 8));
-      const sy = y + 4 + ((h2 >>> 8) % (size - 8));
-      const sr = 0.8 + ((h2 >>> 16) % 100) / 100 * 1.2;
-      context.beginPath();
-      context.arc(sx, sy, sr, 0, Math.PI * 2);
-      context.fill();
-    }
-  }
-  // ─── Macaroni noodle — fat "C" tube. Outer arc filled in pasta cream,
+  // Soft cast shadow under the elbow.
+  context.fillStyle = 'rgba(0,0,0,0.35)';
+  context.beginPath();
+  context.ellipse(cx + 2, cy + 4, size * 0.40, size * 0.18, 0, 0, Math.PI * 2);
+  context.fill();
+  // ─── Macaroni noodle - fat "C" tube. Outer arc filled in pasta cream,
   //   inner arc punched out with the cheese colour for the hollow look.
   const radOuter = size * 0.36;
   const radInner = size * 0.20;
@@ -4603,12 +4610,12 @@ function drawBlockMacNCheese(context, x, y, color, size, alpha, theme) {
   context.strokeStyle = noodle;
   context.lineWidth = (radOuter - radInner) + 1;
   context.beginPath();
-  // Two arcs forming an open horseshoe — start at upper-right, sweep
+  // Two arcs forming an open horseshoe - start at upper-right, sweep
   // counter-clockwise around to lower-right, leaving the right side open.
   context.arc(cx, cy, (radOuter + radInner) / 2, -Math.PI * 0.30, Math.PI * 1.30, false);
   context.stroke();
   // Inner shadow ring on the underside of the noodle (gives the tube
-  // its volume — light from upper-left, shadow on lower-right).
+  // its volume - light from upper-left, shadow on lower-right).
   context.strokeStyle = 'rgba(140,80,20,0.55)';
   context.lineWidth = (radOuter - radInner) * 0.55;
   context.beginPath();
@@ -4637,13 +4644,6 @@ function drawBlockMacNCheese(context, x, y, color, size, alpha, theme) {
     context.arc(ex, ey, (radOuter - radInner) * 0.30, 0, Math.PI * 2);
     context.fill();
   }
-  // Per-piece native-colour tick in the top-right corner.
-  if (type && color) {
-    const [pr, pg, pb] = hexToRgb(color);
-    context.fillStyle = `rgba(${pr},${pg},${pb},0.95)`;
-    const tick = Math.max(2, size * 0.12);
-    context.fillRect(x + size - tick - 2, y + 2, tick, tick);
-  }
   context.globalAlpha = 1;
 }
 
@@ -4656,7 +4656,7 @@ function drawBlockMacNCheese(context, x, y, color, size, alpha, theme) {
 // the whole grid, not per-block.
 function drawBlockGlyph(context, fx, fy, size, type) {
   const cx = fx + size / 2, cy = fy + size / 2;
-  // Bumped 0.18 → 0.32 — glyph footprint roughly doubles so each piece
+  // Bumped 0.18 → 0.32 - glyph footprint roughly doubles so each piece
   // type's silhouette is unmistakable even at small render sizes.
   const r = size * 0.32;
   context.save();
@@ -4666,7 +4666,7 @@ function drawBlockGlyph(context, fx, fy, size, type) {
   context.translate(-0.5, -0.5);
   context.fillStyle = 'rgba(255,255,255,0.55)';
   glyphPath(context, cx, cy, r, type);
-  // Dark shadow stamp slightly down-right — completes the carved look and
+  // Dark shadow stamp slightly down-right - completes the carved look and
   // gives the glyph weight on the gold face.
   context.translate(1.5, 1.5);
   context.fillStyle = 'rgba(0,0,0,0.7)';
@@ -4712,7 +4712,7 @@ function drawBoard() {
   // and tires (Ferrari Window) all use a semi-translucent board so their
   // reactive backgrounds (violins / matrix-rain / Ferrari highway) read
   // through the empty cells. Other levels stay opaque.
-  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese')) {
+  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty')) {
     ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
     ctx.fillStyle = `rgba(${r},${g},${b},0.55)`;
   } else {
@@ -4727,7 +4727,7 @@ function drawBoard() {
     for (let c = 0; c < COLS; c++) ctx.strokeRect(c * CELL, r * CELL, CELL, CELL);
   }
 
-  // Beat pulse — gets meaningfully more intense as you climb past L13 so the
+  // Beat pulse - gets meaningfully more intense as you climb past L13 so the
   // late-game eras feel like they're physically vibrating with the track.
   const pulseIntensity = 0.04 + Math.max(0, level - 13) * 0.012;
   const pulse = Math.sin(beatPhase / 16 * Math.PI * 2) * pulseIntensity;
@@ -4756,7 +4756,7 @@ function drawBoard() {
     for (const [bx, by] of currentPiece) drawBlock(ctx, (currentX + bx) * CELL, (currentY + by) * CELL, color, CELL);
   }
 
-  // Tetris-Effect shimmer pass — diagonal highlight stripe sweeping across
+  // Tetris-Effect shimmer pass - diagonal highlight stripe sweeping across
   // every filled cell. Single global pass with `source-atop` so it only paints
   // on top of existing pixels (block faces), not the empty grid background.
   // Drawn AFTER active piece so both locked and active blocks shimmer alike.
@@ -4777,7 +4777,7 @@ function drawBoard() {
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
   }
-  // Matrix shimmer pass — vertical scan-line band sweeping top→bottom over
+  // Matrix shimmer pass - vertical scan-line band sweeping top→bottom over
   // every filled cell, evoking the Matrix's falling-code wash without
   // strobing every glyph individually. source-atop so the grid stays clean.
   if (theme && theme.blockStyle === 'matrix') {
@@ -4799,44 +4799,10 @@ function drawBoard() {
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
   }
-  // Mac & Cheese shimmer pass — slow warm-glaze sheen sweeping diagonally
-  // over the noodle wall, like cheese sauce catching kitchen light.
-  if (theme && theme.blockStyle === 'macncheese') {
-    const w = mainCanvas.width, h = mainCanvas.height;
-    const cycle = 3200;
-    const phase = (Date.now() % cycle) / cycle;
-    const stripeW = w * 0.4;
-    const cxPos = -stripeW + (w + stripeW * 2) * phase;
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-atop';
-    const sg = ctx.createLinearGradient(cxPos, 0, cxPos + stripeW, h);
-    sg.addColorStop(0,    'rgba(255,235,140,0)');
-    sg.addColorStop(0.5,  'rgba(255,235,140,0.28)');
-    sg.addColorStop(1,    'rgba(255,235,140,0)');
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, 0, w, h);
-    ctx.restore();
-  }
-  // Tires shimmer pass — horizontal red glow band sweeping left→right
-  // over every filled cell (like a passing-headlight wash). Matches the
-  // Ferrari-night-drive vibe instead of TE's diagonal or matrix's vertical.
-  if (theme && theme.blockStyle === 'tires') {
-    const w = mainCanvas.width, h = mainCanvas.height;
-    const cycle = 2600;
-    const phase = (Date.now() % cycle) / cycle;
-    const bandW = w * 0.45;
-    const cxPos = -bandW + (w + bandW * 2) * phase;
-    const [sr, sg2, sb] = hexToRgb(theme.colors.accent);
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-atop';
-    const sg = ctx.createLinearGradient(cxPos, 0, cxPos + bandW, 0);
-    sg.addColorStop(0,   `rgba(${sr},${sg2},${sb},0)`);
-    sg.addColorStop(0.5, `rgba(${sr},${sg2},${sb},0.18)`);
-    sg.addColorStop(1,   `rgba(${sr},${sg2},${sb},0)`);
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, 0, w, h);
-    ctx.restore();
-  }
+  // Mac & Cheese + tires deliberately skip the shimmer pass: those
+  // styles render only the noodle / tire silhouette (no per-cell box
+  // backing), so a source-atop sweep would light up the empty cells
+  // around the silhouettes too. The bg scenes carry the motion now.
 
   // Zone overlay
   if (zoneActive) {
@@ -4882,7 +4848,7 @@ function drawBoard() {
     }
   }
 
-  // Incoming-garbage meter — thin red bar on the left edge of the board,
+  // Incoming-garbage meter - thin red bar on the left edge of the board,
   // height proportional to pending attack lines. Only drawn in vs mode and
   // only when there's actually something queued.
   if (gameMode === 'vs' && activePlayer && activePlayer.incomingGarbage > 0) {
@@ -4957,7 +4923,7 @@ let _crowdBgW = 0;
 let _crowdBgH = 0;
 
 // Crowd member styles: each one's persistent identity (hair, hat, phone)
-// and gesture. Drawn proportional to stake — most people are plain, a few
+// and gesture. Drawn proportional to stake - most people are plain, a few
 // have phones, a few have hands permanently up, etc.
 //   - hair:    'plain' | 'mohawk' | 'bun' | 'long' | 'cap' | 'beanie'
 //   - gesture: 'sway'  | 'phone'  | 'handsUp' | 'headbang' | 'normal'
@@ -5004,7 +4970,7 @@ function ensureCrowd() {
   const boardCx = w / 2;
   const floorY = h - 70;
   const tiers = [];
-  // Crowd density tuned for performance — denser than the original but
+  // Crowd density tuned for performance - denser than the original but
   // not so dense it tanks the framerate on mid-tier phones. 1 per 12px
   // (was 9) for back row.
   const backCount = Math.floor(w / 12);
@@ -5083,7 +5049,7 @@ function getBrickPattern() {
   // Mortar background
   ox.fillStyle = 'rgba(28,32,40,0.9)';
   ox.fillRect(0, 0, oc.width, oc.height);
-  // Brick rows — staggered every other row
+  // Brick rows - staggered every other row
   const drawBrick = (x, y, w, h, shade) => {
     ox.fillStyle = `rgba(${42+shade},${36+shade},${32+shade},0.85)`;
     ox.fillRect(x, y, w - 2, h - 2);
@@ -5111,7 +5077,7 @@ function drawWarehouseScene(theme, now) {
   const trussY = Math.max(40, h * 0.08);
   const floorY = h - 70;
 
-  // 1. ROOM — dark gradient base
+  // 1. ROOM - dark gradient base
   const cg = bgCtx.createRadialGradient(w / 2, h * 0.55, 0, w / 2, h * 0.55, w * 0.85);
   cg.addColorStop(0, 'rgba(20,28,42,0.55)');
   cg.addColorStop(0.5, 'rgba(8,12,20,0.7)');
@@ -5119,7 +5085,7 @@ function drawWarehouseScene(theme, now) {
   bgCtx.fillStyle = cg;
   bgCtx.fillRect(0, 0, w, h);
 
-  // 2. BRICK BACK WALL — runs from below the truss down to behind the crowd.
+  // 2. BRICK BACK WALL - runs from below the truss down to behind the crowd.
   //    Cached pattern means it costs ~one fillRect per frame.
   const wallTop = trussY + 10;
   const wallBot = floorY - 80;
@@ -5138,7 +5104,7 @@ function drawWarehouseScene(theme, now) {
     bgCtx.fillRect(0, wallTop, w, wallBot - wallTop);
   }
 
-  // 3. STAGE BACKDROP BANNER — "UNDERGROUND" sign mounted on the wall
+  // 3. STAGE BACKDROP BANNER - "UNDERGROUND" sign mounted on the wall
   //    behind the DJ booth, pulsing very gently with the beat.
   const bannerY = wallTop + 18;
   const bannerH = 28;
@@ -5154,13 +5120,13 @@ function drawWarehouseScene(theme, now) {
   bgCtx.fillText('UNDERGROUND', w * 0.5, bannerY + bannerH / 2);
   bgCtx.restore();
 
-  // 4. SPEAKER STACKS — tall cabinets flanking the stage with subwoofer
+  // 4. SPEAKER STACKS - tall cabinets flanking the stage with subwoofer
   //    cones that pulse outward with audio energy. The pulse is real-time
-  //    bass response, not a clock — gives the room that booming feel.
+  //    bass response, not a clock - gives the room that booming feel.
   drawSpeakerStack(w * 0.06, floorY, energy, cheer, accentRgb);
   drawSpeakerStack(w * 0.94, floorY, energy, cheer, accentRgb);
 
-  // 5. DJ BOOTH — center-back podium with a figure mixing. Sits behind
+  // 5. DJ BOOTH - center-back podium with a figure mixing. Sits behind
   //    the wall banner, in front of the brick wall.
   drawDjBooth(w / 2, wallBot - 5, now, energy, cheer, accentRgb);
 
@@ -5199,7 +5165,7 @@ function drawWarehouseScene(theme, now) {
     }
   }
 
-  // 7. SWEEPING LASERS — thin colored lines from truss anchors, sweeping
+  // 7. SWEEPING LASERS - thin colored lines from truss anchors, sweeping
   //    across the floor. Two pairs at different speeds for the criss-cross.
   drawLasers(w, h, trussY, now, accentRgb, energy);
 
@@ -5216,7 +5182,7 @@ function drawWarehouseScene(theme, now) {
   const bpm = theme.bpm || 100;
   const beatMs = 60000 / bpm;
   const baseT = (now / beatMs) * Math.PI;
-  // Update jumper state — random crowd members occasionally launch.
+  // Update jumper state - random crowd members occasionally launch.
   // jumpY is a 0..1 envelope; rises fast, decays in ~0.6s.
   for (const d of _crowd) {
     if (d.jumpY > 0) d.jumpY = Math.max(0, d.jumpY - 0.025);
@@ -5233,16 +5199,16 @@ function drawWarehouseScene(theme, now) {
     drawCrowdDancer(d, t, accentRgb, energy, cheer);
   }
 
-  // 10. CAMERA FLASHES — random bright sparks in the crowd suggesting
+  // 10. CAMERA FLASHES - random bright sparks in the crowd suggesting
   //     phones taking pictures. Tiny so they don't dominate, frequent
   //     enough that there's always something popping.
   drawCameraFlashes(now);
 
-  // 11. CONFETTI — falls from the truss after line clears. Drawn after
+  // 11. CONFETTI - falls from the truss after line clears. Drawn after
   //     the crowd so pieces appear in front of dancers.
   drawConfetti();
 
-  // 12. STAGE FLASH — full-bg white pulse on triple/tetris. Drawn last so
+  // 12. STAGE FLASH - full-bg white pulse on triple/tetris. Drawn last so
   //     it bathes everything (and the front-row dancer rim glow) at once.
   if (stageFlash > 0) {
     bgCtx.fillStyle = `rgba(255,255,255,${stageFlash * 0.45})`;
@@ -5264,7 +5230,7 @@ function drawSpeakerStack(cx, baseY, energy, cheer, accentRgb) {
   // Horn (top driver)
   bgCtx.fillStyle = 'rgba(20,24,32,0.95)';
   bgCtx.fillRect(x + 6, y + 8, w - 12, 22);
-  // Cones — pulse outward with energy
+  // Cones - pulse outward with energy
   const conePulse = 1 + energy * 0.35 + cheer * 0.25;
   const cone = (cy, r) => {
     bgCtx.fillStyle = 'rgba(14,16,22,1)';
@@ -5280,7 +5246,7 @@ function drawSpeakerStack(cx, baseY, energy, cheer, accentRgb) {
   cone(y + 50, 12);
   cone(y + 78, 10);
   cone(y + 102, 9);
-  // Pulse aura — soft ring outside the stack on hard energy
+  // Pulse aura - soft ring outside the stack on hard energy
   if (energy > 0.25) {
     const aura = bgCtx.createRadialGradient(cx, y + h / 2, w * 0.4, cx, y + h / 2, w * 1.6);
     aura.addColorStop(0, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${energy * 0.18})`);
@@ -5292,7 +5258,7 @@ function drawSpeakerStack(cx, baseY, energy, cheer, accentRgb) {
 
 // DJ booth at center back: podium + figure leaning over the decks, head
 // bobbing on the beat. Reacts to:
-//   - the music beat (sin(now/200) — base bob),
+//   - the music beat (sin(now/200) - base bob),
 //   - cheer (scratches the platter back-and-forth, head goes lower),
 //   - movePulse (extra hand twitch + lean),
 //   - energy (CDJ glow brightens, face plate accent intensifies).
@@ -5304,7 +5270,7 @@ function drawDjBooth(cx, baseY, now, energy, cheer, accentRgb) {
   // Podium
   bgCtx.fillStyle = 'rgba(8,10,16,0.95)';
   bgCtx.fillRect(x, y, podW, podH);
-  // Front face plate with accent strip — brightens with energy + move
+  // Front face plate with accent strip - brightens with energy + move
   bgCtx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.18 + energy * 0.3 + move * 0.3})`;
   bgCtx.fillRect(x, y + podH - 5, podW, 4);
   // Equalizer LEDs on the face plate, dancing with energy
@@ -5314,7 +5280,7 @@ function drawDjBooth(cx, baseY, now, energy, cheer, accentRgb) {
     bgCtx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.6 + energy * 0.3})`;
     bgCtx.fillRect(lx, y + podH - 9 - lh, 5, lh);
   }
-  // CDJ decks — two glowing platters that spin (visualized via a moving dot)
+  // CDJ decks - two glowing platters that spin (visualized via a moving dot)
   bgCtx.fillStyle = 'rgba(20,24,32,1)';
   bgCtx.fillRect(x + 4, y + 4, podW - 8, 10);
   for (let i = 0; i < 2; i++) {
@@ -5323,14 +5289,14 @@ function drawDjBooth(cx, baseY, now, energy, cheer, accentRgb) {
     bgCtx.beginPath();
     bgCtx.arc(dx, y + 9, 4, 0, Math.PI * 2);
     bgCtx.fill();
-    // Spinning indicator dot — direction reverses on cheer (scratching)
+    // Spinning indicator dot - direction reverses on cheer (scratching)
     const platterPhase = (now / (cheer > 0.4 ? -160 : 320) + i * 1.5);
     bgCtx.fillStyle = '#fff';
     bgCtx.beginPath();
     bgCtx.arc(dx + Math.cos(platterPhase) * 3, y + 9 + Math.sin(platterPhase) * 3, 0.8, 0, Math.PI * 2);
     bgCtx.fill();
   }
-  // DJ figure — head bobs harder on cheer, leans forward on big moves
+  // DJ figure - head bobs harder on cheer, leans forward on big moves
   const bob = Math.abs(Math.sin(now / 200)) * (3 + cheer * 6 + move * 3);
   const lean = (cheer * 4 + move * 3); // forward tilt
   const dy = y - 18 - bob + lean;
@@ -5338,7 +5304,7 @@ function drawDjBooth(cx, baseY, now, energy, cheer, accentRgb) {
   bgCtx.beginPath();
   bgCtx.arc(cx, dy, 8, 0, Math.PI * 2);
   bgCtx.fill();
-  // Shoulders + arms — on cheer, arms scratch back-and-forth instead of
+  // Shoulders + arms - on cheer, arms scratch back-and-forth instead of
   // resting on the decks. Move pulse jitters them slightly.
   bgCtx.strokeStyle = 'rgba(2,4,10,0.95)';
   bgCtx.lineWidth = 6;
@@ -5352,7 +5318,7 @@ function drawDjBooth(cx, baseY, now, energy, cheer, accentRgb) {
   bgCtx.lineTo(cx + 24 - scratch + moveTwitch, y + 8);
   bgCtx.stroke();
   bgCtx.fillRect(cx - 12, dy + 4, 24, 14);
-  // Headphones — small detail that reads "DJ" at a glance
+  // Headphones - small detail that reads "DJ" at a glance
   bgCtx.strokeStyle = 'rgba(2,4,10,0.95)';
   bgCtx.lineWidth = 2;
   bgCtx.beginPath();
@@ -5427,7 +5393,7 @@ function spawnConfetti(n, theme) {
       life: 1,
     });
   }
-  // Cap total — old pieces get culled if a player chain-clears like crazy.
+  // Cap total - old pieces get culled if a player chain-clears like crazy.
   if (confetti.length > 600) confetti.splice(0, confetti.length - 600);
 }
 
@@ -5454,12 +5420,12 @@ function drawConfetti() {
   }
 }
 
-// Camera flashes — short-lived bright dots positioned over crowd members
+// Camera flashes - short-lived bright dots positioned over crowd members
 // who rolled in their flashRoll lottery this tick. Visual: random pop of
 // white that decays in ~120ms.
 let _camFlashes = [];
 function drawCameraFlashes(now) {
-  // Spawn new flashes — ~one every 200-400ms on average
+  // Spawn new flashes - ~one every 200-400ms on average
   if (Math.random() < 0.05 && _crowd && _crowd.length) {
     const candidates = _crowd.filter(d => d.tier !== 'front');
     if (candidates.length) {
@@ -5483,11 +5449,11 @@ function drawCameraFlashes(now) {
   }
 }
 
-// Render one figure. `tier` decides level of detail — back row is heads only,
+// Render one figure. `tier` decides level of detail - back row is heads only,
 // mid row is head+torso, front row is full body with arms + legs.
 function drawCrowdDancer(d, beatT, accentRgb, energy, cheer) {
   const s = d.scale;
-  // Move pulse adds a small ripple to the bob amplitude — every player
+  // Move pulse adds a small ripple to the bob amplitude - every player
   // input (move/rotate/drop) telegraphs into the crowd's bouncing.
   const move = (typeof movePulse !== 'undefined') ? movePulse : 0;
   const bobAmp = (4 + energy * 6 + cheer * 4 + move * 6) * s;
@@ -5609,7 +5575,7 @@ function drawCrowdDancer(d, beatT, accentRgb, energy, cheer) {
       };
       armDir(1); armDir(-1);
     }
-    // Legs — bend on bounce or jump
+    // Legs - bend on bounce or jump
     const bend = Math.abs(Math.sin(beatT)) * 6 * s + (d.jumpY > 0 ? 6 * s : 0);
     const legDir = (sign) => {
       bgCtx.beginPath();
@@ -5624,7 +5590,7 @@ function drawCrowdDancer(d, beatT, accentRgb, energy, cheer) {
 
 // Draw a head with a hair style on top. Head is a circle in skinFill, hair
 // is a darker silhouette layered on. Each style is just a few rectangles
-// or arcs — cheap.
+// or arcs - cheap.
 function drawHead(cx, cy, r, skinFill, hair, scale) {
   bgCtx.save();
   // Head
@@ -5636,7 +5602,7 @@ function drawHead(cx, cy, r, skinFill, hair, scale) {
   bgCtx.fillStyle = 'rgba(2,4,10,0.98)';
   switch (hair) {
     case 'cap': {
-      // Baseball cap — half-circle on top + brim sticking forward
+      // Baseball cap - half-circle on top + brim sticking forward
       bgCtx.beginPath();
       bgCtx.arc(cx, cy, r * 1.05, Math.PI, 0);
       bgCtx.fill();
@@ -5644,7 +5610,7 @@ function drawHead(cx, cy, r, skinFill, hair, scale) {
       break;
     }
     case 'beanie': {
-      // Knit cap — taller dome, slight pom on top
+      // Knit cap - taller dome, slight pom on top
       bgCtx.beginPath();
       bgCtx.arc(cx, cy + r * 0.1, r * 1.1, Math.PI, 0);
       bgCtx.fill();
@@ -5654,7 +5620,7 @@ function drawHead(cx, cy, r, skinFill, hair, scale) {
       break;
     }
     case 'long': {
-      // Long hair — extends below the head silhouette
+      // Long hair - extends below the head silhouette
       bgCtx.beginPath();
       bgCtx.arc(cx, cy, r * 1.1, Math.PI, 0);
       bgCtx.fill();
@@ -5685,7 +5651,7 @@ function drawHead(cx, cy, r, skinFill, hair, scale) {
     }
     case 'plain':
     default: {
-      // Short hair — just a cap of darkness on top
+      // Short hair - just a cap of darkness on top
       bgCtx.beginPath();
       bgCtx.arc(cx, cy - r * 0.15, r * 0.95, Math.PI, 0);
       bgCtx.fill();
@@ -5727,7 +5693,7 @@ function drawPhone(handX, handY, scale, accentRgb) {
   // Phone body
   bgCtx.fillStyle = 'rgba(2,4,10,0.98)';
   bgCtx.fillRect(handX - w / 2, handY - h, w, h);
-  // Screen glow — bright accent
+  // Screen glow - bright accent
   bgCtx.fillStyle = `rgba(255,255,255,0.9)`;
   bgCtx.fillRect(handX - w / 2 + 0.5, handY - h + 0.5, w - 1, h - 1.5);
   // Tiny accent tint inside (suggests photo subject color)
@@ -5757,7 +5723,7 @@ let _matrixCellW = 0;
 function drawMatrixRain(theme, now, playRects) {
   const w = bgCanvas.width, h = bgCanvas.height;
   if (w <= 0 || h <= 0) return;
-  // Glyph cell size scales with viewport — bigger screens get bigger
+  // Glyph cell size scales with viewport - bigger screens get bigger
   // glyphs so the rain doesn't look like a smear on a 4K display.
   const cellW = Math.max(12, Math.floor(w / 80));
   // Rebuild column array on first call OR when the viewport changes
@@ -5774,8 +5740,8 @@ function drawMatrixRain(theme, now, playRects) {
         // Per-column raw fall speed (px per frame). Mixed slow/fast so
         // the streams don't all advance at the same rate.
         speed: 1.2 + Math.random() * 3.2,
-        // Trail length — longer trails read as faster streams in the
-        // film. 8–22 glyphs feels right at this glyph size.
+        // Trail length - longer trails read as faster streams in the
+        // film. 8-22 glyphs feels right at this glyph size.
         len: 8 + Math.floor(Math.random() * 14),
         // Per-column flicker intensity used by movePulse reactions.
         flick: 0,
@@ -5790,12 +5756,12 @@ function drawMatrixRain(theme, now, playRects) {
   const fallBoost = 1 + cheer * 1.6 + flash * 0.6;
   // Theme-driven palette: head/glow/trail colours are derived from
   // the level theme so the same renderer can re-skin between L4 (green
-  // Back for More) and L5 (purple White Rabbit) — and any future
-  // matrix-style era — without forking the code.
+  // Back for More) and L5 (purple White Rabbit) - and any future
+  // matrix-style era - without forking the code.
   const accentRgb = hexToRgb(theme.colors.accent);
   const glowRgb   = hexToRgb(theme.colors.glow);
   const bg2Rgb    = hexToRgb(theme.colors.bg2);
-  // Trail-fade pass — translucent theme-bg over the whole bg canvas so
+  // Trail-fade pass - translucent theme-bg over the whole bg canvas so
   // previous frames' tails dim down. Slight alpha (0.32) so heads leave
   // a faint trail-glow even though we redraw the full trail this frame.
   bgCtx.fillStyle = `rgba(${bg2Rgb[0]},${bg2Rgb[1]},${bg2Rgb[2]},0.32)`;
@@ -5815,7 +5781,7 @@ function drawMatrixRain(theme, now, playRects) {
   bgCtx.textBaseline = 'middle';
   // Helper: is this cell hidden by the play area? Skip rendering both
   // head and tail so the rain doesn't read through the semi-translucent
-  // matrix board. We let the column keep advancing — it just doesn't
+  // matrix board. We let the column keep advancing - it just doesn't
   // paint while behind the board.
   const _hidden = (px, py) => {
     if (!playRects.length) return false;
@@ -5838,7 +5804,7 @@ function drawMatrixRain(theme, now, playRects) {
     }
     const headRow = Math.floor(col.y / cellH);
     const flick = col.flick;
-    // Head glyph — bright white-green. Kick beat scales it slightly so
+    // Head glyph - bright white-green. Kick beat scales it slightly so
     // the rain visibly throbs with the track.
     const headY = headRow * cellH + cellH / 2;
     if (!_hidden(cx, headY)) {
@@ -5857,7 +5823,7 @@ function drawMatrixRain(theme, now, playRects) {
       bgCtx.fillText(headCh, cx, headY);
       bgCtx.shadowBlur = 0;
     }
-    // Trail — fades from bright phosphor at the head to nearly black at
+    // Trail - fades from bright phosphor at the head to nearly black at
     // the tail. Glyph picked deterministically per (column, row) via the
     // existing _matrixGlyphAt hash so each cell has its own letter that
     // changes on the same 600ms cadence as the block-face glyphs.
@@ -5869,7 +5835,7 @@ function drawMatrixRain(theme, now, playRects) {
       const fade = (1 - t / col.len);
       const a = Math.min(1, fade * 0.85 + flick * 0.25);
       // Trail glyphs interpolate accent → black as they recede so green
-      // themes glow green and purple themes glow purple — same renderer.
+      // themes glow green and purple themes glow purple - same renderer.
       const tr = Math.floor(accentRgb[0] * fade);
       const tg = Math.floor(accentRgb[1] * fade);
       const tb = Math.floor(accentRgb[2] * fade);
@@ -5882,31 +5848,119 @@ function drawMatrixRain(theme, now, playRects) {
   }
 }
 
-// Ferrari Window scene: looking out a tinted-blue Ferrari window at city
-// lights streaking past. The constant-Ferrari highway scene was hard to
-// see and made the tire blocks blend in — Sir asked for a clean glass
-// background that lets the tires read, with a sports car only when a
-// line is cleared. Reactive to gameplay:
-//   - cheerPulse (line clears)  → triggers a red Ferrari drive-by (set
-//                                  from clearLines via the trigger
-//                                  helper at the bottom of this file)
-//   - movePulse  (piece moves)  → bokeh dots wobble + brighten briefly
-//   - kick beat                 → city-light streaks pulse brighter
-//   - stageFlash (Tetris-FX)    → whole window brightens
+// Ferrari Window scene v3: a proper night highway. Three lanes recede
+// to a vanishing point, dashed lane markers scroll toward the viewer,
+// background traffic cars cruise in the lanes, and the player's red
+// Ferrari is anchored mid-screen in the centre lane by default. On
+// every line clear the Ferrari changes lanes / overtakes the car
+// ahead - visible reward for clearing.
 //
-// Owns its own scene state on closure-static vars. _ferrariDriveByT is
-// the drive-by animation progress (-1 = inactive, 0..1 = animating).
-let _ferrariStreakScroll = 0;
-let _ferrariDriveByT = -1;
-let _ferrariDriveByLines = 0;
-function triggerFerrariDriveBy(cleared) {
-  // Bigger / faster sports car for bigger clears. Combo also handled by
-  // the caller bumping cleared. Restarts mid-flight if a player chains
-  // clears so the car doesn't snap mid-screen.
-  _ferrariDriveByT = 0;
-  _ferrariDriveByLines = Math.max(1, cleared | 0);
+// Reactive:
+//   - cheerPulse (line clears) → triggers lane change + speed surge
+//   - movePulse  (piece moves) → small steering wobble in current lane
+//   - kick beat                → headlights flash brighter
+//   - stageFlash (Tetris-FX)   → whole road momentarily brightens
+//
+// Owns its own scene state on closure-static vars.
+let _ferrariMarkerScroll = 0;
+let _ferrariCurrentLane = 1;     // 0 / 1 / 2 (left / centre / right)
+let _ferrariTargetLane = 1;
+let _ferrariLaneOffset = 0;      // smoothed real-valued lane position
+let _ferrariOvertakeT = -1;      // overtake-burst animation progress
+let _ferrariOvertakeLines = 0;
+let _trafficCars = null;         // lazy-init array of background cars
+let _trafficSpawnCooldown = 0;
+function triggerFerrariOvertake(cleared) {
+  // Pick a new lane that's different from the current one. Centre lane
+  // is preferred when in an outer lane; outer lanes alternate when
+  // already in centre, so the player sees real lane switching.
+  let next;
+  if (_ferrariCurrentLane === 1) {
+    next = (Math.random() < 0.5) ? 0 : 2;
+  } else {
+    // From an outer lane, mostly cut back to centre so we don't park on
+    // the shoulder. Occasionally hop straight across to the other side.
+    next = (Math.random() < 0.7) ? 1 : (2 - _ferrariCurrentLane);
+  }
+  _ferrariTargetLane = next;
+  _ferrariCurrentLane = next;
+  _ferrariOvertakeT = 0;
+  _ferrariOvertakeLines = Math.max(1, cleared | 0);
 }
-function drawFerrariWindow(theme, now, playRects) {
+// Helper: draw a top-down/3-quarter car silhouette at (cx, cy) with the
+// given footprint and tint. Looks like a car viewed from behind/above
+// at ~70° camera angle - a windshield-trapezoid on top of a chassis-
+// rectangle, with two tail lights at the rear and two headlights at
+// the front. Same shape used for traffic AND the player's red car.
+function _drawHwyCar(cx, cy, carW, carH, tint, opts) {
+  opts = opts || {};
+  const headlightOn = opts.headlightOn !== false;
+  const tilt = opts.tilt || 0;
+  bgCtx.save();
+  bgCtx.translate(cx, cy);
+  if (tilt) bgCtx.rotate(tilt);
+  // Drop shadow
+  bgCtx.fillStyle = 'rgba(0,0,0,0.55)';
+  bgCtx.beginPath();
+  bgCtx.ellipse(0, carH * 0.5, carW * 0.55, carH * 0.18, 0, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Body - chassis is a vertically-elongated rounded rectangle (we
+  // see the rear of the car since traffic is moving away from the
+  // viewer toward the vanishing point).
+  const [tr, tg, tb] = tint;
+  const bodyGrad = bgCtx.createLinearGradient(0, -carH * 0.5, 0, carH * 0.5);
+  bodyGrad.addColorStop(0, `rgba(${Math.min(255,tr+40)},${Math.min(255,tg+30)},${Math.min(255,tb+30)},1)`);
+  bodyGrad.addColorStop(1, `rgba(${Math.max(0,tr-60)},${Math.max(0,tg-60)},${Math.max(0,tb-60)},1)`);
+  bgCtx.fillStyle = bodyGrad;
+  const radius = Math.min(carW, carH) * 0.18;
+  // Rounded rect chassis
+  bgCtx.beginPath();
+  bgCtx.moveTo(-carW/2 + radius, -carH/2);
+  bgCtx.lineTo( carW/2 - radius, -carH/2);
+  bgCtx.quadraticCurveTo(carW/2, -carH/2, carW/2, -carH/2 + radius);
+  bgCtx.lineTo( carW/2, carH/2 - radius);
+  bgCtx.quadraticCurveTo(carW/2, carH/2, carW/2 - radius, carH/2);
+  bgCtx.lineTo(-carW/2 + radius, carH/2);
+  bgCtx.quadraticCurveTo(-carW/2, carH/2, -carW/2, carH/2 - radius);
+  bgCtx.lineTo(-carW/2, -carH/2 + radius);
+  bgCtx.quadraticCurveTo(-carW/2, -carH/2, -carW/2 + radius, -carH/2);
+  bgCtx.closePath();
+  bgCtx.fill();
+  // Roof - narrower trapezoid centred on the chassis (windshield up at
+  // the front of the car which is the FAR side from the camera).
+  bgCtx.fillStyle = `rgba(${Math.max(0,tr-30)},${Math.max(0,tg-30)},${Math.max(0,tb-30)},1)`;
+  bgCtx.beginPath();
+  bgCtx.moveTo(-carW * 0.32, -carH * 0.18);
+  bgCtx.lineTo( carW * 0.32, -carH * 0.18);
+  bgCtx.lineTo( carW * 0.28,  carH * 0.18);
+  bgCtx.lineTo(-carW * 0.28,  carH * 0.18);
+  bgCtx.closePath();
+  bgCtx.fill();
+  // Rear window (at the bottom - the side closest to the camera)
+  bgCtx.fillStyle = 'rgba(15,18,28,0.88)';
+  bgCtx.fillRect(-carW * 0.26, carH * 0.04, carW * 0.52, carH * 0.13);
+  // Tail lights - two small bright red rectangles at the rear (bottom)
+  bgCtx.fillStyle = 'rgba(255,80,80,0.95)';
+  bgCtx.shadowColor = 'rgba(255,60,60,0.95)';
+  bgCtx.shadowBlur = 8;
+  bgCtx.fillRect(-carW * 0.42, carH * 0.36, carW * 0.16, carH * 0.10);
+  bgCtx.fillRect( carW * 0.26, carH * 0.36, carW * 0.16, carH * 0.10);
+  bgCtx.shadowBlur = 0;
+  // Headlights - pale dots at the front (top), and a forward-projecting
+  // beam cone on each side. Beams skipped for distant traffic to keep
+  // the scene clean.
+  if (headlightOn) {
+    bgCtx.fillStyle = 'rgba(255,235,180,0.92)';
+    bgCtx.shadowColor = 'rgba(255,225,160,0.85)';
+    bgCtx.shadowBlur = 8;
+    bgCtx.fillRect(-carW * 0.42, -carH * 0.46, carW * 0.16, carH * 0.10);
+    bgCtx.fillRect( carW * 0.26, -carH * 0.46, carW * 0.16, carH * 0.10);
+    bgCtx.shadowBlur = 0;
+  }
+  bgCtx.restore();
+}
+
+function drawFerrariHighway(theme, now, playRects) {
   const w = bgCanvas.width, h = bgCanvas.height;
   if (w <= 0 || h <= 0) return;
   const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
@@ -5915,202 +5969,246 @@ function drawFerrariWindow(theme, now, playRects) {
   const onKick = (beatPhase % 4 === 0);
   const accent = theme.colors.accent;
   const [ar, ag, ab] = hexToRgb(accent);
-  const [b1r, b1g, b1b] = hexToRgb(theme.colors.bg1);
-  const [b2r, b2g, b2b] = hexToRgb(theme.colors.bg2);
 
-  // ─── BLUE WINDOW GLASS BACKDROP ──────────────────────────────────
-  // Repaint solidly with a vertical teal-blue gradient so the tires
-  // sit in front of a clean, readable backdrop instead of the busy
-  // highway. Slightly lighter at the top (sky-through-glass), darker
-  // at the bottom (dashboard line of sight).
-  const sky = bgCtx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0,   `rgba(${b1r + 25},${b1g + 30},${b1b + 40},1)`);
-  sky.addColorStop(0.5, `rgba(${b1r},${b1g},${b1b},1)`);
-  sky.addColorStop(1,   `rgba(${b2r},${b2g},${b2b},1)`);
+  // ─── SKY: deep night gradient. Top is darkest; warm city-glow band
+  //   right at the horizon line where the road meets the sky.
+  const horizonY = h * 0.42;
+  const sky = bgCtx.createLinearGradient(0, 0, 0, horizonY);
+  sky.addColorStop(0,    '#02020a');
+  sky.addColorStop(0.7,  '#0a0816');
+  sky.addColorStop(1,    '#181024');
   bgCtx.fillStyle = sky;
-  bgCtx.fillRect(0, 0, w, h);
+  bgCtx.fillRect(0, 0, w, horizonY);
+  // Stars
+  bgCtx.fillStyle = 'rgba(220,220,255,0.55)';
+  for (let i = 0; i < 60; i++) {
+    const sx = ((i * 9173) % 1000) / 1000 * w;
+    const sy = ((i * 6151) % 1000) / 1000 * horizonY * 0.85;
+    const sz = ((i * 4099) % 100) / 100 * 1.2 + 0.4;
+    bgCtx.fillRect(sx, sy, sz, sz);
+  }
+  // Horizon city glow
+  const hgrad = bgCtx.createLinearGradient(0, horizonY - 32, 0, horizonY + 4);
+  hgrad.addColorStop(0,   `rgba(${ar},${ag},${ab},0)`);
+  hgrad.addColorStop(0.7, `rgba(${ar},${ag},${ab},0.20)`);
+  hgrad.addColorStop(1,   `rgba(${ar},${ag},${ab},0.36)`);
+  bgCtx.fillStyle = hgrad;
+  bgCtx.fillRect(0, horizonY - 32, w, 36);
 
-  // ─── HORIZONTAL CITY-LIGHT STREAKS — long faint horizontal lines
-  //   moving right→left, evoking the view through a side window of a
-  //   car cruising past city lights. Pulse brighter on every kick.
-  _ferrariStreakScroll = (_ferrariStreakScroll + 1.4 + cheer * 4) % w;
-  const streakA = (onKick ? 0.18 : 0.10) + flash * 0.12;
-  bgCtx.strokeStyle = `rgba(180,220,255,${streakA})`;
-  bgCtx.lineWidth = 1;
-  for (let i = 0; i < 9; i++) {
-    // Deterministic hash → stable Y per row, varying speed factor per row.
-    const yFrac = ((i * 6151) % 1000) / 1000;
-    const speedF = 0.5 + ((i * 4099) % 100) / 100;
-    const ly = yFrac * h;
-    const off = (_ferrariStreakScroll * speedF) % w;
-    bgCtx.beginPath();
-    bgCtx.moveTo(-off, ly);
-    bgCtx.lineTo(w * 1.5 - off, ly);
-    bgCtx.stroke();
+  // ─── ROAD perspective. Vanishing point at horizon centre.
+  const vpx = w / 2, vpy = horizonY;
+  const roadBaseHalfW = w * 0.95;
+  const roadTopHalfW  = w * 0.04;
+
+  // Asphalt
+  bgCtx.fillStyle = '#0d0d12';
+  bgCtx.beginPath();
+  bgCtx.moveTo(vpx - roadTopHalfW, vpy);
+  bgCtx.lineTo(vpx + roadTopHalfW, vpy);
+  bgCtx.lineTo(vpx + roadBaseHalfW, h);
+  bgCtx.lineTo(vpx - roadBaseHalfW, h);
+  bgCtx.closePath();
+  bgCtx.fill();
+
+  // Helper: project (t in 0..1, laneX in -1..+1) → screen px.
+  const project = (t, laneX) => {
+    const halfW = roadTopHalfW + (roadBaseHalfW - roadTopHalfW) * t;
+    return { x: vpx + laneX * halfW, y: vpy + (h - vpy) * t, scale: 0.05 + t * 0.95 };
+  };
+
+  // Road shoulder lines (red strips along the edges)
+  bgCtx.strokeStyle = `rgba(${ar},${ag},${ab},0.55)`;
+  bgCtx.lineWidth = 2;
+  bgCtx.beginPath();
+  bgCtx.moveTo(vpx - roadTopHalfW, vpy);
+  bgCtx.lineTo(vpx - roadBaseHalfW, h);
+  bgCtx.moveTo(vpx + roadTopHalfW, vpy);
+  bgCtx.lineTo(vpx + roadBaseHalfW, h);
+  bgCtx.stroke();
+
+  // Scrolling dashed lane markers - two lane separators (between lanes
+  // 0/1 and 1/2). Cheer briefly speeds the scroll.
+  const scrollSpeed = 1.6 + cheer * 4 + flash * 2;
+  _ferrariMarkerScroll = (_ferrariMarkerScroll + scrollSpeed) % 60;
+  const drawDashedLine = (laneX, color, alpha) => {
+    bgCtx.strokeStyle = `rgba(${color[0]},${color[1]},${color[2]},${alpha})`;
+    for (let i = 0; i < 18; i++) {
+      const t0 = Math.pow((i + (_ferrariMarkerScroll / 60)) / 18, 1.6);
+      const t1 = Math.pow((i + 0.45 + (_ferrariMarkerScroll / 60)) / 18, 1.6);
+      if (t0 > 1) break;
+      if (t1 > 1) continue;
+      const a = project(t0, laneX);
+      const b = project(t1, laneX);
+      bgCtx.lineWidth = 1 + t1 * 5;
+      bgCtx.beginPath();
+      bgCtx.moveTo(a.x, a.y);
+      bgCtx.lineTo(b.x, b.y);
+      bgCtx.stroke();
+    }
+  };
+  // 3 lanes → separators at -1/3 and +1/3 of road half-width.
+  drawDashedLine(-0.33, [255, 235, 170], 0.85);
+  drawDashedLine( 0.33, [255, 235, 170], 0.85);
+
+  // Roadside streetlights, both shoulders, receding.
+  for (let side = -1; side <= 1; side += 2) {
+    bgCtx.fillStyle = 'rgba(255,210,140,0.85)';
+    bgCtx.shadowColor = 'rgba(255,210,140,0.6)';
+    for (let i = 0; i < 14; i++) {
+      const t0 = Math.pow((i + (_ferrariMarkerScroll / 60)) / 14, 1.7);
+      if (t0 > 1) break;
+      const pt = project(t0, side * 1.05);
+      bgCtx.shadowBlur = 4 + t0 * 8;
+      bgCtx.beginPath();
+      bgCtx.arc(pt.x, pt.y, 1 + t0 * 4.5, 0, Math.PI * 2);
+      bgCtx.fill();
+    }
+    bgCtx.shadowBlur = 0;
   }
 
-  // ─── BOKEH CITY LIGHTS — soft glowing dots scattered through the
-  //   glass like out-of-focus streetlights. Hue picked from the warm/
-  //   cool gradient so they don't all blob into one colour. movePulse
-  //   wobbles + brightens them so piece moves twinkle the field.
-  const wob = move * 4;
-  for (let i = 0; i < 28; i++) {
-    const bx = ((i * 9173) % 1000) / 1000 * w;
-    const by = ((i * 6673) % 1000) / 1000 * h;
-    const br = 4 + ((i * 4099) % 100) / 100 * 14;
-    const hueShift = (i % 3 === 0) ? 35 : (i % 3 === 1) ? 200 : 320;
-    const a = 0.18 + ((i * 7919) % 100) / 100 * 0.18 + move * 0.25;
-    bgCtx.fillStyle = `hsla(${hueShift}, 80%, 70%, ${a})`;
-    bgCtx.shadowColor = `hsla(${hueShift}, 80%, 70%, 0.7)`;
-    bgCtx.shadowBlur = 12 + cheer * 10;
-    bgCtx.beginPath();
-    bgCtx.arc(
-      bx + Math.sin(now / 1800 + i) * wob,
-      by + Math.cos(now / 2200 + i) * wob,
-      br * (1 + flash * 0.4),
-      0, Math.PI * 2
-    );
-    bgCtx.fill();
-  }
-  bgCtx.shadowBlur = 0;
+  // ─── TRAFFIC. Background cars cruise at varying speeds in three
+  //   lanes. Each car carries a `t` (0=horizon, 1=close to camera)
+  //   and a `lane` (-1, 0, +1 = left/centre/right). They advance every
+  //   frame; when a car passes t=1.05 it despawns.
+  const LANE_X = [-0.66, 0, 0.66];   // lane centres
+  if (!_trafficCars) _trafficCars = [];
 
-  // ─── GLASS RAIN STREAKS — sparse vertical drips along the window
-  //   give the surface a tactile feel. Static; deterministic positions.
-  bgCtx.strokeStyle = 'rgba(180,210,240,0.10)';
-  bgCtx.lineWidth = 1;
-  for (let i = 0; i < 14; i++) {
-    const dx = ((i * 5237) % 1000) / 1000 * w;
-    const dyTop = ((i * 8861) % 1000) / 1000 * h * 0.6;
-    bgCtx.beginPath();
-    bgCtx.moveTo(dx, dyTop);
-    bgCtx.lineTo(dx + 1, dyTop + 30 + (i % 5) * 8);
-    bgCtx.stroke();
+  // Spawn new cars at the horizon at a steady rate, plus more if cheer
+  // is hot (line clears = denser traffic to overtake).
+  _trafficSpawnCooldown -= 1;
+  if (_trafficSpawnCooldown <= 0) {
+    const lane = Math.floor(Math.random() * 3);
+    // Don't pile cars on top of an existing one near the horizon.
+    const tooClose = _trafficCars.some(c => c.lane === lane && c.t < 0.16);
+    if (!tooClose && _trafficCars.length < 9) {
+      const palettes = [
+        [200, 200, 215],   // silver
+        [70, 90, 130],     // blue
+        [170, 90, 60],     // copper
+        [60, 60, 70],      // dark grey
+        [220, 200, 90],    // pale yellow
+        [80, 130, 90],     // green
+      ];
+      _trafficCars.push({
+        lane,
+        t: 0.04,
+        speed: 0.0028 + Math.random() * 0.0022,
+        tint: palettes[Math.floor(Math.random() * palettes.length)],
+      });
+    }
+    _trafficSpawnCooldown = 30 + Math.floor(Math.random() * 30);
   }
 
-  // ─── DRIVE-BY FERRARI ────────────────────────────────────────────
-  // Triggered from clearLines via triggerFerrariDriveBy. Animation is a
-  // single right→left pass over ~2.4 s. Bigger clears = bigger car +
-  // brighter glow so a Tetris really sells the moment.
-  if (_ferrariDriveByT >= 0) {
-    // Advance — assume ~60 fps; advancing 1/144 per frame ≈ 2.4 s pass.
-    _ferrariDriveByT += 1 / 144;
-    if (_ferrariDriveByT >= 1) {
-      _ferrariDriveByT = -1;
-      _ferrariDriveByLines = 0;
-    } else {
-      const t = _ferrariDriveByT;
-      // Ease the position so the car eases in and out at the edges
-      // (cubic in/out) instead of moving at a constant pixel rate.
-      const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      // Right edge → left edge.
-      const carScale = Math.max(0.7, w / 1400) * (1 + (_ferrariDriveByLines - 1) * 0.18);
-      const carW = 240 * carScale;
-      const carH = 95  * carScale;
-      const cx = w + carW * 0.6 - (w + carW * 1.2) * ease;
-      const cy = h * 0.62;
-      bgCtx.save();
-      bgCtx.translate(cx, cy);
-
-      // Speed-streak motion lines trailing the car (right side, since
-      // it's moving left → trail is to the right of the car's body).
-      bgCtx.strokeStyle = 'rgba(255,210,210,0.55)';
-      bgCtx.lineWidth = 2;
-      for (let s = 0; s < 6; s++) {
-        const sy = -carH * 0.2 + s * (carH * 0.1);
-        bgCtx.beginPath();
-        bgCtx.moveTo(carW * 0.55, sy);
-        bgCtx.lineTo(carW * 0.55 + 60 + s * 8, sy);
-        bgCtx.stroke();
+  // Advance + cull traffic cars; collect render entries with their
+  // current screen position so we can sort by depth.
+  // Same-lane collision avoidance: when a traffic car would visually
+  // overlap the player (same lane + t within ~0.18), it lazily swerves
+  // toward the nearest shoulder so the player appears to weave past it
+  // instead of clipping through. Each car remembers its swerve side
+  // (`c.swerveDir`) so the motion stays smooth instead of flipping.
+  const playerLane = _ferrariCurrentLane;
+  const renderEntries = [];
+  for (let i = _trafficCars.length - 1; i >= 0; i--) {
+    const c = _trafficCars[i];
+    c.t += c.speed * (1 + cheer * 1.5);
+    if (c.t > 1.08) { _trafficCars.splice(i, 1); continue; }
+    // Lateral lane-X with collision-aware swerve.
+    let laneX = LANE_X[c.lane];
+    const dt = Math.abs(playerT - c.t);
+    if (c.lane === playerLane && dt < 0.18) {
+      // Pick a side once when collision starts, then keep swerving same
+      // direction for the duration of the encounter. Player at outer
+      // lane → traffic always swerves to the opposite shoulder. Player
+      // at centre → split based on the car's natural side bias.
+      if (!c.swerveDir) {
+        c.swerveDir = (playerLane === 0) ? +1
+                    : (playerLane === 2) ? -1
+                    : (((c.t * 100) | 0) % 2 ? +1 : -1);
       }
+      // Bell-curve intensity (peaks when dt is smallest). Multiplied by
+      // ~0.7 lane-widths so the car visibly clears the lane edge but
+      // doesn't fly off the road.
+      const intensity = 1 - dt / 0.18;
+      laneX += c.swerveDir * intensity * 0.55;
+    } else {
+      c.swerveDir = 0;
+    }
+    const pt = project(c.t, laneX);
+    renderEntries.push({
+      t: c.t,
+      cx: pt.x,
+      cy: pt.y,
+      carW: 70 * pt.scale + 10,
+      carH: 110 * pt.scale + 14,
+      tint: c.tint,
+      isPlayer: false,
+      // Steering tilt for cars in mid-swerve — roll the chassis slightly
+      // so the avoidance reads as deliberate driving rather than drift.
+      tilt: c.swerveDir ? c.swerveDir * 0.18 * (1 - dt / 0.18) : 0,
+    });
+  }
 
-      // Ground shadow
-      bgCtx.fillStyle = 'rgba(0,0,0,0.55)';
-      bgCtx.beginPath();
-      bgCtx.ellipse(0, carH * 0.55, carW * 0.5, carH * 0.18, 0, 0, Math.PI * 2);
-      bgCtx.fill();
-
-      // Ferrari body — side-view low-slung sports car silhouette.
-      // Hood line: long sweeping curve from front nose up to roof to
-      // a short back end. Single Path then filled with red gradient.
-      const bodyGrad = bgCtx.createLinearGradient(0, -carH * 0.6, 0, carH * 0.5);
-      bodyGrad.addColorStop(0, `rgba(${Math.min(255,ar+50)},${Math.min(120,ag+30)},${Math.min(120,ab+30)},1)`);
-      bodyGrad.addColorStop(1, `rgba(${Math.max(0,ar-80)},0,0,1)`);
-      bgCtx.fillStyle = bodyGrad;
-      bgCtx.beginPath();
-      // Start at front-bottom (front-left wheel area, left = front since car drives left)
-      bgCtx.moveTo(-carW * 0.5, carH * 0.35);
-      // Front nose curve up
-      bgCtx.quadraticCurveTo(-carW * 0.55, -carH * 0.05, -carW * 0.32, -carH * 0.15);
-      // Hood up to windshield base
-      bgCtx.lineTo(-carW * 0.05, -carH * 0.18);
-      // Windshield slope up
-      bgCtx.quadraticCurveTo(carW * 0.05, -carH * 0.55, carW * 0.20, -carH * 0.55);
-      // Roof flat
-      bgCtx.lineTo(carW * 0.30, -carH * 0.52);
-      // Rear window slope down
-      bgCtx.quadraticCurveTo(carW * 0.43, -carH * 0.18, carW * 0.50, -carH * 0.10);
-      // Rear bumper
-      bgCtx.lineTo(carW * 0.50, carH * 0.30);
-      // Underside back to start
-      bgCtx.lineTo(-carW * 0.5, carH * 0.30);
-      bgCtx.closePath();
-      bgCtx.fill();
-
-      // Side-window tint
-      bgCtx.fillStyle = 'rgba(15,20,35,0.85)';
-      bgCtx.beginPath();
-      bgCtx.moveTo(-carW * 0.02, -carH * 0.18);
-      bgCtx.quadraticCurveTo(carW * 0.06, -carH * 0.50, carW * 0.20, -carH * 0.50);
-      bgCtx.lineTo(carW * 0.27, -carH * 0.48);
-      bgCtx.quadraticCurveTo(carW * 0.40, -carH * 0.20, carW * 0.42, -carH * 0.18);
-      bgCtx.closePath();
-      bgCtx.fill();
-
-      // Tail light (rear)
-      bgCtx.fillStyle = `rgba(255,80,80,${0.95 + cheer * 0.05})`;
-      bgCtx.shadowColor = 'rgba(255,60,60,0.95)';
-      bgCtx.shadowBlur = 14 + cheer * 16;
-      bgCtx.fillRect(carW * 0.42, -carH * 0.05, carW * 0.07, carH * 0.10);
-      bgCtx.shadowBlur = 0;
-
-      // Headlight (front) — bright cone projecting left
-      bgCtx.fillStyle = 'rgba(255,235,180,0.95)';
-      bgCtx.shadowColor = 'rgba(255,220,140,0.85)';
-      bgCtx.shadowBlur = 18;
-      bgCtx.fillRect(-carW * 0.50, -carH * 0.05, carW * 0.06, carH * 0.10);
-      bgCtx.shadowBlur = 0;
-      // Headlight beam — long thin cone
-      const beamGrad = bgCtx.createLinearGradient(-carW * 0.5, 0, -carW * 1.5, 0);
-      beamGrad.addColorStop(0, 'rgba(255,235,180,0.4)');
-      beamGrad.addColorStop(1, 'rgba(255,235,180,0)');
-      bgCtx.fillStyle = beamGrad;
-      bgCtx.beginPath();
-      bgCtx.moveTo(-carW * 0.5, -carH * 0.05);
-      bgCtx.lineTo(-carW * 1.6, -carH * 0.4);
-      bgCtx.lineTo(-carW * 1.6,  carH * 0.4);
-      bgCtx.lineTo(-carW * 0.5,  carH * 0.05);
-      bgCtx.closePath();
-      bgCtx.fill();
-
-      // Wheels — two black circles peeking under the body
-      bgCtx.fillStyle = '#06060a';
-      const wheelR = carH * 0.22;
-      bgCtx.beginPath();
-      bgCtx.arc(-carW * 0.32, carH * 0.32, wheelR, 0, Math.PI * 2);
-      bgCtx.arc( carW * 0.30, carH * 0.32, wheelR, 0, Math.PI * 2);
-      bgCtx.fill();
-      // Chrome rim hint
-      bgCtx.fillStyle = 'rgba(200,205,215,0.85)';
-      bgCtx.beginPath();
-      bgCtx.arc(-carW * 0.32, carH * 0.32, wheelR * 0.4, 0, Math.PI * 2);
-      bgCtx.arc( carW * 0.30, carH * 0.32, wheelR * 0.4, 0, Math.PI * 2);
-      bgCtx.fill();
-
-      bgCtx.restore();
+  // ─── PLAYER'S RED FERRARI: anchored mid-screen. Lane lerps toward
+  //   _ferrariCurrentLane on overtake. Slight wobble from movePulse.
+  // Lerp the current lane offset toward target.
+  _ferrariLaneOffset += (_ferrariCurrentLane - _ferrariLaneOffset) * 0.08;
+  // Overtake speed-burst: while _ferrariOvertakeT >= 0, the player
+  // briefly sits a bit further ahead (lower t) to suggest passing
+  // cars in the chosen lane.
+  let playerT = 0.74;
+  if (_ferrariOvertakeT >= 0) {
+    _ferrariOvertakeT += 1 / 90;     // ~1.5 s burst
+    if (_ferrariOvertakeT >= 1) {
+      _ferrariOvertakeT = -1;
+      _ferrariOvertakeLines = 0;
+    } else {
+      // Bell-curve forward push: +0.08 t at the peak so the Ferrari
+      // visibly advances past nearby traffic mid-burst.
+      const bell = Math.sin(_ferrariOvertakeT * Math.PI);
+      playerT += 0.08 * bell * (1 + (_ferrariOvertakeLines - 1) * 0.15);
     }
   }
+  const playerLaneX = LANE_X[0] + (LANE_X[2] - LANE_X[0]) * (_ferrariLaneOffset / 2);
+  const playerPt = project(playerT, playerLaneX + (Math.sin(now / 800) >= 0 ? 1 : -1) * move * 0.02);
+  const playerScaleBoost = (onKick ? 1.04 : 1) * (1 + cheer * 0.06);
+  const playerCarW = (95 * playerPt.scale + 14) * playerScaleBoost;
+  const playerCarH = (140 * playerPt.scale + 18) * playerScaleBoost;
+  renderEntries.push({
+    t: playerT,
+    cx: playerPt.x,
+    cy: playerPt.y,
+    carW: playerCarW,
+    carH: playerCarH,
+    tint: [ar, ag, ab],
+    isPlayer: true,
+  });
 
-  // ─── Mask off the play area so the bokeh + drive-by Ferrari don't
+  // Sort by depth (smaller t = farther = drawn first), then render.
+  renderEntries.sort((a, b) => a.t - b.t);
+  for (const e of renderEntries) {
+    // Player gets a faint red underglow halo BEHIND the car (drawn
+    // before the chassis itself) so the silhouette stays clean — the
+    // earlier overlapping ellipse smeared the car shape.
+    if (e.isPlayer && (cheer > 0.05 || _ferrariOvertakeT >= 0)) {
+      const halo = 0.32 + cheer * 0.35 + (_ferrariOvertakeT >= 0 ? 0.20 : 0);
+      bgCtx.save();
+      bgCtx.globalAlpha = halo;
+      const grad = bgCtx.createRadialGradient(e.cx, e.cy, e.carW * 0.3, e.cx, e.cy, e.carW * 0.95);
+      grad.addColorStop(0, `rgba(${ar},${ag},${ab},0.55)`);
+      grad.addColorStop(1, `rgba(${ar},${ag},${ab},0)`);
+      bgCtx.fillStyle = grad;
+      bgCtx.beginPath();
+      bgCtx.arc(e.cx, e.cy, e.carW * 0.95, 0, Math.PI * 2);
+      bgCtx.fill();
+      bgCtx.restore();
+    }
+    _drawHwyCar(e.cx, e.cy, e.carW, e.carH, e.tint, {
+      headlightOn: e.t > 0.3 || e.isPlayer,
+      tilt: e.tilt || 0,
+    });
+  }
+
+  // ─── Mask off the play area so the road + traffic + Ferrari don't
   //   read through the semi-translucent tire-block board.
   if (playRects.length) {
     bgCtx.save();
@@ -6175,12 +6273,12 @@ function drawCheeseWhips(theme, now, playRects) {
   bgCtx.fillStyle = sky;
   bgCtx.fillRect(0, 0, w, h);
 
-  // ─── DRIPS — thick cheese ribbons hanging from the top edge.
+  // ─── DRIPS - thick cheese ribbons hanging from the top edge.
   //   Each drip is a curving teardrop body widened toward the top
   //   (where it meets the "ceiling") and ending in a hanging blob.
   for (let i = 0; i < _cheeseDrips.length; i++) {
     const d = _cheeseDrips[i];
-    // Length pulses with cheer + slight breathing — drips literally
+    // Length pulses with cheer + slight breathing - drips literally
     // stretch down on a Tetris combo.
     const breathe = Math.sin(now / 1800 + d.wobblePhase) * 8;
     const len = d.baseLen + breathe + cheer * 80;
@@ -6188,7 +6286,7 @@ function drawCheeseWhips(theme, now, playRects) {
     // all swing together in lockstep).
     const swayDir = Math.sin(d.wobblePhase * 3.7) >= 0 ? 1 : -1;
     const cx = d.x + Math.sin(now / 2200 + d.wobblePhase) * 4 + swayDir * move * 8;
-    // Ribbon body — outline a teardrop using two side curves meeting
+    // Ribbon body - outline a teardrop using two side curves meeting
     // at a rounded blob at the bottom.
     const wTop = d.width;
     const wMid = d.width * 0.85;
@@ -6209,7 +6307,7 @@ function drawCheeseWhips(theme, now, playRects) {
     bgCtx.bezierCurveTo(cx + wMid, len * 0.55, cx + wTop, len * 0.35, cx + wTop, 0);
     bgCtx.closePath();
     bgCtx.fill();
-    // Bright highlight stripe down the centre — sells the shiny molten
+    // Bright highlight stripe down the centre - sells the shiny molten
     // surface of the cheese.
     bgCtx.fillStyle = 'rgba(255,250,210,0.45)';
     bgCtx.beginPath();
@@ -6226,7 +6324,7 @@ function drawCheeseWhips(theme, now, playRects) {
     bgCtx.fill();
   }
 
-  // ─── BUBBLES — drift slowly upward, wrap to bottom when off-screen.
+  // ─── BUBBLES - drift slowly upward, wrap to bottom when off-screen.
   //   Glint brightens on every kick beat so bubbles visually pop with
   //   the music.
   for (const b of _cheeseBubbles) {
@@ -6262,6 +6360,885 @@ function drawCheeseWhips(theme, now, playRects) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DANCEHALL SCENE (Level 8 - Life is Good)
+// Outdoor Caribbean night dancehall: warm sky, string lights strung between
+// palm trees, a big speaker stack, and a crowd of colorful dancers moving
+// to the riddim. Reacts to audio energy (crowd bounces harder on the one)
+// and cheerPulse (color streamers burst on line clears).
+// ─────────────────────────────────────────────────────────────────────────────
+let _dhScene = null, _dhSceneW = 0;
+let _dhBgImage = null;           // cached dancehall backdrop image
+
+function _initDancehallScene(w, h, theme) {
+  _dhScene = {};
+  _dhSceneW = w;
+  // Lazy-load the dancehall backdrop image once
+  if (!_dhBgImage) {
+    _dhBgImage = new Image();
+    _dhBgImage.src = theme.bgImage || 'level8-dancehall-bg.png';
+  }
+  // Crowd dancers: spread across the lower third of the screen.
+  // Each dancer has a lane (x), a bob phase offset, and a palette index.
+  const DANCER_PALETTES = [
+    { skin: '#8B4513', shirt: '#FF3333', pants: '#1a1a6e' },
+    { skin: '#C68642', shirt: '#00CC44', pants: '#330066' },
+    { skin: '#4A2C0A', shirt: '#FFD700', pants: '#8B0000' },
+    { skin: '#D2691E', shirt: '#FF69B4', pants: '#006600' },
+    { skin: '#8B4513', shirt: '#00BFFF', pants: '#4B0082' },
+    { skin: '#C68642', shirt: '#FF8C00', pants: '#006400' },
+    { skin: '#4A2C0A', shirt: '#EE82EE', pants: '#1C1C1C' },
+    { skin: '#D2691E', shirt: '#FF4500', pants: '#00008B' },
+  ];
+  const count = Math.max(12, Math.floor(w / 50));
+  _dhScene.dancers = [];
+  for (let i = 0; i < count; i++) {
+    const palette = DANCER_PALETTES[i % DANCER_PALETTES.length];
+    _dhScene.dancers.push({
+      x: (i + 0.5) * (w / count) + (Math.random() - 0.5) * 24,
+      bobPhase: Math.random() * Math.PI * 2,
+      // Slightly randomise height/width so the crowd isn't uniform
+      scale: 0.68 + Math.random() * 0.50,
+      palette,
+      // Arms-up phase - each dancer raises arms at a slightly different beat
+      armPhase: Math.random() * Math.PI * 2,
+      // Dance style: 0=wine, 1=daggering, 2=bogle
+      style: Math.floor(Math.random() * 3),
+      // Individual sway speed variation
+      swaySpeed: 200 + Math.random() * 300,
+    });
+  }
+  // String lights: organised as chaser groups along catenary strings
+  _dhScene.lights = [];
+  // Five string-light anchor points
+  _dhScene.lightAnchors = [w * 0.04, w * 0.24, w * 0.50, w * 0.76, w * 0.96];
+  _dhScene.lightAnchorY = h * 0.12;
+  // Generate bulbs along each string segment
+  for (let a = 0; a < _dhScene.lightAnchors.length - 1; a++) {
+    const ax1 = _dhScene.lightAnchors[a], ax2 = _dhScene.lightAnchors[a + 1];
+    const segLen = ax2 - ax1;
+    const bulbCount = Math.max(4, Math.floor(segLen / 24));
+    for (let b = 0; b < bulbCount; b++) {
+      const t = b / (bulbCount - 1);
+      const bx = ax1 + t * segLen;
+      const by = _dhScene.lightAnchorY + Math.sin(t * Math.PI) * 22;
+      _dhScene.lights.push({
+        x: bx, y: by,
+        hue: ((a * 60 + b * 25) % 360) | 0,
+        r: 3.5 + (b % 3) * 2.5,
+        phase: Math.random() * Math.PI * 2,
+        chaserGroup: a,         // which string segment
+        chaserIndex: b,         // position along string
+        chaserPhase: b * 0.45,  // offset for the chasing effect
+      });
+    }
+  }
+  // Streamers (appear on line-clear via cheerPulse).
+  _dhScene.streamers = [];
+
+  // ── PALM TREES flanking the scene ─────────────────────────────────────
+  _dhScene.palms = [];
+  const palmCount = Math.max(2, Math.floor(w / 320));
+  for (let i = 0; i < palmCount; i++) {
+    // Position palms on the edges, avoiding the play area center
+    const side = (i / palmCount < 0.5) ? 'left' : 'right';
+    const px = side === 'left'
+      ? 20 + Math.random() * (w * 0.12)
+      : w - 20 - Math.random() * (w * 0.12);
+    _dhScene.palms.push({
+      x: px,
+      baseY: h * 0.30 + Math.random() * h * 0.28,
+      height: h * 0.22 + Math.random() * h * 0.24,
+      swayPhase: Math.random() * Math.PI * 2,
+      swaySpeed: 2200 + Math.random() * 1800,
+      lean: (Math.random() - 0.5) * 0.16,
+      fronds: 5 + Math.floor(Math.random() * 4),
+    });
+  }
+
+  // ── DJ BOOTH ──────────────────────────────────────────────────────────
+  _dhScene.djBooth = {
+    x: w * 0.12,                // off to the left
+    y: h * 0.48,
+    w: Math.min(90, w * 0.12),
+    h: 55,
+  };
+
+  // ── FLOOR SPOT LIGHTS (colored pools on the dance floor) ─────────────
+  _dhScene.spots = [];
+  const spotCount = 4;
+  const spotHues = [0, 280, 120, 50];
+  for (let i = 0; i < spotCount; i++) {
+    _dhScene.spots.push({
+      x: w * (0.18 + i * 0.22),
+      y: h * 0.78,
+      hue: spotHues[i],
+      r: 34 + Math.random() * 20,
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+
+  // ── CONFETTI PIECES (spawned on line clears, persisted here) ──────────
+  _dhScene.confetti = [];
+
+  // ── DJ VIBE: arm-waving selector phase ────────────────────────────────
+  _dhScene.djSpinPhase = Math.random() * Math.PI * 2;
+}
+
+function _drawDancehallDancer(d, baseFloorY, now, energy, cheer, beatPhase) {
+  const { x, bobPhase, scale, palette, style, swaySpeed } = d;
+  const h = 54 * scale;
+  const w = 20 * scale;
+  // ── BOUNCE: deep riddim bob with energy boost ──
+  const beatT = now / swaySpeed + bobPhase;
+  const bobAmp = (3 + energy * 14 + cheer * 12) * scale;
+  const bob = Math.sin(beatT) * bobAmp;
+  const fy = baseFloorY - bob;
+  const cx = x;
+  // ── HIP SWAY - lateral shift for that dancehall wine ──
+  const swayAmp = 4 + energy * 8 + cheer * 7;
+  const sway = Math.sin(beatT * 1.7) * swayAmp * scale;
+  const footY = fy;
+  const hipY = footY - h * 0.38;
+  const shoulderY = footY - h * 0.70;
+  const headY = footY - h * 0.90;
+  const headR = h * 0.13;
+
+  bgCtx.save();
+  bgCtx.translate(cx, 0);
+  // ─── LEGS with side-to-side weight shift ──
+  bgCtx.strokeStyle = palette.pants;
+  bgCtx.lineWidth = w * 0.40;
+  bgCtx.lineCap = 'round';
+  const legSwing = Math.sin(beatT) * (10 + cheer * 8) * scale;
+  bgCtx.beginPath();
+  bgCtx.moveTo(0, hipY);
+  bgCtx.lineTo(-w * 0.32 + legSwing + sway * 0.6, footY);
+  bgCtx.stroke();
+  bgCtx.beginPath();
+  bgCtx.moveTo(0, hipY);
+  bgCtx.lineTo(w * 0.32 - legSwing + sway * 0.6, footY);
+  bgCtx.stroke();
+  // ─── BODY with hip sway lean ──
+  bgCtx.fillStyle = palette.shirt;
+  bgCtx.beginPath();
+  const bodyLean = sway * 0.5;
+  bgCtx.moveTo(-w * 0.45 + bodyLean, hipY);
+  bgCtx.lineTo(w * 0.45 + bodyLean, hipY);
+  bgCtx.lineTo(w * 0.38 - bodyLean * 0.3, shoulderY);
+  bgCtx.lineTo(-w * 0.38 - bodyLean * 0.3, shoulderY);
+  bgCtx.closePath();
+  bgCtx.fill();
+  // ─── ARMS: varies by style ──
+  bgCtx.strokeStyle = palette.skin;
+  bgCtx.lineWidth = w * 0.26;
+  switch (style) {
+    case 0: // WINE - arms float gracefully side to side
+      const wineArmAmp = 14 * scale * (1 + cheer * 1.2);
+      const wineReach = Math.sin(beatT * 0.7) * wineArmAmp;
+      bgCtx.beginPath();
+      bgCtx.moveTo(-w * 0.38, shoulderY);
+      bgCtx.lineTo(-w * 0.55 + wineReach, shoulderY - h * 0.08);
+      bgCtx.stroke();
+      bgCtx.beginPath();
+      bgCtx.moveTo(w * 0.38, shoulderY);
+      bgCtx.lineTo(w * 0.55 - wineReach, shoulderY - h * 0.08);
+      bgCtx.stroke();
+      break;
+    case 1: // DAGGERING - arms punch up rhythmically
+      const dagPunch = Math.max(0, Math.sin(beatT * 2 + Math.PI * 0.5)) * (h * 0.40) * (1 + cheer * 0.8);
+      bgCtx.beginPath();
+      bgCtx.moveTo(-w * 0.38, shoulderY);
+      bgCtx.lineTo(-w * 0.52, shoulderY - dagPunch);
+      bgCtx.stroke();
+      bgCtx.beginPath();
+      bgCtx.moveTo(w * 0.38, shoulderY);
+      bgCtx.lineTo(w * 0.52, shoulderY - dagPunch);
+      bgCtx.stroke();
+      break;
+    case 2: // BOGLE - alternating arm wave
+    default:
+      const bogleL = Math.sin(beatT * 1.3) * h * 0.32 * (1 + cheer * 0.6);
+      const bogleR = Math.sin(beatT * 1.3 + Math.PI) * h * 0.32 * (1 + cheer * 0.6);
+      bgCtx.beginPath();
+      bgCtx.moveTo(-w * 0.38, shoulderY);
+      bgCtx.lineTo(-w * 0.65, shoulderY - Math.max(0, bogleL));
+      bgCtx.stroke();
+      bgCtx.beginPath();
+      bgCtx.moveTo(w * 0.38, shoulderY);
+      bgCtx.lineTo(w * 0.65, shoulderY - Math.max(0, bogleR));
+      bgCtx.stroke();
+      break;
+  }
+  // ─── HEAD with independent nodding ──
+  const headNod = Math.sin(beatT * 1.8 + 0.8) * (3 + energy * 4 + cheer * 6) * scale;
+  bgCtx.fillStyle = palette.skin;
+  bgCtx.beginPath();
+  bgCtx.arc(bodyLean * 0.3, headY + headNod, headR, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Hair (simple dark cap)
+  bgCtx.fillStyle = '#1a0a00';
+  bgCtx.beginPath();
+  bgCtx.arc(bodyLean * 0.3, headY + headNod - headR * 0.1, headR * 0.82, Math.PI, 0, false);
+  bgCtx.closePath();
+  bgCtx.fill();
+
+  // ─── CHEER REACTION: arms shoot up + white highlight glow ──
+  if (cheer > 0.4) {
+    const cheerAlpha = Math.min(1, (cheer - 0.4) * 1.5) * 0.55;
+    bgCtx.fillStyle = `rgba(255,255,200,${cheerAlpha})`;
+    bgCtx.beginPath();
+    bgCtx.arc(bodyLean * 0.3, headY + headNod - headR * 1.6, headR * 0.3, 0, Math.PI * 2);
+    bgCtx.fill();
+    bgCtx.beginPath();
+    bgCtx.arc(bodyLean * 0.3 - w * 0.35, headY + headNod - headR * 1.6, headR * 0.3, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.restore();
+}
+
+function drawDancehallScene(theme, now, playRects) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (w <= 0 || h <= 0) return;
+  if (!_dhScene || _dhSceneW !== w) _initDancehallScene(w, h, theme);
+
+  const energy  = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+  const cheer   = (typeof cheerPulse === 'number') ? cheerPulse : 0;
+  const onBeat  = (beatPhase % 4 === 0);
+  const onUpbeat = (beatPhase % 4 === 2);
+  const accentRgb = hexToRgb(theme.colors.glow);
+  const floorY = h * 0.80;
+
+  // ── 1. DANCEHALL BACKDROP IMAGE ──────────────────────────────────────
+  if (_dhBgImage && _dhBgImage.complete && _dhBgImage.naturalWidth > 0) {
+    const imgRatio = _dhBgImage.naturalWidth / _dhBgImage.naturalHeight;
+    const canvasRatio = w / h;
+    let sx = 0, sy = 0, sw = _dhBgImage.naturalWidth, sh = _dhBgImage.naturalHeight;
+    if (imgRatio > canvasRatio) {
+      sw = sh * canvasRatio;
+      sx = (_dhBgImage.naturalWidth - sw) / 2;
+    } else {
+      sh = sw / canvasRatio;
+      sy = (_dhBgImage.naturalHeight - sh) / 2;
+    }
+    bgCtx.drawImage(_dhBgImage, sx, sy, sw, sh, 0, 0, w, h);
+    // Slight dimming wash so procedural overlays (string lights, dancers,
+    // floor spots, confetti) read clearly on top instead of fighting the
+    // already-busy photo. Brightens back up briefly on beat / cheer.
+    const dim = 0.32 - (onBeat ? 0.08 : 0) - cheer * 0.12;
+    bgCtx.fillStyle = `rgba(0,8,2,${Math.max(0, dim)})`;
+    bgCtx.fillRect(0, 0, w, h);
+  } else {
+    const sky = bgCtx.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0,    '#07140a');
+    sky.addColorStop(0.40, '#0d2010');
+    sky.addColorStop(0.70, '#1a3a14');
+    sky.addColorStop(1,    '#0a1a06');
+    bgCtx.fillStyle = sky;
+    bgCtx.fillRect(0, 0, w, h);
+  }
+
+  // ── 2. CHASER STRING LIGHTS (behind speakers) ────────────────────────
+  // Draw catenary strings
+  for (let a = 0; a < _dhScene.lightAnchors.length - 1; a++) {
+    const ax1 = _dhScene.lightAnchors[a], ax2 = _dhScene.lightAnchors[a + 1];
+    bgCtx.strokeStyle = 'rgba(60,40,12,0.55)';
+    bgCtx.lineWidth = 0.8;
+    bgCtx.beginPath();
+    bgCtx.moveTo(ax1, _dhScene.lightAnchorY);
+    bgCtx.quadraticCurveTo((ax1 + ax2) / 2, _dhScene.lightAnchorY + 28, ax2, _dhScene.lightAnchorY);
+    bgCtx.stroke();
+  }
+  // Chaser bulbs - cycling brightness along each string
+  const chaserT = (now / 400) % (Math.PI * 2);
+  for (const li of _dhScene.lights) {
+    // Chaser: a wave of brightness travels along each string segment
+    const chaserOn = Math.sin(chaserT - li.chaserPhase) > 0.3;
+    const chaserBright = chaserOn ? 1 : 0.22;
+    const beatBoost = onBeat ? 1.7 : 1;
+    const r2 = li.r * chaserBright * beatBoost;
+    const alpha = 0.3 + chaserBright * 0.65;
+    bgCtx.save();
+    bgCtx.globalAlpha = alpha;
+    bgCtx.shadowColor = `hsl(${li.hue},100%,${chaserOn ? 75 : 40}%)`;
+    bgCtx.shadowBlur = r2 * (chaserOn ? 5 : 1.2);
+    bgCtx.fillStyle = `hsl(${li.hue},100%,${chaserOn ? 80 : 45}%)`;
+    bgCtx.beginPath();
+    bgCtx.arc(li.x, li.y, r2, 0, Math.PI * 2);
+    bgCtx.fill();
+    bgCtx.restore();
+  }
+
+  // ── 3. PALM TREES (behind speakers, swaying) ─────────────────────────
+  for (const palm of _dhScene.palms) {
+    let insideBoard = false;
+    for (const pr of playRects) {
+      if (palm.x >= pr.x - 60 && palm.x <= pr.x + pr.w + 60) { insideBoard = true; break; }
+    }
+    if (insideBoard) continue;
+    _drawPalmTree(palm, now, energy, cheer, accentRgb);
+  }
+
+  // ── 4. STEREO SPEAKER STACKS (left + right, bass-reactive) ───────────
+  _drawDancehallSpeaker(w * 0.35, floorY, now, energy, cheer, onBeat, accentRgb);
+  _drawDancehallSpeaker(w * 0.65, floorY, now, energy, cheer, onBeat, accentRgb);
+
+  // ── 5. DJ BOOTH ───────────────────────────────────────────────────────
+  _drawDjBoothDancehall(now, energy, cheer, onBeat, accentRgb, theme);
+
+  // ── 6. FLOOR SPOT LIGHTS (colored pools pulsing on the ground) ────────
+  bgCtx.save();
+  bgCtx.globalCompositeOperation = 'lighter';
+  for (const sp of _dhScene.spots) {
+    const pulseR = sp.r * (1 + energy * 0.8 + (onBeat ? 0.4 : 0));
+    const spotGrad = bgCtx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, pulseR);
+    spotGrad.addColorStop(0, `hsla(${sp.hue},90%,65%,${0.22 + energy * 0.15})`);
+    spotGrad.addColorStop(1, 'hsla(0,0%,0%,0)');
+    bgCtx.fillStyle = spotGrad;
+    bgCtx.beginPath();
+    bgCtx.ellipse(sp.x, sp.y, pulseR, pulseR * 0.35, 0, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.restore();
+
+  // ── 7. CROWD FLOOR HAZE ───────────────────────────────────────────────
+  const haze = bgCtx.createLinearGradient(0, floorY - 50, 0, h);
+  haze.addColorStop(0, 'rgba(8,16,4,0)');
+  haze.addColorStop(0.4, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.04)`);
+  haze.addColorStop(1, 'rgba(2,6,1,0.92)');
+  bgCtx.fillStyle = haze;
+  bgCtx.fillRect(0, floorY - 50, w, h - floorY + 50);
+
+  // ── 8. DANCERS with varied styles ─────────────────────────────────────
+  bgCtx.save();
+  for (const d of _dhScene.dancers) {
+    let blocked = false;
+    for (const pr of playRects) {
+      if (d.x >= pr.x - 14 && d.x <= pr.x + pr.w + 14) { blocked = true; break; }
+    }
+    if (blocked) continue;
+    _drawDancehallDancer(d, floorY, now, energy, cheer, beatPhase);
+  }
+  bgCtx.restore();
+
+  // ── 9. CONFETTI (falls from string lights on line clears) ─────────────
+  // Spawn confetti when cheer peaks
+  if (cheer > 0.5 && Math.random() < 0.35) {
+    const pc = _dhScene.confetti.length;
+    if (pc < 80) {
+      for (let i = 0; i < 3; i++) {
+        _dhScene.confetti.push({
+          x: Math.random() * w,
+          y: _dhScene.lightAnchorY + 20,
+          vx: (Math.random() - 0.5) * 2.5,
+          vy: 0.3 + Math.random() * 1.5,
+          rot: Math.random() * Math.PI * 2,
+          rotV: (Math.random() - 0.5) * 0.3,
+          size: 3 + Math.random() * 5,
+          color: ['#FFD700','#FF69B4','#00FF88','#FF4500','#00BFFF','#FFFFFF'][Math.floor(Math.random()*6)],
+          life: 1,
+        });
+      }
+    }
+  }
+  // Also consume the global confetti array into the dancehall scene
+  if (confetti.length && _dhScene.confetti.length < 100) {
+    while (confetti.length && _dhScene.confetti.length < 100) {
+      const c = confetti.shift();
+      // Adjust position so they fall from string lights down
+      c.y = Math.min(c.y, _dhScene.lightAnchorY + 20);
+      _dhScene.confetti.push(c);
+    }
+  }
+  // Render confetti
+  for (let i = _dhScene.confetti.length - 1; i >= 0; i--) {
+    const pc = _dhScene.confetti[i];
+    pc.vy += 0.035; pc.vx *= 0.994;
+    pc.x += pc.vx; pc.y += pc.vy; pc.rot += pc.rotV;
+    if (pc.y > h - 30) pc.life -= 0.03;
+    pc.life -= 0.002;
+    if (pc.life <= 0 || pc.y > h + 30) { _dhScene.confetti.splice(i, 1); continue; }
+    bgCtx.save();
+    bgCtx.globalAlpha = pc.life * 0.85;
+    bgCtx.translate(pc.x, pc.y);
+    bgCtx.rotate(pc.rot);
+    bgCtx.fillStyle = pc.color;
+    bgCtx.fillRect(-pc.size / 2, -pc.size / 4, pc.size, pc.size / 2);
+    bgCtx.restore();
+  }
+
+  // ── 10. STREAMERS on cheer/line-clear ─────────────────────────────────
+  if (cheer > 0.1 && _dhScene.streamers.length < 30 && Math.random() < 0.3) {
+    _dhScene.streamers.push({
+      x: Math.random() * w,
+      y: h * 0.35 + Math.random() * h * 0.35,
+      vx: (Math.random() - 0.5) * 3.5,
+      vy: -1.5 - Math.random() * 3,
+      hue: Math.floor(Math.random() * 360),
+      len: 20 + Math.random() * 36,
+      life: 1.0,
+    });
+  }
+  for (let i = _dhScene.streamers.length - 1; i >= 0; i--) {
+    const s = _dhScene.streamers[i];
+    s.x += s.vx; s.y += s.vy; s.vy += 0.04; s.life -= 0.016;
+    if (s.life <= 0) { _dhScene.streamers.splice(i, 1); continue; }
+    bgCtx.save();
+    bgCtx.globalAlpha = s.life * 0.88;
+    bgCtx.strokeStyle = `hsl(${s.hue},100%,65%)`;
+    bgCtx.lineWidth = 2;
+    bgCtx.lineCap = 'round';
+    bgCtx.beginPath();
+    bgCtx.moveTo(s.x, s.y);
+    bgCtx.lineTo(s.x + s.vx * s.len * 0.5, s.y - s.len);
+    bgCtx.stroke();
+    bgCtx.restore();
+  }
+
+  // ── 11. STAGE FLASH - full-screen warm flash on line clears ───────────
+  if (stageFlash > 0) {
+    bgCtx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${stageFlash * 0.5})`;
+    bgCtx.fillRect(0, 0, w, h);
+  }
+
+  // ── 12. BOARD EDGE DROP PULSE - golden ring on piece drop ────────────
+  if (typeof boardDropPulse !== 'undefined' && boardDropPulse > 0 && playRects.length) {
+    const pr = playRects[0]; // main player board
+    const pAlpha = boardDropPulse * 0.6;
+    bgCtx.strokeStyle = `rgba(255,200,50,${pAlpha})`;
+    bgCtx.lineWidth = 3 * boardDropPulse;
+    bgCtx.shadowColor = `rgba(255,200,50,${pAlpha})`;
+    bgCtx.shadowBlur = 18 * boardDropPulse;
+    bgCtx.strokeRect(pr.x - 2, pr.y - 2, pr.w + 4, pr.h + 4);
+    bgCtx.shadowBlur = 0;
+  }
+
+  // ── 13. MASK OFF PLAY AREA ────────────────────────────────────────────
+  if (playRects.length) {
+    bgCtx.save();
+    bgCtx.globalCompositeOperation = 'destination-out';
+    bgCtx.fillStyle = 'rgba(0,0,0,1)';
+    for (const pr of playRects) bgCtx.fillRect(pr.x, pr.y, pr.w, pr.h);
+    bgCtx.restore();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PALM TREE - swaying Caribbean silhouette
+// ─────────────────────────────────────────────────────────────────────────────
+function _drawPalmTree(palm, now, energy, cheer, accentRgb) {
+  const swaySpeed = palm.swaySpeed;
+  const swayAmp = 0.12 + energy * 0.08 + cheer * 0.10;
+  const sway = Math.sin(now / swaySpeed + palm.swayPhase) * swayAmp;
+  const trunkX = palm.x;
+  const trunkTopY = palm.baseY;
+  const trunkBotY = palm.baseY + palm.height * 0.55;
+  const trunkLean = palm.lean + sway * 0.5;
+
+  // ── Trunk: two curved lines (trunk silhouette) ──
+  const trunkW = Math.max(4, palm.height * 0.06);
+  bgCtx.strokeStyle = 'rgba(60,35,15,0.85)';
+  bgCtx.lineWidth = trunkW;
+  bgCtx.lineCap = 'round';
+  const leanOff = trunkLean * palm.height * 0.20;
+  bgCtx.beginPath();
+  bgCtx.moveTo(trunkX - trunkW * 0.3, trunkBotY);
+  bgCtx.quadraticCurveTo(
+    trunkX - trunkW * 0.5 + leanOff * 0.3,
+    (trunkTopY + trunkBotY) / 2,
+    trunkX + leanOff * 0.6,
+    trunkTopY
+  );
+  bgCtx.stroke();
+
+  // ── Fronds: radial arcs from the top ──
+  const frondLen = palm.height * 0.55;
+  const frondBaseX = trunkX + leanOff * 0.7;
+  const frondBaseY = trunkTopY - 6;
+  for (let f = 0; f < palm.fronds; f++) {
+    const angle = -Math.PI * 0.70 + (f / (palm.fronds - 1)) * Math.PI * 0.85;
+    const frondSway = Math.sin(now / 1100 + palm.swayPhase + f * 0.7) * 0.16;
+    const a = angle + sway * 0.6 + frondSway;
+    const tipX = frondBaseX + Math.cos(a) * frondLen;
+    const tipY = frondBaseY + Math.sin(a) * frondLen;
+    const midX = frondBaseX + Math.cos(a) * frondLen * 0.55;
+    const midY = frondBaseY + Math.sin(a) * frondLen * 0.55;
+
+    // Frond with slight droop
+    bgCtx.strokeStyle = 'rgba(20,50,12,0.8)';
+    bgCtx.lineWidth = 2.5;
+    bgCtx.beginPath();
+    bgCtx.moveTo(frondBaseX, frondBaseY);
+    bgCtx.quadraticCurveTo(
+      midX + Math.cos(a + Math.PI/2) * frondLen * 0.12,
+      midY + Math.sin(a + Math.PI/2) * frondLen * 0.12 + frondLen * 0.08,
+      tipX, tipY + 6
+    );
+    bgCtx.stroke();
+
+    // Small leaflets along the frond
+    for (let lf = 0; lf < 5; lf++) {
+      const t = 0.25 + (lf / 5) * 0.7;
+      const lx = frondBaseX + (tipX - frondBaseX) * t;
+      const ly = frondBaseY + (tipY - frondBaseY) * t + 2;
+      const lAngle = a + Math.PI / 2 * (lf % 2 ? 1 : -1) * 0.7;
+      bgCtx.strokeStyle = 'rgba(30,65,15,0.55)';
+      bgCtx.lineWidth = 1;
+      bgCtx.beginPath();
+      bgCtx.moveTo(lx, ly);
+      bgCtx.lineTo(lx + Math.cos(lAngle) * 14, ly + Math.sin(lAngle) * 14);
+      bgCtx.stroke();
+    }
+  }
+
+  // ── Coconuts - 2-3 small brown circles near the crown ──
+  bgCtx.fillStyle = 'rgba(60,30,10,0.9)';
+  for (let c = 0; c < 3; c++) {
+    bgCtx.beginPath();
+    bgCtx.arc(frondBaseX + c * 3 - 3, frondBaseY + 15 + c * 4, 2.5, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DANCEHALL SPEAKER STACK - bass-reactive, chunky sound-system cabinet
+// ─────────────────────────────────────────────────────────────────────────────
+function _drawDancehallSpeaker(cx, floorY, now, energy, cheer, onBeat, accentRgb) {
+  const bassKick = energy * 0.22 + cheer * 0.12 + (onBeat ? 0.08 : 0);
+  const spkW = 36 + bassKick * 22;
+  const spkH = 80 + bassKick * 8;
+  const x = cx - spkW / 2;
+  const y = floorY - spkH;
+
+  // ── Cabinet ──
+  const cabGrad = bgCtx.createLinearGradient(x, y, x + spkW, y);
+  cabGrad.addColorStop(0, '#0c0c0c');
+  cabGrad.addColorStop(0.5, '#1a1a1a');
+  cabGrad.addColorStop(1, '#080808');
+  bgCtx.fillStyle = cabGrad;
+  bgCtx.fillRect(x, y, spkW, spkH);
+  bgCtx.strokeStyle = '#2a2a2a';
+  bgCtx.lineWidth = 1;
+  bgCtx.strokeRect(x, y, spkW, spkH);
+
+  // ── Subwoofer cone: pulse outward with bass ──
+  const coneCx = cx;
+  const coneCy = y + spkH * 0.38;
+  const coneR = Math.max(8, 14 + bassKick * 18);
+  // Cone glow
+  const glowR = coneR * 1.8;
+  const coneGlow = bgCtx.createRadialGradient(coneCx, coneCy, coneR * 0.3, coneCx, coneCy, glowR);
+  coneGlow.addColorStop(0, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.25 + bassKick * 1.5})`);
+  coneGlow.addColorStop(1, 'rgba(0,0,0,0)');
+  bgCtx.fillStyle = coneGlow;
+  bgCtx.beginPath();
+  bgCtx.arc(coneCx, coneCy, glowR, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Cone circle
+  bgCtx.fillStyle = '#151515';
+  bgCtx.beginPath();
+  bgCtx.arc(coneCx, coneCy, coneR, 0, Math.PI * 2);
+  bgCtx.fill();
+  bgCtx.strokeStyle = '#444';
+  bgCtx.lineWidth = 1.5;
+  bgCtx.stroke();
+  // Cone dust cap
+  bgCtx.fillStyle = '#222';
+  bgCtx.beginPath();
+  bgCtx.arc(coneCx, coneCy, coneR * 0.28, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Cone rings (ripples)
+  for (let r2 = 1; r2 <= 3; r2++) {
+    const cr = coneR * (0.4 + r2 * 0.18);
+    bgCtx.strokeStyle = 'rgba(60,60,60,0.5)';
+    bgCtx.lineWidth = 0.6;
+    bgCtx.beginPath();
+    bgCtx.arc(coneCx, coneCy, cr, 0, Math.PI * 2);
+    bgCtx.stroke();
+  }
+
+  // ── Tweeter horn ──
+  const tweeterY = y + spkH * 0.78;
+  bgCtx.fillStyle = 'rgba(255,255,255,0.04)';
+  bgCtx.beginPath();
+  bgCtx.moveTo(cx - 5, tweeterY);
+  bgCtx.lineTo(cx - 10, tweeterY - 12);
+  bgCtx.lineTo(cx + 10, tweeterY - 12);
+  bgCtx.lineTo(cx + 5, tweeterY);
+  bgCtx.closePath();
+  bgCtx.fill();
+  bgCtx.strokeStyle = '#555';
+  bgCtx.stroke();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DJ BOOTH - selector with decks, nodding to the riddim
+// ─────────────────────────────────────────────────────────────────────────────
+function _drawDjBoothDancehall(now, energy, cheer, onBeat, accentRgb, theme) {
+  const booth = _dhScene.djBooth;
+  const bx = booth.x, by = booth.y, bw = booth.w, bh = booth.h;
+  bgCtx.save();
+
+  // ── Booth table ──
+  bgCtx.fillStyle = 'rgba(10,10,14,0.88)';
+  bgCtx.fillRect(bx, by + bh * 0.3, bw, bh * 0.7);
+  bgCtx.strokeStyle = '#333';
+  bgCtx.lineWidth = 1;
+  bgCtx.strokeRect(bx, by + bh * 0.3, bw, bh * 0.7);
+
+  // ── Turntable platters (two circles on the table) ──
+  const deckY = by + bh * 0.18;
+  const deckR = Math.min(14, bw * 0.18);
+  for (const doff of [-1, 1]) {
+    const dx = bx + bw * 0.5 + doff * bw * 0.28;
+    const spinA = (now / 600 + doff * 3) % (Math.PI * 2);
+    // Platter
+    bgCtx.fillStyle = '#1a1a1a';
+    bgCtx.beginPath();
+    bgCtx.arc(dx, deckY, deckR, 0, Math.PI * 2);
+    bgCtx.fill();
+    bgCtx.strokeStyle = '#444';
+    bgCtx.lineWidth = 1;
+    bgCtx.stroke();
+    // Label
+    bgCtx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.35)`;
+    bgCtx.beginPath();
+    bgCtx.arc(dx, deckY, deckR * 0.35, 0, Math.PI * 2);
+    bgCtx.fill();
+    // White dot (rotation marker)
+    bgCtx.fillStyle = 'rgba(255,255,255,0.7)';
+    bgCtx.beginPath();
+    bgCtx.arc(
+      dx + Math.cos(spinA) * deckR * 0.55,
+      deckY + Math.sin(spinA) * deckR * 0.55,
+      1.5, 0, Math.PI * 2
+    );
+    bgCtx.fill();
+  }
+
+  // ── Mixer (center strip) ──
+  bgCtx.fillStyle = '#222';
+  bgCtx.fillRect(bx + bw * 0.43, deckY - 6, bw * 0.14, deckR * 1.0 + 6);
+  // Crossfader line
+  bgCtx.strokeStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.6)`;
+  bgCtx.lineWidth = 1;
+  bgCtx.beginPath();
+  bgCtx.moveTo(bx + bw * 0.46, deckY + 8);
+  bgCtx.lineTo(bx + bw * 0.54, deckY + 8);
+  bgCtx.stroke();
+
+  // ── DJ (selector): small figure behind the booth, head nodding ──
+  const djX = bx + bw * 0.5;
+  const djHeadY = by - 8;
+  const djHeadR = 7;
+  const djNod = Math.sin(now / 300 + _dhScene.djSpinPhase) * (3 + energy * 5 + cheer * 4);
+  // Head
+  bgCtx.fillStyle = '#8B4513';
+  bgCtx.beginPath();
+  bgCtx.arc(djX, djHeadY + djNod, djHeadR, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Headphones band
+  bgCtx.strokeStyle = '#333';
+  bgCtx.lineWidth = 1.5;
+  bgCtx.beginPath();
+  bgCtx.arc(djX, djHeadY + djNod - 1, djHeadR + 2, Math.PI * 0.6, Math.PI * 2.4);
+  bgCtx.stroke();
+  // Headphones earcups
+  bgCtx.fillStyle = '#222';
+  bgCtx.fillRect(djX - djHeadR - 3, djHeadY + djNod - 4, 4, 7);
+  bgCtx.fillRect(djX + djHeadR - 1, djHeadY + djNod - 4, 4, 7);
+  // Arm waving (selector vibe)
+  const armWave = Math.sin(now / 350 + _dhScene.djSpinPhase) * (7 + cheer * 9);
+  bgCtx.strokeStyle = '#8B4513';
+  bgCtx.lineWidth = 3;
+  bgCtx.beginPath();
+  bgCtx.moveTo(djX - 10, djHeadY + djNod + 12);
+  bgCtx.lineTo(djX - 18 + armWave, djHeadY + djNod - 2);
+  bgCtx.stroke();
+
+  // ── Booth banner "DANCEHALL VIBES" ──
+  bgCtx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.5 + (onBeat ? 0.35 : 0)})`;
+  bgCtx.font = `bold ${Math.floor(6)}px "Segoe UI", system-ui, sans-serif`;
+  bgCtx.textAlign = 'center';
+  bgCtx.shadowColor = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.8)`;
+  bgCtx.shadowBlur = onBeat ? 6 : 2;
+  bgCtx.fillText('DJS', bx + bw * 0.5, by - 18);
+  bgCtx.shadowBlur = 0;
+
+  bgCtx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BEEF PATTY BLOCK (Level 8 - Life is Good)
+// Each Tetris cell renders as a cartoon Jamaican beef patty: a semicircular
+// turnover with golden-brown flaky pastry, a visible reddish-brown meat filling
+// in the center, scalloped crimped edge at the top, and a buttery sheen.
+// Each tetromino type uses a slightly different shade variant so the stack
+// reads as a golden pyramid of patties.
+// ─────────────────────────────────────────────────────────────────────────────
+function drawBlockBeefPatty(context, x, y, color, size, alpha, theme) {
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  // Semi-ellipse turnover proportions: wider than tall but not flat.
+  // rx=0.43 → patty spans ~86% of cell width
+  // ry=0.38 → patty spans ~76% of cell height  
+  // The bottom half of the ellipse is the curved turnover edge (filling shows);
+  // the top half has the scalloped crimped pastry edge.
+  const rx = size * 0.43;
+  const ry = size * 0.38;
+
+  context.globalAlpha = alpha;
+
+  // ── Drop shadow so patties pop off the board ──
+  context.save();
+  context.shadowColor = 'rgba(0,0,0,0.50)';
+  context.shadowBlur  = 7;
+  context.shadowOffsetX = 2;
+  context.shadowOffsetY = 3;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LAYER 1 — Reddish-brown meat filling (visible through the top opening)
+  // A rich oval slightly smaller than the patty body, centered slightly
+  // below the ellipse center so it peeks through the top semicircle opening.
+  // ═══════════════════════════════════════════════════════════════════════
+  const fillRx = rx * 0.68;
+  const fillRy = ry * 0.62;
+  const fillCy = cy + ry * 0.08; // slightly below center so top edge shows
+
+  const fillGrad = context.createRadialGradient(
+    cx - fillRx * 0.15, fillCy - fillRy * 0.25, 1,
+    cx, fillCy, fillRx * 1.1
+  );
+  fillGrad.addColorStop(0,   '#b83000'); // bright reddish-brown highlight
+  fillGrad.addColorStop(0.45,'#8B2500'); // rich dark meat color
+  fillGrad.addColorStop(1,   '#5c1500'); // deep burnt edge
+  context.fillStyle = fillGrad;
+  context.beginPath();
+  context.ellipse(cx, fillCy, fillRx, fillRy, 0, 0, Math.PI * 2);
+  context.fill();
+
+  // ── Filling texture specks ──
+  context.save();
+  const speckSeed = Math.floor(cx * 3 + cy);
+  context.fillStyle = 'rgba(80,10,0,0.30)';
+  for (let i = 0; i < 6; i++) {
+    const angle = ((speckSeed + i * 47) % 360) * Math.PI / 180;
+    const dist  = ((speckSeed + i * 31) % 50) / 100;
+    const sx = cx + Math.cos(angle) * fillRx * dist;
+    const sy = fillCy + Math.sin(angle) * fillRy * dist;
+    context.beginPath();
+    context.ellipse(sx, sy, 1.8, 1.1, angle, 0, Math.PI * 2);
+    context.fill();
+  }
+  context.restore();
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LAYER 2 — Golden-brown flaky pastry shell (the turnover body)
+  // A semi-transparent semi-ellipse clipped to show only the lower portion,
+  // giving the illusion of a turnover viewed from slightly above.
+  // ═══════════════════════════════════════════════════════════════════════
+  context.save();
+  // Clip to lower semicircle (the curved turnover edge)
+  context.beginPath();
+  context.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  context.clip();
+  // Fill the whole ellipse with pastry; the filling layer beneath shows through
+  // the top semicircle opening (above the pastry's curved edge).
+  const pastryGrad = context.createLinearGradient(
+    cx, cy - ry,   // top
+    cx, cy + ry    // bottom
+  );
+  pastryGrad.addColorStop(0,   '#f0b840'); // bright golden top edge
+  pastryGrad.addColorStop(0.25,'#e8a017'); // rich honey-gold
+  pastryGrad.addColorStop(0.60,'#c8850A'); // deep golden-brown
+  pastryGrad.addColorStop(1,   '#9b5e08'); // dark amber-brown bottom
+  context.fillStyle = pastryGrad;
+  context.fillRect(x, y, size, size);
+  context.restore();
+  context.restore(); // pop shadow
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LAYER 3 — Scalloped crimped pastry edge (top of the turnover)
+  // The scallops trace the upper arc of the ellipse, sitting on top of
+  // the filling like the pastry pinched around the meat.
+  // ═══════════════════════════════════════════════════════════════════════
+  const crimpCount = 11;
+  context.save();
+  context.translate(cx, cy);
+  context.strokeStyle = '#7a3a06';
+  context.lineWidth = 2.0;
+  context.lineJoin = 'round';
+  for (let i = 0; i < crimpCount; i++) {
+    // Angle spans the upper semicircle: from 180° to 360° (π to 2π)
+    const a1 = Math.PI + (i / crimpCount) * Math.PI;           // start of bump
+    const a2 = Math.PI + ((i + 0.5) / crimpCount) * Math.PI;  // peak of bump  
+    const a3 = Math.PI + ((i + 1) / crimpCount) * Math.PI;    // end of bump
+    const innerRx = rx * 0.86;
+    const innerRy = ry * 0.86;
+    const outerRx = rx * 1.06;
+    const outerRy = ry * 1.06;
+    context.beginPath();
+    context.moveTo(Math.cos(a1) * innerRx, Math.sin(a1) * innerRy);
+    context.quadraticCurveTo(
+      Math.cos(a2) * outerRx, Math.sin(a2) * outerRy,
+      Math.cos(a3) * innerRx, Math.sin(a3) * innerRy
+    );
+    context.stroke();
+  }
+  // Outline stroke around full patty perimeter to crisp up the silhouette
+  context.strokeStyle = '#6b3206';
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  context.stroke();
+  context.restore();
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LAYER 4 — Butter / egg-wash sheen (top-left glossy highlight)
+  // ═══════════════════════════════════════════════════════════════════════
+  const sheenGrad = context.createRadialGradient(
+    cx - rx * 0.28, cy - ry * 0.38, 0,
+    cx - rx * 0.15, cy - ry * 0.20, rx * 0.52
+  );
+  sheenGrad.addColorStop(0,   'rgba(255,252,220,0.68)'); // warm white highlight
+  sheenGrad.addColorStop(0.5, 'rgba(255,238,160,0.28)');
+  sheenGrad.addColorStop(1,   'rgba(255,220,100,0)');
+  context.fillStyle = sheenGrad;
+  context.beginPath();
+  context.ellipse(cx - rx * 0.10, cy - ry * 0.18, rx * 0.58, ry * 0.42, -0.25, 0, Math.PI * 2);
+  context.fill();
+
+  // Small bright specular dot (butter blob highlight)
+  context.fillStyle = 'rgba(255,255,240,0.80)';
+  context.beginPath();
+  context.ellipse(cx - rx * 0.22, cy - ry * 0.32, rx * 0.14, ry * 0.11, -0.3, 0, Math.PI * 2);
+  context.fill();
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // LAYER 5 — Flaky pastry score lines across the visible crust surface
+  // ═══════════════════════════════════════════════════════════════════════
+  context.save();
+  context.globalAlpha = context.globalAlpha * 0.55; // flake lines sit on pastry
+  context.strokeStyle = 'rgba(110,55,8,0.50)';
+  context.lineWidth = 0.9;
+  context.lineCap = 'round';
+  for (let s = -1; s <= 1; s++) {
+    const oy = s * ry * 0.28;
+    const span = rx * (1 - Math.abs(s) * 0.32);
+    // Only draw if the line is within the visible ellipse
+    const lineY = cy + oy;
+    if (lineY < cy - ry * 0.1) { // skip lines too far into the filling zone
+      context.beginPath();
+      context.moveTo(cx - span, lineY);
+      context.quadraticCurveTo(cx, lineY - ry * 0.06, cx + span, lineY);
+      context.stroke();
+    }
+  }
+  context.restore();
+
+  context.globalAlpha = 1;
+}
+
 function drawBackground() {
   const theme = getTheme(level);
   const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
@@ -6272,7 +7249,7 @@ function drawBackground() {
   const hue = theme.particleHue;
   const style = theme.particleStyle;
   const beatBump = (beatPhase % 4 === 0) ? 1.6 : 1;
-  const isMono = style === 'dots'; // Donda is black & white
+  const isMono = style === 'dots'; // Life is Good is black & white
 
   // Play-area exclusion rects in bg-canvas pixels (the bg canvas is 1:1
   // with the visual viewport, so getBoundingClientRect maps directly).
@@ -6281,7 +7258,7 @@ function drawBackground() {
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
   const playRects = [];
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-window' || style === 'cheese-whips');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall');
   if (gameStarted && usesPlayAreaMask) {
     const c1 = document.getElementById('main-canvas');
     if (c1) {
@@ -6322,24 +7299,32 @@ function drawBackground() {
     drawWarehouseScene(theme, now);
   }
   // Matrix code-rain (Back for More): vertical falling-code columns. Owns
-  // its own column state — no per-particle loop needed (bgParticles is
+  // its own column state - no per-particle loop needed (bgParticles is
   // empty for this style). Returns early since there's nothing else to
   // render for this background.
   if (style === 'matrix-rain') {
     drawMatrixRain(theme, now, playRects);
     return;
   }
-  // Ferrari Window: looking through tinted blue glass at city lights
-  // streaking past. A Ferrari only drives across when the player clears
-  // a line (triggered from clearLines via _ferrariDriveByT).
-  if (style === 'ferrari-window') {
-    drawFerrariWindow(theme, now, playRects);
+  // Ferrari Window: night highway with traffic + the player's red
+  // Ferrari cruising in the centre lane. Line clears trigger a lane
+  // change / overtake (signalled from clearLines via the trigger
+  // helper at the bottom of drawFerrariHighway).
+  if (style === 'ferrari-highway') {
+    drawFerrariHighway(theme, now, playRects);
     return;
   }
   // Mac & Cheese: oozing cheese ribbons dripping down from the top
   // edge + lazy floating cheese bubbles. Reactive to game events.
   if (style === 'cheese-whips') {
     drawCheeseWhips(theme, now, playRects);
+    return;
+  }
+  // Dancehall (Life is Good): outdoor Caribbean night party - string lights,
+  // colorful crowd of dancers, palm trees, and a live sound system pulsing
+  // to the riddim.
+  if (style === 'dancehall') {
+    drawDancehallScene(theme, now, playRects);
     return;
   }
 
@@ -6397,9 +7382,9 @@ function drawBackground() {
         const move  = (typeof movePulse  === 'number') ? movePulse  : 0;
         const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
         const flash = (typeof stageFlash === 'number') ? stageFlash : 0;
-        // Cheer/flash still accelerate the fall on big game events — but
+        // Cheer/flash still accelerate the fall on big game events - but
         // off a much lower baseline now, so even a Tetris combo only
-        // pushes ~30–60 px/s briefly instead of strobing the screen.
+        // pushes ~30-60 px/s briefly instead of strobing the screen.
         const fallBoost = 1 + cheer * 1.6 + flash * 1.0;
         p.y += p.speed * 0.7 * fallBoost;
         // Pendulum sway. Each violin carries its own sway-direction sign
@@ -6409,7 +7394,7 @@ function drawBackground() {
         const swayDir = Math.sin(p.phase * 3.7) >= 0 ? 1 : -1;
         const baseSway = Math.sin(now / 3200 + p.phase) * (0.25 + cheer * 0.7);
         p.x += baseSway + swayDir * move * 4;
-        // Subtle wobble around upright — never a full tumble. Cheer widens
+        // Subtle wobble around upright - never a full tumble. Cheer widens
         // the wobble; movePulse adds a quick lurch in the sway direction.
         // Period slowed 1100ms → 2000ms to match the slower fall.
         const wobble = Math.sin(now / 2000 + p.phase) * (0.14 + cheer * 0.25);
@@ -6434,7 +7419,7 @@ function drawBackground() {
     }
 
     // Skip render if a violin/balloon happens to be over the play area.
-    // Sway can carry one onto the board mid-flight — we let it keep
+    // Sway can carry one onto the board mid-flight - we let it keep
     // travelling so it emerges on the far side, but hide it while it's
     // behind the board so it doesn't read through the semi-transparent
     // tetris-effect / matrix tiles.
@@ -6485,7 +7470,7 @@ function drawBackground() {
         break;
       case 'violins': {
         // Recognisable violin silhouette built from primitives. Drawn at
-        // p.size (already 14–28 from initBgParticles) so it reads as a
+        // p.size (already 14-28 from initBgParticles) so it reads as a
         // physical instrument instead of a smudge. Beat-pulse scales it on
         // the kick; cheerPulse from line clears brightens the gold and adds
         // glow; stageFlash on Tetris/big combos lights the strings up.
@@ -6517,7 +7502,7 @@ function drawBackground() {
         bgCtx.beginPath();
         bgCtx.ellipse(0, -S * 0.55, S * 0.75, S * 0.7, 0, 0, Math.PI * 2);
         bgCtx.fill();
-        // Waist filler — slim rect bridging the two bouts so the C-bout
+        // Waist filler - slim rect bridging the two bouts so the C-bout
         // dip looks like a curve, not two missing chunks.
         bgCtx.fillRect(-S * 0.5, -S * 0.55, S, S * 1.1);
         // Outline pass over the whole assembled body.
@@ -6528,7 +7513,7 @@ function drawBackground() {
         bgCtx.ellipse(0, -S * 0.55, S * 0.75, S * 0.7, 0, 0, Math.PI * 2);
         bgCtx.stroke();
 
-        // Drop the shadow now that the body is laid down — the inner
+        // Drop the shadow now that the body is laid down - the inner
         // details would otherwise smear into a glowing blob.
         bgCtx.shadowBlur = 0;
 
@@ -6644,7 +7629,7 @@ function updateUI() {
   document.getElementById('score-display').textContent = Math.floor(score).toLocaleString();
   document.getElementById('level-display').textContent = `Level ${level}`;
   document.getElementById('lines-display').textContent = `Lines: ${lines}`;
-  // "X to L<next>" — how many more line clears until the next level. Levels
+  // "X to L<next>" - how many more line clears until the next level. Levels
   // advance every 10 lines, capped at the last theme so L19 just shows "MAX".
   const nextLevelEl = document.getElementById('next-level-display');
   if (nextLevelEl) {
@@ -6673,7 +7658,7 @@ function updateP2Stats() {
 }
 
 // ============================================================
-// AI (ALFRED) — plans each piece greedily, executes moves with a small
+// AI (ALFRED) - plans each piece greedily, executes moves with a small
 // cooldown so it looks like a player rather than a snap. Heuristic is a
 // Dellacherie-lite: penalise holes and aggregate height, reward line clears.
 // ============================================================
@@ -6758,7 +7743,7 @@ function aiPlanMove(p) {
   }
   if (!candidates.length) return null;
   candidates.sort((a, b) => b.score - a.score);
-  // Difficulty tuning — occasionally pick a weaker placement instead of the
+  // Difficulty tuning - occasionally pick a weaker placement instead of the
   // optimal one so Alfred feels beatable. On a successful "mistake" we pick
   // from the 2nd-to-5th best moves, which are typically close-but-not-ideal
   // rather than catastrophic.
@@ -6822,10 +7807,12 @@ function render(timestamp) {
   // Cheer pulse decays each frame (rises only on line clears in clearLines()).
   // Linear decay over ~1.4s feels right against a 4-beat cheer at 100 bpm.
   if (cheerPulse > 0) cheerPulse = Math.max(0, cheerPulse - 0.012);
-  // Move pulse decays faster — quick ripple per move, not a sustained cheer.
+  // Move pulse decays faster - quick ripple per move, not a sustained cheer.
   if (movePulse > 0) movePulse = Math.max(0, movePulse - 0.04);
-  // Stage flash decays faster — should feel like a camera flash, not a fade.
+  // Stage flash decays faster - should feel like a camera flash, not a fade.
   if (stageFlash > 0) stageFlash = Math.max(0, stageFlash - 0.05);
+  // Board drop pulse - quick decay, gone in ~400ms
+  if (boardDropPulse > 0) boardDropPulse = Math.max(0, boardDropPulse - 0.06);
   drawBackground();
   // Screen-shake decay applied via CSS transform on the main canvas. Cheaper
   // than redrawing into a translated context, and respects the per-player
@@ -6845,7 +7832,7 @@ function render(timestamp) {
   }
   // Pre-game: only the background animates behind the start screen.
   // `board` is undefined until startGame() fills it, so we skip all board
-  // drawing here — matches original behaviour (the start-screen overlay
+  // drawing here - matches original behaviour (the start-screen overlay
   // hides the un-rendered canvas anyway).
   if (!gameStarted) return;
   // Tick and draw each player in turn. Solo mode has one player so this
@@ -6854,7 +7841,7 @@ function render(timestamp) {
     setActivePlayer(p);
     if (p.isAI) aiTick(p, timestamp);
     // Remote (PvP) players are driven entirely by incoming `state` messages.
-    // Skip the local simulation — we only paint their latest snapshot.
+    // Skip the local simulation - we only paint their latest snapshot.
     if (!p.isRemote) update(timestamp);
     drawBoard();
     drawParticles();
@@ -7057,7 +8044,7 @@ document.querySelectorAll('#touch-controls .tc-btn').forEach(btn => {
     const dt = Date.now() - startTime;
     const dist = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
     // Flick up -> hard drop. The old guard required `!moved`, but a quick
-    // side-nudge-then-flick would set moved=true and block the drop — now we
+    // side-nudge-then-flick would set moved=true and block the drop - now we
     // only require net upward motion that's clearly vertical.
     if (totalDy < -50 && Math.abs(totalDy) > Math.abs(totalDx) * 1.2) {
       hardDrop();
@@ -7088,7 +8075,7 @@ document.body.addEventListener('touchmove', (e) => {
 // INIT
 // ============================================================
 function startGame() {
-  // VS FRIEND is driven by the lobby — skip if the WS match hasn't started.
+  // VS FRIEND is driven by the lobby - skip if the WS match hasn't started.
   if (gameMode === 'human' && !NET.matchStarted) {
     openLobby();
     return;
@@ -7139,7 +8126,7 @@ function startGame() {
   // Initialise each player's game state. Honour the start-screen level
   // picker by seeding `level` and `lines` so progression keeps working
   // (clearLines computes newLevel from `lines`, so lines must agree).
-  // VS modes start both players at L1 to keep the match symmetric — the
+  // VS modes start both players at L1 to keep the match symmetric - the
   // start-level picker is a solo convenience, not a handicap knob.
   const maxLvl = LEVEL_THEMES.length - 1;
   const seedLevel = (gameMode === 'solo')
@@ -7178,7 +8165,7 @@ function startGame() {
   alfredVoice.prime();
   playerVoice.prime();
   // iOS Safari: AudioContext starts "suspended" and needs a user gesture.
-  // resume() is async — we must await it before the scheduler starts, otherwise
+  // resume() is async - we must await it before the scheduler starts, otherwise
   // notes get scheduled on a context that isn't running yet and nothing plays.
   if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
     audioEngine.ctx.resume().then(() => audioEngine.start());
@@ -7192,7 +8179,7 @@ function startGame() {
   if (gameMode === 'human' && NET.matchStarted) beginNetStateStream();
 }
 
-// Called from the lobby's `start` message — seed's already been applied.
+// Called from the lobby's `start` message - seed's already been applied.
 function startNetworkMatch() { gameMode = 'human'; startGame(); }
 
 // Push state 10Hz to the opponent. Piece type included so their ghost of our
@@ -7236,7 +8223,7 @@ function stopNetStateStream() {
 }
 
 // Receiver: paint opponent's snapshot into P2's slot. P2 is flagged
-// `isRemote` so the main loop doesn't run `update()` on it — we only draw.
+// `isRemote` so the main loop doesn't run `update()` on it - we only draw.
 function applyRemoteState(msg) {
   const p2 = players[1]; if (!p2 || !p2.isRemote) return;
   if (Array.isArray(msg.board) && Array.isArray(msg.palette)) {
@@ -7256,7 +8243,7 @@ function applyRemoteState(msg) {
   p2.incomingGarbage = msg.incomingGarbage | 0;
 }
 
-// Garbage from opponent — same contract as the local Alfred mode: when you
+// Garbage from opponent - same contract as the local Alfred mode: when you
 // clear, attack lands on opponent; if you DON'T clear on next lock, your
 // pending garbage rises. `applyRemoteGarbage` increments P1's pending total.
 function applyRemoteGarbage(n) {
@@ -7288,7 +8275,7 @@ function openLobby() {
   setLobbyStatus('');
   resetLobbyView();
   setLobbyPanel('create');
-  // Probe via the HTTP /api/health rather than pre-opening a WS — opening a WS
+  // Probe via the HTTP /api/health rather than pre-opening a WS - opening a WS
   // without a code on the Cloudflare Worker would mint a throwaway room.
   probeServer().then(ok => {
     if (!ok) setLobbyStatus('Multiplayer server not reachable', true);
@@ -7297,9 +8284,9 @@ function openLobby() {
 }
 function resetLobbyView() {
   const codeEl = document.getElementById('lobby-room-code');
-  if (codeEl) { codeEl.textContent = '————'; codeEl.style.display = ''; }
+  if (codeEl) { codeEl.textContent = '----'; codeEl.style.display = ''; }
   const peer = document.getElementById('lobby-peer-status');
-  if (peer) peer.textContent = 'Waiting for opponent…';
+  if (peer) peer.textContent = 'Waiting for opponent...';
   const startBtn = document.getElementById('lobby-start-btn');
   if (startBtn) startBtn.disabled = true;
   const idle = document.getElementById('lobby-create-idle');
@@ -7335,7 +8322,7 @@ function leaveCurrentRoom() {
   resetLobbyView();
 }
 
-// Prime the voice engine on any user gesture that starts a game session —
+// Prime the voice engine on any user gesture that starts a game session -
 // Safari/iOS require at least one speak() call inside a real click handler
 // before it will play audio from async contexts (the game loop).
 function primeVoiceOnClick() {
@@ -7354,7 +8341,7 @@ document.getElementById('vs-replay-btn').addEventListener('click', () => {
   if (gameMode === 'human') lobbyLeave();
 });
 
-// Lobby button wiring — explicit flows, no auto-create.
+// Lobby button wiring - explicit flows, no auto-create.
 (function wireLobby() {
   const byId = id => document.getElementById(id);
   const nameInput = byId('lobby-name-input');
@@ -7379,7 +8366,7 @@ document.getElementById('vs-replay-btn').addEventListener('click', () => {
   // `room` + `peer` messages; START MATCH enables when opponent joins.
   const createBtn = byId('lobby-create-btn');
   if (createBtn) createBtn.addEventListener('click', async () => {
-    setLobbyStatus('Connecting…');
+    setLobbyStatus('Connecting...');
     try {
       await netConnect({ code: 'CREATE' });
       netSend({ type: 'hello', name: getName() });
@@ -7391,13 +8378,13 @@ document.getElementById('vs-replay-btn').addEventListener('click', () => {
   });
 
   // JOIN ROOM button: connect, hello, join with the entered code. On success
-  // the server sends `room` + `peer` back — we fall into the same match-start
+  // the server sends `room` + `peer` back - we fall into the same match-start
   // path as the host.
   const joinBtn = byId('lobby-join-btn');
   if (joinBtn) joinBtn.addEventListener('click', async () => {
     const code = (byId('lobby-join-input').value || '').toUpperCase().slice(0, 4);
     if (code.length !== 4) return setLobbyStatus('Enter a 4-character code', true);
-    setLobbyStatus('Joining…');
+    setLobbyStatus('Joining...');
     try {
       await netConnect({ code });
       netSend({ type: 'hello', name: getName() });
@@ -7431,7 +8418,7 @@ document.getElementById('vs-replay-btn').addEventListener('click', () => {
   }
 })();
 
-// Initials entry — force uppercase + [A-Z0-9] only, submit on Enter. Keeps
+// Initials entry - force uppercase + [A-Z0-9] only, submit on Enter. Keeps
 // the arrow keys from bubbling to the game's keydown listener (harmless today
 // because the listener early-returns on gameOver, but a defensive stopProp
 // here lets future refactors not accidentally regress).
@@ -7462,7 +8449,7 @@ setInterval(() => {
 
 // Position the Alfred monitor for the current mode/viewport.
 // On mobile vs-mode we anchor it absolutely to the right side of the player's
-// main canvas — small picture-in-picture, vertically aligned with the top of
+// main canvas - small picture-in-picture, vertically aligned with the top of
 // the board, doesn't fight the HUD or eat into the play area. On desktop or
 // non-vs modes we restore it as a sibling of #p1-wrap inside game-container
 // where the existing flex CSS handles layout.
@@ -7486,7 +8473,7 @@ function positionP2Monitor() {
     p2Wrap.style.zIndex = '4';
     const mainRect = main.getBoundingClientRect();
     // Use the canvas width (set by resizeCanvases) instead of the wrap
-    // width — the wrap may be 0px wide before its child canvas paints.
+    // width - the wrap may be 0px wide before its child canvas paints.
     const p2Canvas = document.getElementById('main-canvas-2');
     const p2W = (p2Canvas && p2Canvas.width) || 60;
     const margin = 4;
@@ -7514,7 +8501,7 @@ function positionP2Monitor() {
 // keyboard / etc.
 window.addEventListener('resize', () => positionP2Monitor());
 // Reposition every animation frame's resize (debounced via scheduleResize)
-// — needed because the main-canvas position can change as the board cell
+// - needed because the main-canvas position can change as the board cell
 // size recomputes after the bg-particle init.
 
 // Mode selector (Solo / Vs Alfred / Vs Friend) on the start screen.
@@ -7530,7 +8517,7 @@ window.addEventListener('resize', () => positionP2Monitor());
   }));
 })();
 
-// Difficulty picker — reflects + writes aiDifficulty.
+// Difficulty picker - reflects + writes aiDifficulty.
 (function wireDifficultySelect() {
   const btns = document.querySelectorAll('.diff-btn');
   if (!btns.length) return;
@@ -7542,9 +8529,9 @@ window.addEventListener('resize', () => positionP2Monitor());
   refresh();
 })();
 
-// Level picker — populated from LEVEL_THEMES so chip labels stay in sync
+// Level picker - populated from LEVEL_THEMES so chip labels stay in sync
 // with whatever eras + tracks exist in the build. Only meaningful in solo
-// mode (vs modes start symmetric at L1) — the picker hides itself in vs.
+// mode (vs modes start symmetric at L1) - the picker hides itself in vs.
 (function wireLevelSelect() {
   const wrap = document.getElementById('level-select');
   const grid = wrap && wrap.querySelector('.lvl-grid');
@@ -7560,7 +8547,7 @@ window.addEventListener('resize', () => positionP2Monitor());
     btn.dataset.lvl = String(lv);
     btn.textContent = String(lv);
     const t = LEVEL_THEMES[lv];
-    btn.title = (t && t.name) ? `Level ${lv} — ${t.name}` : `Level ${lv}`;
+    btn.title = (t && t.name) ? `Level ${lv} - ${t.name}` : `Level ${lv}`;
     grid.appendChild(btn);
   }
   const btns = grid.querySelectorAll('.lvl-btn');
@@ -7578,7 +8565,7 @@ window.addEventListener('resize', () => positionP2Monitor());
     b.addEventListener('mouseleave', refresh);
   });
   refresh();
-  // Hide the picker in vs modes — the seeded-level escape hatch above forces
+  // Hide the picker in vs modes - the seeded-level escape hatch above forces
   // both players to L1 so the match stays fair.
   const modeBtns = document.querySelectorAll('.mode-btn');
   const sync = () => {
