@@ -261,16 +261,43 @@
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
   }
+  /* Tier-1 tabs (SOLO / VS) — bigger pill buttons that visually own the
+     start screen.  Tier-2 sub-modes hang underneath. */
+  .mode-tabs {
+    display: flex; gap: 6px; margin-bottom: 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 28px; padding: 4px;
+  }
+  .mode-tab {
+    padding: 10px 28px; min-width: 110px;
+    font-size: 13px; font-weight: 800; letter-spacing: 3px;
+    background: transparent; color: rgba(255,255,255,0.45);
+    border: none; border-radius: 22px;
+    cursor: pointer; transition: color 0.18s, background 0.18s;
+  }
+  .mode-tab:hover { color: rgba(255,255,255,0.85); }
+  .mode-tab.mode-tab-active {
+    background: linear-gradient(140deg, #8000ff, #ff00ff);
+    color: #fff;
+    box-shadow: 0 2px 14px rgba(255,0,255,0.45);
+  }
   #mode-select {
-    display: flex; gap: 10px; margin-bottom: 24px;
-    flex-wrap: wrap; justify-content: center; max-width: 92%;
+    display: grid; gap: 8px; margin-bottom: 22px;
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 560px; width: 92%;
+  }
+  /* On mobile fall back to a 2-column grid so each label is readable
+     instead of cramming four narrow pills onto one row. */
+  @media (max-width: 720px), (pointer: coarse) {
+    #mode-select { grid-template-columns: repeat(2, 1fr); max-width: 360px; }
+    .mode-tab { padding: 8px 20px; min-width: 90px; font-size: 12px; }
   }
   .mode-btn[data-mode="marathon"].mode-active,
   .mode-btn[data-mode="sprint"].mode-active,
   .mode-btn[data-mode="ultra"].mode-active {
     /* Distinct hue per competitive mode so the picker reads like a menu of
        different challenges, not "another VS". */
-    border-color: #ffd166; background: rgba(255,209,102,0.12);
+    border-color: #ffd166; background: rgba(255,209,102,0.12); color: #fff;
   }
   #difficulty-select {
     display: flex; flex-direction: column; align-items: center;
@@ -351,17 +378,22 @@
     min-height: 14px;
   }
   .mode-btn {
-    padding: 10px 24px;
-    font-size: 12px;
-    font-weight: 700;
+    padding: 12px 8px;
+    font-size: 11px;
+    font-weight: 800;
     letter-spacing: 2px;
     background: transparent;
-    color: rgba(255,255,255,0.4);
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 30px;
+    color: rgba(255,255,255,0.55);
+    border: 1px solid rgba(255,255,255,0.20);
+    border-radius: 14px;
     cursor: pointer;
-    transition: color 0.2s, border-color 0.2s, background 0.2s;
+    transition: color 0.2s, border-color 0.2s, background 0.2s, transform 0.1s;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+  .mode-btn:active { transform: scale(0.96); }
   .mode-btn:hover { color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.5); }
   .mode-btn.mode-active {
     color: #fff;
@@ -527,21 +559,64 @@
     max-width: 140px;
     text-align: center;
   }
+  /* Mode HUD: a panel with a labelled big number for the primary metric
+     of the current mode (lines remaining for Sprint, time remaining for
+     Ultra) plus a small secondary line. Sits above the play area where
+     it's always visible without blocking pieces. */
   #mode-hud {
-    position: fixed; top: 12px; left: 50%;
+    position: fixed; top: 8px; left: 50%;
     transform: translateX(-50%);
     z-index: 50; pointer-events: none;
     font-family: 'Segoe UI', system-ui, sans-serif;
-    font-weight: 800; letter-spacing: 4px; font-size: 16px;
-    color: #fff; padding: 8px 16px;
-    background: rgba(8,8,16,0.78);
-    border: 1px solid rgba(255,209,102,0.45);
-    border-radius: 18px;
-    box-shadow: 0 0 18px rgba(255,209,102,0.30);
-    text-shadow: 0 0 10px rgba(255,209,102,0.55);
+    color: #fff;
+    padding: 10px 22px;
+    background: linear-gradient(180deg, rgba(255,209,102,0.20), rgba(8,8,16,0.85));
+    border: 1.5px solid rgba(255,209,102,0.65);
+    border-radius: 22px;
+    box-shadow: 0 4px 24px rgba(255,209,102,0.30), inset 0 1px 0 rgba(255,255,255,0.18);
+    text-align: center;
+    min-width: 220px;
+  }
+  #mode-hud .mh-label {
+    display: block;
+    font-size: 9px; letter-spacing: 4px; font-weight: 700;
+    color: rgba(255,209,102,0.85);
+    margin-bottom: 2px;
+  }
+  #mode-hud .mh-primary {
+    display: block;
+    font-size: 32px; font-weight: 900;
+    letter-spacing: 1px;
+    text-shadow: 0 0 14px rgba(255,209,102,0.60);
+    line-height: 1;
+    /* Tabular figures so the digits don't wiggle as the timer ticks. */
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+  #mode-hud .mh-secondary {
+    display: block; margin-top: 4px;
+    font-size: 11px; letter-spacing: 2px; font-weight: 700;
+    color: rgba(255,255,255,0.70);
+    font-variant-numeric: tabular-nums;
+  }
+  /* Urgent state — turns red + pulses when sprint < 5 lines OR ultra < 10s */
+  #mode-hud.is-urgent {
+    border-color: #ff4466;
+    background: linear-gradient(180deg, rgba(255,68,102,0.30), rgba(8,8,16,0.85));
+    box-shadow: 0 4px 24px rgba(255,68,102,0.50), inset 0 1px 0 rgba(255,255,255,0.18);
+    animation: modeHudPulse 0.6s ease-in-out infinite;
+  }
+  #mode-hud.is-urgent .mh-label   { color: rgba(255,180,200,0.95); }
+  #mode-hud.is-urgent .mh-primary { text-shadow: 0 0 14px rgba(255,68,102,0.85); }
+  @keyframes modeHudPulse {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50%      { transform: translateX(-50%) scale(1.06); }
   }
   @media (max-width: 720px) {
-    #mode-hud { font-size: 13px; padding: 6px 12px; letter-spacing: 2px; }
+    #mode-hud { padding: 6px 14px; min-width: 160px; top: 4px; }
+    #mode-hud .mh-primary   { font-size: 22px; }
+    #mode-hud .mh-secondary { font-size: 9px; letter-spacing: 1.5px; }
+    #mode-hud .mh-label     { font-size: 8px; letter-spacing: 3px; }
   }
   #zone-active-badge {
     position: fixed;
@@ -1142,13 +1217,23 @@
 
 <div id="start-screen">
   <h1>TETRIS BEATS</h1>
-  <div id="mode-select">
-    <button class="mode-btn mode-active" data-mode="solo" title="Pick any of the 19 themed levels — each with its own track + visual scene.">STORY</button>
-    <button class="mode-btn" data-mode="marathon" title="Endless run from L1 → L19. Highest score wins. End on top out.">MARATHON</button>
-    <button class="mode-btn" data-mode="sprint" title="Clear 40 lines as fast as possible. Best time wins.">SPRINT</button>
-    <button class="mode-btn" data-mode="ultra" title="Score as much as possible in 2 minutes flat.">ULTRA</button>
-    <button class="mode-btn" data-mode="vs">VS ALFRED</button>
-    <button class="mode-btn" data-mode="human">VS FRIEND</button>
+  <!-- Two-tier mode picker:
+         Tier 1  : SOLO | VS  (big tabs)
+         Tier 2  : sub-modes specific to the active tab
+       Mobile-friendly: each tier is its own row that wraps cleanly. -->
+  <div id="mode-tabs" class="mode-tabs">
+    <button class="mode-tab mode-tab-active" data-tab="solo">SOLO</button>
+    <button class="mode-tab" data-tab="vs">VERSUS</button>
+  </div>
+  <div id="mode-select" data-active-tab="solo">
+    <!-- SOLO sub-modes -->
+    <button class="mode-btn mode-active" data-mode="solo"     data-tab="solo" title="Pick any of the 19 themed levels — each with its own track + visual scene.">STORY</button>
+    <button class="mode-btn"             data-mode="marathon" data-tab="solo" title="150-line endurance run. Levels speed up every 15 lines, capping at L19. Score chase.">MARATHON</button>
+    <button class="mode-btn"             data-mode="sprint"   data-tab="solo" title="Clear 40 lines as fast as possible. Locked at L1 gravity — pure speed. Top-out fails the run.">SPRINT</button>
+    <button class="mode-btn"             data-mode="ultra"    data-tab="solo" title="Score as much as possible in 2 minutes flat. Locked at L1 gravity.">ULTRA</button>
+    <!-- VS sub-modes -->
+    <button class="mode-btn"             data-mode="vs"       data-tab="vs"   style="display:none;">VS ALFRED</button>
+    <button class="mode-btn"             data-mode="human"    data-tab="vs"   style="display:none;">VS FRIEND</button>
   </div>
   <!-- Difficulty picker - visible only when "VS ALFRED" mode is selected.
        Three tiers wired to AI_DIFFICULTIES presets in JS. Persists across
@@ -1309,9 +1394,13 @@
 </div>
 <div id="combo-display"></div>
 <div id="level-announce"></div>
-<!-- Sprint lines-left / Ultra time-left HUD. Single floating chip above
-     the play area; visible only during those modes. Driven by updateUI(). -->
-<div id="mode-hud" style="display:none;"></div>
+<!-- Sprint lines-left / Ultra time-left HUD. Big panel above the play
+     area; visible only during those modes. Driven by updateUI(). -->
+<div id="mode-hud" style="display:none;">
+  <span class="mh-label" id="mh-label">SPRINT</span>
+  <span class="mh-primary" id="mh-primary">0:00.00</span>
+  <span class="mh-secondary" id="mh-secondary">40 lines · 0.00 PPS</span>
+</div>
 <div id="zone-active-badge">ZONE × 2.5</div>
 
 <!-- Touch HUD: minimal - swipe handles left/right/down + hard-drop, tap rotates.
@@ -2217,6 +2306,12 @@ var paused, gameStarted, animFrame;
 // `_ultraTimeLimit`: ms before Ultra ends. 120000 in ultra, 0 elsewhere.
 // `_sprintTarget`: line count to clear in Sprint. 40 in sprint, 0 elsewhere.
 var _modeStartTime = 0, _modeFinishTime = null, _ultraTimeLimit = 0, _sprintTarget = 0;
+// `_pieceLockCount`: total pieces locked this run — drives Sprint's
+// pieces-per-second readout (the standard sprint speed metric).
+// `_marathonGoal`: line target for Marathon (default 150 per Tetris
+// Effect's standard). Reaching it ends the run as a SUCCESS.
+var _pieceLockCount = 0;
+var _marathonGoal = 150;
 var bgParticles;
 var beatPhase = 0;
 // ─── Tetris Effect-style FX (shared, not per-player) ──────────────
@@ -2420,26 +2515,34 @@ function handleTopOut() {
     // own `result` handler.
     handleNetworkResult({ youWon: false, reason: 'topout' });
   } else if (gameMode === 'sprint') {
-    // Topping out in sprint = failed run. Don't post a time. Show game over
-    // with no leaderboard entry path.
+    // Topping out in sprint = FAILED RUN. We mark the time as null so
+    // showGameOver knows not to qualify it for the leaderboard.
     handleModeFinish('sprint', /* failed */ true);
   } else if (gameMode === 'ultra') {
     // Topping out in ultra short-circuits the timer but still records the
     // score the player accumulated.
     handleModeFinish('ultra', false);
+  } else if (gameMode === 'marathon') {
+    // Marathon top-out before the 150-line goal = FAILED RUN; no
+    // leaderboard. Reaching the goal is handled by handleModeFinish via
+    // the render-loop end-condition path.
+    handleModeFinish('marathon', /* failed */ true);
   } else {
-    // story / marathon: standard score-chase top-out.
+    // story: standard score-chase top-out.
     showGameOver();
   }
 }
 
-// Sprint / Ultra finishers — share the score-screen flow but pre-stamp the
-// metric so the leaderboard saves the right value.
-function handleModeFinish(mode, failedSprint) {
+// Sprint / Ultra / Marathon finishers — share the score-screen flow but
+// pre-stamp the metric so the leaderboard saves the right value. `failed`
+// signals a top-out before the goal (Sprint < 40 lines, Marathon < 150
+// lines); those runs don't qualify for the leaderboard.
+let _modeRunFailed = false;
+function handleModeFinish(mode, failed) {
+  _modeRunFailed = !!failed;
   if (activePlayer) {
     for (const f of PLAYER_FIELDS) activePlayer[f] = globalThis[f];
   }
-  // Stop the music + scheduler the same way showGameOver does.
   audioEngine.stop();
   showGameOver();
 }
@@ -2521,6 +2624,10 @@ function getGhostY() {
 }
 
 function lockPiece() {
+  // Per-run piece counter — feeds Sprint's pieces-per-second readout.
+  // Only counted on the human player's lock so AI activity doesn't
+  // pollute Sir's PPS.
+  if (!activePlayer || !activePlayer.isAI) _pieceLockCount++;
   const color = PIECES[currentType].color;
   for (const [bx, by] of currentPiece) {
     const nx = currentX + bx, ny = currentY + by;
@@ -2679,13 +2786,22 @@ function clearLines() {
     const zoneMul = zoneActive ? 2.5 : 1;
     score += (basePoints[cleared] || 800) * level * (1 + combo * 0.5) * zoneMul;
     lines += cleared;
-    const newLevel = Math.floor(lines / LINES_PER_LEVEL) + 1;
-    if (newLevel !== level) {
-      prevLevel = level;
-      level = newLevel;
-      dropInterval = computeDropInterval(level);
-      lockDelay = computeLockDelay(level);
-      onLevelChange();
+    // Sprint and Ultra LOCK gravity at L1 — pure speed/score modes per the
+    // standard Tetris guideline (TETR.IO 40 LINES, Tetris Effect Ultra).
+    // Levels still tick visually for theme cycling? No — keep them static
+    // so the music + visuals stay consistent for the whole run. Marathon
+    // caps at L19 (final theme) per Tetris Effect's "Endless toggled off"
+    // L15 cap pattern, adapted to our 19 themes.
+    if (gameMode !== 'sprint' && gameMode !== 'ultra') {
+      const cap = (gameMode === 'marathon') ? (LEVEL_THEMES.length - 1) : 999;
+      const newLevel = Math.min(cap, Math.floor(lines / LINES_PER_LEVEL) + 1);
+      if (newLevel !== level) {
+        prevLevel = level;
+        level = newLevel;
+        dropInterval = computeDropInterval(level);
+        lockDelay = computeLockDelay(level);
+        onLevelChange();
+      }
     }
     if (!zoneActive) zoneEnergy = Math.min(100, zoneEnergy + cleared * 15);
     audioEngine.playLineClear(cleared);
@@ -4400,20 +4516,34 @@ async function showGameOver() {
   _currentLbMode = _pendingMode;
   let rankMetric = finalScore;
   let resultLine;
+  // Failed run = top-out before reaching goal; it stays off the leaderboard
+  // regardless of score/time.
+  const runFailed = _modeRunFailed;
   if (_pendingMode === 'sprint') {
     const elapsed = (_modeFinishTime || performance.now()) - _modeStartTime;
-    _pendingTimeMs = (lines >= _sprintTarget) ? Math.round(elapsed) : null;
+    _pendingTimeMs = (!runFailed && lines >= _sprintTarget) ? Math.round(elapsed) : null;
     rankMetric = _pendingTimeMs;
     resultLine = (_pendingTimeMs != null)
-      ? `Sprint · ${fmtSprintTime(_pendingTimeMs)} · ${lines}/${_sprintTarget}ln`
-      : `Sprint · failed at ${lines}/${_sprintTarget}ln`;
+      ? `Sprint · ${fmtSprintTime(_pendingTimeMs)} · 40/40 lines`
+      : `Sprint · FAILED at ${lines}/40 lines`;
   } else if (_pendingMode === 'ultra') {
     _pendingTimeMs = null;
-    resultLine = `Ultra · ${finalScore.toLocaleString()} · ${lines}ln · 2:00`;
+    rankMetric = runFailed ? null : finalScore;
+    resultLine = runFailed
+      ? `Ultra · TOP-OUT · ${finalScore.toLocaleString()} · ${lines}ln`
+      : `Ultra · ${finalScore.toLocaleString()} · ${lines}ln · 2:00`;
+  } else if (_pendingMode === 'marathon') {
+    _pendingTimeMs = null;
+    rankMetric = runFailed ? null : finalScore;
+    resultLine = runFailed
+      ? `Marathon · FAILED · ${finalScore.toLocaleString()} · ${lines}/${_marathonGoal} lines`
+      : `Marathon · CLEARED · ${finalScore.toLocaleString()} · ${lines} lines · L${level}`;
   } else {
     _pendingTimeMs = null;
     resultLine = `Score: ${finalScore.toLocaleString()} · Lines: ${lines} · Level: ${level}`;
   }
+  // Reset the flag for the next run.
+  _modeRunFailed = false;
   finalLine.textContent = resultLine;
   document.getElementById('game-over-screen').style.display = 'flex';
   audioEngine.stop();
@@ -8078,139 +8208,145 @@ function drawBlockBrain(context, x, y, color, size, alpha, theme) {
 // Sized so the bell + mouthpiece span the full cell width, instantly
 // recognisable as a trumpet rather than an abstract gold blob.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// TRUMPET BLOCK (Level 10 - Trumpets Please)
+// Trumpet 🎺-emoji orientation: mouthpiece on LEFT, bell flaring out to
+// the RIGHT (the universally-recognised trumpet silhouette). Built from
+// six clear shapes so it reads as a horn even at 18-px CELL:
+//   1. Mouthpiece cup  (left edge)
+//   2. Lead pipe       (thin horizontal tube)
+//   3. Three valve caps clustered above the pipe (the iconic signature)
+//   4. Bell THROAT     (narrow neck where pipe meets bell)
+//   5. Bell FLARE      (rapid cone widening to the right)
+//   6. Bell RIM disc   (the dark ellipse "looking into" the bell)
+// Bell flare is now CURVED (quadratic) instead of straight-line so it
+// reads as a real horn rather than a megaphone/flashlight.
+// ─────────────────────────────────────────────────────────────────────────────
 function drawBlockTrumpet(context, x, y, color, size, alpha, theme) {
-  const cx = x + size / 2;
-  const cy = y + size * 0.62; // trumpet body sits on the lower half; valves stick up
+  const cy = y + size * 0.58; // pipe sits below centre so valves rise into upper half
 
   context.globalAlpha = alpha;
   context.save();
-  // Brass colours (theme accent provides the gold but we anchor on real
-  // brass to make the icon legible regardless of accent tweaks).
-  const goldDark = '#8a5a14';
+  const goldDark = '#7a4f10';
   const goldMid  = '#d99820';
   const goldLite = '#fbd86b';
-
-  // Drop shadow so brass pops on the velvet board fill.
   context.shadowColor = 'rgba(80,40,0,0.55)';
   context.shadowBlur  = Math.min(7, size * 0.16);
   context.shadowOffsetX = 1;
   context.shadowOffsetY = 1.5;
 
-  // ── 1. BELL (LEFT side) — flares out, the most recognisable trumpet feature.
-  // Sir noted the prior orientation read as "backwards"; trumpets in art /
-  // emoji are conventionally drawn with the bell on the left, mouthpiece
-  // on the right (the way a player faces forward and lifts the bell to
-  // their left side). Mirrored all X coords.
-  const bellTipX = x + size * 0.08;
-  const bellTopY = cy - size * 0.30;
-  const bellBotY = cy + size * 0.30;
-  const bellNeckX = x + size * 0.38;
-  const bellNeckHalf = size * 0.10;
-
+  // ── 1. MOUTHPIECE — small cup on the LEFT edge
+  const mouthX = x + size * 0.10;
+  const mouthRy = size * 0.10;
   context.fillStyle = goldMid;
   context.beginPath();
-  context.moveTo(bellNeckX, cy - bellNeckHalf);
-  context.lineTo(bellTipX,  bellTopY);
-  context.lineTo(bellTipX,  bellBotY);
-  context.lineTo(bellNeckX, cy + bellNeckHalf);
-  context.closePath();
+  context.ellipse(mouthX, cy, size * 0.05, mouthRy, 0, 0, Math.PI * 2);
   context.fill();
-  // Bell rim disc (the front face of the bell - flat ellipse)
   context.fillStyle = goldDark;
   context.beginPath();
-  context.ellipse(bellTipX, cy, size * 0.045, size * 0.30, 0, 0, Math.PI * 2);
-  context.fill();
-  // Bell inner gradient highlight (top diagonal sheen)
-  const bellSheen = context.createLinearGradient(bellNeckX, bellTopY, bellTipX, bellBotY);
-  bellSheen.addColorStop(0, 'rgba(255,235,180,0.55)');
-  bellSheen.addColorStop(0.5, 'rgba(255,255,255,0.0)');
-  bellSheen.addColorStop(1, 'rgba(80,40,0,0.20)');
-  context.fillStyle = bellSheen;
-  context.beginPath();
-  context.moveTo(bellNeckX, cy - bellNeckHalf);
-  context.lineTo(bellTipX,  bellTopY);
-  context.lineTo(bellTipX,  bellBotY);
-  context.lineTo(bellNeckX, cy + bellNeckHalf);
-  context.closePath();
+  context.ellipse(mouthX - size * 0.015, cy, size * 0.02, size * 0.06, 0, 0, Math.PI * 2);
   context.fill();
 
-  context.restore();
-  context.save();
-
-  // ── 2. LEAD PIPE — thin horizontal tube from bell neck to mouthpiece
+  // ── 2. LEAD PIPE — thin tube running from mouthpiece to bell throat
   const pipeY  = cy - size * 0.04;
-  const pipeH  = size * 0.12;
-  const pipeX0 = bellNeckX;     // tube starts at the bell neck (left)
-  const pipeX1 = x + size * 0.84; // tube ends at the mouthpiece (right)
+  const pipeH  = size * 0.10;
+  const pipeX0 = mouthX;
+  const pipeX1 = x + size * 0.55; // bell throat starts here
   const pipeGrad = context.createLinearGradient(0, pipeY, 0, pipeY + pipeH);
-  pipeGrad.addColorStop(0, goldLite);
-  pipeGrad.addColorStop(0.5, goldMid);
-  pipeGrad.addColorStop(1, goldDark);
+  pipeGrad.addColorStop(0,    goldLite);
+  pipeGrad.addColorStop(0.55, goldMid);
+  pipeGrad.addColorStop(1,    goldDark);
   context.fillStyle = pipeGrad;
   context.fillRect(pipeX0, pipeY, pipeX1 - pipeX0, pipeH);
-
-  // ── 3. MOUTHPIECE — small cup at the right end, slightly larger than the pipe
-  context.fillStyle = goldMid;
+  // Pipe edge lines for definition
+  context.strokeStyle = goldDark;
+  context.lineWidth = Math.max(0.6, size * 0.018);
   context.beginPath();
-  context.ellipse(pipeX1, cy + size * 0.02, size * 0.07, size * 0.10, 0, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = goldDark;
-  context.beginPath();
-  context.ellipse(pipeX1 + size * 0.02, cy + size * 0.02, size * 0.025, size * 0.06, 0, 0, Math.PI * 2);
-  context.fill();
+  context.moveTo(pipeX0, pipeY);          context.lineTo(pipeX1, pipeY);
+  context.moveTo(pipeX0, pipeY + pipeH);  context.lineTo(pipeX1, pipeY + pipeH);
+  context.stroke();
 
-  // ── 4. THREE VALVES — short vertical cylinders rising from the lead pipe
-  // Each valve = a vertical pill above the pipe. They're the classic trumpet
-  // signature, so make them clearly visible.
-  const valveCount = 3;
-  const valveW = size * 0.10;
-  const valveH = size * 0.30;
-  const valveSpacing = size * 0.13;
-  // Valve cluster sits between the bell neck and the mouthpiece, biased
-  // toward the bell so the silhouette reads as a real trumpet (valves are
-  // closer to the bell than the mouthpiece on a real horn).
-  const valveStartX = x + size * 0.45;
-  const valveTopY = pipeY - valveH + size * 0.04;
+  // ── 3. THREE VALVES — rounded caps clustered on top of the lead pipe.
+  // Closer together + smaller than before so they read as cluster, not
+  // three separate antennae.
+  const valveW = size * 0.08;
+  const valveH = size * 0.28;
+  const valveGap = size * 0.02;
+  const valveStartX = x + size * 0.20;
+  const valveTopY = pipeY - valveH + size * 0.02;
   const valveGrad = context.createLinearGradient(0, valveTopY, 0, valveTopY + valveH);
-  valveGrad.addColorStop(0, goldLite);
+  valveGrad.addColorStop(0,   goldLite);
   valveGrad.addColorStop(0.5, goldMid);
-  valveGrad.addColorStop(1, goldDark);
-  for (let v = 0; v < valveCount; v++) {
-    const vx = valveStartX + v * valveSpacing;
+  valveGrad.addColorStop(1,   goldDark);
+  for (let v = 0; v < 3; v++) {
+    const vx = valveStartX + v * (valveW + valveGap);
     context.fillStyle = valveGrad;
     context.beginPath();
-    if (context.roundRect) context.roundRect(vx, valveTopY, valveW, valveH, valveW * 0.40);
+    if (context.roundRect) context.roundRect(vx, valveTopY, valveW, valveH, valveW * 0.45);
     else context.rect(vx, valveTopY, valveW, valveH);
     context.fill();
-    // Valve cap highlight
-    context.fillStyle = 'rgba(255,240,200,0.65)';
+    // Cap highlight
+    context.fillStyle = 'rgba(255,245,210,0.85)';
     context.beginPath();
-    context.arc(vx + valveW / 2, valveTopY + valveW * 0.40, valveW * 0.25, 0, Math.PI * 2);
+    context.ellipse(vx + valveW / 2, valveTopY + valveW * 0.40, valveW * 0.30, valveW * 0.20, 0, 0, Math.PI * 2);
     context.fill();
-    // Tiny darker base where the valve meets the pipe (visual seam)
-    context.fillStyle = goldDark;
-    context.fillRect(vx, valveTopY + valveH - size * 0.025, valveW, size * 0.025);
   }
 
-  // ── 5. PIPE EDGE LINES for definition ──
+  // ── 4-5. BELL — quadratic-curve flare from throat (pipeX1, narrow) to
+  // tip (rim, wide). Two filled paths layered: outer brass body, then a
+  // top-edge sheen so it reads as a polished surface.
+  const throatY1 = pipeY;
+  const throatY2 = pipeY + pipeH;
+  const tipX     = x + size * 0.95;
+  const tipTopY  = cy - size * 0.34;
+  const tipBotY  = cy + size * 0.34;
+  const ctrlOff  = size * 0.10; // pulls the flare into a curve
+
+  context.fillStyle = goldMid;
+  context.beginPath();
+  // Top edge: throat top → curve up to rim top
+  context.moveTo(pipeX1, throatY1);
+  context.quadraticCurveTo(pipeX1 + size * 0.18, throatY1 - ctrlOff, tipX, tipTopY);
+  // Across the rim face (slight inward arc — gives the bell mouth dimension)
+  context.lineTo(tipX, tipBotY);
+  // Bottom edge: rim bottom → curve back to throat bottom
+  context.quadraticCurveTo(pipeX1 + size * 0.18, throatY2 + ctrlOff, pipeX1, throatY2);
+  context.closePath();
+  context.fill();
+  // Bell sheen along top
+  const bellSheen = context.createLinearGradient(pipeX1, throatY1, tipX, cy);
+  bellSheen.addColorStop(0,   'rgba(255,245,210,0.55)');
+  bellSheen.addColorStop(0.6, 'rgba(255,245,210,0.10)');
+  bellSheen.addColorStop(1,   'rgba(80,40,0,0.0)');
+  context.fillStyle = bellSheen;
+  context.beginPath();
+  context.moveTo(pipeX1, throatY1);
+  context.quadraticCurveTo(pipeX1 + size * 0.18, throatY1 - ctrlOff, tipX, tipTopY);
+  context.lineTo(tipX, cy - size * 0.04);
+  context.quadraticCurveTo(pipeX1 + size * 0.18, throatY1 + size * 0.06, pipeX1, throatY1 + size * 0.02);
+  context.closePath();
+  context.fill();
+
+  // ── 6. BELL RIM — dark ellipse on the tip end so we "look into" the bell
+  context.fillStyle = '#3d2408';
+  context.beginPath();
+  context.ellipse(tipX, cy, size * 0.04, (tipBotY - tipTopY) / 2, 0, 0, Math.PI * 2);
+  context.fill();
+  // Rim outer outline (catches light)
   context.strokeStyle = goldDark;
   context.lineWidth = Math.max(0.8, size * 0.025);
   context.beginPath();
-  context.moveTo(pipeX0, pipeY);
-  context.lineTo(pipeX1, pipeY);
-  context.moveTo(pipeX0, pipeY + pipeH);
-  context.lineTo(pipeX1, pipeY + pipeH);
+  context.ellipse(tipX, cy, size * 0.04, (tipBotY - tipTopY) / 2, 0, 0, Math.PI * 2);
   context.stroke();
-
-  // ── 6. SOFT TOP-LEFT GLOSS for shine ──
-  const gloss = context.createRadialGradient(
-    x + size * 0.30, cy - size * 0.20, 1,
-    x + size * 0.30, cy - size * 0.20, size * 0.35
-  );
-  gloss.addColorStop(0, 'rgba(255,255,220,0.45)');
-  gloss.addColorStop(1, 'rgba(255,255,220,0)');
-  context.fillStyle = gloss;
-  context.fillRect(x, y, size, size);
+  // Bell-body outline so the curve reads against busy backdrops
+  context.strokeStyle = goldDark;
+  context.lineWidth = Math.max(0.7, size * 0.022);
+  context.beginPath();
+  context.moveTo(pipeX1, throatY1);
+  context.quadraticCurveTo(pipeX1 + size * 0.18, throatY1 - ctrlOff, tipX, tipTopY);
+  context.moveTo(pipeX1, throatY2);
+  context.quadraticCurveTo(pipeX1 + size * 0.18, throatY2 + ctrlOff, tipX, tipBotY);
+  context.stroke();
 
   context.restore();
   context.globalAlpha = 1;
@@ -9307,21 +9443,45 @@ function updateUI() {
   document.getElementById('zone-bar').style.width = zoneEnergy + '%';
 
   // ── Mode HUD (Sprint lines-left / Ultra time-left) ─────────────────────
-  // Rendered as a single floating overlay above the play area so it reads
-  // even on mobile where the side panels are tiny.
+  // Big labelled panel above the play area. Sprint shows TIME as the
+  // primary metric (per TETR.IO 40 LINES — sprint is timed) plus
+  // lines-remaining + pieces-per-second secondary. Ultra shows
+  // time-remaining as the primary plus current score secondary. Goes
+  // urgent (red, pulse) at 5 lines / 10 seconds.
   const modeHud = document.getElementById('mode-hud');
   if (modeHud) {
+    const elPri = document.getElementById('mh-primary');
+    const elSec = document.getElementById('mh-secondary');
+    const elLab = document.getElementById('mh-label');
     if (gameMode === 'sprint' && _sprintTarget > 0) {
       const remain = Math.max(0, _sprintTarget - lines);
       const elapsed = ((_modeFinishTime || performance.now()) - _modeStartTime);
-      modeHud.textContent = `${remain} LINES · ${fmtSprintTime(elapsed)}`;
+      // Pieces per second — total pieces locked / elapsed seconds.
+      const pps = (_pieceLockCount > 0 && elapsed > 100)
+                  ? (_pieceLockCount / (elapsed / 1000)).toFixed(2)
+                  : '0.00';
+      elLab.textContent = 'SPRINT';
+      elPri.textContent = fmtSprintTime(elapsed);
+      elSec.textContent = `${remain} lines · ${pps} PPS`;
+      modeHud.classList.toggle('is-urgent', remain <= 5 && remain > 0);
       modeHud.style.display = '';
     } else if (gameMode === 'ultra' && _ultraTimeLimit > 0) {
       const remainMs = Math.max(0, _ultraTimeLimit - (performance.now() - _modeStartTime));
-      modeHud.textContent = `${fmtSprintTime(remainMs)} · ${Math.floor(score).toLocaleString()}`;
+      elLab.textContent = 'ULTRA';
+      elPri.textContent = fmtSprintTime(remainMs);
+      elSec.textContent = `${Math.floor(score).toLocaleString()} · ${lines} ln`;
+      modeHud.classList.toggle('is-urgent', remainMs <= 10000);
+      modeHud.style.display = '';
+    } else if (gameMode === 'marathon') {
+      const goal = _marathonGoal;
+      elLab.textContent = 'MARATHON';
+      elPri.textContent = `${lines} / ${goal}`;
+      elSec.textContent = `${Math.floor(score).toLocaleString()} · L${level}`;
+      modeHud.classList.remove('is-urgent');
       modeHud.style.display = '';
     } else {
       modeHud.style.display = 'none';
+      modeHud.classList.remove('is-urgent');
     }
   }
 
@@ -9578,6 +9738,13 @@ function render(timestamp) {
       _modeFinishTime = performance.now();
       gameOver = true;
       handleModeFinish('sprint');
+      return;
+    }
+  } else if (gameMode === 'marathon' && !gameOver) {
+    if (_marathonGoal > 0 && lines >= _marathonGoal && _modeFinishTime == null) {
+      _modeFinishTime = performance.now();
+      gameOver = true;
+      handleModeFinish('marathon');
       return;
     }
   }
@@ -9883,8 +10050,10 @@ function startGame() {
   // restarting Sprint right after a fail gets a clean clock.
   _modeStartTime = performance.now();
   _modeFinishTime = null;
-  _ultraTimeLimit = (gameMode === 'ultra') ? 120000 : 0; // 2 minutes
-  _sprintTarget   = (gameMode === 'sprint') ? 40 : 0;
+  _ultraTimeLimit = (gameMode === 'ultra')    ? 120000 : 0; // 2 minutes
+  _sprintTarget   = (gameMode === 'sprint')   ? 40     : 0;
+  _marathonGoal   = (gameMode === 'marathon') ? 150    : 0;
+  _pieceLockCount = 0;
   for (const p of players) {
     setActivePlayer(p);
     initBoard();
@@ -10260,12 +10429,11 @@ window.addEventListener('resize', () => positionP2Monitor());
 // Also reveals/hides the Alfred difficulty picker depending on which mode
 // is active.
 (function wireModeSelect() {
+  const tabs = document.querySelectorAll('.mode-tab');
   const btns = document.querySelectorAll('.mode-btn');
+  const select = document.getElementById('mode-select');
   const diff = document.getElementById('difficulty-select');
   const lbLabel = document.getElementById('lb-mode-label');
-  // Map gameMode → leaderboard mode key. solo→story (legacy alias);
-  // marathon/sprint/ultra each have their own; vs/human use story too
-  // (those are head-to-head matches not score chases).
   const lbModeFor = (m) => {
     if (m === 'marathon') return 'marathon';
     if (m === 'sprint')   return 'sprint';
@@ -10277,18 +10445,43 @@ window.addEventListener('resize', () => positionP2Monitor());
     if (lbLabel) lbLabel.textContent = _currentLbMode.toUpperCase() + (isLowerBetterMode(_currentLbMode) ? ' · TIME' : '');
     if (typeof renderStartLeaderboard === 'function') renderStartLeaderboard();
   };
+  // ── Tier-1 tab switch ──
+  // Toggles which sub-mode buttons are visible. Tab change auto-selects
+  // the first sub-mode of the new tab so a quick tap doesn't leave the
+  // game in the previous tab's mode.
+  const tabSubmodes = {
+    solo: 'solo',  // default sub-mode for SOLO tab
+    vs:   'vs',    // default sub-mode for VS tab
+  };
+  function setTab(tab) {
+    if (select) select.dataset.activeTab = tab;
+    tabs.forEach(t => t.classList.toggle('mode-tab-active', t.dataset.tab === tab));
+    btns.forEach(b => b.style.display = b.dataset.tab === tab ? '' : 'none');
+    // Auto-select first sub-mode of this tab so the start button works
+    // immediately. Honours the previously-active sub-mode if it belongs
+    // to this tab.
+    const prev = document.querySelector(`.mode-btn.mode-active[data-tab="${tab}"]`);
+    if (!prev) {
+      const target = document.querySelector(`.mode-btn[data-tab="${tab}"][data-mode="${tabSubmodes[tab]}"]`)
+                   || document.querySelector(`.mode-btn[data-tab="${tab}"]`);
+      if (target) target.click();
+    }
+  }
+  tabs.forEach(tab => tab.addEventListener('click', () => setTab(tab.dataset.tab)));
   btns.forEach(btn => btn.addEventListener('click', () => {
     gameMode = btn.dataset.mode;
     btns.forEach(b => b.classList.toggle('mode-active', b === btn));
+    // Remember last sub-mode per tab so re-entering keeps Sir's choice.
+    tabSubmodes[btn.dataset.tab] = btn.dataset.mode;
     if (diff) diff.style.display = (gameMode === 'vs') ? 'flex' : 'none';
-    // Hide the level picker for Marathon/Sprint/Ultra — those modes have
-    // their own seeded start (always L1) and a fixed challenge profile.
     const levelSelect = document.getElementById('level-select');
-    const isFixedMode = (gameMode === 'marathon' || gameMode === 'sprint' || gameMode === 'ultra' || gameMode === 'vs' || gameMode === 'human');
-    if (levelSelect) levelSelect.style.display = isFixedMode ? 'none' : 'flex';
+    const isFixedStart = (gameMode === 'marathon' || gameMode === 'sprint' ||
+                          gameMode === 'ultra' || gameMode === 'vs' || gameMode === 'human');
+    if (levelSelect) levelSelect.style.display = isFixedStart ? 'none' : 'flex';
     refreshLb();
   }));
-  // Init on first load so the leaderboard label matches the default mode.
+  // Init: SOLO tab + STORY sub-mode visible.
+  setTab('solo');
   refreshLb();
 })();
 
