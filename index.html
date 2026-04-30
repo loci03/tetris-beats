@@ -648,6 +648,62 @@
     border: none;
     color: #fff;
     box-shadow: 0 2px 14px rgba(128,0,255,0.45), inset 0 1px 0 rgba(255,255,255,0.18);
+    position: relative;
+    overflow: hidden;
+    /* `--zone-fill` drives the visual:
+        - 0–100% during charging (energy bar climbs left→right)
+        - 100→0% during ZONE active (drain countdown)
+       Set per-frame in JS. */
+    --zone-fill: 0%;
+  }
+  /* Charging fill — soft glow climbing from the left. */
+  .tc-btn.tc-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+      rgba(255,255,255,0.55) 0%,
+      rgba(255,255,255,0.30) 100%);
+    width: var(--zone-fill);
+    transition: width 0.15s ease-out;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+  }
+  /* When zone is ACTIVE, swap the fill to a vertical drain so the player
+     reads it as "time running out" rather than "filling up". The width
+     shows remaining %, the gradient is more saturated, and we add a faint
+     pulse so the urgency reads. */
+  .tc-btn.tc-zone.is-active {
+    background: linear-gradient(140deg, #2a0a40 0%, #0a0218 100%);
+    box-shadow: 0 0 22px rgba(255,255,255,0.55), inset 0 0 12px rgba(255,255,255,0.25);
+    animation: zoneActivePulse 0.7s ease-in-out infinite;
+  }
+  .tc-btn.tc-zone.is-active::before {
+    background: linear-gradient(90deg, #ff3df0 0%, #00e5ff 100%);
+    width: var(--zone-fill);
+    transition: width 0.05s linear;
+    mix-blend-mode: normal;
+    opacity: 0.95;
+  }
+  @keyframes zoneActivePulse {
+    0%, 100% { box-shadow: 0 0 22px rgba(255,255,255,0.55), inset 0 0 12px rgba(255,255,255,0.25); }
+    50%      { box-shadow: 0 0 32px rgba(255,255,255,0.85), inset 0 0 18px rgba(255,255,255,0.35); }
+  }
+  .tc-btn.tc-zone.is-ready {
+    animation: zoneReadyPulse 1.2s ease-in-out infinite;
+  }
+  @keyframes zoneReadyPulse {
+    0%, 100% { box-shadow: 0 2px 14px rgba(128,0,255,0.45), inset 0 1px 0 rgba(255,255,255,0.18); }
+    50%      { box-shadow: 0 2px 22px rgba(255,0,255,0.95), inset 0 1px 0 rgba(255,255,255,0.40); }
+  }
+  /* Numeric overlay on the active zone button so even on small screens
+     the player can read the seconds left. */
+  .tc-btn.tc-zone .tc-icon,
+  .tc-btn.tc-zone .tc-label { position: relative; z-index: 1; }
+  .tc-btn.tc-zone.is-active .tc-icon { font-size: 12px; }
+  .tc-btn.tc-zone.is-active .tc-label::after {
+    content: ' ' attr(data-zone-secs) 's';
+    margin-left: 2px;
   }
   .tc-btn.tc-hold {
     background: linear-gradient(140deg, rgba(40,46,66,0.95), rgba(20,24,38,0.95));
@@ -1219,7 +1275,7 @@
      gesture, soft-drop is swipe-down, left/right is swipe, rotate is tap. -->
 <div id="touch-controls">
   <div class="tc-row">
-    <button class="tc-btn tc-zone" data-action="zone" aria-label="Zone">
+    <button class="tc-btn tc-zone" id="tc-zone-btn" data-action="zone" aria-label="Zone">
       <span class="tc-icon">⚡</span>
       <span class="tc-label">ZONE</span>
     </button>
@@ -1716,21 +1772,28 @@ const LEVEL_THEMES = [
     chords: [[220, 277.18, 329.63], [196, 246.94, 293.66], [261.63, 329.63, 392]],
     synthType: 'gospel',
   },
-  { // Level 9 - Donda 2
-    name: 'Donda 2',
-    bpm: 140,
-    colors: { bg1: '#0a0005', bg2: '#050000', accent: '#ff3366', glow: '#ff0044' },
-    particleHue: 350,
-    particleStyle: 'embers', // rising embers for stem project fire
-    blockGlow: 5,
-    kick:  [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],
-    snare: [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
-    hh:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+  { // Level 9 - Relax Your Mind (Suno track + brain blocks + chill zen scene)
+    name: 'Relax Your Mind',
+    bpm: 78,
+    track: 'audio/levels/relax-your-mind.mp3',
+    colors: { bg1: '#1a0e2e', bg2: '#0c0820', accent: '#c89bff', glow: '#ff9ed8' },
+    particleHue: 285,
+    // Lavender gyri rendered through drawBlockBrain. Uses the same opt-out
+    // path as tires/macncheese - no rectangular cell backdrop, just the
+    // brain silhouette. Reads as a soft, organic shape against the night sky.
+    blockStyle: 'brain',
+    particleStyle: 'zen-drift', // dreamy floaters + interactive ripples
+    blockGlow: 4,
+    // Procedural-fallback drum pattern in case the MP3 fails to load.
+    // Calm 2-and-4 backbeat, sparse hh, pad-style chord progression.
+    kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
     hhOpen:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-    bass:  [1,0,0,1, 0,0,0,1, 1,0,0,1, 0,0,0,0],
-    bassNote: 41.20, // E1 - club bass
-    scale: [164.81, 196, 220, 261.63, 293.66, 329.63, 392, 440],
-    chords: [[164.81, 220, 293.66], [196, 261.63, 329.63], [220, 293.66, 392]],
+    bass:  [1,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+    bassNote: 55.00, // A1 - warm pad bass
+    scale: [220, 246.94, 277.18, 329.63, 369.99, 415.30, 440, 493.88],
+    chords: [[220, 277.18, 329.63], [246.94, 293.66, 369.99], [196, 246.94, 293.66]],
     synthType: 'choir',
   },
   { // Level 10 - Vultures 1
@@ -1981,14 +2044,24 @@ function computeCellSize() {
 
 // Throttle resizeCanvases triggers - iOS fires visualViewport `scroll` rapidly
 // as the URL bar slides, so we coalesce to one rAF tick to avoid layout thrash.
+// CRITICAL: keep `_resizePending` true for the entire duration of resizeCanvases().
+// resizeCanvases() calls positionP2Monitor() which calls scheduleResize(), so if
+// we cleared the flag BEFORE running, every resize would re-enter and we'd ping-pong
+// at 60 Hz. That re-allocates every canvas buffer per frame → main-canvas reads as
+// fully transparent (all draws were just wiped) AND eats enough CPU to cause
+// piece-movement lag on heavy scenes (L8 dancehall especially). Reset the flag
+// AFTER the work runs so re-entrant calls coalesce.
 let _resizePending = false;
 function scheduleResize() {
   if (_resizePending) return;
   _resizePending = true;
   requestAnimationFrame(() => {
-    _resizePending = false;
-    resizeCanvases();
-    if (typeof bgParticles !== 'undefined' && bgParticles) initBgParticles();
+    try {
+      resizeCanvases();
+      if (typeof bgParticles !== 'undefined' && bgParticles) initBgParticles();
+    } finally {
+      _resizePending = false;
+    }
   });
 }
 
@@ -2487,7 +2560,7 @@ function clearLines() {
       // styled level - matrix + tires count as visually-rich for these FX
       // too, so a Tetris on Back for More / Ferrari Window gets the same
       // shockwave/flash treatment). Volume scales with line count + combo.
-      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty')) {
+      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain')) {
         const pieces = [0, 12, 22, 36, 60][cleared] || 60;
         const totalPieces = pieces + Math.max(0, combo) * 8;
         spawnConfetti(totalPieces, theme);
@@ -3608,6 +3681,7 @@ function initBgParticles() {
               : theme.particleStyle === 'ferrari-highway' ? 0
               : theme.particleStyle === 'cheese-whips' ? 0
               : theme.particleStyle === 'dancehall' ? 0
+              : theme.particleStyle === 'zen-drift' ? 0
               : theme.particleStyle === 'dots' ? 30
               : theme.particleStyle === 'violins' ? 18
               : 80;
@@ -4289,7 +4363,7 @@ function drawGhostBlock(context, x, y, color, size) {
   // dashed ghost reads as a different piece type than what's about to
   // lock. For Mac & Cheese the accent is yellow, which means the ghost
   // automatically renders as the yellow guide outline Sir asked for.
-  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty');
+  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain');
   const outlineColor = useThemeColor ? theme.colors.accent : color;
   context.save();
   const [r, g, b] = hexToRgb(outlineColor);
@@ -4330,6 +4404,10 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   }
   if (theme && theme.blockStyle === 'beefpatty') {
     drawBlockBeefPatty(context, x, y, color, size, alpha, theme);
+    return;
+  }
+  if (theme && theme.blockStyle === 'brain') {
+    drawBlockBrain(context, x, y, color, size, alpha, theme);
     return;
   }
   context.globalAlpha = alpha;
@@ -4720,12 +4798,16 @@ function drawBoard() {
   // and tires (Ferrari Window) all use a semi-translucent board so their
   // reactive backgrounds (violins / matrix-rain / Ferrari highway) read
   // through the empty cells. Other levels stay opaque.
-  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty')) {
+  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain')) {
     ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
     // Tires (L6) use a darker / more opaque board fill so the tire
     // silhouettes read on top - the highway scene is too busy to let
-    // 55% alpha through. Other shaped-piece styles stay translucent.
-    const fillAlpha = (theme.blockStyle === 'tires') ? 0.82 : 0.55;
+    // 55% alpha through. Brain (L9) keeps the dreamy zen scene visible
+    // through the empty cells - nice and translucent. Other shaped-piece
+    // styles stay translucent.
+    const fillAlpha = (theme.blockStyle === 'tires') ? 0.82
+                    : (theme.blockStyle === 'brain') ? 0.42
+                    : 0.55;
     ctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
   } else {
     ctx.fillStyle = `rgb(${r},${g},${b})`;
@@ -6111,6 +6193,31 @@ function drawFerrariHighway(theme, now, playRects) {
     _trafficSpawnCooldown = 30 + Math.floor(Math.random() * 30);
   }
 
+  // ─── PLAYER FERRARI POSITION ─────────────────────────────────────
+  // Compute `playerT` BEFORE the traffic loop — the per-car swerve
+  // logic below reads `playerT` to decide when an oncoming car needs
+  // to weave aside. Earlier code put this block after the traffic
+  // loop; that's a TDZ ReferenceError because `playerT` is `let`.
+  // The player car's actual screen position (playerLaneX / playerPt)
+  // is still computed after the loop where it's first needed.
+  _ferrariLaneOffset += (_ferrariCurrentLane - _ferrariLaneOffset) * 0.08;
+  // Overtake speed-burst: while _ferrariOvertakeT >= 0, the player
+  // briefly sits a bit further ahead (lower t) to suggest passing
+  // cars in the chosen lane.
+  let playerT = 0.74;
+  if (_ferrariOvertakeT >= 0) {
+    _ferrariOvertakeT += 1 / 90;     // ~1.5 s burst
+    if (_ferrariOvertakeT >= 1) {
+      _ferrariOvertakeT = -1;
+      _ferrariOvertakeLines = 0;
+    } else {
+      // Bell-curve forward push: +0.08 t at the peak so the Ferrari
+      // visibly advances past nearby traffic mid-burst.
+      const bell = Math.sin(_ferrariOvertakeT * Math.PI);
+      playerT += 0.08 * bell * (1 + (_ferrariOvertakeLines - 1) * 0.15);
+    }
+  }
+
   // Advance + cull traffic cars; collect render entries with their
   // current screen position so we can sort by depth.
   // Same-lane collision avoidance: when a traffic car would visually
@@ -6162,24 +6269,8 @@ function drawFerrariHighway(theme, now, playRects) {
 
   // ─── PLAYER'S RED FERRARI: anchored mid-screen. Lane lerps toward
   //   _ferrariCurrentLane on overtake. Slight wobble from movePulse.
-  // Lerp the current lane offset toward target.
-  _ferrariLaneOffset += (_ferrariCurrentLane - _ferrariLaneOffset) * 0.08;
-  // Overtake speed-burst: while _ferrariOvertakeT >= 0, the player
-  // briefly sits a bit further ahead (lower t) to suggest passing
-  // cars in the chosen lane.
-  let playerT = 0.74;
-  if (_ferrariOvertakeT >= 0) {
-    _ferrariOvertakeT += 1 / 90;     // ~1.5 s burst
-    if (_ferrariOvertakeT >= 1) {
-      _ferrariOvertakeT = -1;
-      _ferrariOvertakeLines = 0;
-    } else {
-      // Bell-curve forward push: +0.08 t at the peak so the Ferrari
-      // visibly advances past nearby traffic mid-burst.
-      const bell = Math.sin(_ferrariOvertakeT * Math.PI);
-      playerT += 0.08 * bell * (1 + (_ferrariOvertakeLines - 1) * 0.15);
-    }
-  }
+  // (playerT + lane lerp + overtake burst already computed above so the
+  // traffic loop could read playerT for swerve avoidance.)
   const playerLaneX = LANE_X[0] + (LANE_X[2] - LANE_X[0]) * (_ferrariLaneOffset / 2);
   const playerPt = project(playerT, playerLaneX + (Math.sin(now / 800) >= 0 ? 1 : -1) * move * 0.02);
   const playerScaleBoost = (onKick ? 1.04 : 1) * (1 + cheer * 0.06);
@@ -6629,24 +6720,40 @@ function drawDancehallScene(theme, now, playRects) {
   const floorY = h * 0.80;
 
   // ── 1. DANCEHALL BACKDROP IMAGE ──────────────────────────────────────
+  // PERF: cache the resized + dimmed photo to an offscreen canvas keyed on
+  // (w, h, dhBgImage.complete). On Sir's desktop this image gets drawn at
+  // the visualViewport size each frame and re-decoded by the GPU; that and
+  // the per-frame dim-fillRect were dominant costs at 1920×1080. Caching
+  // collapses both into a single drawImage of an already-baked layer.
+  // The dim wash IS time-varying (onBeat / cheer), so we still apply it
+  // as a thin per-frame fillRect on top of the cached photo.
   if (_dhBgImage && _dhBgImage.complete && _dhBgImage.naturalWidth > 0) {
-    const imgRatio = _dhBgImage.naturalWidth / _dhBgImage.naturalHeight;
-    const canvasRatio = w / h;
-    let sx = 0, sy = 0, sw = _dhBgImage.naturalWidth, sh = _dhBgImage.naturalHeight;
-    if (imgRatio > canvasRatio) {
-      sw = sh * canvasRatio;
-      sx = (_dhBgImage.naturalWidth - sw) / 2;
-    } else {
-      sh = sw / canvasRatio;
-      sy = (_dhBgImage.naturalHeight - sh) / 2;
+    if (!_dhBgImage._cache || _dhBgImage._cacheW !== w || _dhBgImage._cacheH !== h) {
+      const off = document.createElement('canvas');
+      off.width = w; off.height = h;
+      const octx = off.getContext('2d');
+      const imgRatio = _dhBgImage.naturalWidth / _dhBgImage.naturalHeight;
+      const canvasRatio = w / h;
+      let sx = 0, sy = 0, sw = _dhBgImage.naturalWidth, sh = _dhBgImage.naturalHeight;
+      if (imgRatio > canvasRatio) {
+        sw = sh * canvasRatio;
+        sx = (_dhBgImage.naturalWidth - sw) / 2;
+      } else {
+        sh = sw / canvasRatio;
+        sy = (_dhBgImage.naturalHeight - sh) / 2;
+      }
+      octx.drawImage(_dhBgImage, sx, sy, sw, sh, 0, 0, w, h);
+      _dhBgImage._cache = off;
+      _dhBgImage._cacheW = w;
+      _dhBgImage._cacheH = h;
     }
-    bgCtx.drawImage(_dhBgImage, sx, sy, sw, sh, 0, 0, w, h);
-    // Slight dimming wash so procedural overlays (string lights, dancers,
-    // floor spots, confetti) read clearly on top instead of fighting the
-    // already-busy photo. Brightens back up briefly on beat / cheer.
+    bgCtx.drawImage(_dhBgImage._cache, 0, 0);
+    // Per-frame dim wash (still time-varying, so can't be baked).
     const dim = 0.32 - (onBeat ? 0.08 : 0) - cheer * 0.12;
-    bgCtx.fillStyle = `rgba(0,8,2,${Math.max(0, dim)})`;
-    bgCtx.fillRect(0, 0, w, h);
+    if (dim > 0) {
+      bgCtx.fillStyle = `rgba(0,8,2,${dim})`;
+      bgCtx.fillRect(0, 0, w, h);
+    }
   } else {
     const sky = bgCtx.createLinearGradient(0, 0, 0, h);
     sky.addColorStop(0,    '#07140a');
@@ -6668,29 +6775,43 @@ function drawDancehallScene(theme, now, playRects) {
     bgCtx.quadraticCurveTo((ax1 + ax2) / 2, _dhScene.lightAnchorY + 28, ax2, _dhScene.lightAnchorY);
     bgCtx.stroke();
   }
-  // Chaser bulbs - cycling brightness along each string. Dim bulbs skip
-  // the shadowBlur entirely (shadowBlur is the single most expensive
-  // canvas op; was the dominant cost in L8 lag). Only bright/chaser-on
-  // bulbs get the glow.
+  // Chaser bulbs - cycling brightness along each string. shadowBlur is the
+  // single most expensive canvas op so we (a) gate it on chaser-on (only
+  // ~30% of bulbs at a time), (b) cap it at 8 px regardless of bulb size
+  // so a wide bg-canvas doesn't multiply cost, and (c) batch ALL dim bulbs
+  // into one save/restore pair to skip re-asserting shadow state.
   const chaserT = (now / 400) % (Math.PI * 2);
+  // Pass 1 — dim bulbs in one go, no shadowBlur.
+  bgCtx.save();
+  bgCtx.shadowBlur = 0;
   for (const li of _dhScene.lights) {
-    const chaserOn = Math.sin(chaserT - li.chaserPhase) > 0.3;
-    const chaserBright = chaserOn ? 1 : 0.22;
+    const chaserOn = Math.sin(chaserT - li.chaserPhase) > 0.4; // narrowed window
+    if (chaserOn) continue;
     const beatBoost = onBeat ? 1.7 : 1;
-    const r2 = li.r * chaserBright * beatBoost;
-    const alpha = 0.3 + chaserBright * 0.65;
-    bgCtx.save();
-    bgCtx.globalAlpha = alpha;
-    if (chaserOn) {
-      bgCtx.shadowColor = `hsl(${li.hue},100%,75%)`;
-      bgCtx.shadowBlur = r2 * 5;
-    }
-    bgCtx.fillStyle = `hsl(${li.hue},100%,${chaserOn ? 80 : 45}%)`;
+    const r2 = li.r * 0.22 * beatBoost;
+    bgCtx.globalAlpha = 0.45;
+    bgCtx.fillStyle = `hsl(${li.hue},100%,45%)`;
     bgCtx.beginPath();
     bgCtx.arc(li.x, li.y, r2, 0, Math.PI * 2);
     bgCtx.fill();
-    bgCtx.restore();
   }
+  bgCtx.restore();
+  // Pass 2 — bright bulbs with shadowBlur (capped).
+  bgCtx.save();
+  for (const li of _dhScene.lights) {
+    const chaserOn = Math.sin(chaserT - li.chaserPhase) > 0.4;
+    if (!chaserOn) continue;
+    const beatBoost = onBeat ? 1.7 : 1;
+    const r2 = li.r * beatBoost;
+    bgCtx.globalAlpha = 0.95;
+    bgCtx.shadowColor = `hsl(${li.hue},100%,75%)`;
+    bgCtx.shadowBlur = Math.min(8, r2 * 2);
+    bgCtx.fillStyle = `hsl(${li.hue},100%,80%)`;
+    bgCtx.beginPath();
+    bgCtx.arc(li.x, li.y, r2, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.restore();
 
   // ── 3. PALM TREES (behind speakers, swaying) ─────────────────────────
   for (const palm of _dhScene.palms) {
@@ -7092,6 +7213,307 @@ function _drawDjBoothDancehall(now, energy, cheer, onBeat, accentRgb, theme) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ZEN DRIFT SCENE (Level 9 - Relax Your Mind)
+// A chill, low-vibes night-sky-on-a-warm-evening. Layered:
+//   1. Soft purple-pink gradient sky
+//   2. Distant moon with glow
+//   3. Slow-drifting cloud silhouettes (parallax × 3 layers)
+//   4. Soft mountain/hill silhouettes (static)
+//   5. Floating particles (dust motes) — interactive: speed up on movePulse
+//   6. Meditation rings — slow expanding from centre, accelerated by cheer
+//   7. Brainwave pulse — emitted on line clears (cheerPulse)
+//   8. Ripple on hard-drop (boardDropPulse)
+//   9. Stars twinkling in upper sky
+// Reactive but never busy — designed to relax, not distract.
+// ─────────────────────────────────────────────────────────────────────────────
+let _zenScene = null, _zenSceneW = 0;
+
+function _initZenScene(w, h) {
+  _zenScene = {
+    // ── Stars: tiny twinkling dots in the upper sky ──
+    stars: [],
+    // ── Clouds: soft horizontal blobs at three parallax depths ──
+    clouds: [],
+    // ── Particles: drifting motes (speed up on movePulse) ──
+    motes: [],
+    // ── Meditation rings: emanate from a centre point in the upper-third ──
+    rings: [],
+    ringTimer: 0,
+    // ── Brainwave pulses: emitted on cheerPulse spikes (line clears) ──
+    waves: [],
+    lastCheer: 0,
+    // ── Hard-drop ripples ──
+    drops: [],
+    lastDrop: 0,
+    // ── Mountain silhouettes (one set, computed once for this width) ──
+    mountains: [],
+    // ── Moon position (upper-right, randomised once) ──
+    moon: { x: w * 0.78, y: h * 0.18, r: Math.max(28, w * 0.045) },
+  };
+  _zenSceneW = w;
+  // Stars
+  const starCount = Math.min(60, Math.floor(w / 24));
+  for (let i = 0; i < starCount; i++) {
+    _zenScene.stars.push({
+      x: Math.random() * w,
+      y: Math.random() * h * 0.45,
+      r: Math.random() < 0.85 ? 0.6 + Math.random() * 0.8 : 1.2 + Math.random() * 0.7,
+      phase: Math.random() * Math.PI * 2,
+      twinkle: 0.6 + Math.random() * 0.4,
+    });
+  }
+  // Clouds: three parallax layers, each layer = 2-4 clouds
+  const layerSpec = [
+    { y: h * 0.25, n: 3, w: 110, h: 28, alpha: 0.10, speed: 0.03 },
+    { y: h * 0.38, n: 3, w: 160, h: 38, alpha: 0.13, speed: 0.05 },
+    { y: h * 0.50, n: 2, w: 220, h: 52, alpha: 0.16, speed: 0.08 },
+  ];
+  for (const l of layerSpec) {
+    for (let i = 0; i < l.n; i++) {
+      _zenScene.clouds.push({
+        x: Math.random() * w,
+        y: l.y + (Math.random() - 0.5) * 24,
+        w: l.w * (0.85 + Math.random() * 0.35),
+        h: l.h * (0.85 + Math.random() * 0.30),
+        alpha: l.alpha,
+        speed: l.speed * (0.85 + Math.random() * 0.30),
+      });
+    }
+  }
+  // Motes
+  const moteCount = Math.min(36, Math.floor(w / 36));
+  for (let i = 0; i < moteCount; i++) {
+    _zenScene.motes.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.18,
+      vy: -0.05 - Math.random() * 0.12,
+      r: 0.7 + Math.random() * 1.4,
+      hue: 280 + Math.random() * 60,
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+  // Mountains: 5-7 overlapping triangles silhouetted on the horizon
+  const mtCount = 5 + Math.floor(w / 480);
+  for (let i = 0; i < mtCount; i++) {
+    const cx = (i / (mtCount - 1)) * w + (Math.random() - 0.5) * 60;
+    const peakH = h * (0.10 + Math.random() * 0.10);
+    const baseW = w * (0.16 + Math.random() * 0.14);
+    _zenScene.mountains.push({
+      cx, baseY: h * 0.78, peakY: h * 0.78 - peakH, baseW,
+      // Slight blueish tint variation so they don't read flat
+      shade: 0.10 + Math.random() * 0.06,
+    });
+  }
+}
+
+function drawZenScene(theme, now, playRects) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (w <= 0 || h <= 0) return;
+  if (!_zenScene || _zenSceneW !== w) _initZenScene(w, h);
+
+  const cheer  = (typeof cheerPulse === 'number') ? cheerPulse : 0;
+  const move   = (typeof movePulse === 'number') ? movePulse : 0;
+  const dropP  = (typeof boardDropPulse === 'number') ? boardDropPulse : 0;
+  const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+
+  // ── 1. SKY ── soft purple→pink→deep-purple gradient
+  const sky = bgCtx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0,    '#15082a');
+  sky.addColorStop(0.40, '#2a0e44');
+  sky.addColorStop(0.75, '#3a1854');
+  sky.addColorStop(1,    '#1a0828');
+  bgCtx.fillStyle = sky;
+  bgCtx.fillRect(0, 0, w, h);
+
+  // ── 2. STARS ── twinkle gently
+  bgCtx.save();
+  for (const s of _zenScene.stars) {
+    const tw = 0.55 + Math.sin(now / 1400 + s.phase) * 0.30 * s.twinkle;
+    bgCtx.globalAlpha = tw * 0.85;
+    bgCtx.fillStyle = '#fff';
+    bgCtx.beginPath();
+    bgCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.restore();
+
+  // ── 3. MOON ── a soft circle with a glow ring; brightens slightly with energy
+  const m = _zenScene.moon;
+  bgCtx.save();
+  // Glow halo (radial gradient, cheap — drawn once)
+  const moonGlow = bgCtx.createRadialGradient(m.x, m.y, m.r * 0.4, m.x, m.y, m.r * 3.2);
+  moonGlow.addColorStop(0, `rgba(255,210,235,${0.22 + energy * 0.12})`);
+  moonGlow.addColorStop(1, 'rgba(255,210,235,0)');
+  bgCtx.fillStyle = moonGlow;
+  bgCtx.beginPath();
+  bgCtx.arc(m.x, m.y, m.r * 3.2, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Moon body
+  const moonGrad = bgCtx.createRadialGradient(m.x - m.r * 0.3, m.y - m.r * 0.3, m.r * 0.1, m.x, m.y, m.r);
+  moonGrad.addColorStop(0, '#fff7fb');
+  moonGrad.addColorStop(1, '#e0b3d6');
+  bgCtx.fillStyle = moonGrad;
+  bgCtx.beginPath();
+  bgCtx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+  bgCtx.fill();
+  bgCtx.restore();
+
+  // ── 4. CLOUDS ── drift slowly; movePulse nudges them along faster.
+  // Single ellipse per cloud — soft via alpha, no shadowBlur (stays cheap).
+  const cloudBoost = 1 + move * 1.8;
+  bgCtx.save();
+  for (const c of _zenScene.clouds) {
+    c.x += c.speed * cloudBoost;
+    if (c.x - c.w > w) c.x = -c.w;
+    bgCtx.fillStyle = `rgba(255,200,235,${c.alpha})`;
+    bgCtx.beginPath();
+    bgCtx.ellipse(c.x, c.y, c.w / 2, c.h / 2, 0, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.restore();
+
+  // ── 5. MOUNTAIN SILHOUETTES ── static, soft purple silhouette
+  bgCtx.save();
+  bgCtx.fillStyle = 'rgba(20,8,38,0.92)';
+  for (const mt of _zenScene.mountains) {
+    bgCtx.beginPath();
+    bgCtx.moveTo(mt.cx - mt.baseW / 2, mt.baseY);
+    bgCtx.lineTo(mt.cx, mt.peakY);
+    bgCtx.lineTo(mt.cx + mt.baseW / 2, mt.baseY);
+    bgCtx.closePath();
+    bgCtx.fill();
+  }
+  // Faint accent rim along ridge crests for depth
+  const [ar, ag, ab] = hexToRgb(theme.colors.accent);
+  bgCtx.strokeStyle = `rgba(${ar},${ag},${ab},${0.08 + energy * 0.06})`;
+  bgCtx.lineWidth = 1;
+  for (const mt of _zenScene.mountains) {
+    bgCtx.beginPath();
+    bgCtx.moveTo(mt.cx - mt.baseW / 2, mt.baseY);
+    bgCtx.lineTo(mt.cx, mt.peakY);
+    bgCtx.lineTo(mt.cx + mt.baseW / 2, mt.baseY);
+    bgCtx.stroke();
+  }
+  bgCtx.restore();
+
+  // ── 6. MEDITATION RINGS ── periodically expand from the centre of the
+  // visible play-area gutter (left of the board on desktop, full-width on
+  // mobile). Cheer accelerates them so a clear feels meditative, not jarring.
+  _zenScene.ringTimer += 1;
+  const ringInterval = 90 - cheer * 35; // every ~1.5s, faster after a clear
+  if (_zenScene.ringTimer >= ringInterval) {
+    _zenScene.ringTimer = 0;
+    // Spawn from upper-third, centre horizontally
+    _zenScene.rings.push({
+      x: w * 0.5,
+      y: h * 0.42,
+      r: 8,
+      maxR: Math.min(w, h) * 0.55,
+      alpha: 0.45,
+    });
+  }
+  bgCtx.save();
+  for (let i = _zenScene.rings.length - 1; i >= 0; i--) {
+    const ring = _zenScene.rings[i];
+    ring.r += 0.7 + cheer * 1.5;
+    ring.alpha -= 0.0035;
+    if (ring.alpha <= 0 || ring.r >= ring.maxR) {
+      _zenScene.rings.splice(i, 1);
+      continue;
+    }
+    bgCtx.strokeStyle = `rgba(${ar},${ag},${ab},${ring.alpha})`;
+    bgCtx.lineWidth = 1.4;
+    bgCtx.beginPath();
+    bgCtx.arc(ring.x, ring.y, ring.r, 0, Math.PI * 2);
+    bgCtx.stroke();
+  }
+  bgCtx.restore();
+
+  // ── 7. BRAINWAVE PULSE ── emitted whenever cheer rises sharply (line clears).
+  // A horizontal sine wave that travels outward + fades. Visualises "thinking
+  // clearly" - the player just made something happen.
+  if (cheer > _zenScene.lastCheer + 0.20) {
+    _zenScene.waves.push({
+      y: h * 0.50,
+      t: 0,
+      maxT: 1.1,
+      strength: Math.min(1, cheer * 1.2),
+    });
+  }
+  _zenScene.lastCheer = cheer;
+  bgCtx.save();
+  for (let i = _zenScene.waves.length - 1; i >= 0; i--) {
+    const wv = _zenScene.waves[i];
+    wv.t += 0.018;
+    if (wv.t >= wv.maxT) { _zenScene.waves.splice(i, 1); continue; }
+    const fade = 1 - (wv.t / wv.maxT);
+    const amp = 22 * wv.strength * fade;
+    const period = w / 6;
+    const phase = wv.t * Math.PI * 4;
+    bgCtx.strokeStyle = `rgba(255,180,230,${0.55 * fade})`;
+    bgCtx.lineWidth = 1.6;
+    bgCtx.beginPath();
+    for (let xx = 0; xx <= w; xx += 6) {
+      const yy = wv.y + Math.sin((xx / period) * Math.PI * 2 + phase) * amp;
+      if (xx === 0) bgCtx.moveTo(xx, yy);
+      else bgCtx.lineTo(xx, yy);
+    }
+    bgCtx.stroke();
+  }
+  bgCtx.restore();
+
+  // ── 8. HARD-DROP RIPPLE ── boardDropPulse triggers a horizon shock-ring.
+  if (dropP > _zenScene.lastDrop + 0.10) {
+    _zenScene.drops.push({ x: w * 0.5, y: h * 0.62, r: 4, maxR: w * 0.6, alpha: 0.5 });
+  }
+  _zenScene.lastDrop = dropP;
+  bgCtx.save();
+  for (let i = _zenScene.drops.length - 1; i >= 0; i--) {
+    const d = _zenScene.drops[i];
+    d.r += 8;
+    d.alpha -= 0.025;
+    if (d.alpha <= 0 || d.r >= d.maxR) { _zenScene.drops.splice(i, 1); continue; }
+    bgCtx.strokeStyle = `rgba(${ar},${ag},${ab},${d.alpha})`;
+    bgCtx.lineWidth = 2;
+    bgCtx.beginPath();
+    bgCtx.ellipse(d.x, d.y, d.r, d.r * 0.35, 0, 0, Math.PI * 2);
+    bgCtx.stroke();
+  }
+  bgCtx.restore();
+
+  // ── 9. DUST MOTES ── slow drift + interactive speed-up on movePulse.
+  // No shadowBlur, just soft alpha; very cheap.
+  bgCtx.save();
+  const moteSpeed = 1 + move * 4;
+  for (const mp of _zenScene.motes) {
+    mp.x += mp.vx * moteSpeed;
+    mp.y += mp.vy * moteSpeed;
+    if (mp.y < -8) { mp.y = h + 8; mp.x = Math.random() * w; }
+    if (mp.x < -8) mp.x = w + 8; else if (mp.x > w + 8) mp.x = -8;
+    const tw = 0.55 + Math.sin(now / 1100 + mp.phase) * 0.35;
+    bgCtx.fillStyle = `hsla(${mp.hue},80%,82%,${tw * 0.55})`;
+    bgCtx.beginPath();
+    bgCtx.arc(mp.x, mp.y, mp.r, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.restore();
+
+  // ── 10. PLAY-AREA MASK ── punch a hole over the player's board so the
+  // dimmed-purple board fill reads cleanly without any scene element
+  // bleeding through the brain blocks.
+  if (playRects.length) {
+    bgCtx.save();
+    bgCtx.globalCompositeOperation = 'destination-out';
+    for (const pr of playRects) {
+      bgCtx.fillStyle = '#000';
+      bgCtx.fillRect(pr.x, pr.y, pr.w, pr.h);
+    }
+    bgCtx.restore();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // BEEF PATTY BLOCK (Level 8 - Life is Good)
 // Each Tetris cell renders as a cartoon Jamaican beef patty: a semicircular
 // turnover with golden-brown flaky pastry, a visible reddish-brown meat filling
@@ -7262,6 +7684,96 @@ function drawBlockBeefPatty(context, x, y, color, size, alpha, theme) {
   context.globalAlpha = 1;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BRAIN BLOCK (Level 9 - Relax Your Mind)
+// Soft, organic brain silhouette - a rounded blob with a single visible cleft
+// down the middle (the inter-hemispheric fissure) and a couple of curved
+// gyri (folds) suggesting the cortex. No rectangular cell backdrop, just the
+// brain shape - matches the "shaped pieces, no cell box" pattern from L6/L7/L8.
+// Uses theme accent (lavender) so all pieces read as one calm material.
+// ─────────────────────────────────────────────────────────────────────────────
+function drawBlockBrain(context, x, y, color, size, alpha, theme) {
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  const r  = size * 0.40;
+
+  context.globalAlpha = alpha;
+  context.save();
+  // Subtle drop shadow so the brain pops on the dim sky board
+  context.shadowColor = 'rgba(80,30,140,0.45)';
+  context.shadowBlur  = Math.min(8, size * 0.18);
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 1.5;
+
+  // ── Main blob: tinted radial of the theme accent ──
+  const [ar, ag, ab] = hexToRgb(theme.colors.accent || '#c89bff');
+  const main = context.createRadialGradient(
+    cx - r * 0.25, cy - r * 0.30, r * 0.10,
+    cx, cy, r * 1.05
+  );
+  // Light blush highlight → accent body → muted shadow rim. Pink hint at
+  // the highlight makes it feel warm and tissue-like rather than stone.
+  main.addColorStop(0,    `rgba(${Math.min(255, ar+50)},${Math.min(255, ag+30)},${Math.min(255, ab+30)},1)`);
+  main.addColorStop(0.55, `rgb(${ar},${ag},${ab})`);
+  main.addColorStop(1,    `rgb(${Math.max(0, ar-70)},${Math.max(0, ag-70)},${Math.max(0, ab-50)})`);
+  context.fillStyle = main;
+  context.beginPath();
+  context.arc(cx, cy, r, 0, Math.PI * 2);
+  context.fill();
+
+  context.restore();
+
+  // Drop the shadow before drawing the surface details so each gyrus
+  // doesn't get its own halo (would smear into a single pink fuzzball).
+  context.save();
+
+  // ── Inter-hemispheric fissure: vertical cleft down the middle ──
+  context.strokeStyle = `rgba(${Math.max(0, ar-90)},${Math.max(0, ag-80)},${Math.max(0, ab-60)},0.72)`;
+  context.lineWidth = Math.max(1, size * 0.05);
+  context.lineCap = 'round';
+  context.beginPath();
+  context.moveTo(cx, cy - r * 0.85);
+  context.quadraticCurveTo(cx + r * 0.06, cy, cx, cy + r * 0.85);
+  context.stroke();
+
+  // ── A couple of curved gyri suggesting cortex folds ──
+  // Using a deterministic cell-based seed (cx+cy) so the folds don't
+  // re-randomise every frame and shimmer.
+  context.strokeStyle = `rgba(${Math.max(0, ar-60)},${Math.max(0, ag-55)},${Math.max(0, ab-30)},0.55)`;
+  context.lineWidth = Math.max(0.8, size * 0.035);
+  const folds = [
+    { side: -1, off: -0.30, span: 0.65 },
+    { side: -1, off:  0.25, span: 0.55 },
+    { side:  1, off: -0.20, span: 0.60 },
+    { side:  1, off:  0.30, span: 0.50 },
+  ];
+  for (const f of folds) {
+    const fx = cx + f.side * r * 0.42;
+    const fy = cy + f.off * r;
+    const fw = r * f.span * 0.4;
+    context.beginPath();
+    context.moveTo(fx - fw, fy);
+    context.quadraticCurveTo(fx, fy - fw * 0.5, fx + fw, fy);
+    context.stroke();
+  }
+
+  // ── Soft inner highlight: a small white-ish gloss on top-left to
+  // suggest moist tissue without going garish. ──
+  const gloss = context.createRadialGradient(
+    cx - r * 0.30, cy - r * 0.40, 1,
+    cx - r * 0.20, cy - r * 0.30, r * 0.55
+  );
+  gloss.addColorStop(0, 'rgba(255,235,255,0.55)');
+  gloss.addColorStop(1, 'rgba(255,235,255,0)');
+  context.fillStyle = gloss;
+  context.beginPath();
+  context.arc(cx, cy, r * 0.95, 0, Math.PI * 2);
+  context.fill();
+
+  context.restore();
+  context.globalAlpha = 1;
+}
+
 function drawBackground() {
   const theme = getTheme(level);
   const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
@@ -7281,7 +7793,7 @@ function drawBackground() {
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
   const playRects = [];
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift');
   if (gameStarted && usesPlayAreaMask) {
     const c1 = document.getElementById('main-canvas');
     if (c1) {
@@ -7348,6 +7860,13 @@ function drawBackground() {
   // to the riddim.
   if (style === 'dancehall') {
     drawDancehallScene(theme, now, playRects);
+    return;
+  }
+  // Relax Your Mind (Level 9): chill purple/pink gradient sky + slow
+  // drifting clouds + meditation rings + interactive ripples on player
+  // input + brainwave pulse on line clears. Reactive but never busy.
+  if (style === 'zen-drift') {
+    drawZenScene(theme, now, playRects);
     return;
   }
 
@@ -7665,6 +8184,42 @@ function updateUI() {
     }
   }
   document.getElementById('zone-bar').style.width = zoneEnergy + '%';
+
+  // ── Touch-controls Zone button visualisation ───────────────────────────
+  // Three states: charging (energy %), ready (energy=100), active (drain).
+  // The CSS variable `--zone-fill` is the single source of truth. We also
+  // toggle two state classes that own the colour palette and animations.
+  const zb = document.getElementById('tc-zone-btn');
+  if (zb) {
+    if (zoneActive) {
+      const pct = Math.max(0, Math.min(100, (zoneTimer / 12000) * 100));
+      zb.style.setProperty('--zone-fill', pct + '%');
+      zb.classList.add('is-active');
+      zb.classList.remove('is-ready');
+      const lbl = zb.querySelector('.tc-label');
+      if (lbl) lbl.setAttribute('data-zone-secs', Math.ceil(zoneTimer / 1000));
+    } else {
+      zb.style.setProperty('--zone-fill', zoneEnergy + '%');
+      zb.classList.remove('is-active');
+      if (zoneEnergy >= 100) zb.classList.add('is-ready');
+      else zb.classList.remove('is-ready');
+      const lbl = zb.querySelector('.tc-label');
+      if (lbl) lbl.removeAttribute('data-zone-secs');
+    }
+  }
+  // Desktop zone bar mirrors the same logic — turns into a draining bar
+  // (right-to-left) when zone is active so it reads as a countdown rather
+  // than empty energy.
+  const zoneBar = document.getElementById('zone-bar');
+  const zoneLabel = document.getElementById('zone-label');
+  if (zoneActive && zoneBar) {
+    zoneBar.style.width = (zoneTimer / 12000) * 100 + '%';
+    zoneBar.style.background = 'linear-gradient(90deg, #ff3df0, #00e5ff)';
+    if (zoneLabel) zoneLabel.textContent = `ZONE · ${Math.ceil(zoneTimer / 1000)}s`;
+  } else if (zoneBar) {
+    zoneBar.style.background = 'linear-gradient(90deg, #ff00ff, #00ffff)';
+    if (zoneLabel) zoneLabel.textContent = zoneEnergy >= 100 ? 'ZONE · READY' : 'ZONE';
+  }
 }
 // Updates the small stats line beneath Alfred's bare canvas: score, level,
 // lines. Runs every render frame in vs-mode so it stays fresh.
