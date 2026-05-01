@@ -220,8 +220,13 @@
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: rgba(5,5,15,0.95);
-    backdrop-filter: blur(20px);
+    /* Underground lair gradient — dark at the top fading to a richer
+       indigo glow near the floor, like a subterranean speakeasy lit by
+       a single overhead bulb. The home-bg-canvas paints over this and
+       adds the falling pieces + spotlight + brick texture. */
+    background:
+      radial-gradient(ellipse at 50% 100%, rgba(40,15,80,0.50) 0%, rgba(0,0,0,0) 60%),
+      linear-gradient(180deg, #060312 0%, #0a0420 50%, #14082a 100%);
     /* Honour iOS safe areas so the title isn't hidden behind the notch /
        dynamic island and so the high-scores list isn't behind the home
        indicator. */
@@ -232,6 +237,18 @@
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+  /* The lair canvas sits BEHIND every start-screen child. position:absolute
+     within the fixed parent so it follows the same scroll context. */
+  #home-bg-canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+  /* Make sure every visible start-screen child stacks ABOVE the lair
+     canvas. Without this they share the default z-index and the canvas
+     would draw on top of (i.e. hide) the title + buttons. */
+  #start-screen > *:not(#home-bg-canvas) { position: relative; z-index: 1; }
   #start-screen h1 {
     font-size: 68px;
     font-weight: 900;
@@ -1329,6 +1346,11 @@
 <canvas id="bg-canvas"></canvas>
 
 <div id="start-screen">
+  <!-- Underground-lair backdrop: a separate canvas pinned behind every
+       start-screen child. Renders looping falling tetrominoes + a single
+       overhead spotlight cone + brick-wall texture. Animates only while
+       gameStarted is false (saves perf during the actual game). -->
+  <canvas id="home-bg-canvas"></canvas>
   <h1>TETRIS BEATS</h1>
   <!-- Cycles through map names so the front page advertises the breadth
        of vibes available. Updates via wireTagline IIFE. -->
@@ -2290,31 +2312,63 @@ function getTheme(lvl) {
   return LEVEL_THEMES[idx];
 }
 
+// Marathon vibe-rotation crossfade state. When non-null, render() paints a
+// dimming overlay over both the bg canvas + mainCanvas so the actual
+// theme swap (which is necessarily a hard reset of scene caches + audio
+// source) happens behind a smooth fade-to-black. The overlay rises 0→1
+// over `start..peak`, the swap fires at peak, then it falls 1→0 over
+// `peak..end`. Total transition ~1.4 s.
+let _themeXfade = null;
+
 // Pick a random LEVEL_THEMES entry that isn't the current one and has an
-// MP3 track, switch the marathon-active theme to it, restart audio with
-// no-loop + onended → repeat. Reset all scene caches so the new theme's
-// background re-initialises cleanly.
+// MP3 track, then animate a fade-to-black, swap the active theme +
+// audio + scene caches at the dark midpoint, and fade back in. Sir's
+// feedback: the prior implementation was a hard cut.
 function _marathonRotateVibe() {
   if (gameMode !== 'marathon' || gameOver) return;
   const choices = LEVEL_THEMES.filter((t, i) => i > 0 && t.track && t !== _marathonActiveTheme);
   if (!choices.length) return;
   const next = choices[Math.floor(Math.random() * choices.length)];
-  _marathonActiveTheme = next;
-  // Reset every scene's lazy-init cache so the new theme's background
-  // builds from scratch instead of inheriting the prior scene's geometry.
-  _gxScene = _dhScene = _jzScene = _ofScene = _zenScene = null;
-  // Update the on-screen era display + canvas glow for the new vibe.
-  const eraEl = document.getElementById('era-display');
-  if (eraEl) eraEl.textContent = next.name;
-  if (typeof mainCanvas !== 'undefined' && mainCanvas) {
-    mainCanvas.style.boxShadow = `0 0 60px ${next.colors.glow}33, 0 0 120px ${next.colors.glow}15`;
+
+  const now = performance.now();
+  // 600 ms fade-out → swap → 800 ms fade-in. Slightly asymmetric: the
+  // fade-in is longer so the new scene reveals more gracefully than the
+  // old one disappears.
+  _themeXfade = { start: now, peak: now + 600, end: now + 1400 };
+  // Pre-fade the audio out manually so the music starts dropping before
+  // the visual goes dark, instead of cutting at the swap moment.
+  if (audioEngine && audioEngine._stopTrack) {
+    audioEngine._stopTrack(0.55);
   }
-  if (typeof initBgParticles === 'function') initBgParticles();
-  // Kick the next track in the rotation. Non-looping with onended hooked
-  // back to this same function so it keeps rotating forever.
-  if (audioEngine && audioEngine._playTrack) {
-    audioEngine._playTrack(next.track, { loop: false, onended: _marathonRotateVibe });
+
+  // Swap theme + audio at the dark midpoint (when alpha=1).
+  setTimeout(() => {
+    _marathonActiveTheme = next;
+    _gxScene = _dhScene = _jzScene = _ofScene = _zenScene = null;
+    const eraEl = document.getElementById('era-display');
+    if (eraEl) eraEl.textContent = next.name;
+    if (typeof mainCanvas !== 'undefined' && mainCanvas) {
+      mainCanvas.style.boxShadow = `0 0 60px ${next.colors.glow}33, 0 0 120px ${next.colors.glow}15`;
+    }
+    if (typeof initBgParticles === 'function') initBgParticles();
+    if (audioEngine && audioEngine._playTrack) {
+      audioEngine._playTrack(next.track, { loop: false, onended: _marathonRotateVibe });
+    }
+  }, 600);
+}
+
+// Compute the current crossfade alpha (0..1). Returns 0 when no xfade
+// is active. Called from render() to know how much to dim the canvases.
+function _themeXfadeAlpha() {
+  if (!_themeXfade) return 0;
+  const t = performance.now();
+  if (t >= _themeXfade.end) { _themeXfade = null; return 0; }
+  if (t < _themeXfade.peak) {
+    const k = (t - _themeXfade.start) / (_themeXfade.peak - _themeXfade.start);
+    return Math.min(1, Math.max(0, k));
   }
+  const k = (t - _themeXfade.peak) / (_themeXfade.end - _themeXfade.peak);
+  return Math.min(1, Math.max(0, 1 - k));
 }
 
 // Lines required to advance one level. Bumped 10 → 15 so each level lasts
@@ -10443,6 +10497,28 @@ function render(timestamp) {
   // Leave P1 active for input handlers between frames.
   if (players[0]) setActivePlayer(players[0]);
   if (gameMode === 'vs') updateP2Stats();
+
+  // Marathon vibe-rotation crossfade overlay. Drawn LAST so it dims every
+  // surface — bg scene, board, falling piece, particles. Sir flagged the
+  // prior swap as "a hard cut" — this is the soft transition.
+  const xfa = _themeXfadeAlpha();
+  if (xfa > 0) {
+    if (typeof bgCtx !== 'undefined' && bgCtx) {
+      bgCtx.save();
+      bgCtx.fillStyle = `rgba(0,0,0,${xfa})`;
+      bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+      bgCtx.restore();
+    }
+    for (const p of (players || [])) {
+      const mc = p.mainCanvas, mctx = p.ctx;
+      if (mc && mctx && mc.width > 0) {
+        mctx.save();
+        mctx.fillStyle = `rgba(0,0,0,${xfa})`;
+        mctx.fillRect(0, 0, mc.width, mc.height);
+        mctx.restore();
+      }
+    }
+  }
 }
 
 // ============================================================
@@ -11070,6 +11146,238 @@ setInterval(() => {
   const startVisible = document.getElementById('start-screen').style.display !== 'none';
   if (startVisible) refreshSharedLeaderboard();
 }, 30_000);
+
+// ============================================================================
+// HOME-PAGE UNDERGROUND-LAIR ANIMATION
+// Sir's idea: "an underground lair and tetris are falling from the sky".
+// Layered behind the start-screen content:
+//   1. Dim brick wall (procedural — diagonal mortar lines + brick stagger)
+//   2. Single overhead spotlight cone
+//   3. Small floor spotlight pool
+//   4. Continuously-falling tetrominoes in the per-piece accent colours,
+//      with rotation, parallax depth, and gentle horizontal sway
+//   5. Faint dust motes drifting up through the spotlight beam
+// Loop pauses when gameStarted goes true (saves perf during the actual game)
+// and resumes when the player returns to the home screen.
+// ============================================================================
+(function wireHomeLair() {
+  const canvas = document.getElementById('home-bg-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // Tetromino shapes in 4-cell offset form, plus per-piece accent colours
+  // that match the in-game palette so the home page reads as the same
+  // game's universe.
+  const HOME_PIECES = [
+    { shape: [[0,0],[1,0],[2,0],[3,0]], color: '#00f5ff' },  // I  cyan
+    { shape: [[0,0],[1,0],[0,1],[1,1]], color: '#ffe700' },  // O  yellow
+    { shape: [[1,0],[0,1],[1,1],[2,1]], color: '#ff00ff' },  // T  magenta
+    { shape: [[1,0],[2,0],[0,1],[1,1]], color: '#00ff66' },  // S  green
+    { shape: [[0,0],[1,0],[1,1],[2,1]], color: '#ff3366' },  // Z  red
+    { shape: [[0,0],[0,1],[1,1],[2,1]], color: '#3366ff' },  // J  blue
+    { shape: [[2,0],[0,1],[1,1],[2,1]], color: '#ff8800' },  // L  orange
+  ];
+
+  const pieces = [];
+  const motes = [];
+  let lastT = 0, frame = 0;
+
+  function resize() {
+    // Match the canvas pixel buffer to its CSS box so circles aren't
+    // blurry on retina displays.
+    const r = canvas.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
+    canvas.width  = Math.floor(r.width);
+    canvas.height = Math.floor(r.height);
+  }
+  function spawnPiece() {
+    const p = HOME_PIECES[Math.floor(Math.random() * HOME_PIECES.length)];
+    const w = canvas.width;
+    const depth = 0.4 + Math.random() * 0.6; // parallax: 0.4 = far/small, 1.0 = near/big
+    pieces.push({
+      shape: p.shape,
+      color: p.color,
+      x: Math.random() * w,
+      y: -80,
+      cell: 14 + depth * 14,           // 14-28 px per cell, depth-driven
+      depth,
+      vy:  (1.0 + Math.random() * 1.6) * (0.6 + depth * 0.6), // ~0.6-2.6 px/frame
+      vx:  (Math.random() - 0.5) * 0.4,
+      rot: Math.random() * Math.PI * 2,
+      rotV:(Math.random() - 0.5) * 0.012,
+      alpha: 0.22 + depth * 0.45,      // far pieces are dimmer
+      glow: depth > 0.75,              // only the closest pieces get a glow halo
+      swayPhase: Math.random() * Math.PI * 2,
+    });
+  }
+  function spawnMote() {
+    motes.push({
+      x: canvas.width * (0.35 + Math.random() * 0.30),
+      y: canvas.height + 5,
+      vy: -(0.20 + Math.random() * 0.30),
+      r:  0.8 + Math.random() * 1.2,
+      alpha: 0.15 + Math.random() * 0.20,
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+  function drawBrickWall(w, h) {
+    // Very subtle: only the seams are drawn, the brick face is the
+    // gradient already painted by start-screen background. Two-row
+    // staggered pattern, dim mortar.
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+    ctx.lineWidth = 1;
+    const brickH = 22, brickW = 80;
+    for (let y = 0; y < h; y += brickH) {
+      ctx.beginPath();
+      ctx.moveTo(0, y); ctx.lineTo(w, y);
+      ctx.stroke();
+      const rowOff = ((y / brickH) | 0) % 2 === 0 ? 0 : brickW / 2;
+      for (let x = -rowOff; x < w; x += brickW) {
+        ctx.beginPath();
+        ctx.moveTo(x, y); ctx.lineTo(x, y + brickH);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  function drawSpotlight(w, h, t) {
+    // Overhead cone of warm light from above the title down toward the
+    // CTA. Sways very gently so it never reads as static.
+    const sway = Math.sin(t / 4500) * w * 0.04;
+    const tipX = w * 0.5 + sway;
+    const tipY = -10;
+    const beamLen = h * 0.85;
+    const beamHalf = w * 0.34;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const grad = ctx.createLinearGradient(tipX, tipY, tipX, tipY + beamLen);
+    grad.addColorStop(0,   'rgba(255,210,140,0.20)');
+    grad.addColorStop(0.4, 'rgba(190,140,255,0.10)');
+    grad.addColorStop(1,   'rgba(120,80,200,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - beamHalf, tipY + beamLen);
+    ctx.lineTo(tipX + beamHalf, tipY + beamLen);
+    ctx.closePath();
+    ctx.fill();
+    // Floor spotlight pool (where the cone hits the ground)
+    const floorY = h * 0.92;
+    const pool = ctx.createRadialGradient(tipX, floorY, 0, tipX, floorY, beamHalf);
+    pool.addColorStop(0,   'rgba(255,200,140,0.18)');
+    pool.addColorStop(0.6, 'rgba(180,120,220,0.08)');
+    pool.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = pool;
+    ctx.beginPath();
+    ctx.ellipse(tipX, floorY, beamHalf, beamHalf * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  function drawPiece(p, w, h) {
+    const cell = p.cell;
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    // Sway + rotate around the piece's bounding-box centre
+    const swayX = Math.sin(p.swayPhase + p.y * 0.003) * 6;
+    ctx.translate(p.x + swayX, p.y);
+    ctx.rotate(p.rot);
+    // Optional glow on the closest pieces only
+    if (p.glow) {
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur  = Math.min(14, cell * 0.55);
+    }
+    for (const [bx, by] of p.shape) {
+      const x0 = bx * cell - cell * 1.5;
+      const y0 = by * cell - cell * 0.5;
+      // Cell body — radial sheen so it reads as a dimensional block
+      const grad = ctx.createLinearGradient(x0, y0, x0 + cell, y0 + cell);
+      grad.addColorStop(0, p.color);
+      grad.addColorStop(1, '#000');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x0 + 1, y0 + 1, cell - 2, cell - 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      ctx.fillRect(x0 + 1, y0 + 1, cell - 2, 2.5);
+      ctx.fillRect(x0 + 1, y0 + 1, 2.5, cell - 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.30)';
+      ctx.fillRect(x0 + 1, y0 + cell - 3, cell - 2, 2);
+      ctx.fillRect(x0 + cell - 3, y0 + 1, 2, cell - 2);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+  function drawMote(m) {
+    ctx.save();
+    ctx.fillStyle = `rgba(255,225,180,${m.alpha * (0.6 + Math.sin(performance.now() / 1100 + m.phase) * 0.4)})`;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  let _rafActive = false;
+  function tick(t) {
+    _rafActive = true;
+    // If the game has started, the start screen is hidden — pause the
+    // animation entirely so we don't compete with game render for CPU.
+    if (gameStarted) { _rafActive = false; return; }
+    const w = canvas.width, h = canvas.height;
+    if (w === 0 || h === 0) {
+      resize();
+      requestAnimationFrame(tick);
+      return;
+    }
+    ctx.clearRect(0, 0, w, h);
+    drawBrickWall(w, h);
+    drawSpotlight(w, h, t);
+
+    // Spawn pieces at a controlled rate. Cap so we never draw more than
+    // ~14 pieces simultaneously (mostly far/small ones).
+    if (frame % 28 === 0 && pieces.length < 14) spawnPiece();
+    if (frame % 90 === 0 && motes.length  < 12) spawnMote();
+
+    // Draw far pieces first, then near pieces (depth-sort once per frame).
+    pieces.sort((a, b) => a.depth - b.depth);
+    for (let i = pieces.length - 1; i >= 0; i--) {
+      const p = pieces[i];
+      p.y += p.vy;
+      p.x += p.vx;
+      p.rot += p.rotV;
+      // wrap when offscreen
+      if (p.y > h + 60) {
+        pieces.splice(i, 1);
+        continue;
+      }
+      drawPiece(p, w, h);
+    }
+    for (let i = motes.length - 1; i >= 0; i--) {
+      const m = motes[i];
+      m.y += m.vy;
+      if (m.y < -10) { motes.splice(i, 1); continue; }
+      drawMote(m);
+    }
+    // Faint vignette that pulls the eye toward the center where the title sits
+    const vign = ctx.createRadialGradient(w * 0.5, h * 0.45, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.65);
+    vign.addColorStop(0, 'rgba(0,0,0,0)');
+    vign.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = vign;
+    ctx.fillRect(0, 0, w, h);
+
+    frame++;
+    requestAnimationFrame(tick);
+  }
+  function ensureRunning() {
+    if (_rafActive || gameStarted) return;
+    requestAnimationFrame(tick);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  ensureRunning();
+  // When the player returns to the home screen after a game, restart the
+  // loop. We poll a couple of times because nothing in this codebase
+  // emits a "screen change" event.
+  setInterval(ensureRunning, 1500);
+})();
 
 // Position the Alfred monitor for the current mode/viewport.
 // On mobile vs-mode we anchor it absolutely to the right side of the player's
