@@ -272,17 +272,19 @@
     50%      { background-position: 100% 50%; }
   }
   /* Animated tagline under the title — a single line that cycles through
-     each map name so the home page advertises the depth of the game even
-     before the user picks anything. */
+     funny inspirational quotes so the home page has personality while you
+     pick your vibe. Italicised, mixed-case so quotes read naturally. */
   #start-screen .tagline {
-    font-size: 11px;
-    color: rgba(255,215,128,0.85);
-    margin-bottom: 22px;
-    letter-spacing: 6px;
-    text-transform: uppercase;
+    font-size: 13px;
+    color: rgba(255,215,128,0.88);
+    margin: 0 auto 22px;
+    max-width: 92%;
+    letter-spacing: 0.5px;
     text-shadow: 0 0 10px rgba(255,180,80,0.35);
-    min-height: 14px;
-    font-weight: 800;
+    min-height: 18px;
+    font-style: italic;
+    font-weight: 600;
+    line-height: 1.35;
     transition: opacity 0.45s;
   }
   #start-screen .sub {
@@ -11606,29 +11608,134 @@ window.addEventListener('resize', () => positionP2Monitor());
   sync();
 })();
 
-// Cycles the start-screen tagline through "<MAP NAME> · pick your vibe"
-// for each LEVEL_THEMES entry, plus a couple of brand lines, so the home
-// page constantly hints at the depth of the game without taking extra
-// vertical space. Pauses while game is running.
+// Cycles the start-screen tagline through 100 funny inspirational quotes,
+// shuffled once per session so the order feels fresh. Pauses while game
+// is running. Quotes are italic / mixed-case so they read like actual
+// quotes rather than UI shouting.
 (function wireTagline() {
   const el = document.getElementById('start-tagline');
   if (!el) return;
-  const lines = [
-    '19 VIBES · 5 MODES · ONE BEAT',
-    'STORY · MARATHON · SPRINT · ULTRA',
-    ...LEVEL_THEMES.slice(1).map(t => `${(t.name || '').toUpperCase()} · TAP TO PLAY`),
-    'PICK YOUR VIBE · DROP THE BEAT',
+  const quotes = [
+    'Believe you can — and you\'re halfway to a Tetris.',
+    'Every line you clear is a line forward in life.',
+    'If at first you don\'t succeed, blame the J-piece.',
+    'Be the I-piece in a sea of S-pieces.',
+    'Your only competition is the gravity of yesterday.',
+    'Stack hard. Clear harder. Sleep eventually.',
+    'Procrastination is just a hard drop on tomorrow.',
+    'You miss 100% of the lines you don\'t drop.',
+    'The early bird gets the T-spin.',
+    'Life is 10% what happens and 90% piece preview.',
+    'Do or do not. There is no soft drop.',
+    'Be the change you wish to see in the playfield.',
+    'When life gives you S-pieces, make Z-spins.',
+    'The block is the way.',
+    'Dream big. Start with one line.',
+    'Champions clear lines they didn\'t even plan.',
+    'If it\'s not a Tetris, it\'s a lesson.',
+    'Patience is a virtue. Hard drop is a lifestyle.',
+    'Failure is just feedback in 4-bit color.',
+    'Top out today, top score tomorrow.',
+    'The grind is real. So is the gravity.',
+    'Some clear lines. Others clear cobwebs.',
+    'Bend like the J-piece, break like the S-piece.',
+    'Mistakes happen. So do back-to-back tetrises.',
+    'You are the architect of your own well.',
+    'Don\'t watch the queue. Build the future.',
+    'Excellence is a stack consistently leveled.',
+    'Take risks — the L-piece never apologized.',
+    'If gravity was easy, everyone would top out.',
+    'Stay humble. The next piece humbles us all.',
+    'Be the holder of your own destiny.',
+    'Hold the piece, hold the dream.',
+    'There are no traffic jams on the extra mile.',
+    'The harder I drop, the luckier I get.',
+    'Success is 10% inspiration and 90% T-spin doubles.',
+    'Rotate, don\'t ruminate.',
+    'Your worst day stacking beats no day playing.',
+    'Comfort zones are where lines go to die.',
+    'Aim for the Tetris. Settle for nothing less.',
+    'Don\'t quit your day job. Just clear the next line.',
+    'The impossible is just an undocumented kick.',
+    'Some days you\'re the I-piece. Some days you\'re the gap.',
+    'Strong stacks are built one row at a time.',
+    'Wisdom comes from S-pieces you didn\'t want.',
+    'Optimism: there\'s always another piece.',
+    'If you can dream it, you can stack it.',
+    'Confidence looks like a T-spin triple.',
+    'Embrace the grind. Question the gravity.',
+    'Discipline is choosing the I-piece over the J-piece.',
+    'Practice doesn\'t make perfect. It makes Tetrises.',
+    'Even the best stack started as one block.',
+    'Don\'t stack today what you can clear tomorrow. Wait — reverse that.',
+    'Adversity introduces a stacker to themselves.',
+    'Doubt kills more lines than gravity ever did.',
+    'The block does not lie. The player does.',
+    'Greatness isn\'t given. It\'s hard-dropped.',
+    'Smile. The next piece is probably an I-piece.',
+    'If plan A fails, the alphabet has six more pieces.',
+    'Burn no bridges, hold no S-pieces.',
+    'A goal without a stack is just a wish.',
+    'Some build walls. Some clear them.',
+    'Trust the queue. Question the gravity.',
+    'Do small things in great ways. Then T-spin them.',
+    'Action is the foundational key to all stacking.',
+    'It always seems impossible — until it\'s a Tetris.',
+    'The pessimist sees gaps. The optimist fills them.',
+    'Hustle until your J-pieces become your jealousy.',
+    'Done is better than perfect. Tetris is better than both.',
+    'Nothing is impossible. The word itself spells I-piece.',
+    'Clarity comes from action. So does back-to-back.',
+    'A river cuts through rock by persistence — and so do you.',
+    'Be a voice, not an echo. Be a Tetris, not a single.',
+    'Stay weird. Stay rotating.',
+    'If you\'re not stacking, you\'re slipping.',
+    'Make today so awesome yesterday gets jealous.',
+    'Keep calm and clear lines.',
+    'A winner is a dreamer who didn\'t top out.',
+    'The journey of a thousand lines begins with a single drop.',
+    'Don\'t count the lines. Make the lines count.',
+    'Where focus goes, energy flows. Where pieces go, points show.',
+    'Pressure makes diamonds. And T-spin doubles.',
+    'Rise by lifting others. And by clearing your own stack.',
+    'Be the kind of person who finds the I-piece.',
+    'Don\'t tell people your dreams. Show them your stack.',
+    'Talent wins games. Teamwork wins Tetrises.',
+    'Worry less. Stack more.',
+    'Live the life you\'ve imagined. Or at least hold the line.',
+    'There is no elevator to success. Only hard drops.',
+    'Energy flows where attention goes. So do the gaps.',
+    'When in doubt — hold.',
+    'Don\'t be afraid to give up the good for the Tetris.',
+    'The best time to clear a line was 20 seconds ago. The second best is now.',
+    'Be the energy you want to attract. And the I-piece you want to receive.',
+    'Whatever you are, be a good one. Especially a J-piece.',
+    'Life shrinks or expands in proportion to the lines you clear.',
+    'Don\'t watch the clock. Soft-drop forward.',
+    'The future depends on what you do today. Hard drop accordingly.',
+    'Quality over quantity. Tetris over single.',
+    'Push yourself. No one else is clearing those lines for you.',
+    'Stay hungry. Stay foolish. Stay stacking.',
+    'You are exactly one I-piece away from greatness.',
+    'Plot twist: the S-piece was a metaphor.',
+    'In a world full of gaps, be the I-piece.',
   ];
+  // Fisher-Yates shuffle so the order feels different each visit.
+  for (let k = quotes.length - 1; k > 0; k--) {
+    const j = Math.floor(Math.random() * (k + 1));
+    [quotes[k], quotes[j]] = [quotes[j], quotes[k]];
+  }
   let i = 0;
+  el.textContent = quotes[0];
   setInterval(() => {
     if (gameStarted) return;
     el.style.opacity = 0;
     setTimeout(() => {
-      i = (i + 1) % lines.length;
-      el.textContent = lines[i];
+      i = (i + 1) % quotes.length;
+      el.textContent = quotes[i];
       el.style.opacity = 1;
-    }, 280);
-  }, 2400);
+    }, 320);
+  }, 5200);
 })();
 
 // Sync voice toggle with saved preference and wire the checkbox.
