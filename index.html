@@ -8227,13 +8227,24 @@ function drawBlockTrumpet(context, x, y, color, size, alpha, theme) {
 
   context.globalAlpha = alpha;
   context.save();
+  // 180° rotation around the cell's centre — Sir said the trumpet was
+  // upside-down; rotating flips both bell-direction AND valve-direction
+  // in one transform without rewriting every coordinate. After this, the
+  // local-coord drawing code is unchanged: the SAME shape is rendered,
+  // just point-symmetrically about (x + size/2, y + size/2).
+  context.translate(x + size / 2, y + size / 2);
+  context.rotate(Math.PI);
+  context.translate(-x - size / 2, -y - size / 2);
   const goldDark = '#7a4f10';
   const goldMid  = '#d99820';
   const goldLite = '#fbd86b';
   context.shadowColor = 'rgba(80,40,0,0.55)';
   context.shadowBlur  = Math.min(7, size * 0.16);
-  context.shadowOffsetX = 1;
-  context.shadowOffsetY = 1.5;
+  // After the 180° rotation the shadow offset gets mirrored too — keep
+  // the visual offset consistent (shadow drops down-right from the
+  // viewer's perspective) by inverting it here.
+  context.shadowOffsetX = -1;
+  context.shadowOffsetY = -1.5;
 
   // ── 1. MOUTHPIECE — small cup on the LEFT edge
   const mouthX = x + size * 0.10;
