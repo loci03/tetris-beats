@@ -3420,8 +3420,22 @@ const audioEngine = {
     this._updateDelayTime();
     this._schedule();
     // Kick off the per-level backing track if the current theme has one.
+    // Marathon plays each track ONCE through (non-looping) and rotates to
+    // a random vibe on `onended`. Sir reported the prior implementation
+    // double-fired _playTrack (once via start() with loop=true, then again
+    // from startGame() with loop=false) which raced — the second call's
+    // _stopTrack fired the first source's onended-equivalent before the
+    // marathon source was actually playing, triggering an immediate
+    // random-vibe rotation and skipping the Galaxy intro entirely. Single
+    // call here, single source of truth.
     const theme = getTheme(level);
-    if (theme && theme.track) this._playTrack(theme.track);
+    if (theme && theme.track) {
+      if (gameMode === 'marathon' && typeof _marathonRotateVibe === 'function') {
+        this._playTrack(theme.track, { loop: false, onended: _marathonRotateVibe });
+      } else {
+        this._playTrack(theme.track);
+      }
+    }
     // Preload per-theme move SFX so the very first piece movement plays the
     // real sample instead of falling back to the synth click.
     if (theme && theme.moveSfx) this._loadSfx(theme.moveSfx);
@@ -10857,20 +10871,13 @@ function startGame() {
   // iOS Safari: AudioContext starts "suspended" and needs a user gesture.
   // resume() is async - we must await it before the scheduler starts, otherwise
   // notes get scheduled on a context that isn't running yet and nothing plays.
-  const startAudio = () => {
-    audioEngine.start();
-    // MARATHON auto-rotate: replace the just-started looping Galaxy track
-    // with a non-looping version so its `onended` fires and we can swap
-    // to a random LEVEL_THEMES vibe. _playTrack internally crossfades the
-    // looping one out, so this is seamless.
-    if (gameMode === 'marathon' && theme && theme.track) {
-      audioEngine._playTrack(theme.track, { loop: false, onended: _marathonRotateVibe });
-    }
-  };
+  // (Marathon's non-looping track + onended rotation hook is wired inside
+  // audioEngine.start() itself so there's a single source of truth and no
+  // race between competing _playTrack calls.)
   if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
-    audioEngine.ctx.resume().then(startAudio);
+    audioEngine.ctx.resume().then(() => audioEngine.start());
   } else {
-    startAudio();
+    audioEngine.start();
   }
   initBgParticles();
   gameStarted = true;
