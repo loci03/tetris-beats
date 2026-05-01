@@ -233,13 +233,40 @@
     overscroll-behavior: contain;
   }
   #start-screen h1 {
-    font-size: 64px;
+    font-size: 68px;
     font-weight: 900;
-    background: linear-gradient(135deg, #ff00ff, #00ffff, #ff6600);
+    /* Animated multi-stop hue gradient — looks like a marquee shifting
+       through every theme colour. */
+    background: linear-gradient(135deg, #ff00ff 0%, #00ffff 25%, #7df9ff 45%, #ffd700 65%, #ff66c8 85%, #ff00ff 100%);
+    background-size: 280% 280%;
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 8px;
+    color: transparent;
+    margin-bottom: 4px;
     letter-spacing: 4px;
+    /* Subtle drop-shadow that picks up the gradient hue underneath the text. */
+    filter: drop-shadow(0 0 18px rgba(255,80,200,0.35)) drop-shadow(0 0 38px rgba(125,249,255,0.20));
+    animation: titleHueShift 14s ease-in-out infinite;
+    line-height: 1.0;
+  }
+  @keyframes titleHueShift {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+  /* Animated tagline under the title — a single line that cycles through
+     each map name so the home page advertises the depth of the game even
+     before the user picks anything. */
+  #start-screen .tagline {
+    font-size: 11px;
+    color: rgba(255,215,128,0.85);
+    margin-bottom: 22px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(255,180,80,0.35);
+    min-height: 14px;
+    font-weight: 800;
+    transition: opacity 0.45s;
   }
   #start-screen .sub {
     font-size: 16px;
@@ -336,45 +363,85 @@
      the picker from blowing past the start-screen width on mobile. */
   #level-select {
     display: flex; flex-direction: column; align-items: center;
-    gap: 8px; margin: -8px 0 24px;
-    max-width: 360px;
+    gap: 10px; margin: -4px 0 22px;
+    max-width: 560px; width: 92%;
   }
   #level-select .lvl-label {
     font-size: 10px;
-    letter-spacing: 4px;
-    color: rgba(255,255,255,0.5);
+    letter-spacing: 5px;
+    color: rgba(255,215,128,0.85);
     text-transform: uppercase;
+    font-weight: 800;
+    text-shadow: 0 0 8px rgba(255,180,80,0.45);
   }
+  /* Vibe-card grid: 5-wide on desktop so the row reads as a clean shelf,
+     3-wide on mobile so each card is tappable. Each card shows the
+     theme number tile + name. */
   #level-select .lvl-grid {
-    display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+    display: grid; gap: 6px; justify-content: center;
+    grid-template-columns: repeat(5, minmax(94px, 1fr));
+    width: 100%;
   }
+  @media (max-width: 720px), (pointer: coarse) {
+    #level-select .lvl-grid {
+      grid-template-columns: repeat(3, minmax(86px, 1fr));
+    }
+  }
+  /* Map / vibe card. Each chip is now a horizontal pill with the era
+     number on the left (small badge) and the theme name on the right
+     (the meaningful label). Inactive: dim border + faded label.
+     Active: glowing gradient ring matching the theme accent. */
   .lvl-btn {
-    padding: 5px 10px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    background: transparent;
-    color: rgba(255,255,255,0.55);
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 14px;
+    display: flex; align-items: center; justify-content: flex-start;
+    gap: 6px; padding: 7px 8px;
+    font-size: 10px; font-weight: 800; letter-spacing: 1.2px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    color: rgba(255,255,255,0.65);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 11px;
     cursor: pointer;
-    transition: all 0.15s;
-    min-width: 32px;
+    transition: color 0.18s, border-color 0.18s, background 0.18s, transform 0.1s;
+    text-align: left;
+    overflow: hidden;
+    min-height: 36px;
   }
-  .lvl-btn:hover { color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.4); }
+  .lvl-btn .lvl-num {
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px;
+    font-size: 11px; font-weight: 900;
+    background: rgba(255,255,255,0.10);
+    border-radius: 7px;
+    color: rgba(255,255,255,0.85);
+    font-feature-settings: 'tnum' 1;
+  }
+  .lvl-btn .lvl-name {
+    flex: 1; line-height: 1.05;
+    font-size: 9px; letter-spacing: 1px;
+    color: inherit;
+    text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
+  }
+  .lvl-btn:hover { color: rgba(255,255,255,0.95); border-color: rgba(255,215,128,0.50); transform: translateY(-1px); }
+  .lvl-btn:active { transform: scale(0.97); }
   .lvl-btn.lvl-active {
     color: #fff;
     border-color: #ffd700;
-    background: rgba(255,215,0,0.15);
-    box-shadow: 0 0 12px rgba(255,215,0,0.35);
+    background: linear-gradient(135deg, rgba(255,215,0,0.30), rgba(255,100,200,0.20));
+    box-shadow: 0 4px 18px rgba(255,215,0,0.35), inset 0 1px 0 rgba(255,255,255,0.18);
   }
-  /* Selected era name preview underneath the grid so the player knows what
-     they're picking before they commit. */
+  .lvl-btn.lvl-active .lvl-num {
+    background: rgba(0,0,0,0.45);
+    color: #ffd700;
+  }
+  /* Selected era name preview underneath the grid (still useful on mobile
+     where chip text may be ellipsised). */
   #level-select .lvl-preview {
-    font-size: 11px;
-    letter-spacing: 2px;
-    color: rgba(255,215,0,0.85);
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: #ffd700;
     text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(255,215,0,0.45);
+    font-weight: 800;
     min-height: 14px;
   }
   .mode-btn {
@@ -1217,6 +1284,9 @@
 
 <div id="start-screen">
   <h1>TETRIS BEATS</h1>
+  <!-- Cycles through map names so the front page advertises the breadth
+       of vibes available. Updates via wireTagline IIFE. -->
+  <div class="tagline" id="start-tagline">19 VIBES · 4 MODES · ONE BEAT</div>
   <!-- Two-tier mode picker:
          Tier 1  : SOLO | VS  (big tabs)
          Tier 2  : sub-modes specific to the active tab
@@ -1246,10 +1316,15 @@
       <button class="diff-btn" data-diff="hard">HARD</button>
     </div>
   </div>
-  <!-- Level picker - chips populated from LEVEL_THEMES at boot so the labels
-       always match the actual eras + tracks. Persists in localStorage. -->
+  <!-- Map / vibe picker — chips populated from LEVEL_THEMES at boot so
+       labels match the actual themes. Renamed from "START LEVEL" because
+       Sir's spec: each chip is a MAP/VIBE (its theme + track), the
+       in-game level is the difficulty curve. Visible under STORY (pick a
+       map to start at) and SPRINT (pick a map to play your 40-line run
+       on). Hidden under MARATHON (locked to Galaxy), ULTRA (always L1
+       Underground), and VS modes. -->
   <div id="level-select">
-    <div class="lvl-label">START LEVEL</div>
+    <div class="lvl-label">CHOOSE YOUR VIBE</div>
     <div class="lvl-grid"></div>
     <div class="lvl-preview"></div>
   </div>
@@ -2118,7 +2193,39 @@ const LEVEL_THEMES = [
   },
 ];
 
+// Marathon mode is locked to its own dedicated theme — "Galaxy" — instead
+// of cycling through the 19 Story themes. Difficulty progression in
+// Marathon affects ONLY drop speed / lock delay (handled in
+// computeDropInterval), not the visual theme. Per Sir's design: Marathon
+// is the "endurance crazy mode" with one consistent space vibe.
+const MARATHON_THEME = {
+  name: 'Galaxy',
+  bpm: 92,
+  track: 'galaxy.mp3',
+  // Deep space palette: cosmic purple sky, cyan accent, magenta glow
+  // for nebula reactivity. The star block uses these directly.
+  colors: { bg1: '#06051f', bg2: '#020114', accent: '#7df9ff', glow: '#ff66e0' },
+  particleHue: 195,
+  blockStyle: 'star',
+  particleStyle: 'galaxy',
+  blockGlow: 12,
+  // Procedural-fallback drum pattern in case the MP3 fails to load.
+  // Spacious 4/4 with a wide-open hi-hat — leaves room for the ambient
+  // synth pads to breathe like an actual cosmic track.
+  kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+  snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+  hh:    [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+  hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+  bass:  [1,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+  bassNote: 41.20, // E1 — deep cosmic bass
+  scale: [220, 246.94, 277.18, 329.63, 392, 415.30, 440, 493.88],
+  chords: [[220, 277.18, 329.63], [246.94, 329.63, 415.30], [196, 246.94, 329.63]],
+  synthType: 'choir',
+};
 function getTheme(lvl) {
+  // Marathon plays Galaxy regardless of internal level — the level number
+  // there only drives gravity/lock-delay difficulty, not theme rotation.
+  if (gameMode === 'marathon') return MARATHON_THEME;
   const idx = Math.min(lvl, LEVEL_THEMES.length - 1);
   return LEVEL_THEMES[idx];
 }
@@ -2765,7 +2872,7 @@ function clearLines() {
       // styled level - matrix + tires count as visually-rich for these FX
       // too, so a Tetris on Back for More / Ferrari Window gets the same
       // shockwave/flash treatment). Volume scales with line count + combo.
-      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug')) {
+      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star')) {
         const pieces = [0, 12, 22, 36, 60][cleared] || 60;
         const totalPieces = pieces + Math.max(0, combo) * 8;
         spawnConfetti(totalPieces, theme);
@@ -3898,8 +4005,9 @@ function initBgParticles() {
               : theme.particleStyle === 'zen-drift' ? 0
               : theme.particleStyle === 'jazz-club' ? 0
               : theme.particleStyle === 'office-rage' ? 0
+              : theme.particleStyle === 'galaxy' ? 0
               : theme.particleStyle === 'dots' ? 30
-              : theme.particleStyle === 'violins' ? 18
+              : theme.particleStyle === 'violins' ? 28  // L3 violins — speed-up bumps count for a livelier sky
               : 80;
   const isViolins  = theme.particleStyle === 'violins';
   for (let i = 0; i < count; i++) {
@@ -3917,7 +4025,10 @@ function initBgParticles() {
       // 0.02-0.045 raw × 0.7 mult ≈ 1.4-3.1 px/s baseline; a violin takes
       // 4-10 minutes to cross the screen. Reads as effectively suspended
       // mid-air, drifting down only on cheer/flash boosts.
-      speed: isViolins ? 0.02 + Math.random() * 0.025 : Math.random() * 0.5 + 0.1,
+      // Sir asked for the violins to actually MOVE this time — bumped raw
+    // speed 0.02-0.045 → 0.18-0.40 (~10× faster baseline). Now they drift
+    // visibly across the sky instead of feeling stuck mid-air.
+    speed: isViolins ? 0.18 + Math.random() * 0.22 : Math.random() * 0.5 + 0.1,
       alpha: isViolins ? 0.6 + Math.random() * 0.3 : Math.random() * 0.4 + 0.1,
       phase: Math.random() * Math.PI * 2,
       // Violins stay nearly upright (gentle wobble); others keep full spin.
@@ -4691,7 +4802,7 @@ function drawGhostBlock(context, x, y, color, size) {
   // dashed ghost reads as a different piece type than what's about to
   // lock. For Mac & Cheese the accent is yellow, which means the ghost
   // automatically renders as the yellow guide outline Sir asked for.
-  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug');
+  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star');
   const outlineColor = useThemeColor ? theme.colors.accent : color;
   context.save();
   const [r, g, b] = hexToRgb(outlineColor);
@@ -4744,6 +4855,10 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   }
   if (theme && theme.blockStyle === 'mug') {
     drawBlockMug(context, x, y, color, size, alpha, theme);
+    return;
+  }
+  if (theme && theme.blockStyle === 'star') {
+    drawBlockStar(context, x, y, color, size, alpha, theme);
     return;
   }
   context.globalAlpha = alpha;
@@ -5134,12 +5249,13 @@ function drawBoard() {
   // and tires (Ferrari Window) all use a semi-translucent board so their
   // reactive backgrounds (violins / matrix-rain / Ferrari highway) read
   // through the empty cells. Other levels stay opaque.
-  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug')) {
+  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star')) {
     ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
     const fillAlpha = (theme.blockStyle === 'tires') ? 0.82
                     : (theme.blockStyle === 'brain') ? 0.42
                     : (theme.blockStyle === 'trumpet') ? 0.50
                     : (theme.blockStyle === 'mug') ? 0.55
+                    : (theme.blockStyle === 'star') ? 0.30  // very dim so stars + nebula glow through
                     : 0.55;
     ctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
   } else {
@@ -9027,6 +9143,424 @@ function drawOfficeRageScene(theme, now, playRects) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// STAR BLOCK (Marathon — Galaxy)
+// 5-pointed star drawn from a single path with alternating outer/inner radii.
+// Cyan-white body with magenta halo + an animated sparkle that crosses the
+// face every ~1.4s so each star always feels alive (the "shimmering" Sir
+// asked for). No two cells shimmer in lockstep — phase is seeded from the
+// cell origin so adjacent stars sparkle off-beat from each other.
+// ─────────────────────────────────────────────────────────────────────────────
+function drawBlockStar(context, x, y, color, size, alpha, theme) {
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  const rOut = size * 0.46;
+  const rIn  = size * 0.20;
+
+  context.globalAlpha = alpha;
+  context.save();
+  // Outer halo glow — pulses with audio energy + always breathes a little
+  // so even idle stars feel charged. Cheap radial gradient on a circle.
+  const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+  const breathe = 0.85 + Math.sin(Date.now() / 600 + (cx * 13 + cy * 7)) * 0.15;
+  const haloR = size * 0.65;
+  const halo = context.createRadialGradient(cx, cy, rOut * 0.5, cx, cy, haloR);
+  halo.addColorStop(0,   `rgba(255,150,235,${0.55 * breathe + energy * 0.10})`);
+  halo.addColorStop(0.5, `rgba(125,249,255,${0.30 * breathe})`);
+  halo.addColorStop(1,   'rgba(0,0,0,0)');
+  context.fillStyle = halo;
+  context.beginPath();
+  context.arc(cx, cy, haloR, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+
+  // Build the star path
+  const path = new Path2D();
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    const r = (i % 2 === 0) ? rOut : rIn;
+    const px = cx + Math.cos(a) * r;
+    const py = cy + Math.sin(a) * r;
+    if (i === 0) path.moveTo(px, py); else path.lineTo(px, py);
+  }
+  path.closePath();
+
+  // Star body — cyan→white→pink gradient
+  context.save();
+  context.shadowColor = 'rgba(255,160,235,0.85)';
+  context.shadowBlur  = Math.min(10, size * 0.22);
+  const body = context.createRadialGradient(cx - rOut * 0.20, cy - rOut * 0.30, 1, cx, cy, rOut);
+  body.addColorStop(0,    '#ffffff');
+  body.addColorStop(0.50, '#7df9ff');
+  body.addColorStop(1,    '#5e3df0');
+  context.fillStyle = body;
+  context.fill(path);
+  context.restore();
+
+  // Outer rim outline catches against busy nebula backgrounds
+  context.save();
+  context.strokeStyle = 'rgba(255,255,255,0.85)';
+  context.lineWidth = Math.max(0.8, size * 0.025);
+  context.stroke(path);
+  context.restore();
+
+  // SHIMMER SWEEP — a thin diagonal stripe of bright white that scans
+  // across the star face on a per-cell phase offset, then resets. Painted
+  // with `source-atop` so it only lights the existing star pixels (no
+  // halo bleed). Drives Sir's "shimmer / sparkle" requirement.
+  context.save();
+  context.clip(path);
+  const cycle = 1400; // ms per shimmer pass
+  const phase = ((Date.now() + (cx * 19 + cy * 11)) % cycle) / cycle; // 0..1
+  const sweepW = size * 0.40;
+  const sweepX = -sweepW + (size + sweepW * 2) * phase;
+  const sweep = context.createLinearGradient(x + sweepX, y, x + sweepX + sweepW, y + size);
+  sweep.addColorStop(0,    'rgba(255,255,255,0)');
+  sweep.addColorStop(0.5,  'rgba(255,255,255,0.85)');
+  sweep.addColorStop(1,    'rgba(255,255,255,0)');
+  context.fillStyle = sweep;
+  context.fillRect(x, y, size, size);
+  context.restore();
+
+  // Tiny sparkle crosses on the body — two thin crossed strokes that
+  // appear briefly mid-shimmer for an extra "Disney star" twinkle.
+  if (phase > 0.45 && phase < 0.55) {
+    context.save();
+    context.strokeStyle = 'rgba(255,255,255,0.95)';
+    context.lineWidth = Math.max(0.7, size * 0.025);
+    context.lineCap = 'round';
+    const sparkR = size * 0.18;
+    const sx = cx - rOut * 0.15;
+    const sy = cy - rOut * 0.10;
+    context.beginPath();
+    context.moveTo(sx - sparkR, sy);  context.lineTo(sx + sparkR, sy);
+    context.moveTo(sx, sy - sparkR);  context.lineTo(sx, sy + sparkR);
+    context.stroke();
+    context.restore();
+  }
+
+  context.globalAlpha = 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GALAXY SCENE (Marathon — Galaxy)
+// Sir's "crazy artistry" mode. Layered:
+//   1. Deep-space gradient sky (purple → black)
+//   2. Three nebula clouds drifting + pulsing on cheer
+//   3. Distant planets with rings (background; static-ish)
+//   4. Twinkling starfield (~120 stars, parallax in two layers)
+//   5. Swirling galaxy spiral arm in the upper third — rotates slowly,
+//      always animating (constant motion = never feels still)
+//   6. Shooting stars that streak across on movePulse + occasional random
+//   7. On-clear shockwave ring that expands from the play-area centre
+//   8. On-hard-drop: brief screen-wide flash as if a meteor struck
+//   9. Constellation lines connect the brightest stars to form shapes
+//      that subtly rotate
+// ─────────────────────────────────────────────────────────────────────────────
+let _gxScene = null, _gxSceneW = 0;
+
+function _initGalaxyScene(w, h) {
+  _gxScene = {
+    stars: [],
+    farStars: [],
+    nebulae: [],
+    planets: [],
+    shooters: [],
+    shocks: [],
+    spiralAngle: 0,
+    flash: 0,
+    lastMove: 0,
+    lastCheer: 0,
+    lastDrop: 0,
+  };
+  _gxSceneW = w;
+  // Background star layer (small, slow parallax)
+  for (let i = 0; i < 90; i++) {
+    _gxScene.farStars.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: 0.5 + Math.random() * 0.7,
+      hue: 200 + Math.random() * 60,
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+  // Foreground twinkle stars (a few brighter, larger stars)
+  for (let i = 0; i < 40; i++) {
+    _gxScene.stars.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: 1.0 + Math.random() * 1.6,
+      hue: 180 + Math.random() * 80,
+      phase: Math.random() * Math.PI * 2,
+      twinkle: 0.7 + Math.random() * 0.3,
+    });
+  }
+  // Nebula clouds: 3 large soft blobs at random hues
+  const hues = [285, 200, 320];
+  for (let i = 0; i < 3; i++) {
+    _gxScene.nebulae.push({
+      x: w * (0.20 + Math.random() * 0.60),
+      y: h * (0.15 + Math.random() * 0.55),
+      r: Math.min(w, h) * (0.18 + Math.random() * 0.10),
+      hue: hues[i],
+      phase: Math.random() * Math.PI * 2,
+      driftX: (Math.random() - 0.5) * 0.04,
+      driftY: (Math.random() - 0.5) * 0.04,
+    });
+  }
+  // Planets: 2 planets at deep parallax positions
+  _gxScene.planets.push({
+    x: w * 0.78, y: h * 0.20, r: Math.min(w, h) * 0.06,
+    hue1: 28, hue2: 12, ringTilt: 0.35, hasRing: true,
+  });
+  _gxScene.planets.push({
+    x: w * 0.18, y: h * 0.62, r: Math.min(w, h) * 0.045,
+    hue1: 200, hue2: 240, ringTilt: 0.0, hasRing: false,
+  });
+}
+
+function drawGalaxyScene(theme, now, playRects) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (w <= 0 || h <= 0) return;
+  if (!_gxScene || _gxSceneW !== w) _initGalaxyScene(w, h);
+
+  const cheer  = (typeof cheerPulse === 'number') ? cheerPulse : 0;
+  const move   = (typeof movePulse  === 'number') ? movePulse  : 0;
+  const dropP  = (typeof boardDropPulse === 'number') ? boardDropPulse : 0;
+  const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+  const onBeat = (beatPhase % 4 === 0);
+  const [ar, ag, ab] = hexToRgb(theme.colors.accent);
+  const [gr, gg, gb] = hexToRgb(theme.colors.glow);
+
+  // ── 1. DEEP-SPACE SKY ─── purple → black gradient, brightens slightly with energy
+  const sky = bgCtx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0,    `#0a0524`);
+  sky.addColorStop(0.45, `#06031a`);
+  sky.addColorStop(1,    `#02010d`);
+  bgCtx.fillStyle = sky;
+  bgCtx.fillRect(0, 0, w, h);
+  // Faint vignette of accent that pulses with energy
+  if (energy > 0.05) {
+    const sheen = bgCtx.createRadialGradient(w * 0.5, h * 0.5, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.5);
+    sheen.addColorStop(0, `rgba(${ar},${ag},${ab},${energy * 0.04})`);
+    sheen.addColorStop(1, 'rgba(0,0,0,0)');
+    bgCtx.fillStyle = sheen;
+    bgCtx.fillRect(0, 0, w, h);
+  }
+
+  // ── 2. NEBULA CLOUDS ─── soft, drifting, pulse on cheer
+  bgCtx.save();
+  bgCtx.globalCompositeOperation = 'lighter';
+  for (const n of _gxScene.nebulae) {
+    n.x += n.driftX;
+    n.y += n.driftY;
+    if (n.x < -n.r) n.x = w + n.r; else if (n.x > w + n.r) n.x = -n.r;
+    if (n.y < -n.r) n.y = h + n.r; else if (n.y > h + n.r) n.y = -n.r;
+    const pulse = 1 + Math.sin(now / 1800 + n.phase) * 0.08 + cheer * 0.18;
+    const r = n.r * pulse;
+    const grad = bgCtx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
+    grad.addColorStop(0,   `hsla(${n.hue},90%,60%,${0.18 + cheer * 0.08})`);
+    grad.addColorStop(0.5, `hsla(${n.hue},80%,40%,${0.08 + cheer * 0.04})`);
+    grad.addColorStop(1,   'hsla(260,80%,20%,0)');
+    bgCtx.fillStyle = grad;
+    bgCtx.beginPath();
+    bgCtx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.restore();
+
+  // ── 3. DISTANT PLANETS ─── crescent-lit spheres, with optional rings
+  for (const p of _gxScene.planets) {
+    bgCtx.save();
+    // Body
+    const pGrad = bgCtx.createRadialGradient(p.x - p.r * 0.30, p.y - p.r * 0.30, p.r * 0.15, p.x, p.y, p.r);
+    pGrad.addColorStop(0,   `hsl(${p.hue1},70%,55%)`);
+    pGrad.addColorStop(0.55, `hsl(${p.hue1},65%,30%)`);
+    pGrad.addColorStop(1,   `hsl(${p.hue2},75%,12%)`);
+    bgCtx.fillStyle = pGrad;
+    bgCtx.beginPath();
+    bgCtx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    bgCtx.fill();
+    // Ring (if any) — drawn as an ellipse band
+    if (p.hasRing) {
+      bgCtx.strokeStyle = `hsla(${p.hue1},80%,75%,0.55)`;
+      bgCtx.lineWidth = Math.max(1.2, p.r * 0.06);
+      bgCtx.beginPath();
+      bgCtx.ellipse(p.x, p.y, p.r * 1.85, p.r * 0.50, p.ringTilt, 0, Math.PI * 2);
+      bgCtx.stroke();
+      bgCtx.strokeStyle = `hsla(${p.hue2},60%,55%,0.30)`;
+      bgCtx.lineWidth = Math.max(0.6, p.r * 0.03);
+      bgCtx.beginPath();
+      bgCtx.ellipse(p.x, p.y, p.r * 2.15, p.r * 0.58, p.ringTilt, 0, Math.PI * 2);
+      bgCtx.stroke();
+    }
+    // Atmosphere glow
+    const atmo = bgCtx.createRadialGradient(p.x, p.y, p.r * 0.95, p.x, p.y, p.r * 1.30);
+    atmo.addColorStop(0, `hsla(${p.hue1},80%,70%,0.40)`);
+    atmo.addColorStop(1, 'rgba(0,0,0,0)');
+    bgCtx.fillStyle = atmo;
+    bgCtx.beginPath();
+    bgCtx.arc(p.x, p.y, p.r * 1.30, 0, Math.PI * 2);
+    bgCtx.fill();
+    bgCtx.restore();
+  }
+
+  // ── 4. STARFIELD — far layer (parallax slow) + foreground twinkles
+  bgCtx.save();
+  for (const s of _gxScene.farStars) {
+    const tw = 0.55 + Math.sin(now / 1600 + s.phase) * 0.30;
+    bgCtx.globalAlpha = tw * 0.65;
+    bgCtx.fillStyle = `hsl(${s.hue},80%,82%)`;
+    bgCtx.beginPath();
+    bgCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  for (const s of _gxScene.stars) {
+    const tw = 0.6 + Math.sin(now / 900 + s.phase) * 0.40 * s.twinkle;
+    bgCtx.globalAlpha = tw;
+    bgCtx.fillStyle = `hsl(${s.hue},80%,88%)`;
+    bgCtx.beginPath();
+    bgCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    bgCtx.fill();
+    // Tiny cross-flare on the brightest stars
+    if (s.r > 1.8 && tw > 0.85) {
+      bgCtx.strokeStyle = `rgba(255,255,255,${tw * 0.4})`;
+      bgCtx.lineWidth = 0.7;
+      bgCtx.beginPath();
+      bgCtx.moveTo(s.x - s.r * 2.2, s.y); bgCtx.lineTo(s.x + s.r * 2.2, s.y);
+      bgCtx.moveTo(s.x, s.y - s.r * 2.2); bgCtx.lineTo(s.x, s.y + s.r * 2.2);
+      bgCtx.stroke();
+    }
+  }
+  bgCtx.restore();
+
+  // ── 5. SWIRLING GALAXY SPIRAL ─── always-animating centerpiece in the
+  // upper-third. Two-arm logarithmic spiral painted as a series of glowing
+  // dots; rotation accelerates on cheer.
+  _gxScene.spiralAngle += 0.0035 * (1 + cheer * 4 + (onBeat ? 0.5 : 0));
+  const sx = w * 0.50;
+  const sy = h * 0.30;
+  const spiralR = Math.min(w, h) * 0.18;
+  bgCtx.save();
+  bgCtx.translate(sx, sy);
+  bgCtx.rotate(_gxScene.spiralAngle);
+  bgCtx.globalCompositeOperation = 'lighter';
+  // Core glow
+  const core = bgCtx.createRadialGradient(0, 0, 0, 0, 0, spiralR * 0.5);
+  core.addColorStop(0,   `rgba(255,240,200,${0.55 + energy * 0.20})`);
+  core.addColorStop(0.4, `rgba(${gr},${gg},${gb},${0.30 + energy * 0.10})`);
+  core.addColorStop(1,   'rgba(0,0,0,0)');
+  bgCtx.fillStyle = core;
+  bgCtx.beginPath();
+  bgCtx.arc(0, 0, spiralR * 0.5, 0, Math.PI * 2);
+  bgCtx.fill();
+  // Two spiral arms — log spiral r = a * e^(b * theta), traced with dots
+  for (let arm = 0; arm < 2; arm++) {
+    const armOffset = arm * Math.PI;
+    for (let t = 0; t < 80; t++) {
+      const theta = (t / 80) * Math.PI * 4 + armOffset;
+      const r = 4 + Math.exp(0.18 * t / 6) * 1.1;
+      if (r > spiralR) break;
+      const dotX = Math.cos(theta) * r;
+      const dotY = Math.sin(theta) * r;
+      const fade = 1 - t / 80;
+      bgCtx.fillStyle = `rgba(${gr},${gg},${gb},${fade * 0.65})`;
+      bgCtx.beginPath();
+      bgCtx.arc(dotX, dotY, 1.2 + (1 - fade) * 1.5, 0, Math.PI * 2);
+      bgCtx.fill();
+    }
+  }
+  bgCtx.restore();
+
+  // ── 6. SHOOTING STARS ─── streak across on movePulse + random spawn
+  if ((move > _gxScene.lastMove + 0.06) || Math.random() < 0.006) {
+    const fromTop = Math.random() < 0.5;
+    _gxScene.shooters.push({
+      x: Math.random() * w * 0.6 + (fromTop ? 0 : w * 0.4),
+      y: fromTop ? -10 : Math.random() * h * 0.4,
+      vx: 6 + Math.random() * 4,
+      vy: 3 + Math.random() * 2,
+      life: 1,
+      hue: 180 + Math.random() * 80,
+    });
+    if (_gxScene.shooters.length > 8) _gxScene.shooters.shift();
+  }
+  _gxScene.lastMove = move;
+  bgCtx.save();
+  for (let i = _gxScene.shooters.length - 1; i >= 0; i--) {
+    const s = _gxScene.shooters[i];
+    s.x += s.vx; s.y += s.vy; s.life -= 0.025;
+    if (s.life <= 0 || s.x > w + 60 || s.y > h + 60) {
+      _gxScene.shooters.splice(i, 1); continue;
+    }
+    // Trail — gradient from head to tail
+    const tailLen = 60;
+    const tx = s.x - s.vx * tailLen / 10;
+    const ty = s.y - s.vy * tailLen / 10;
+    const trail = bgCtx.createLinearGradient(s.x, s.y, tx, ty);
+    trail.addColorStop(0, `hsla(${s.hue},90%,80%,${s.life})`);
+    trail.addColorStop(1, `hsla(${s.hue},90%,80%,0)`);
+    bgCtx.strokeStyle = trail;
+    bgCtx.lineWidth = 2;
+    bgCtx.lineCap = 'round';
+    bgCtx.beginPath();
+    bgCtx.moveTo(s.x, s.y); bgCtx.lineTo(tx, ty);
+    bgCtx.stroke();
+    // Head glow
+    bgCtx.fillStyle = `hsla(${s.hue},90%,90%,${s.life})`;
+    bgCtx.beginPath();
+    bgCtx.arc(s.x, s.y, 2.5, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.restore();
+
+  // ── 7. SHOCKWAVE on cheer ── expanding ring from play-area centre
+  if (cheer > _gxScene.lastCheer + 0.20) {
+    const cxV = playRects[0] ? (playRects[0].x + playRects[0].w / 2) : w * 0.5;
+    const cyV = playRects[0] ? (playRects[0].y + playRects[0].h / 2) : h * 0.5;
+    _gxScene.shocks.push({ x: cxV, y: cyV, r: 8, maxR: Math.min(w, h) * 0.7, alpha: 0.65 });
+  }
+  _gxScene.lastCheer = cheer;
+  bgCtx.save();
+  for (let i = _gxScene.shocks.length - 1; i >= 0; i--) {
+    const s = _gxScene.shocks[i];
+    s.r += 12;
+    s.alpha -= 0.022;
+    if (s.alpha <= 0 || s.r >= s.maxR) { _gxScene.shocks.splice(i, 1); continue; }
+    bgCtx.strokeStyle = `rgba(255,200,255,${s.alpha})`;
+    bgCtx.lineWidth = 2;
+    bgCtx.beginPath();
+    bgCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    bgCtx.stroke();
+    bgCtx.strokeStyle = `rgba(125,249,255,${s.alpha * 0.5})`;
+    bgCtx.lineWidth = 1.2;
+    bgCtx.beginPath();
+    bgCtx.arc(s.x, s.y, s.r * 0.6, 0, Math.PI * 2);
+    bgCtx.stroke();
+  }
+  bgCtx.restore();
+
+  // ── 8. METEOR FLASH on hard-drop ──
+  if (dropP > _gxScene.lastDrop + 0.10) _gxScene.flash = 1.0;
+  _gxScene.lastDrop = dropP;
+  if (_gxScene.flash > 0) {
+    bgCtx.fillStyle = `rgba(255,200,255,${_gxScene.flash * 0.18})`;
+    bgCtx.fillRect(0, 0, w, h);
+    _gxScene.flash = Math.max(0, _gxScene.flash - 0.05);
+  }
+
+  // ── 9. PLAY-AREA MASK ── punch a hole over the player's board
+  if (playRects.length) {
+    bgCtx.save();
+    bgCtx.globalCompositeOperation = 'destination-out';
+    for (const pr of playRects) {
+      bgCtx.fillStyle = '#000';
+      bgCtx.fillRect(pr.x, pr.y, pr.w, pr.h);
+    }
+    bgCtx.restore();
+  }
+}
+
 function drawBackground() {
   const theme = getTheme(level);
   const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
@@ -9046,7 +9580,7 @@ function drawBackground() {
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
   const playRects = [];
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy');
   if (gameStarted && usesPlayAreaMask) {
     const c1 = document.getElementById('main-canvas');
     if (c1) {
@@ -9137,6 +9671,13 @@ function drawBackground() {
     drawOfficeRageScene(theme, now, playRects);
     return;
   }
+  // MARATHON: Galaxy. Cosmic deep-space scene — twinkling starfield,
+  // drifting nebula clouds, occasional shooting stars, swirling galaxy
+  // spiral, planets in the distance, all reactive.
+  if (style === 'galaxy') {
+    drawGalaxyScene(theme, now, playRects);
+    return;
+  }
 
   for (const p of bgParticles) {
     // Movement varies by style
@@ -9195,8 +9736,9 @@ function drawBackground() {
         // Cheer/flash still accelerate the fall on big game events - but
         // off a much lower baseline now, so even a Tetris combo only
         // pushes ~30-60 px/s briefly instead of strobing the screen.
+        // 0.7× → 1.4× scalar so the fall rate matches the bumped raw speed.
         const fallBoost = 1 + cheer * 1.6 + flash * 1.0;
-        p.y += p.speed * 0.7 * fallBoost;
+        p.y += p.speed * 1.4 * fallBoost;
         // Pendulum sway. Each violin carries its own sway-direction sign
         // (derived from phase) so a movePulse kick fans them outward
         // instead of all jumping the same way. Sway frequency slowed
@@ -10053,10 +10595,21 @@ function startGame() {
   // VS modes start both players at L1 to keep the match symmetric - the
   // start-level picker is a solo convenience, not a handicap knob.
   const maxLvl = LEVEL_THEMES.length - 1;
-  const seedLevel = (gameMode === 'solo')
-    ? Math.max(1, Math.min(maxLvl, startLevel | 0))
-    : 1;
-  const seedLines = (seedLevel - 1) * LINES_PER_LEVEL;
+  // Story honours the picker AND seeds lines so progression keeps working
+  // (clearLines computes newLevel from `lines`).  Sprint honours the picker
+  // for VIBE (theme + music) but seeds lines = 0 so the 40-line target is
+  // honest. Marathon / Ultra / VS always start L1.
+  let seedLevel, seedLines;
+  if (gameMode === 'solo') {
+    seedLevel = Math.max(1, Math.min(maxLvl, startLevel | 0));
+    seedLines = (seedLevel - 1) * LINES_PER_LEVEL;
+  } else if (gameMode === 'sprint') {
+    seedLevel = Math.max(1, Math.min(maxLvl, startLevel | 0));
+    seedLines = 0;     // 40-line target is honest, not pre-seeded
+  } else {
+    seedLevel = 1;
+    seedLines = 0;
+  }
   // Mode-specific timer / target state. Reset every startGame so a player
   // restarting Sprint right after a fail gets a clean clock.
   _modeStartTime = performance.now();
@@ -10485,10 +11038,12 @@ window.addEventListener('resize', () => positionP2Monitor());
     // Remember last sub-mode per tab so re-entering keeps Sir's choice.
     tabSubmodes[btn.dataset.tab] = btn.dataset.mode;
     if (diff) diff.style.display = (gameMode === 'vs') ? 'flex' : 'none';
+    // Vibe picker shows under STORY (pick where in the campaign to start)
+    // and SPRINT (pick which map to do your 40-line run on). Hidden for
+    // Marathon (locked to Galaxy), Ultra (always Underground L1), and VS.
     const levelSelect = document.getElementById('level-select');
-    const isFixedStart = (gameMode === 'marathon' || gameMode === 'sprint' ||
-                          gameMode === 'ultra' || gameMode === 'vs' || gameMode === 'human');
-    if (levelSelect) levelSelect.style.display = isFixedStart ? 'none' : 'flex';
+    const showsPicker = (gameMode === 'solo' || gameMode === 'sprint');
+    if (levelSelect) levelSelect.style.display = showsPicker ? 'flex' : 'none';
     refreshLb();
   }));
   // Init: SOLO tab + STORY sub-mode visible.
@@ -10517,16 +11072,16 @@ window.addEventListener('resize', () => positionP2Monitor());
   const preview = wrap && wrap.querySelector('.lvl-preview');
   if (!grid) return;
   const maxLvl = LEVEL_THEMES.length - 1;
-  // Build chips lazily once; each chip shows the level number, with the era
-  // name surfaced in the preview line on hover/select so we don't bloat the
-  // chip itself on mobile.
+  // Build map / vibe cards. Each card = [number-tile][theme-name] so the
+  // player picks by VIBE, not by abstract level number. Sir's spec.
   for (let lv = 1; lv <= maxLvl; lv++) {
     const btn = document.createElement('button');
     btn.className = 'lvl-btn';
     btn.dataset.lvl = String(lv);
-    btn.textContent = String(lv);
     const t = LEVEL_THEMES[lv];
-    btn.title = (t && t.name) ? `Level ${lv} - ${t.name}` : `Level ${lv}`;
+    const name = (t && t.name) ? t.name : `Vibe ${lv}`;
+    btn.innerHTML = `<span class="lvl-num">${lv}</span><span class="lvl-name">${name}</span>`;
+    btn.title = `${name} · Vibe ${lv}`;
     grid.appendChild(btn);
   }
   const btns = grid.querySelectorAll('.lvl-btn');
@@ -10548,15 +11103,38 @@ window.addEventListener('resize', () => positionP2Monitor());
   // both players to L1 so the match stays fair.
   const modeBtns = document.querySelectorAll('.mode-btn');
   const sync = () => {
-    // Hide the picker for any mode that doesn't honour startLevel: VS
-    // matches force L1 to stay symmetric, and Marathon/Sprint/Ultra each
-    // have their own fixed challenge profile that always begins at L1.
-    const isFixedStart = (gameMode === 'vs' || gameMode === 'human' ||
-                          gameMode === 'marathon' || gameMode === 'sprint' || gameMode === 'ultra');
-    wrap.style.display = isFixedStart ? 'none' : 'flex';
+    // Sir's spec: vibe picker shows under STORY + SPRINT, hidden in
+    // Marathon (Galaxy lock) / Ultra (L1 lock) / VS (forced L1 symmetry).
+    const showsPicker = (gameMode === 'solo' || gameMode === 'sprint');
+    wrap.style.display = showsPicker ? 'flex' : 'none';
   };
   modeBtns.forEach(mb => mb.addEventListener('click', sync));
   sync();
+})();
+
+// Cycles the start-screen tagline through "<MAP NAME> · pick your vibe"
+// for each LEVEL_THEMES entry, plus a couple of brand lines, so the home
+// page constantly hints at the depth of the game without taking extra
+// vertical space. Pauses while game is running.
+(function wireTagline() {
+  const el = document.getElementById('start-tagline');
+  if (!el) return;
+  const lines = [
+    '19 VIBES · 5 MODES · ONE BEAT',
+    'STORY · MARATHON · SPRINT · ULTRA',
+    ...LEVEL_THEMES.slice(1).map(t => `${(t.name || '').toUpperCase()} · TAP TO PLAY`),
+    'PICK YOUR VIBE · DROP THE BEAT',
+  ];
+  let i = 0;
+  setInterval(() => {
+    if (gameStarted) return;
+    el.style.opacity = 0;
+    setTimeout(() => {
+      i = (i + 1) % lines.length;
+      el.textContent = lines[i];
+      el.style.opacity = 1;
+    }, 280);
+  }, 2400);
 })();
 
 // Sync voice toggle with saved preference and wire the checkbox.
