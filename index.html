@@ -363,8 +363,53 @@
      the picker from blowing past the start-screen width on mobile. */
   #level-select {
     display: flex; flex-direction: column; align-items: center;
-    gap: 10px; margin: -4px 0 22px;
+    gap: 10px; margin: 4px 0 18px;
     max-width: 560px; width: 92%;
+  }
+  /* Collapsed-by-default trigger — single chip showing the active vibe. */
+  .vibe-trigger {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px;
+    font-size: 11px; font-weight: 800; letter-spacing: 2px;
+    background: linear-gradient(140deg, rgba(255,215,0,0.12), rgba(255,100,200,0.10));
+    color: #ffd700;
+    border: 1px solid rgba(255,215,0,0.55);
+    border-radius: 22px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: transform 0.12s, box-shadow 0.18s, border-color 0.18s;
+    box-shadow: 0 0 10px rgba(255,215,0,0.20);
+  }
+  .vibe-trigger:hover { transform: translateY(-1px); border-color: #ffd700; box-shadow: 0 0 18px rgba(255,215,0,0.45); }
+  .vibe-trigger .vt-label {
+    font-size: 9px; letter-spacing: 3px;
+    color: rgba(255,215,128,0.75);
+    border-right: 1px solid rgba(255,215,0,0.30);
+    padding-right: 8px;
+  }
+  .vibe-trigger .vt-name {
+    font-size: 12px; letter-spacing: 2px;
+    color: #fff;
+    text-shadow: 0 0 8px rgba(255,180,80,0.55);
+  }
+  .vibe-trigger .vt-chevron {
+    font-size: 11px;
+    color: rgba(255,215,128,0.85);
+    transition: transform 0.18s;
+  }
+  #level-select[data-expanded="true"] .vt-chevron { transform: rotate(180deg); }
+  /* Expandable panel — collapsed = max-height 0. */
+  #level-select .lvl-panel {
+    width: 100%;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.28s ease, opacity 0.18s;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  #level-select[data-expanded="true"] .lvl-panel {
+    max-height: 720px;  /* big enough for the 19-card grid + label + preview */
+    opacity: 1;
   }
   #level-select .lvl-label {
     font-size: 10px;
@@ -373,6 +418,7 @@
     text-transform: uppercase;
     font-weight: 800;
     text-shadow: 0 0 8px rgba(255,180,80,0.45);
+    margin-top: 8px;
   }
   /* Vibe-card grid: 5-wide on desktop so the row reads as a clean shelf,
      3-wide on mobile so each card is tappable. Each card shows the
@@ -1323,10 +1369,21 @@
        map to start at) and SPRINT (pick a map to play your 40-line run
        on). Hidden under MARATHON (locked to Galaxy), ULTRA (always L1
        Underground), and VS modes. -->
-  <div id="level-select">
-    <div class="lvl-label">CHOOSE YOUR VIBE</div>
-    <div class="lvl-grid"></div>
-    <div class="lvl-preview"></div>
+  <!-- Collapsed by default — Sir's feedback: the 19-card grid took up
+       half the start screen and pushed the title off the top. Now we
+       show a single trigger chip with the current vibe name; the grid
+       expands inline only when the player wants to change. -->
+  <div id="level-select" data-expanded="false">
+    <button class="vibe-trigger" id="vibe-trigger" type="button" aria-expanded="false">
+      <span class="vt-label">VIBE</span>
+      <span class="vt-name" id="vt-name">Underground</span>
+      <span class="vt-chevron">▾</span>
+    </button>
+    <div class="lvl-panel">
+      <div class="lvl-label">CHOOSE YOUR VIBE</div>
+      <div class="lvl-grid"></div>
+      <div class="lvl-preview"></div>
+    </div>
   </div>
   <button id="start-btn">DROP THE BEAT</button>
   <div class="controls-info desktop-only">
@@ -2222,12 +2279,42 @@ const MARATHON_THEME = {
   chords: [[220, 277.18, 329.63], [246.94, 329.63, 415.30], [196, 246.94, 329.63]],
   synthType: 'choir',
 };
+// Marathon currently-playing vibe. Starts at MARATHON_THEME (Galaxy) and
+// auto-rotates to a random Story-mode vibe each time the active track
+// finishes — Sir wanted Marathon to keep things fresh after the song
+// ends. Set in startGame() and updated by _marathonRotateVibe().
+let _marathonActiveTheme = null;
 function getTheme(lvl) {
-  // Marathon plays Galaxy regardless of internal level — the level number
-  // there only drives gravity/lock-delay difficulty, not theme rotation.
-  if (gameMode === 'marathon') return MARATHON_THEME;
+  if (gameMode === 'marathon') return _marathonActiveTheme || MARATHON_THEME;
   const idx = Math.min(lvl, LEVEL_THEMES.length - 1);
   return LEVEL_THEMES[idx];
+}
+
+// Pick a random LEVEL_THEMES entry that isn't the current one and has an
+// MP3 track, switch the marathon-active theme to it, restart audio with
+// no-loop + onended → repeat. Reset all scene caches so the new theme's
+// background re-initialises cleanly.
+function _marathonRotateVibe() {
+  if (gameMode !== 'marathon' || gameOver) return;
+  const choices = LEVEL_THEMES.filter((t, i) => i > 0 && t.track && t !== _marathonActiveTheme);
+  if (!choices.length) return;
+  const next = choices[Math.floor(Math.random() * choices.length)];
+  _marathonActiveTheme = next;
+  // Reset every scene's lazy-init cache so the new theme's background
+  // builds from scratch instead of inheriting the prior scene's geometry.
+  _gxScene = _dhScene = _jzScene = _ofScene = _zenScene = null;
+  // Update the on-screen era display + canvas glow for the new vibe.
+  const eraEl = document.getElementById('era-display');
+  if (eraEl) eraEl.textContent = next.name;
+  if (typeof mainCanvas !== 'undefined' && mainCanvas) {
+    mainCanvas.style.boxShadow = `0 0 60px ${next.colors.glow}33, 0 0 120px ${next.colors.glow}15`;
+  }
+  if (typeof initBgParticles === 'function') initBgParticles();
+  // Kick the next track in the rotation. Non-looping with onended hooked
+  // back to this same function so it keeps rotating forever.
+  if (audioEngine && audioEngine._playTrack) {
+    audioEngine._playTrack(next.track, { loop: false, onended: _marathonRotateVibe });
+  }
 }
 
 // Lines required to advance one level. Bumped 10 → 15 so each level lasts
@@ -3095,17 +3182,33 @@ const audioEngine = {
     }
   },
 
-  // Play a backing track in a loop with a short fade-in. Stops any currently
-  // playing track first (with a fade-out) so level transitions crossfade.
-  async _playTrack(name) {
+  // Play a backing track with a short fade-in. Stops any currently playing
+  // track first (with a fade-out) so level transitions crossfade.
+  // Default behaviour is to loop indefinitely; pass `opts.loop=false` plus
+  // `opts.onended` to drive Marathon mode's auto-rotate (each track plays
+  // through once, then onended picks the next vibe).
+  async _playTrack(name, opts) {
     if (!this.ctx) return;
-    if (this._trackName === name && this._trackSource) return; // already on it
+    opts = opts || {};
+    const wantLoop = opts.loop !== false;
+    if (this._trackName === name && this._trackSource && wantLoop) return; // already on it
     const buf = await this._loadTrack(name);
     if (!buf) return; // load failed - silently fall back
     this._stopTrack(0.4); // crossfade out anything currently playing
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
-    src.loop = true;
+    src.loop = wantLoop;
+    if (!wantLoop && typeof opts.onended === 'function') {
+      // BufferSourceNode `onended` fires when the track naturally finishes
+      // (or is explicitly stopped). Wrap so we only forward natural ends
+      // — manual stops via `_stopTrack` set _trackSource=null first.
+      const expected = (this._trackSource && this._trackSource.node) || src;
+      src.onended = () => {
+        // If a different track has taken over since we started, ignore.
+        if (this._trackName !== name) return;
+        opts.onended();
+      };
+    }
     const g = this.ctx.createGain();
     g.gain.value = 0;
     src.connect(g);
@@ -8510,7 +8613,10 @@ function _initJazzScene(w, h) {
   };
   _jzSceneW = w;
   // Stage-valance bulbs: strung across the top in a slight catenary
-  const bulbCount = Math.max(8, Math.floor(w / 60));
+  // Cap bulb count at 18 — looks essentially identical to 30+ on a wide
+  // canvas but cuts per-frame shadowBlur overhead massively. Mobile
+  // (narrow w) still gets ~8 bulbs.
+  const bulbCount = Math.max(8, Math.min(18, Math.floor(w / 90)));
   for (let i = 0; i < bulbCount; i++) {
     const t = i / (bulbCount - 1);
     _jzScene.bulbs.push({
@@ -8568,19 +8674,38 @@ function drawJazzClubScene(theme, now, playRects) {
   bgCtx.restore();
 
   // ── 3. VALANCE BULBS ── steady warm pinpoints, brighter on beat
+  // PERF: shadowBlur is the single most expensive canvas op, and on a
+  // wide bgCanvas there can be 30+ bulbs (was the dominant L10 cost,
+  // mirroring the original L8 issue). Two-pass split so the majority of
+  // bulbs paint with NO shadow at all, and only the on-beat brightening
+  // gets a capped 6px blur.
+  // Pass 1: all bulbs as flat dots, no shadow.
   bgCtx.save();
-  const beatBoost = onBeat ? 1.4 : 1;
+  bgCtx.shadowBlur = 0;
   for (const b of _jzScene.bulbs) {
     const tw = 0.7 + Math.sin(now / 600 + b.phase) * 0.2;
-    bgCtx.globalAlpha = 0.85 * tw;
-    bgCtx.shadowColor = `hsl(${b.hue},90%,72%)`;
-    bgCtx.shadowBlur  = Math.min(10, b.r * beatBoost * 3);
-    bgCtx.fillStyle = `hsl(${b.hue},85%,${72 + (onBeat ? 6 : 0)}%)`;
+    bgCtx.globalAlpha = 0.75 * tw;
+    bgCtx.fillStyle = `hsl(${b.hue},85%,72%)`;
     bgCtx.beginPath();
-    bgCtx.arc(b.x, b.y, b.r * beatBoost, 0, Math.PI * 2);
+    bgCtx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
     bgCtx.fill();
   }
   bgCtx.restore();
+  // Pass 2: only on the kick beat, paint a brighter pulse with capped
+  // shadowBlur. Burns shadowBlur ~25% of frames instead of every frame.
+  if (onBeat) {
+    bgCtx.save();
+    for (const b of _jzScene.bulbs) {
+      bgCtx.globalAlpha = 0.95;
+      bgCtx.shadowColor = `hsl(${b.hue},90%,75%)`;
+      bgCtx.shadowBlur = 6;
+      bgCtx.fillStyle = `hsl(${b.hue},90%,80%)`;
+      bgCtx.beginPath();
+      bgCtx.arc(b.x, b.y, b.r * 1.4, 0, Math.PI * 2);
+      bgCtx.fill();
+    }
+    bgCtx.restore();
+  }
 
   // ── 4. SPOTLIGHTS ── warm cones that sweep across the stage on the beat
   bgCtx.save();
@@ -10636,6 +10761,10 @@ function startGame() {
   paused = false;
   beatPhase = 0;
 
+  // Marathon: each new run starts on the Galaxy vibe and rotates from
+  // there as tracks finish. Reset the active-theme pointer so a previous
+  // run's last-rotated theme doesn't leak across game-overs.
+  if (gameMode === 'marathon') _marathonActiveTheme = MARATHON_THEME;
   // Theme + canvas glow follow the seeded level so the HUD, boxShadow, and
   // (further down) audio track all match the picker on the very first frame.
   const theme = getTheme(level);
@@ -10652,10 +10781,20 @@ function startGame() {
   // iOS Safari: AudioContext starts "suspended" and needs a user gesture.
   // resume() is async - we must await it before the scheduler starts, otherwise
   // notes get scheduled on a context that isn't running yet and nothing plays.
-  if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
-    audioEngine.ctx.resume().then(() => audioEngine.start());
-  } else {
+  const startAudio = () => {
     audioEngine.start();
+    // MARATHON auto-rotate: replace the just-started looping Galaxy track
+    // with a non-looping version so its `onended` fires and we can swap
+    // to a random LEVEL_THEMES vibe. _playTrack internally crossfades the
+    // looping one out, so this is seamless.
+    if (gameMode === 'marathon' && theme && theme.track) {
+      audioEngine._playTrack(theme.track, { loop: false, onended: _marathonRotateVibe });
+    }
+  };
+  if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+    audioEngine.ctx.resume().then(startAudio);
+  } else {
+    startAudio();
   }
   initBgParticles();
   gameStarted = true;
@@ -11085,19 +11224,38 @@ window.addEventListener('resize', () => positionP2Monitor());
     grid.appendChild(btn);
   }
   const btns = grid.querySelectorAll('.lvl-btn');
+  const trigger = document.getElementById('vibe-trigger');
+  const triggerName = document.getElementById('vt-name');
   const refresh = () => {
     btns.forEach(b => b.classList.toggle('lvl-active', Number(b.dataset.lvl) === startLevel));
     const t = LEVEL_THEMES[startLevel];
-    if (preview) preview.textContent = t ? t.name : '';
+    if (preview)     preview.textContent     = t ? t.name : '';
+    if (triggerName) triggerName.textContent = t ? t.name : '';
   };
   btns.forEach(b => {
-    b.addEventListener('click', () => { setStartLevel(Number(b.dataset.lvl)); refresh(); });
+    b.addEventListener('click', () => {
+      setStartLevel(Number(b.dataset.lvl));
+      refresh();
+      // Auto-collapse on selection — once the player picks, free up the
+      // start-screen real estate so the title + DROP THE BEAT are
+      // immediately visible again.
+      wrap.dataset.expanded = 'false';
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    });
     b.addEventListener('mouseenter', () => {
       const t = LEVEL_THEMES[Number(b.dataset.lvl)];
       if (preview && t) preview.textContent = t.name;
     });
     b.addEventListener('mouseleave', refresh);
   });
+  // Trigger toggle — expands / collapses the panel.
+  if (trigger) {
+    trigger.addEventListener('click', () => {
+      const next = wrap.dataset.expanded !== 'true';
+      wrap.dataset.expanded = next ? 'true' : 'false';
+      trigger.setAttribute('aria-expanded', next ? 'true' : 'false');
+    });
+  }
   refresh();
   // Hide the picker in vs modes - the seeded-level escape hatch above forces
   // both players to L1 so the match stays fair.
