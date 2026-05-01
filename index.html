@@ -4178,7 +4178,7 @@ function initBgParticles() {
               : theme.particleStyle === 'office-rage' ? 0
               : theme.particleStyle === 'galaxy' ? 0
               : theme.particleStyle === 'dots' ? 30
-              : theme.particleStyle === 'violins' ? 28  // L3 violins — speed-up bumps count for a livelier sky
+              : theme.particleStyle === 'violins' ? 36  // L3 violins — densified sky so reactive boosts have plenty of bodies to feel
               : 80;
   const isViolins  = theme.particleStyle === 'violins';
   for (let i = 0; i < count; i++) {
@@ -4196,10 +4196,12 @@ function initBgParticles() {
       // 0.02-0.045 raw × 0.7 mult ≈ 1.4-3.1 px/s baseline; a violin takes
       // 4-10 minutes to cross the screen. Reads as effectively suspended
       // mid-air, drifting down only on cheer/flash boosts.
-      // Sir asked for the violins to actually MOVE this time — bumped raw
-    // speed 0.02-0.045 → 0.18-0.40 (~10× faster baseline). Now they drift
-    // visibly across the sky instead of feeling stuck mid-air.
-    speed: isViolins ? 0.18 + Math.random() * 0.22 : Math.random() * 0.5 + 0.1,
+      // Sir asked AGAIN for faster violins. Bumped 0.18-0.40 → 0.55-1.10
+    // (~3× the prior pass, ~30× the original "suspended mid-air" build).
+    // Combined with the 2.4× render-loop scalar + reactive boosts (cheer,
+    // hard-drop, audio energy, beat pulse), normal play sits around
+    // 80-150 px/s and slams hit ~250 px/s — clearly raining now.
+    speed: isViolins ? 0.55 + Math.random() * 0.55 : Math.random() * 0.5 + 0.1,
       alpha: isViolins ? 0.6 + Math.random() * 0.3 : Math.random() * 0.4 + 0.1,
       phase: Math.random() * Math.PI * 2,
       // Violins stay nearly upright (gentle wobble); others keep full spin.
@@ -9914,36 +9916,50 @@ function drawBackground() {
         p.x += Math.sin(now / 4000 + p.phase) * 0.5;
         break;
       case 'violins': {
-        // Falling violins rain down from the sky. Three game signals drive
-        // the motion so the rain feels alive:
-        //   - movePulse  → bumped on every left/right/soft/hard piece move;
-        //                  imparts a horizontal kick + tilt (the violins
-        //                  literally lurch with the piece).
-        //   - cheerPulse → bumped on line clears; speeds the fall, widens
-        //                  the sway, and brightens the gold (in render).
-        //   - stageFlash → bumped on Tetris-Effect FX; lights the strings
-        //                  (handled in render).
-        const move  = (typeof movePulse  === 'number') ? movePulse  : 0;
-        const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
-        const flash = (typeof stageFlash === 'number') ? stageFlash : 0;
-        // Cheer/flash still accelerate the fall on big game events - but
-        // off a much lower baseline now, so even a Tetris combo only
-        // pushes ~30-60 px/s briefly instead of strobing the screen.
-        // 0.7× → 1.4× scalar so the fall rate matches the bumped raw speed.
-        const fallBoost = 1 + cheer * 1.6 + flash * 1.0;
-        p.y += p.speed * 1.4 * fallBoost;
-        // Pendulum sway. Each violin carries its own sway-direction sign
-        // (derived from phase) so a movePulse kick fans them outward
-        // instead of all jumping the same way. Sway frequency slowed
-        // 1800ms → 3200ms so the pendulum reads as a long, lazy drift.
+        // Falling violins rain down from the sky — actively reacting to
+        // every signal we have. Sir's feedback (multiple times): "make
+        // them fall faster" + "make them reactive/interactive". Hooks:
+        //   - movePulse        → horizontal kick + tilt + speed bump on
+        //                        every piece move
+        //   - cheerPulse       → speeds the fall, widens the sway, brightens
+        //                        the gold (line clears)
+        //   - stageFlash       → strings light on Tetris-Effect FX
+        //   - boardDropPulse   → JOLT downward on hard-drop (Sir slams the
+        //                        piece, the sky responds)
+        //   - audio energy     → constant base-speed multiplier so the rain
+        //                        rides the music's intensity
+        //   - beat (kick)      → 4× per bar speed pulse so they fall in
+        //                        time with the bass
+        const move  = (typeof movePulse       === 'number') ? movePulse       : 0;
+        const cheer = (typeof cheerPulse      === 'number') ? cheerPulse      : 0;
+        const flash = (typeof stageFlash      === 'number') ? stageFlash      : 0;
+        const drop  = (typeof boardDropPulse  === 'number') ? boardDropPulse  : 0;
+        const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+        const onKick = (beatPhase % 4 === 0);
+        // Reactive fall multiplier — every signal stacks. Baseline 1.0,
+        // typical playing range 1.3-2.5, peaks 4-5× during a Tetris combo +
+        // hard-drop. The 2.4× scalar then sits on top of the bumped raw
+        // speed (0.55-1.10 in initBgParticles) so the visible fall rate at
+        // 1080p hits ~80-150 px/s during normal play, ~250 px/s on slams.
+        const fallBoost = 1
+          + cheer  * 2.0   // line clears really push the rain
+          + flash  * 1.6   // big-clear FX
+          + drop   * 2.4   // hard-drop jolt — biggest single kick
+          + energy * 0.55  // music swells = constant lift
+          + move   * 0.8   // even casual moves nudge the speed
+          + (onKick ? 0.30 : 0); // beat pulse
+        p.y += p.speed * 2.4 * fallBoost;
+        // Sway: phase-derived per-violin direction sign so a movePulse kick
+        // fans them outward instead of all jumping together. Cheer widens
+        // the lazy pendulum; movePulse adds a sharp horizontal lurch.
         const swayDir = Math.sin(p.phase * 3.7) >= 0 ? 1 : -1;
-        const baseSway = Math.sin(now / 3200 + p.phase) * (0.25 + cheer * 0.7);
-        p.x += baseSway + swayDir * move * 4;
-        // Subtle wobble around upright - never a full tumble. Cheer widens
-        // the wobble; movePulse adds a quick lurch in the sway direction.
-        // Period slowed 1100ms → 2000ms to match the slower fall.
-        const wobble = Math.sin(now / 2000 + p.phase) * (0.14 + cheer * 0.25);
-        p.rot = wobble + swayDir * move * 0.35;
+        const baseSway = Math.sin(now / 2400 + p.phase) * (0.30 + cheer * 0.9);
+        p.x += baseSway + swayDir * move * 12 + swayDir * drop * 6;
+        // Wobble — small wave around upright. movePulse adds a sharper tilt
+        // that visibly snaps when Sir moves a piece. Drop adds a forward
+        // pitch like the violin "tipped" from the slam.
+        const wobble = Math.sin(now / 1500 + p.phase) * (0.18 + cheer * 0.35 + energy * 0.20);
+        p.rot = wobble + swayDir * move * 0.55 + drop * 0.35;
         break;
       }
       default:
@@ -10016,19 +10032,24 @@ function drawBackground() {
       case 'violins': {
         // Recognisable violin silhouette built from primitives. Drawn at
         // p.size (already 14-28 from initBgParticles) so it reads as a
-        // physical instrument instead of a smudge. Beat-pulse scales it on
-        // the kick; cheerPulse from line clears brightens the gold and adds
-        // glow; stageFlash on Tetris/big combos lights the strings up.
-        const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
-        const flash = (typeof stageFlash === 'number') ? stageFlash : 0;
-        const reactive = 1 + cheer * 0.35;
+        // physical instrument instead of a smudge. Reactive scaling +
+        // glow off ALL the game signals so Sir sees the rain breathe with
+        // the gameplay, not just on rare line clears.
+        const cheer = (typeof cheerPulse     === 'number') ? cheerPulse     : 0;
+        const flash = (typeof stageFlash     === 'number') ? stageFlash     : 0;
+        const drop  = (typeof boardDropPulse === 'number') ? boardDropPulse : 0;
+        const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+        // Body scale pumps on cheer, hard-drop, and audio energy. A Tetris
+        // combo + slam can briefly inflate the rain by ~2×.
+        const reactive = 1 + cheer * 0.45 + drop * 0.30 + energy * 0.20;
         const S = p.size * beatBump * reactive;        // body width unit
         bgCtx.rotate(p.rot);
-        bgCtx.globalAlpha = Math.min(1, a * 1.4 + flash * 0.4);
+        bgCtx.globalAlpha = Math.min(1, a * 1.4 + flash * 0.4 + drop * 0.25);
 
         // ─── Drop shadow underneath body so the violin pops off the bg ───
-        bgCtx.shadowColor = `rgba(255,200,40,${0.45 + cheer * 0.4})`;
-        bgCtx.shadowBlur = 12 + cheer * 18 + flash * 14;
+        // Pulses with cheer + hard-drop so each clear / slam feels punchy.
+        bgCtx.shadowColor = `rgba(255,200,40,${0.45 + cheer * 0.45 + drop * 0.30})`;
+        bgCtx.shadowBlur = 12 + cheer * 22 + flash * 14 + drop * 16;
 
         // ─── BODY: figure-8 from two ellipses + a connecting waist rect ──
         // Lower bout (large) + upper bout (smaller) overlap at the waist;
