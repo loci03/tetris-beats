@@ -565,6 +565,23 @@
     letter-spacing: 0;
     margin-left: 2px;
   }
+  /* When the announcer-voice toggle is off, show a small red "MUTED" badge
+     next to it so users who toggled it off in a previous visit don't think
+     audio is broken. The badge is hidden by default and revealed via the
+     .voice-muted class on the start screen (driven from setVoiceEnabled). */
+  #voice-muted-badge {
+    display: none;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    color: #ff3344;
+    background: rgba(255, 51, 68, 0.12);
+    border: 1px solid rgba(255, 51, 68, 0.45);
+    border-radius: 3px;
+    padding: 2px 6px;
+    margin-left: 6px;
+  }
+  #start-screen.voice-muted #voice-muted-badge { display: inline-block; }
   #game-over-screen {
     position: fixed;
     top: 0; left: 0;
@@ -1345,6 +1362,13 @@
 </head>
 <body>
 
+<!-- iOS silent-switch bypass. iPhone hardware mute mutes Web Audio by default;
+     starting an HTMLAudioElement with `playsinline` shifts the page's audio
+     session to "playback" category, which honors the volume slider but ignores
+     the silent switch. The src is a 0.5 s silent MP3 looped indefinitely. We
+     start playback inside primeVoiceOnClick (the Start-button user gesture). -->
+<audio id="ios-silence-unlock" src="audio/sfx/silence.mp3" loop preload="auto" playsinline style="display:none"></audio>
+
 <canvas id="bg-canvas"></canvas>
 
 <div id="start-screen">
@@ -1426,7 +1450,7 @@
   </label>
   <label class="options-toggle">
     <input type="checkbox" id="voice-toggle" checked>
-    <span>Line-clear voice <span class="opt-hint">(V)</span></span>
+    <span>Announcer voice <span class="opt-hint">(V)</span><span id="voice-muted-badge">MUTED</span></span>
   </label>
   <div id="start-leaderboard" class="leaderboard" aria-live="polite">
     <h3>High Scores <span class="lb-mode" id="lb-mode-label">STORY</span></h3>
@@ -1617,6 +1641,12 @@ function setVoiceEnabled(v) {
   try { localStorage.setItem('tetris.voice', String(voiceEnabled)); } catch {}
   const cb = document.getElementById('voice-toggle');
   if (cb) cb.checked = voiceEnabled;
+  // Surface the muted state on the start screen so returning users (who
+  // turned it off in a prior visit and forgot) can see why no announcer
+  // voices are playing - the CSS reveals #voice-muted-badge when this
+  // class is set.
+  const startScreen = document.getElementById('start-screen');
+  if (startScreen) startScreen.classList.toggle('voice-muted', !voiceEnabled);
   if (!voiceEnabled && 'speechSynthesis' in window) {
     try { speechSynthesis.cancel(); } catch {}
   }
@@ -1676,11 +1706,17 @@ const voiceEngine = (() => {
     loadPromise = (async () => {
       await Promise.all(ALL_FILES.map(async (name) => {
         try {
-          const r = await fetch(`audio/voice/${name}.mp3`, { cache: 'force-cache' });
-          if (!r.ok) return;
+          const url = `audio/voice/${name}.mp3`;
+          const r = await fetch(url, { cache: 'force-cache' });
+          if (!r.ok) {
+            console.error('[voice] fetch failed', url, 'status', r.status);
+            return;
+          }
           const ab = await r.arrayBuffer();
           buffers[name] = await audioEngine.ctx.decodeAudioData(ab);
-        } catch {}
+        } catch (e) {
+          console.error('[voice] load/decode failed for', name, e);
+        }
       }));
     })();
     return loadPromise;
@@ -1760,12 +1796,16 @@ function makeClipVoice(folder, pools, defaultGain) {
       await Promise.all(all.map(async (name) => {
         if (buffers[name]) return;
         try {
-          const r = await fetch(`audio/voice/${folder}/${name}.mp3`, { cache: 'force-cache' });
-          if (!r.ok) return;
+          const url = `audio/voice/${folder}/${name}.mp3`;
+          const r = await fetch(url, { cache: 'force-cache' });
+          if (!r.ok) {
+            console.error(`[${folder}] fetch failed`, url, 'status', r.status);
+            return;
+          }
           const ab = await r.arrayBuffer();
           buffers[name] = await audioEngine.ctx.decodeAudioData(ab);
         } catch (e) {
-          console.warn(`[${folder}] failed to load`, name, e);
+          console.error(`[${folder}] load/decode failed for`, name, e);
         }
       }));
     })();
@@ -3158,6 +3198,13 @@ const audioEngine = {
   _trackSource: null,     // current AudioBufferSourceNode (looping)
   _trackName: null,       // currently-playing filename (for swap detection)
   _trackBuffers: {},      // decoded-buffer cache keyed on filename
+  _prefetchedBytes: {},   // raw ArrayBuffer cache (filled before AudioContext exists)
+  _trackFailedFor: new Set(), // filenames that have failed to fetch/decode - signals
+                              // the procedural scheduler to fire its drum/bass
+                              // fallback so the level isn't silent on load errors
+  _trackStartWatchdog: null,  // setTimeout handle - flips _trackFailedFor if a
+                              // track hasn't started after a few seconds (slow
+                              // network, stalled fetch, etc.)
   _sfxBuffers: {},        // decoded SFX buffers (snare, etc.)
   _lastMoveSfxAt: 0,      // throttle: piece movement can fire rapidly via DAS
   isPlaying: false,
@@ -3219,21 +3266,56 @@ const audioEngine = {
     return Math.min(1, sum / (half * 200));
   },
 
+  // Pre-fetch the raw bytes of a track without an AudioContext. Lets us start
+  // the (large, 3-9 MB) MP3 download as soon as the page loads instead of
+  // waiting for the user to click Start. The buffer is decoded later inside
+  // _loadTrack once the ctx exists. Safe to call before init().
+  async _prefetchTrack(name) {
+    if (this._prefetchedBytes[name] || this._trackBuffers[name]) return;
+    try {
+      const url = 'audio/levels/' + name;
+      const r = await fetch(url, { cache: 'force-cache' });
+      if (!r.ok) {
+        console.error('[audio] prefetch failed', url, 'status', r.status);
+        this._trackFailedFor.add(name);
+        return;
+      }
+      this._prefetchedBytes[name] = await r.arrayBuffer();
+    } catch (e) {
+      console.error('[audio] prefetch threw for', name, e);
+      this._trackFailedFor.add(name);
+    }
+  },
+
   // Load and decode the named MP3 from /audio/levels/. Cached, so subsequent
   // calls return instantly. Resolves to null if fetch/decode fails (e.g.
-  // file missing) - caller falls back to procedural audio.
+  // file missing) - caller falls back to procedural audio. Uses bytes from
+  // _prefetchTrack if they're already in memory.
   async _loadTrack(name) {
     if (this._trackBuffers[name]) return this._trackBuffers[name];
     if (!this.ctx) return null;
     try {
-      const r = await fetch('audio/levels/' + name, { cache: 'force-cache' });
-      if (!r.ok) return null;
-      const ab = await r.arrayBuffer();
+      let ab;
+      if (this._prefetchedBytes[name]) {
+        ab = this._prefetchedBytes[name];
+        delete this._prefetchedBytes[name]; // free the raw bytes after decode
+      } else {
+        const url = 'audio/levels/' + name;
+        const r = await fetch(url, { cache: 'force-cache' });
+        if (!r.ok) {
+          console.error('[audio] track fetch failed', url, 'status', r.status);
+          this._trackFailedFor.add(name);
+          return null;
+        }
+        ab = await r.arrayBuffer();
+      }
       const buf = await this.ctx.decodeAudioData(ab);
       this._trackBuffers[name] = buf;
+      this._trackFailedFor.delete(name); // recovered
       return buf;
     } catch (e) {
-      console.warn('[audio] failed to load track', name, e);
+      console.error('[audio] failed to load/decode track', name, e);
+      this._trackFailedFor.add(name);
       return null;
     }
   },
@@ -3248,8 +3330,23 @@ const audioEngine = {
     opts = opts || {};
     const wantLoop = opts.loop !== false;
     if (this._trackName === name && this._trackSource && wantLoop) return; // already on it
+    // Watchdog: if the track hasn't started in 4 s (slow fetch, stalled CDN,
+    // huge file like galaxy.mp3 on a flaky connection), mark it failed so the
+    // procedural scheduler kicks in and the player isn't sitting in silence.
+    // _loadTrack also marks failed on actual fetch/decode errors.
+    if (this._trackStartWatchdog) clearTimeout(this._trackStartWatchdog);
+    this._trackStartWatchdog = setTimeout(() => {
+      if (this._trackName !== name || !this._trackSource) {
+        console.error('[audio] track watchdog tripped — falling back to procedural for', name);
+        this._trackFailedFor.add(name);
+      }
+    }, 4000);
     const buf = await this._loadTrack(name);
-    if (!buf) return; // load failed - silently fall back
+    if (!buf) {
+      // Load failed - flag so _playStep allows procedural drums/bass/synth.
+      this._trackFailedFor.add(name);
+      return;
+    }
     this._stopTrack(0.4); // crossfade out anything currently playing
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
@@ -3273,6 +3370,13 @@ const audioEngine = {
     g.gain.linearRampToValueAtTime(1, this.ctx.currentTime + 0.4);
     this._trackSource = { node: src, gain: g };
     this._trackName = name;
+    // Track started successfully - clear the watchdog and the failed flag in
+    // case this track previously failed and is now recovering.
+    if (this._trackStartWatchdog) {
+      clearTimeout(this._trackStartWatchdog);
+      this._trackStartWatchdog = null;
+    }
+    this._trackFailedFor.delete(name);
   },
 
   _stopTrack(fadeOut) {
@@ -3293,14 +3397,18 @@ const audioEngine = {
     if (this._sfxBuffers[name]) return this._sfxBuffers[name];
     if (!this.ctx) return null;
     try {
-      const r = await fetch('audio/sfx/' + name, { cache: 'force-cache' });
-      if (!r.ok) return null;
+      const url = 'audio/sfx/' + name;
+      const r = await fetch(url, { cache: 'force-cache' });
+      if (!r.ok) {
+        console.error('[audio] sfx fetch failed', url, 'status', r.status);
+        return null;
+      }
       const ab = await r.arrayBuffer();
       const buf = await this.ctx.decodeAudioData(ab);
       this._sfxBuffers[name] = buf;
       return buf;
     } catch (e) {
-      console.warn('[audio] failed to load sfx', name, e);
+      console.error('[audio] failed to load/decode sfx', name, e);
       return null;
     }
   },
@@ -3479,10 +3587,13 @@ const audioEngine = {
 
   _playStep(step, time) {
     const theme = getTheme(level);
-    // When the level uses a backing track, the procedural drums/bass/synth
-    // would clash. Skip note generation but keep the scheduler running so
-    // beatPhase still advances for the visual beat-pulse + bg particles.
-    if (theme && theme.track) return;
+    // When the level uses a backing track that loaded successfully, the
+    // procedural drums/bass/synth would clash. Skip note generation but keep
+    // the scheduler running so beatPhase still advances for the visual
+    // beat-pulse + bg particles. If the track failed to load (network error,
+    // decode error, watchdog tripped), we fall through to procedural so the
+    // level still has audio instead of going silent.
+    if (theme && theme.track && !this._trackFailedFor.has(theme.track)) return;
     const st = this._stepTime();
     // Swing: delay odd 16ths slightly (about 12% of a step)
     const swingAmt = (theme.synthType === 'industrial') ? 0 : st * 0.14;
@@ -10896,9 +11007,18 @@ function startGame() {
   // notes get scheduled on a context that isn't running yet and nothing plays.
   // (Marathon's non-looping track + onended rotation hook is wired inside
   // audioEngine.start() itself so there's a single source of truth and no
-  // race between competing _playTrack calls.)
+  // race between competing _playTrack calls.) resume() can reject on certain
+  // PWA / iOS-WKWebView configs - in that case we still call start() so the
+  // procedural scheduler runs (the level's MP3 may also still play; AudioContext
+  // can recover from rejected resume on the first buffer.start in some browsers).
   if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
-    audioEngine.ctx.resume().then(() => audioEngine.start());
+    audioEngine.ctx.resume().then(
+      () => audioEngine.start(),
+      (err) => {
+        console.error('[audio] AudioContext resume() rejected — starting anyway', err);
+        audioEngine.start();
+      }
+    );
   } else {
     audioEngine.start();
   }
@@ -11055,7 +11175,19 @@ function leaveCurrentRoom() {
 // Prime the voice engine on any user gesture that starts a game session -
 // Safari/iOS require at least one speak() call inside a real click handler
 // before it will play audio from async contexts (the game loop).
+//
+// Also kick the iOS silent-switch unlock here. iPhones with the hardware
+// mute switch flipped silence Web Audio by default - the only way around
+// it is to play an HTMLAudioElement with playsinline, which shifts the
+// page's audio session to "playback" category. After this fires once on
+// any user gesture, the AudioContext output is audible even with the
+// phone muted (volume slider still applies). Idempotent - calling .play
+// on an already-playing element is a no-op.
 function primeVoiceOnClick() {
+  try {
+    const el = document.getElementById('ios-silence-unlock');
+    if (el && el.paused) el.play().catch(() => {});
+  } catch {}
   try { voiceEngine.prime(); } catch {}
   try { alfredVoice.prime(); } catch {}
   try { playerVoice.prime(); } catch {}
@@ -11743,6 +11875,10 @@ window.addEventListener('resize', () => positionP2Monitor());
   const cb = document.getElementById('voice-toggle');
   if (!cb) return;
   cb.checked = voiceEnabled;
+  // Apply the muted-badge class on initial load so returning users with the
+  // toggle persisted off see the MUTED badge from first paint.
+  const startScreen = document.getElementById('start-screen');
+  if (startScreen) startScreen.classList.toggle('voice-muted', !voiceEnabled);
   cb.addEventListener('change', () => setVoiceEnabled(cb.checked));
 })();
 
@@ -11760,6 +11896,28 @@ beatPhase = 0;
 level = 1;
 initBgParticles();
 render(0);
+
+// Kick off background prefetch of the heaviest backing tracks while the user
+// is still on the start screen. _prefetchTrack pulls the raw bytes into
+// memory so _playTrack can decode instantly when Start fires - critical for
+// galaxy.mp3 (9 MB) on slower connections, where users were hitting silence
+// for 5-10 s before audio kicked in. Runs after first paint so it doesn't
+// block the start-screen render.
+(function preloadHeavyTracks() {
+  const start = () => {
+    // Currently-selected starting level + Marathon's Galaxy. Other tracks
+    // load on demand when the level changes.
+    try {
+      const startTheme = (typeof getTheme === 'function') ? getTheme(level) : null;
+      if (startTheme && startTheme.track) audioEngine._prefetchTrack(startTheme.track);
+      if (typeof MARATHON_THEME !== 'undefined' && MARATHON_THEME.track) {
+        audioEngine._prefetchTrack(MARATHON_THEME.track);
+      }
+    } catch (e) { console.error('[audio] preload error', e); }
+  };
+  if (document.readyState === 'complete') start();
+  else window.addEventListener('load', start, { once: true });
+})();
 </script>
 </body>
 </html>
