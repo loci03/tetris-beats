@@ -13688,23 +13688,30 @@ render(0);
 // is still on the start screen. _prefetchTrack pulls the raw bytes into
 // memory so _playTrack can decode instantly when Start fires - critical for
 // ─────────────────────────────────────────────────────────────────────────────
-// CONSTRUCTION SCENE — animated canvas in the Story WIP panel.
-// Workers dig, carry bricks, drink coffee, argue about blueprints, fall asleep
-// on the job, and get told off by the foreman. Runs only while the story tab
-// is visible; stops automatically when hidden to save CPU.
+// CONSTRUCTION SCENE v2 — high-quality cartoon construction site.
+// Chunky cartoon workers with expressive faces, detailed environment (crane,
+// half-built brick wall, porta-potty, scattered tools, work lights, caution
+// cones). Smooth multi-frame animation with shadows, atmospheric depth, and
+// dust/particle effects. Runs only while the STORY tab is visible.
 // ─────────────────────────────────────────────────────────────────────────────
 (function wireConstructionScene() {
   const canvas  = document.getElementById('construction-canvas');
   const quoteEl = document.getElementById('construction-quote');
   if (!canvas || !quoteEl) return;
 
-  const ctx  = canvas.getContext('2d');
-  const W    = canvas.width;
-  const H    = canvas.height;
-  let   raf  = null;
-  let   tick = 0;
+  // Render at 2× for crisp display on retina
+  const SCALE = window.devicePixelRatio || 1;
+  canvas.width  = 340 * SCALE;
+  canvas.height = 180 * SCALE;
+  canvas.style.width  = '340px';
+  canvas.style.height = '180px';
 
-  const WORKER_QUOTES = [
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SCALE, SCALE);
+  const W = 340, H = 180;
+  let raf = null, tick = 0;
+
+  const QUOTES = [
     '"I said the BLUEPRINT goes HERE, Gerald."',
     '"We\'re gonna need more coffee."',
     '"I\'ve been digging this same hole for 3 weeks."',
@@ -13713,545 +13720,747 @@ render(0);
     '"My back. My BACK."',
     '"Did you read the spec? There IS no spec."',
     '"I quit. ...okay I\'m back."',
-    '"This gap ain\'t gonna fill itself. Or will it?"',
-    '"I-piece delivery? Wrong address again."',
-    '"They said six weeks. It\'s been six months."',
-    '"Hold my hard hat. I\'m about to do something stupid."',
-    '"Foreman says hurry up. Foreman ain\'t here."',
-    '"If we just flip the blueprint upside-down it works."',
-    '"That\'s not a load-bearing wall. ...it was a load-bearing wall."',
-    '"I just work here."',
     '"Four guys watching one guy dig. Peak productivity."',
     '"We lost Dave. Dave is in the hole."',
     '"The deadline is \'soon.\' It\'s been \'soon\' for months."',
+    '"That\'s not load-bearing. ...it was load-bearing."',
+    '"I just work here."',
+    '"If we flip the blueprint upside-down it works."',
+    '"Hold my hard hat. I\'m about to do something dumb."',
     '"Someone stole my sandwich AGAIN."',
+    '"The foreman\'s gone. Nobody move."',
+    '"Est. completion: \'Eventually\'™"',
   ];
+  let quoteIdx = 0, quoteTimer = 0;
 
-  let quoteIdx  = Math.floor(Math.random() * WORKER_QUOTES.length);
-  let quoteTimer = 0;
-  const QUOTE_INTERVAL = 240; // ticks between quote changes
+  // ── Geometry ──────────────────────────────────────────────────────────────
+  const GY   = 128;          // ground y
+  const PX   = 98, PW = 72, PD = 34;  // pit x, width, depth
 
-  // ── Scene objects ──────────────────────────────────────────────────────────
-
-  // Ground / pit geometry
-  const GROUND_Y = H * 0.68;
-  const PIT_X    = W * 0.28;
-  const PIT_W    = W * 0.26;
-  const PIT_D    = H * 0.22;
-
-  // Scaffold
-  const SCAF_X  = W * 0.62;
-  const SCAF_Y  = GROUND_Y - H * 0.30;
-  const SCAF_W  = W * 0.22;
-  const SCAF_H  = H * 0.30;
-
-  // Characters — each has a role, position, and internal state machine
-  const workers = [
-    // Digger — digs in the pit
-    {
-      role: 'digger', x: PIT_X + PIT_W*0.30, baseY: GROUND_Y + PIT_D*0.45,
-      frame: 0, frameTimer: 0, frameSpeed: 18,
-      dirtTimer: 0, facing: 1,
-      state: 'digging', stateTimer: 0,
-    },
-    // Brick carrier — walks back and forth carrying a brick
-    {
-      role: 'carrier', x: W*0.03, baseY: GROUND_Y,
-      frame: 0, frameTimer: 0, frameSpeed: 10,
-      dir: 1, speed: 0.55, destX: SCAF_X,
-      hasBrick: true, brickDelay: 0,
-      state: 'walking', stateTimer: 0,
-    },
-    // Foreman — paces left/right near the pit, clipboard in hand
-    {
-      role: 'foreman', x: PIT_X - W*0.08, baseY: GROUND_Y,
-      frame: 0, frameTimer: 0, frameSpeed: 22,
-      dir: 1, speed: 0.30, patrolMin: PIT_X - W*0.16, patrolMax: PIT_X + PIT_W + W*0.04,
-      state: 'pacing', stateTimer: 0, angryTimer: 0,
-    },
-    // Napper — sitting/sleeping by the scaffold
-    {
-      role: 'napper', x: W*0.88, baseY: GROUND_Y,
-      frame: 0, frameTimer: 0, frameSpeed: 60,
-      state: 'sleeping', zTimer: 0, zOffset: 0,
-    },
-    // Blueprint guy — stands still arguing with himself over a paper
-    {
-      role: 'blueprint', x: W*0.10, baseY: GROUND_Y,
-      frame: 0, frameTimer: 0, frameSpeed: 40,
-      state: 'reading', headBob: 0, headDir: 1,
-    },
-  ];
-
-  // Dirt particles thrown from the pit
-  const dirtParticles = [];
-
-  // Coffee cups that appear/disappear
-  let coffeeVisible = false, coffeeTimer = 0;
-
-  // Scaffold bricks being placed
-  const brickStack = [];  // { x, y }
-  for (let bi = 0; bi < 4; bi++) {
-    brickStack.push({ x: SCAF_X + W*0.02, y: GROUND_Y - bi * H*0.055 - H*0.01 });
+  // ── Particles ─────────────────────────────────────────────────────────────
+  const parts = [];  // { x,y,vx,vy,r,col,life,decay }
+  function spawnDirt(x, y) {
+    for (let i = 0; i < 5; i++)
+      parts.push({ x, y, vx:(Math.random()-0.4)*2.2, vy:-(Math.random()*2.5+1),
+        r:2+Math.random()*2.5, col:'#9b7532', life:1, decay:0.03+Math.random()*0.02 });
+  }
+  function spawnSpark(x, y) {
+    for (let i = 0; i < 8; i++)
+      parts.push({ x, y, vx:(Math.random()-0.5)*3, vy:-(Math.random()*2+0.5),
+        r:1.2+Math.random()*1.5, col:`hsl(${30+Math.random()*40|0},100%,65%)`,
+        life:1, decay:0.04+Math.random()*0.03 });
   }
 
-  // ── Drawing helpers ─────────────────────────────────────────────────────────
+  // ── Worker state ──────────────────────────────────────────────────────────
+  const digger  = { x:130, phase:0, dirtCD:0, sweat:0 };
+  const carrier = { x:20, dir:1, hasBrick:true, pause:0, bobPhase:0 };
+  const foreman = { x:68, dir:1, angryT:0, phase:0 };
+  const napper  = { x:305, zPhase:0 };
+  const bpGuy   = { x:22, headPhase:0 };
+  // Coffee guy stands on scaffold plank
+  const coffee  = { x:258, armPhase:0, drinkT:0 };
 
-  function drawHardHat(x, y, size, col) {
-    ctx.fillStyle = col || '#ffd700';
+  // Bricks placed on the growing wall
+  const wallBricks = [];
+  for (let i = 0; i < 10; i++)
+    wallBricks.push({ col: i%2===0 ? '#c0392b':'#e74c3c',
+      x: 188 + (i%4)*18, y: GY - 8 - Math.floor(i/4)*9 });
+
+  // ── Low-level draw helpers ─────────────────────────────────────────────────
+
+  // Rounded filled rect
+  function rr(x,y,w,h,r,fill,stroke) {
+    ctx.beginPath(); ctx.roundRect(x,y,w,h,r);
+    if (fill)   { ctx.fillStyle=fill;   ctx.fill(); }
+    if (stroke) { ctx.strokeStyle=stroke; ctx.stroke(); }
+  }
+
+  // Shadow ellipse on ground
+  function shadow(x, y, rx, ry) {
+    ctx.save(); ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // Hard hat (dome shape)
+  function hardHat(cx, ty, rad, col) {
+    const brimY = ty + rad*0.55;
+    ctx.fillStyle = col;
     ctx.beginPath();
-    ctx.ellipse(x, y, size*0.95, size*0.45, 0, Math.PI, 0);
+    ctx.arc(cx, ty + rad*0.1, rad*0.82, Math.PI, 0);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = col;
+    rr(cx - rad*1.1, brimY - rad*0.18, rad*2.2, rad*0.38, rad*0.18, col);
+    // Shine
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(cx - rad*0.25, ty - rad*0.08, rad*0.30, rad*0.16, -0.4, 0, Math.PI*2);
     ctx.fill();
-    ctx.fillStyle = col || '#ffd700';
-    ctx.fillRect(x - size*1.05, y - size*0.08, size*2.1, size*0.22);
   }
 
-  function drawStickFigure(x, y, size, facing, options) {
-    const o = options || {};
-    const col    = o.col    || '#fff';
-    const hatCol = o.hatCol || '#ffd700';
-    const armAng = o.armAng || 0;   // extra arm angle (radians)
-    const legAng = o.legAng || 0;   // leg swing phase
-    const holdTool = o.holdTool || null; // 'shovel'|'brick'|'clipboard'|'coffee'
-
-    ctx.strokeStyle = col;
-    ctx.lineWidth   = Math.max(1.5, size * 0.12);
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
-
-    const hd   = size * 0.55; // head radius
-    const torH = size * 1.10;
-    const legL = size * 0.95;
-
-    const headY = y - torH - hd;
-
+  // Face (head circle + eyes + expression)
+  function face(cx, cy, r, skin, expr, facing) {
+    // Drop shadow under head
+    ctx.save(); ctx.globalAlpha = 0.15;
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(cx+1, cy+r*0.7, r*0.7, r*0.22, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
     // Head
-    ctx.fillStyle = '#f5cba7';
+    const hg = ctx.createRadialGradient(cx-r*0.2, cy-r*0.2, 0, cx, cy, r);
+    hg.addColorStop(0, skin === 'dark' ? '#c68642' : skin === 'tan' ? '#e8b87c' : '#f5cba7');
+    hg.addColorStop(1, skin === 'dark' ? '#7d4e20' : skin === 'tan' ? '#c48c4a' : '#d4956a');
+    ctx.fillStyle = hg;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+    // Ear
+    ctx.fillStyle = skin === 'dark' ? '#b5763a' : skin === 'tan' ? '#d9a568' : '#e8b07a';
+    ctx.beginPath(); ctx.ellipse(cx - facing*r*0.88, cy, r*0.25, r*0.30, 0, 0, Math.PI*2); ctx.fill();
+    // Eyes
+    const ex = cx + facing*r*0.26, ey = cy - r*0.08;
+    ctx.fillStyle = '#2c1810';
+    ctx.beginPath(); ctx.ellipse(ex, ey, r*0.14, r*0.17, 0, 0, Math.PI*2); ctx.fill();
+    // Eye white highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.arc(ex+r*0.04, ey-r*0.05, r*0.05, 0, Math.PI*2); ctx.fill();
+    // Second eye (inner, smaller)
+    ctx.fillStyle = '#2c1810';
+    ctx.beginPath(); ctx.ellipse(cx - facing*r*0.10, ey, r*0.10, r*0.13, 0, 0, Math.PI*2); ctx.fill();
+    // Mouth
+    ctx.strokeStyle = '#8B4513'; ctx.lineWidth = r*0.12; ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(x, headY, hd, 0, Math.PI*2);
-    ctx.fill();
-    ctx.strokeStyle = '#d4a07a';
-    ctx.lineWidth = Math.max(1, size*0.08);
+    if (expr === 'angry') {
+      ctx.moveTo(cx - r*0.25, cy + r*0.35); ctx.lineTo(cx + r*0.25, cy + r*0.25);
+      // Furrowed brow
+      ctx.moveTo(ex - r*0.18, ey - r*0.28); ctx.lineTo(ex + r*0.05, ey - r*0.18);
+    } else if (expr === 'sleep') {
+      ctx.moveTo(cx - r*0.20, cy + r*0.30); ctx.quadraticCurveTo(cx, cy + r*0.42, cx + r*0.20, cy + r*0.30);
+      // Closed eyes
+      ctx.strokeStyle = '#7a4020'; ctx.lineWidth = r*0.12;
+      ctx.moveTo(ex - r*0.14, ey); ctx.lineTo(ex + r*0.14, ey);
+      ctx.moveTo(cx - facing*r*0.10 - r*0.10, ey); ctx.lineTo(cx - facing*r*0.10 + r*0.10, ey);
+    } else if (expr === 'happy') {
+      ctx.moveTo(cx - r*0.22, cy + r*0.22); ctx.quadraticCurveTo(cx, cy + r*0.48, cx + r*0.22, cy + r*0.22);
+    } else if (expr === 'confused') {
+      ctx.moveTo(cx - r*0.18, cy + r*0.32); ctx.quadraticCurveTo(cx + r*0.05, cy + r*0.22, cx + r*0.22, cy + r*0.34);
+      // One eyebrow raised
+      ctx.moveTo(ex - r*0.14, ey - r*0.28); ctx.quadraticCurveTo(ex, ey - r*0.40, ex + r*0.14, ey - r*0.28);
+    } else { // neutral
+      ctx.moveTo(cx - r*0.18, cy + r*0.32); ctx.lineTo(cx + r*0.18, cy + r*0.32);
+    }
     ctx.stroke();
-
-    // Hard hat
-    drawHardHat(x, headY - hd*0.25, hd*0.95, hatCol);
-
-    ctx.strokeStyle = col;
-    ctx.lineWidth   = Math.max(1.5, size*0.12);
-
-    // Torso
-    ctx.beginPath();
-    ctx.moveTo(x, headY + hd);
-    ctx.lineTo(x, y - legL * 0.02);
-    ctx.stroke();
-
-    // Arms
-    const armLen = size * 0.78;
-    const shoulderY = headY + hd + torH * 0.28;
-    // Left arm
-    const laBase = armAng - 0.4 * facing;
-    ctx.beginPath();
-    ctx.moveTo(x, shoulderY);
-    ctx.lineTo(x - facing * Math.cos(laBase) * armLen, shoulderY + Math.abs(Math.sin(laBase)) * armLen * 0.9 + Math.sin(laBase) * armLen * 0.6);
-    ctx.stroke();
-    // Right arm
-    const raBase = armAng + 0.4 * facing;
-    const raEndX = x + facing * Math.cos(raBase) * armLen * 0.85;
-    const raEndY = shoulderY + Math.sin(raBase) * armLen * 0.7;
-    ctx.beginPath();
-    ctx.moveTo(x, shoulderY);
-    ctx.lineTo(raEndX, raEndY);
-    ctx.stroke();
-
-    // Legs
-    const hipY = y - legL * 0.05;
-    const swingL = Math.sin(legAng) * 0.35;
-    ctx.beginPath();
-    ctx.moveTo(x, hipY);
-    ctx.lineTo(x - facing*legL*0.35 + Math.sin(legAng)*legL*0.22, y + legL*0.04);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x, hipY);
-    ctx.lineTo(x + facing*legL*0.25 - Math.sin(legAng)*legL*0.22, y + legL*0.04);
-    ctx.stroke();
-
-    // Tool overlays
-    if (holdTool === 'shovel') {
-      ctx.strokeStyle = '#8B6914';
-      ctx.lineWidth   = Math.max(1.5, size*0.11);
-      const sx = raEndX + facing*size*0.1;
-      const sy = raEndY;
+    // Sweat drop (if digger is sweating)
+    if (expr === 'tired') {
+      ctx.fillStyle = 'rgba(100,180,255,0.70)';
       ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(sx + facing*size*0.15, sy + size*1.4);
-      ctx.stroke();
-      ctx.fillStyle = '#aaa';
-      ctx.beginPath();
-      ctx.ellipse(sx + facing*size*0.15, sy + size*1.55, size*0.22, size*0.12, 0.3*facing, 0, Math.PI*2);
+      ctx.moveTo(cx + r*0.55, cy - r*0.20);
+      ctx.bezierCurveTo(cx + r*0.70, cy - r*0.05, cx + r*0.75, cy + r*0.15, cx + r*0.55, cy + r*0.18);
+      ctx.bezierCurveTo(cx + r*0.35, cy + r*0.15, cx + r*0.38, cy - r*0.05, cx + r*0.55, cy - r*0.20);
       ctx.fill();
     }
-    if (holdTool === 'brick') {
-      ctx.fillStyle = '#c0392b';
-      ctx.strokeStyle = '#922b21';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.rect(raEndX + facing*size*0.05, raEndY - size*0.12, size*0.65*facing||size*0.65, size*0.28);
-      ctx.fill(); ctx.stroke();
-    }
-    if (holdTool === 'clipboard') {
-      ctx.fillStyle = '#f5e6c8';
-      ctx.strokeStyle = '#a08050';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      const cbW = size*0.55, cbH = size*0.70;
-      ctx.rect(raEndX + facing*size*0.05 - cbW*0.5, raEndY - cbH*0.5, cbW, cbH);
-      ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = '#888';
-      ctx.lineWidth = 0.7;
-      for (let ln = 0; ln < 3; ln++) {
-        ctx.beginPath();
-        ctx.moveTo(raEndX + facing*size*0.05 - cbW*0.35, raEndY - cbH*0.25 + ln*cbH*0.22);
-        ctx.lineTo(raEndX + facing*size*0.05 + cbW*0.35, raEndY - cbH*0.25 + ln*cbH*0.22);
-        ctx.stroke();
-      }
-    }
-    if (holdTool === 'coffee') {
-      ctx.fillStyle = '#5d4037';
-      ctx.strokeStyle = '#3e2723';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.rect(raEndX + facing*size*0.05, raEndY - size*0.18, size*0.30, size*0.38);
-      ctx.fill(); ctx.stroke();
-      // steam
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-      ctx.lineWidth = 1;
-      for (let st = 0; st < 2; st++) {
-        ctx.beginPath();
-        const bx = raEndX + facing*size*0.12 + st*size*0.12;
-        ctx.moveTo(bx, raEndY - size*0.18);
-        ctx.bezierCurveTo(bx + 3, raEndY - size*0.35, bx - 3, raEndY - size*0.52, bx, raEndY - size*0.65);
-        ctx.stroke();
-      }
-    }
-
-    // Eyes
-    ctx.fillStyle = '#333';
-    ctx.beginPath();
-    ctx.arc(x + facing*hd*0.30, headY - hd*0.10, hd*0.14, 0, Math.PI*2);
-    ctx.fill();
   }
 
-  function drawSleepingFigure(x, y, size, zOff) {
-    // Lying on back
-    ctx.strokeStyle = '#ddd';
-    ctx.lineWidth   = Math.max(1.5, size*0.12);
-    ctx.lineCap     = 'round';
-    // Body horizontal
-    ctx.beginPath();
-    ctx.moveTo(x - size*1.2, y);
-    ctx.lineTo(x + size*0.5, y);
-    ctx.stroke();
-    // Head (circle)
-    ctx.fillStyle = '#f5cba7';
-    ctx.beginPath();
-    ctx.arc(x + size*0.8, y, size*0.42, 0, Math.PI*2);
-    ctx.fill();
-    ctx.strokeStyle = '#d4a07a';
-    ctx.lineWidth = Math.max(1, size*0.08);
-    ctx.stroke();
-    // Hard hat fallen off
-    drawHardHat(x + size*1.1, y + size*0.52, size*0.42*0.95, '#ffd700');
-    // Legs sticking up slightly
-    ctx.strokeStyle = '#ddd';
-    ctx.lineWidth   = Math.max(1.5, size*0.12);
-    ctx.beginPath();
-    ctx.moveTo(x - size*1.2, y);
-    ctx.lineTo(x - size*1.6, y - size*0.6);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x - size*1.0, y);
-    ctx.lineTo(x - size*1.4, y - size*0.5);
-    ctx.stroke();
-    // Z Z Z
-    const zA = 0.55 + Math.sin(tick*0.05 + zOff) * 0.35;
-    ctx.fillStyle = `rgba(180,220,255,${zA})`;
-    ctx.font = `bold ${size*0.55|0}px monospace`;
+  // Body (torso rectangle with vest stripe + shirt)
+  function torso(cx, ty, w, h, shirtCol, vestCol) {
+    // Shirt
+    rr(cx - w*0.5, ty, w, h, w*0.22, shirtCol);
+    // Safety vest stripes
+    ctx.fillStyle = vestCol;
+    ctx.globalAlpha = 0.88;
+    rr(cx - w*0.5, ty + h*0.18, w, h*0.22, 1, vestCol);
+    rr(cx - w*0.5, ty + h*0.58, w, h*0.22, 1, vestCol);
+    ctx.globalAlpha = 1;
+    // Chest shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.10)';
+    rr(cx - w*0.5, ty, w, h*0.35, w*0.22);
+  }
+
+  // Limb (rounded rect, rotated)
+  function limb(x1, y1, x2, y2, thick, col) {
+    const dx = x2-x1, dy = y2-y1;
+    const len = Math.hypot(dx,dy);
+    const ang = Math.atan2(dy,dx);
+    ctx.save();
+    ctx.translate(x1, y1);
+    ctx.rotate(ang);
+    rr(0, -thick*0.5, len, thick, thick*0.5, col);
+    ctx.restore();
+  }
+
+  // Full cartoon worker — the star of the show
+  // facing: 1 = right, -1 = left
+  // anim: { walkPhase, armLift, headTilt }
+  // extras: { hatCol, shirtCol, vestCol, skin, expr, tool }
+  function worker(cx, groundY, facing, anim, extras) {
+    const S    = 1;           // scale (all sizes relative to H)
+    const HR   = 9;           // head radius
+    const TW   = 14, TH = 18; // torso w/h
+    const LW   = 5,  LL = 14; // leg width/length
+    const AW   = 4,  AL = 13; // arm width/length
+
+    const wp = anim.walkPhase || 0;
+    const al = anim.armLift   || 0;
+    const ht = anim.headTilt  || 0;
+
+    const footY = groundY;
+    const hipY  = footY - LL;
+    const shoulderY = hipY - TH;
+    const neckY = shoulderY;
+    const headY = neckY - HR;
+
+    // Ground shadow
+    shadow(cx, footY + 1, 12, 4);
+
+    // ── Legs ──
+    const lSwing = Math.sin(wp) * 0.38;
+    const rSwing = -lSwing;
+    // Back leg first (the one swinging back)
+    const backLeg = facing > 0 ? lSwing : rSwing;
+    const frontLeg = facing > 0 ? rSwing : lSwing;
+
+    // Left leg
+    const ll1x = cx - LW*0.6, ll1y = hipY;
+    const ll2x = ll1x + Math.sin(backLeg) * LL * facing, ll2y = footY;
+    limb(ll1x, ll1y, ll2x, ll2y, LW, '#1a2744');
+    // Boot left
+    rr(ll2x - LW*0.8, ll2y - LW*0.4, LW*2.0, LW*0.7, LW*0.3, '#1a1a1a');
+
+    // Right leg
+    const rl1x = cx + LW*0.6, rl1y = hipY;
+    const rl2x = rl1x + Math.sin(frontLeg) * LL * facing, rl2y = footY;
+    limb(rl1x, rl1y, rl2x, rl2y, LW, '#253256');
+    // Boot right
+    rr(rl2x - LW*0.5, rl2y - LW*0.4, LW*2.0, LW*0.7, LW*0.3, '#222');
+
+    // ── Torso ──
+    torso(cx, shoulderY, TW, TH, extras.shirtCol||'#4a6fa5', extras.vestCol||'#ffa500');
+
+    // ── Arms ──
+    const rArmSwing = Math.sin(wp + Math.PI) * 0.35 + al;
+    const lArmSwing = Math.sin(wp) * 0.35 - al*0.3;
+    // Back arm
+    const ba = facing > 0 ? lArmSwing : rArmSwing;
+    const bax2 = cx - facing * AL * Math.sin(ba), bay2 = shoulderY + AL * Math.cos(Math.abs(ba));
+    limb(cx - facing*AW*0.4, shoulderY + AW*0.5, bax2, bay2, AW, extras.shirtCol||'#4a6fa5');
+
+    // Front arm (may hold tool)
+    const fa = facing > 0 ? rArmSwing : lArmSwing;
+    const fax2 = cx + facing * AL * Math.sin(Math.abs(fa) + 0.2);
+    const fay2 = shoulderY + AL * Math.cos(fa) * 0.9;
+    limb(cx + facing*AW*0.4, shoulderY + AW*0.5, fax2, fay2, AW, extras.shirtCol||'#4a6fa5');
+
+    // ── Tool in front hand ──
+    if (extras.tool === 'shovel') {
+      // Handle
+      limb(fax2, fay2, fax2 + facing*3, fay2 + 16, 2.5, '#8B6914');
+      // Blade
+      ctx.save();
+      ctx.translate(fax2 + facing*3.5, fay2 + 18);
+      ctx.rotate(facing * 0.25);
+      rr(-5, -3, 10, 6, 2, '#aaa', '#666');
+      ctx.restore();
+    }
+    if (extras.tool === 'bricks') {
+      // Stack of bricks on shoulder
+      for (let bi = 0; bi < 3; bi++) {
+        const brickCol = bi%2===0 ? '#c0392b':'#e74c3c';
+        rr(fax2 - 7 + facing*bi*2, fay2 - 5 - bi*5, 14, 5, 1.5, brickCol, '#7b241c');
+      }
+    }
+    if (extras.tool === 'clipboard') {
+      ctx.save();
+      ctx.translate(fax2 + facing*2, fay2 - 3);
+      ctx.rotate(facing * 0.15);
+      rr(-6, -8, 12, 14, 2, '#f5e6c8', '#b8960c');
+      // Clip at top
+      rr(-3, -10, 6, 4, 1, '#888');
+      // Lines on paper
+      ctx.strokeStyle = '#aaa'; ctx.lineWidth = 0.8;
+      for (let li = 0; li < 3; li++) {
+        ctx.beginPath(); ctx.moveTo(-4, -4 + li*4); ctx.lineTo(4, -4 + li*4); ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (extras.tool === 'coffee') {
+      ctx.save();
+      ctx.translate(fax2 + facing*1, fay2 - 2);
+      rr(-4, -7, 8, 9, 2, '#5d4037', '#3e2723');
+      // Handle
+      ctx.strokeStyle = '#3e2723'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(facing*4, -2, 3, -0.5, 0.5); ctx.stroke();
+      // Steam
+      for (let si = 0; si < 2; si++) {
+        ctx.strokeStyle = `rgba(255,255,255,${0.35 + si*0.1})`;
+        ctx.lineWidth = 1;
+        const sx = -2 + si*3;
+        ctx.beginPath();
+        ctx.moveTo(sx, -7);
+        ctx.bezierCurveTo(sx+2, -11, sx-2, -14, sx+1, -17);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (extras.tool === 'phone') {
+      ctx.save();
+      ctx.translate(fax2 + facing*1, fay2 - 2);
+      rr(-3, -6, 7, 10, 1.5, '#222', '#111');
+      ctx.fillStyle = 'rgba(100,180,255,0.6)';
+      rr(-2, -5, 5, 7, 1);
+      ctx.restore();
+    }
+
+    // ── Head ──
+    ctx.save();
+    ctx.translate(cx, headY);
+    ctx.rotate(ht);
+    face(0, 0, HR, extras.skin||'tan', extras.expr||'neutral', facing);
+    hardHat(0, -HR*0.85, HR*1.05, extras.hatCol||'#ffd700');
+    ctx.restore();
+  }
+
+  // Speech / thought bubble
+  function bubble(x, y, text, col, arrow) {
+    const pad = 5, fsize = 9;
+    ctx.font = `bold ${fsize}px sans-serif`;
+    const tw = ctx.measureText(text).width;
+    const bw = tw + pad*2, bh = fsize + pad*2;
+    const bx = x - bw*0.5, by = y - bh - 8;
+    ctx.fillStyle = col || 'rgba(255,255,255,0.94)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.fill(); ctx.stroke();
+    // Arrow tip
+    if (arrow !== false) {
+      ctx.fillStyle = col || 'rgba(255,255,255,0.94)';
+      ctx.beginPath();
+      ctx.moveTo(x-4, by+bh); ctx.lineTo(x+4, by+bh); ctx.lineTo(x, by+bh+6);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#111';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, by + bh*0.5);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+
+  // ── Environment props ──────────────────────────────────────────────────────
+
+  function drawEnvironment() {
+    // ── Sky / atmosphere ──
+    const skyG = ctx.createLinearGradient(0,0,0,H);
+    skyG.addColorStop(0,   '#0f1a2e');
+    skyG.addColorStop(0.5, '#1c2d45');
+    skyG.addColorStop(1,   '#2a3a1a');
+    ctx.fillStyle = skyG; ctx.fillRect(0,0,W,H);
+
+    // Distant city haze
+    const cityG = ctx.createRadialGradient(W*0.5, H*0.6, 0, W*0.5, H*0.6, W*0.5);
+    cityG.addColorStop(0,   'rgba(255,160,40,0.06)');
+    cityG.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = cityG; ctx.fillRect(0,0,W,H);
+
+    // ── Moon ──
+    const moonG = ctx.createRadialGradient(W-22, 14, 0, W-22, 14, 11);
+    moonG.addColorStop(0,   'rgba(255,245,200,0.95)');
+    moonG.addColorStop(0.6, 'rgba(240,230,160,0.6)');
+    moonG.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = moonG; ctx.fillRect(0,0,W,H);
+    // Moon craters
+    ctx.fillStyle = 'rgba(200,190,130,0.4)';
+    ctx.beginPath(); ctx.arc(W-19, 12, 2.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(W-26, 17, 1.8, 0, Math.PI*2); ctx.fill();
+
+    // ── Stars ──
+    const starData = [[12,8],[35,5],[55,12],[80,4],[110,9],[145,6],[170,12],[200,5],[220,10],[250,7],[275,4],[290,11],[315,8],[328,15],[18,22],[62,18],[140,20]];
+    for (const [sx,sy] of starData) {
+      const tw2 = 0.4 + Math.sin(tick*0.04 + sx*0.3)*0.3;
+      ctx.fillStyle = `rgba(255,255,220,${tw2})`;
+      ctx.beginPath(); ctx.arc(sx, sy, 0.9, 0, Math.PI*2); ctx.fill();
+    }
+
+    // ── Crane (background, silhouette) ──
+    ctx.fillStyle = '#1a2a1a';
+    // Mast
+    ctx.fillRect(W-48, GY-80, 5, 80);
+    // Horizontal jib
+    ctx.fillRect(W-90, GY-80, 47, 4);
+    // Counter-jib
+    ctx.fillRect(W-46, GY-80, 20, 3);
+    // Cable
+    ctx.strokeStyle = '#1a2a1a'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(W-72, GY-76); ctx.lineTo(W-72, GY-46); ctx.stroke();
+    // Hook
+    ctx.strokeStyle = '#1a2a1a'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(W-72, GY-42, 4, 0, Math.PI*2); ctx.stroke();
+
+    // ── Background building silhouettes ──
+    const bldgs = [[0,40,28,55],[30,25,18,70],[50,48,22,47],[255,38,25,57],[282,22,20,73],[304,44,18,51],[324,32,16,63]];
+    ctx.fillStyle = '#0d1a0d';
+    for (const [bx,bh,bw,_] of bldgs) {
+      ctx.fillRect(bx, GY-bh, bw, bh);
+      // Lit windows (random, static)
+      const seed = bx * 31 + bh;
+      for (let wi = 0; wi < 8; wi++) {
+        const ww = 4, wh = 3;
+        const wx = bx + 3 + (wi%3) * 8;
+        const wy = GY - bh + 5 + Math.floor(wi/3) * 9;
+        if ((seed + wi * 17) % 5 !== 0) {
+          ctx.fillStyle = `rgba(255,220,80,${0.3 + ((seed*wi)%5)*0.1})`;
+          ctx.fillRect(wx, wy, ww, wh);
+        }
+      }
+      ctx.fillStyle = '#0d1a0d';
+    }
+
+    // ── Fence / barrier ──
+    for (let fi = 0; fi < 18; fi++) {
+      const fx = fi * 20, fw = 16;
+      ctx.fillStyle = '#ffd700';
+      rr(fx, GY-10, fw, 8, 2, '#ffd700');
+      // Stripe
+      ctx.save();
+      ctx.beginPath(); ctx.rect(fx, GY-10, fw, 8);
+      ctx.clip();
+      ctx.fillStyle = '#000';
+      for (let st = -8; st < fw+8; st += 6) {
+        ctx.beginPath();
+        ctx.moveTo(fx+st, GY-10); ctx.lineTo(fx+st+4, GY-2);
+        ctx.lineTo(fx+st+6, GY-2); ctx.lineTo(fx+st+2, GY-10);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // ── Ground ──
+    const grdG = ctx.createLinearGradient(0, GY, 0, H);
+    grdG.addColorStop(0, '#4a3a1a');
+    grdG.addColorStop(1, '#2d2010');
+    ctx.fillStyle = grdG; ctx.fillRect(0, GY, W, H-GY);
+    // Ground texture scratches
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)'; ctx.lineWidth = 1;
+    for (let gi = 0; gi < 8; gi++) {
+      const gx = gi*42+5;
+      ctx.beginPath(); ctx.moveTo(gx, GY+2); ctx.lineTo(gx+25, GY+6); ctx.stroke();
+    }
+
+    // ── Porta-potty ──
+    const ppX = 282, ppY = GY-38;
+    rr(ppX, ppY, 28, 38, 3, '#1a5c2e', '#0e3b1c');
+    // Door
+    rr(ppX+6, ppY+12, 16, 26, 2, '#1f6e36', '#0e3b1c');
+    // Ventilation slots
+    for (let vs = 0; vs < 3; vs++)
+      rr(ppX+9, ppY+4+vs*3, 10, 1.5, 1, 'rgba(0,0,0,0.4)');
+    // Crescent moon cutout (classic)
+    ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(ppX+14, ppY+22, 4, 0.4, Math.PI-0.4); ctx.stroke();
+    // Sign on door
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 5px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('OUT OF', ppX+14, ppY+32);
+    ctx.fillText('ORDER', ppX+14, ppY+38);
     ctx.textAlign = 'left';
+
+    // ── Scaffold ──
+    const scafX = 228, scafTop = GY-55;
+    // Poles
+    ctx.strokeStyle = '#8899aa'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.moveTo(scafX, GY); ctx.lineTo(scafX, scafTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(scafX+40, GY); ctx.lineTo(scafX+40, scafTop); ctx.stroke();
+    // Cross braces
+    ctx.strokeStyle = '#6a7a8a'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(scafX, GY-20); ctx.lineTo(scafX+40, scafTop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(scafX+40, GY-20); ctx.lineTo(scafX, scafTop); ctx.stroke();
+    // Plank at top
+    const plankY = scafTop + 4;
+    rr(scafX-3, plankY, 46, 7, 2, '#8B6914', '#5d4b0a');
+    // Plank grain lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 0.8;
+    for (let pg = 0; pg < 3; pg++) {
+      ctx.beginPath(); ctx.moveTo(scafX+pg*14, plankY+1); ctx.lineTo(scafX+pg*14+12, plankY+6); ctx.stroke();
+    }
+    // Safety railing
+    ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(scafX-2, plankY-6); ctx.lineTo(scafX+42, plankY-6);
+    ctx.stroke();
+
+    // ── Brick wall being built ──
+    const wlX = 175, wlBaseY = GY;
+    // Mortar base
+    ctx.fillStyle = '#888';
+    ctx.fillRect(wlX-2, wlBaseY-3, 80, 3);
+    for (const br of wallBricks) {
+      const bg = ctx.createLinearGradient(br.x, br.y-8, br.x, br.y);
+      bg.addColorStop(0, br.col);
+      bg.addColorStop(1, br.col === '#c0392b' ? '#922b21' : '#c0392b');
+      rr(br.x, br.y-8, 16, 8, 1, null, null);
+      ctx.fillStyle = bg; ctx.fill();
+      ctx.strokeStyle = '#7b241c'; ctx.lineWidth = 0.8; ctx.stroke();
+      // Mortar lines
+      ctx.strokeStyle = '#aaa'; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(br.x, br.y-8); ctx.lineTo(br.x+16, br.y-8); ctx.stroke();
+    }
+
+    // ── Pit ──
+    ctx.fillStyle = '#1a1208';
+    rr(PX, GY-3, PW, PD+3, 2, '#1a1208');
+    // Pit edge highlight
+    ctx.strokeStyle = '#6a5520'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(PX, GY-1); ctx.lineTo(PX+PW, GY-1); ctx.stroke();
+    // Ladder
+    ctx.strokeStyle = '#8B6914'; ctx.lineWidth = 2;
+    const ladX2 = PX+12;
+    ctx.beginPath(); ctx.moveTo(ladX2, GY); ctx.lineTo(ladX2, GY+PD-2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ladX2+10, GY); ctx.lineTo(ladX2+10, GY+PD-2); ctx.stroke();
+    ctx.lineWidth = 1.5;
+    for (let ri = 0; ri < 4; ri++) {
+      const ry = GY + 4 + ri*8;
+      ctx.beginPath(); ctx.moveTo(ladX2, ry); ctx.lineTo(ladX2+10, ry); ctx.stroke();
+    }
+
+    // ── Dirt pile ──
+    const dpX = PX+PW+10, dpY = GY;
+    ctx.fillStyle = '#7a6128';
+    ctx.beginPath();
+    ctx.moveTo(dpX-2, dpY);
+    ctx.bezierCurveTo(dpX+2, dpY-14, dpX+18, dpY-18, dpX+24, dpY-12);
+    ctx.bezierCurveTo(dpX+28, dpY-6, dpX+30, dpY-2, dpX+32, dpY);
+    ctx.closePath(); ctx.fill();
+    // Dirt texture
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    for (let di = 0; di < 4; di++) {
+      ctx.beginPath(); ctx.arc(dpX+6+di*6, dpY-5-di*2, 2, 0, Math.PI*2); ctx.fill();
+    }
+
+    // ── Wheelbarrow ──
+    const wbX = PX-36, wbY = GY-4;
+    ctx.strokeStyle = '#666'; ctx.lineWidth = 2;
+    ctx.fillStyle = '#888';
+    ctx.beginPath();
+    ctx.moveTo(wbX, wbY-2); ctx.lineTo(wbX+26, wbY-2);
+    ctx.lineTo(wbX+22, wbY+12); ctx.lineTo(wbX+4, wbY+12);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // Wheel
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(wbX+13, wbY+16, 7, 0, Math.PI*2); ctx.stroke();
+    // Spokes
+    for (let sp = 0; sp < 4; sp++) {
+      const sa = sp * Math.PI/2 + tick*0.015;
+      ctx.beginPath();
+      ctx.moveTo(wbX+13, wbY+16);
+      ctx.lineTo(wbX+13+Math.cos(sa)*6, wbY+16+Math.sin(sa)*6);
+      ctx.stroke();
+    }
+    // Handles
+    ctx.strokeStyle = '#8B6914'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(wbX, wbY-2); ctx.lineTo(wbX-12, wbY+6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(wbX+26, wbY-2); ctx.lineTo(wbX+38, wbY+6); ctx.stroke();
+    // Dirt in barrow
+    ctx.fillStyle = '#9b7532';
+    ctx.beginPath();
+    ctx.ellipse(wbX+13, wbY+4, 10, 4, 0, Math.PI, 0);
+    ctx.fill();
+
+    // ── Caution cones ──
+    const conePositions = [PX-8, PX+PW+4, 160, 222];
+    for (const cx2 of conePositions) {
+      ctx.fillStyle = '#e74c3c';
+      ctx.beginPath();
+      ctx.moveTo(cx2, GY-16);
+      ctx.lineTo(cx2-6, GY); ctx.lineTo(cx2+6, GY);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(cx2-2, GY-10);
+      ctx.lineTo(cx2-4.5, GY-4); ctx.lineTo(cx2+4.5, GY-4); ctx.lineTo(cx2+2, GY-10);
+      ctx.closePath(); ctx.fill();
+      rr(cx2-7, GY, 14, 2.5, 1, '#e74c3c');
+    }
+
+    // ── Work lights (hanging) ──
+    const lightPos = [[130, 20], [240, 25]];
+    for (const [lx, ly] of lightPos) {
+      // Cable
+      ctx.strokeStyle = '#444'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, ly); ctx.stroke();
+      // Lamp housing
+      ctx.fillStyle = '#333';
+      ctx.beginPath();
+      ctx.moveTo(lx-8, ly); ctx.lineTo(lx+8, ly); ctx.lineTo(lx+5, ly+8); ctx.lineTo(lx-5, ly+8);
+      ctx.closePath(); ctx.fill();
+      // Light glow
+      const lg2 = ctx.createRadialGradient(lx, ly+8, 0, lx, ly+8, 35);
+      lg2.addColorStop(0,   'rgba(255,220,120,0.22)');
+      lg2.addColorStop(0.5, 'rgba(255,180,60,0.06)');
+      lg2.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = lg2; ctx.fillRect(lx-40, ly, 80, 60);
+      // Bulb
+      ctx.fillStyle = `rgba(255,240,180,${0.8+Math.sin(tick*0.02)*0.2})`;
+      ctx.beginPath(); ctx.arc(lx, ly+6, 3, 0, Math.PI*2); ctx.fill();
+    }
+
+    // ── Construction sign ──
+    const sgX = 105, sgY = 8;
+    // Post
+    ctx.fillStyle = '#888';
+    ctx.fillRect(sgX+22, sgY+28, 4, 22);
+    ctx.fillRect(sgX+42, sgY+28, 4, 22);
+    // Board
+    const sgG = ctx.createLinearGradient(sgX, sgY, sgX, sgY+30);
+    sgG.addColorStop(0, '#2a1800');
+    sgG.addColorStop(1, '#1a0e00');
+    rr(sgX, sgY, 68, 28, 4, null, null);
+    ctx.fillStyle = sgG; ctx.fill();
+    ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 1.5; ctx.stroke();
+    // Text
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('STORY MODE', sgX+34, sgY+13);
+    ctx.fillStyle = 'rgba(255,200,60,0.65)';
+    ctx.font = '7px monospace';
+    ctx.fillText('Est. "Soon"™', sgX+34, sgY+24);
+    ctx.textAlign = 'left';
+  }
+
+  // ── Main draw loop ─────────────────────────────────────────────────────────
+
+  function drawScene() {
+    ctx.clearRect(0, 0, W, H);
+    drawEnvironment();
+
+    // ── Blueprint guy (left edge, reading / head nodding) ──
+    bpGuy.headPhase += 0.035;
+    const bpTilt = Math.sin(bpGuy.headPhase) * 0.18;
+    worker(bpGuy.x, GY, -1, { walkPhase:0, armLift:0.6, headTilt:bpTilt },
+      { hatCol:'#e74c3c', shirtCol:'#2c6e8a', vestCol:'#ffa500',
+        skin:'tan', expr:'confused', tool:'clipboard' });
+
+    // ── Coffee guy on scaffold ──
+    coffee.armPhase += 0.028;
+    coffee.drinkT   += 1;
+    const cfArmLift = 0.45 + Math.sin(coffee.armPhase) * 0.15;
+    const cfExpr    = (coffee.drinkT % 200 < 40) ? 'happy' : 'neutral';
+    worker(coffee.x, GY-55, 1, { walkPhase:0, armLift:cfArmLift, headTilt: Math.sin(coffee.armPhase*0.5)*0.08 },
+      { hatCol:'#27ae60', shirtCol:'#1a4a2a', vestCol:'#f39c12',
+        skin:'dark', expr:cfExpr, tool:'coffee' });
+
+    // ── Carrier (walks left/right with bricks) ──
+    if (carrier.pause > 0) {
+      carrier.pause--;
+    } else {
+      carrier.x += carrier.dir * 0.9;
+      carrier.bobPhase += 0.22;
+      if (carrier.dir > 0 && carrier.x > 215) {
+        carrier.dir = -1; carrier.hasBrick = false;
+        carrier.pause = 40;
+        spawnSpark(carrier.x, GY - 20);
+      }
+      if (carrier.dir < 0 && carrier.x < 48) {
+        carrier.dir = 1; carrier.hasBrick = true;
+        carrier.pause = 28;
+      }
+    }
+    const crLegPhase = carrier.pause > 0 ? 0 : carrier.bobPhase;
+    worker(carrier.x, GY, carrier.dir, { walkPhase:crLegPhase, armLift: carrier.hasBrick ? 0.55 : 0.1 },
+      { hatCol:'#f1c40f', shirtCol:'#4a6fa5', vestCol:'#ff6b00',
+        skin:'tan', expr: carrier.hasBrick ? 'neutral' : 'happy',
+        tool: carrier.hasBrick ? 'bricks' : null });
+
+    // ── Foreman (paces, goes angry when carrier drops bricks wrong) ──
+    foreman.angryT  = Math.max(0, foreman.angryT - 1);
+    foreman.phase  += 0.08;
+    foreman.x      += foreman.dir * 0.45;
+    if (foreman.x < 62)  { foreman.dir =  1; foreman.angryT = 70; }
+    if (foreman.x > 160) { foreman.dir = -1; }
+    const fmLeg = foreman.phase;
+    const fmExpr = foreman.angryT > 0 ? 'angry' : 'neutral';
+    const fmArmLift = foreman.angryT > 0 ? 0.8 + Math.sin(tick*0.25)*0.4 : 0.4;
+    worker(foreman.x, GY, foreman.dir > 0 ? 1 : -1, { walkPhase:fmLeg, armLift:fmArmLift },
+      { hatCol:'#e67e22', shirtCol:'#5d2a00', vestCol:'#ff3300',
+        skin:'tan', expr:fmExpr, tool:'clipboard' });
+    if (foreman.angryT > 20) {
+      bubble(foreman.x + foreman.dir*14, GY - 46,
+        foreman.angryT > 50 ? '😤 HEY!!' : 'DO YOUR JOB!!',
+        'rgba(255,80,30,0.95)');
+    }
+
+    // ── Digger (in pit, swings shovel, throws dirt) ──
+    digger.phase += 0.10;
+    digger.sweat  = Math.max(0, digger.sweat - 0.008);
+    digger.dirtCD = Math.max(0, digger.dirtCD - 1);
+    if (digger.dirtCD === 0) {
+      const digY = GY + PD * 0.45;
+      spawnDirt(digger.x + 16, digY - 8);
+      digger.dirtCD = 22 + Math.random()*10 | 0;
+      digger.sweat  = 1;
+    }
+    const digArmLift = Math.sin(digger.phase) * 0.6 + 0.4;
+    const digExpr    = digger.sweat > 0.4 ? 'tired' : 'neutral';
+    // Clip digger to pit area
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(PX+2, GY-4, PW-4, PD+8);
+    ctx.clip();
+    worker(digger.x, GY + PD*0.55, 1, { walkPhase:0, armLift:digArmLift, headTilt: Math.sin(digger.phase*0.5)*0.12 },
+      { hatCol:'#f39c12', shirtCol:'#7f3a00', vestCol:'#ffd700',
+        skin:'dark', expr:digExpr, tool:'shovel' });
+    ctx.restore();
+    // Shovel handle poking out of pit
+    ctx.strokeStyle = '#8B6914'; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(digger.x+14, GY - 2);
+    ctx.lineTo(digger.x+18, GY - 12);
+    ctx.stroke();
+
+    // ── Napper (leaning against porta-potty) ──
+    napper.zPhase += 0.035;
+    worker(napper.x, GY, -1, { walkPhase:0, armLift:0, headTilt: 0.45 },
+      { hatCol:'#ffd700', shirtCol:'#3a3a3a', vestCol:'#ffa500',
+        skin:'tan', expr:'sleep', tool:null });
+    // Z Z Z bubbles
     for (let zi = 0; zi < 3; zi++) {
-      const zx = x + size*(0.6 + zi*0.45);
-      const zy = y - size*(0.35 + zi*0.32) + Math.sin(tick*0.04 + zi)*size*0.08;
-      const za = zA * (1 - zi*0.28);
-      ctx.globalAlpha = za;
+      const za = 0.5 + Math.sin(napper.zPhase + zi*1.2)*0.35;
+      const zx = napper.x - 8 - zi*8 + Math.sin(napper.zPhase+zi)*3;
+      const zy = GY - 30 - zi*10 + Math.cos(napper.zPhase*0.7+zi)*2;
+      ctx.globalAlpha = Math.max(0, za);
+      ctx.fillStyle = 'rgba(160,210,255,0.9)';
+      ctx.font = `bold ${8+zi}px sans-serif`;
+      ctx.textAlign = 'center';
       ctx.fillText('z', zx, zy);
     }
     ctx.globalAlpha = 1;
     ctx.textAlign = 'left';
-  }
 
-  function drawDirtParticle(p) {
-    ctx.fillStyle = `rgba(139,90,43,${p.life})`;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
-    ctx.fill();
-  }
-
-  // ── Scene draw ──────────────────────────────────────────────────────────────
-
-  function drawScene() {
-    ctx.clearRect(0, 0, W, H);
-
-    // Sky gradient
-    const sky = ctx.createLinearGradient(0,0,0,H);
-    sky.addColorStop(0, '#1a1200');
-    sky.addColorStop(1, '#2d1f00');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0,0,W,H);
-
-    // Sun (barely visible through haze)
-    const sunG = ctx.createRadialGradient(W*0.82, H*0.14, 0, W*0.82, H*0.14, W*0.18);
-    sunG.addColorStop(0,   'rgba(255,200,60,0.22)');
-    sunG.addColorStop(1,   'rgba(0,0,0,0)');
-    ctx.fillStyle = sunG;
-    ctx.fillRect(0,0,W,H);
-
-    // Ground
-    ctx.fillStyle = '#5c4a1e';
-    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
-    ctx.fillStyle = '#7a6128';
-    ctx.fillRect(0, GROUND_Y, W, H*0.032);
-
-    // Construction tape stripe along ground
-    const tapeH = H*0.022;
-    const tapeY = GROUND_Y - tapeH;
-    for (let ti = 0; ti < Math.ceil(W/30); ti++) {
-      ctx.fillStyle = ti%2===0 ? '#ffd700' : '#000';
-      ctx.fillRect(ti*30, tapeY, 30, tapeH);
+    // ── Particles ──
+    for (let pi = parts.length-1; pi >= 0; pi--) {
+      const p = parts[pi];
+      p.x += p.vx; p.y += p.vy;
+      p.vy += 0.15; p.vx *= 0.97;
+      p.life -= p.decay;
+      if (p.life <= 0) { parts.splice(pi,1); continue; }
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
     }
+    ctx.globalAlpha = 1;
 
-    // Pit
-    ctx.fillStyle = '#3b2d10';
-    ctx.beginPath();
-    ctx.rect(PIT_X, GROUND_Y - H*0.01, PIT_W, PIT_D);
-    ctx.fill();
-    ctx.strokeStyle = '#7a6128';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(PIT_X, GROUND_Y - H*0.01, PIT_W, PIT_D);
-    // Ladder in pit
-    ctx.strokeStyle = '#8B6914';
-    ctx.lineWidth = 2;
-    const ladX = PIT_X + PIT_W*0.12;
-    ctx.beginPath(); ctx.moveTo(ladX, GROUND_Y); ctx.lineTo(ladX, GROUND_Y + PIT_D*0.9); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(ladX+W*0.04, GROUND_Y); ctx.lineTo(ladX+W*0.04, GROUND_Y + PIT_D*0.9); ctx.stroke();
-    for (let ri = 0; ri < 5; ri++) {
-      const ry = GROUND_Y + ri * PIT_D*0.18 + PIT_D*0.05;
-      ctx.beginPath(); ctx.moveTo(ladX, ry); ctx.lineTo(ladX+W*0.04, ry); ctx.stroke();
-    }
-
-    // Scaffold poles
-    ctx.strokeStyle = '#bbb';
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(SCAF_X, GROUND_Y); ctx.lineTo(SCAF_X, SCAF_Y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(SCAF_X+SCAF_W, GROUND_Y); ctx.lineTo(SCAF_X+SCAF_W, SCAF_Y); ctx.stroke();
-    // Scaffold planks
-    for (let pi = 0; pi < 3; pi++) {
-      const py = GROUND_Y - (pi+1)*SCAF_H/3;
-      ctx.fillStyle = '#8B6914';
-      ctx.fillRect(SCAF_X - W*0.01, py - H*0.012, SCAF_W + W*0.02, H*0.024);
-      ctx.strokeStyle = '#5d4b14';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(SCAF_X - W*0.01, py - H*0.012, SCAF_W + W*0.02, H*0.024);
-    }
-
-    // Brick stack near scaffold
-    for (const br of brickStack) {
-      ctx.fillStyle = '#c0392b';
-      ctx.strokeStyle = '#7b241c';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.rect(br.x - W*0.045, br.y - H*0.028, W*0.09, H*0.028);
-      ctx.fill(); ctx.stroke();
-    }
-
-    // Pile of dirt beside pit
-    ctx.fillStyle = '#7a6128';
-    ctx.beginPath();
-    ctx.ellipse(PIT_X + PIT_W + W*0.06, GROUND_Y + H*0.01, W*0.07, H*0.04, 0, Math.PI, 0);
-    ctx.fill();
-
-    // Wheelbarrow (static prop)
-    const wbX = PIT_X - W*0.14, wbY = GROUND_Y - H*0.035;
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 2;
-    ctx.fillStyle = '#888';
-    ctx.beginPath();
-    ctx.moveTo(wbX, wbY); ctx.lineTo(wbX + W*0.08, wbY); ctx.lineTo(wbX + W*0.06, wbY + H*0.04);
-    ctx.lineTo(wbX + W*0.02, wbY + H*0.04); ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(wbX + W*0.04, wbY + H*0.055, H*0.025, 0, Math.PI*2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(wbX, wbY); ctx.lineTo(wbX - W*0.04, wbY + H*0.065);
-    ctx.moveTo(wbX + W*0.08, wbY); ctx.lineTo(wbX + W*0.12, wbY + H*0.065);
-    ctx.stroke();
-
-    // ── WORKER: Blueprint guy ──────────────────────────────────────────
-    const bp = workers[4];
-    bp.headBob += 0.045 * bp.headDir;
-    if (Math.abs(bp.headBob) > 0.22) bp.headDir *= -1;
-    const bobY = Math.sin(bp.headBob * 4) * H*0.005;
-    const sz = H * 0.092;
-    drawStickFigure(bp.x, bp.baseY + bobY, sz, 1, {
-      col: '#88ccff', hatCol: '#e74c3c', holdTool: 'clipboard',
-      armAng: 0.15 + bp.headBob,
-    });
-
-    // ── WORKER: Foreman ────────────────────────────────────────────────
-    const fm = workers[2];
-    fm.frameTimer++;
-    if (fm.frameTimer >= fm.frameSpeed) { fm.frame = (fm.frame+1)%4; fm.frameTimer = 0; }
-    fm.x += fm.dir * fm.speed;
-    if (fm.x < fm.patrolMin || fm.x > fm.patrolMax) fm.dir *= -1;
-    const legSwingFm = Math.sin(tick * 0.12) * (fm.speed > 0.15 ? 2.5 : 0);
-    const szFm = H * 0.10;
-    const fmAngry = fm.angryTimer > 0;
-    fm.angryTimer = Math.max(0, fm.angryTimer - 1);
-    const fmArmAng = fmAngry ? Math.sin(tick*0.3)*0.6 : 0.2;
-    drawStickFigure(fm.x, fm.baseY, szFm, fm.dir > 0 ? 1 : -1, {
-      col: '#ff9900', hatCol: '#e67e22', holdTool: 'clipboard',
-      armAng: fmArmAng, legAng: legSwingFm,
-    });
-    // Shout bubble when angry
-    if (fmAngry) {
-      ctx.fillStyle = 'rgba(255,60,0,0.88)';
-      ctx.beginPath();
-      ctx.roundRect(fm.x + fm.dir*szFm*0.6, fm.baseY - szFm*2.6, W*0.10, H*0.07, 5);
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.font = `bold ${H*0.032|0}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText('HEY!!', fm.x + fm.dir*szFm*0.6 + W*0.05, fm.baseY - szFm*2.25);
-      ctx.textAlign = 'left';
-    }
-
-    // ── WORKER: Carrier ────────────────────────────────────────────────
-    const cr = workers[1];
-    cr.frameTimer++;
-    if (cr.frameTimer >= cr.frameSpeed) { cr.frame = (cr.frame+1)%4; cr.frameTimer = 0; }
-    if (cr.brickDelay > 0) {
-      cr.brickDelay--;
-    } else {
-      cr.x += cr.dir * cr.speed;
-      if (cr.dir > 0 && cr.x >= cr.destX) {
-        cr.dir = -1; cr.hasBrick = false;
-        cr.destX = W*0.03;
-        cr.brickDelay = 35;
-        // Make foreman angry occasionally
-        if (Math.random() < 0.25) workers[2].angryTimer = 80;
-      } else if (cr.dir < 0 && cr.x <= cr.destX) {
-        cr.dir = 1; cr.hasBrick = true;
-        cr.destX = SCAF_X + W*0.04;
-        cr.brickDelay = 25;
-      }
-    }
-    const legSwingCr = Math.sin(tick * 0.14) * (cr.brickDelay > 0 ? 0 : 2.5);
-    const szCr = H * 0.088;
-    drawStickFigure(cr.x, cr.baseY, szCr, cr.dir > 0 ? 1 : -1, {
-      col: '#b8ff88', hatCol: '#27ae60',
-      holdTool: cr.hasBrick ? 'brick' : null,
-      armAng: cr.hasBrick ? 0.45 : 0.15,
-      legAng: legSwingCr,
-    });
-
-    // ── WORKER: Digger ─────────────────────────────────────────────────
-    const dg = workers[0];
-    dg.frameTimer++;
-    if (dg.frameTimer >= dg.frameSpeed) {
-      dg.frame = (dg.frame+1)%4;
-      dg.frameTimer = 0;
-      dg.dirtTimer++;
-      if (dg.dirtTimer % 2 === 0) {
-        // Fling a dirt particle
-        dirtParticles.push({
-          x: dg.x + W*0.04, y: dg.baseY - H*0.06,
-          vx: 1.2 + Math.random()*1.5,
-          vy: -(1.5 + Math.random()*1.5),
-          r: 2.5 + Math.random()*3,
-          life: 0.9,
-        });
-      }
-    }
-    const digArmAng = Math.sin(dg.frame * 1.6) * 0.65 + 0.3;
-    drawStickFigure(dg.x, dg.baseY, H*0.082, dg.facing, {
-      col: '#ffcc55', hatCol: '#f39c12', holdTool: 'shovel',
-      armAng: digArmAng, legAng: 0,
-    });
-
-    // ── Dirt particles ─────────────────────────────────────────────────
-    for (let pi = dirtParticles.length-1; pi >= 0; pi--) {
-      const p = dirtParticles[pi];
-      p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.life -= 0.035;
-      if (p.life <= 0) { dirtParticles.splice(pi,1); continue; }
-      drawDirtParticle(p);
-    }
-
-    // ── WORKER: Napper ─────────────────────────────────────────────────
-    const np = workers[3];
-    np.zTimer += 0.04;
-    drawSleepingFigure(np.x, np.baseY - H*0.015, H*0.08, np.zTimer);
-
-    // ── Hard-hat on napper's head sign ─────────────────────────────────
-    // Sign above site
-    ctx.fillStyle = '#1a0a00';
-    ctx.strokeStyle = '#ffd700';
-    ctx.lineWidth = 2;
-    const signX = W*0.32, signY = H*0.065, signW = W*0.36, signH = H*0.13;
-    ctx.beginPath();
-    ctx.roundRect(signX, signY, signW, signH, 6);
-    ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#ffd700';
-    ctx.font = `bold ${H*0.038|0}px monospace`;
-    ctx.textAlign = 'center';
-    ctx.fillText('STORY MODE', signX + signW*0.5, signY + signH*0.42);
-    ctx.fillStyle = 'rgba(255,200,60,0.65)';
-    ctx.font = `${H*0.028|0}px monospace`;
-    ctx.fillText('Est. "Soon"™', signX + signW*0.5, signY + signH*0.80);
-    ctx.textAlign = 'left';
-
-    // ── Quote panel ────────────────────────────────────────────────────
+    // ── Quote cycling ──
     quoteTimer++;
-    if (quoteTimer >= QUOTE_INTERVAL) {
+    if (quoteTimer >= 260) {
       quoteTimer = 0;
-      quoteIdx   = (quoteIdx + 1) % WORKER_QUOTES.length;
+      quoteIdx   = (quoteIdx+1) % QUOTES.length;
       quoteEl.style.opacity = '0';
-      setTimeout(() => {
-        quoteEl.textContent = WORKER_QUOTES[quoteIdx];
-        quoteEl.style.opacity = '1';
-      }, 320);
+      setTimeout(() => { quoteEl.textContent = QUOTES[quoteIdx]; quoteEl.style.opacity = '1'; }, 300);
     }
-    if (quoteEl.textContent === '') quoteEl.textContent = WORKER_QUOTES[quoteIdx];
+    if (!quoteEl.textContent) quoteEl.textContent = QUOTES[0];
   }
 
-  // ── Loop ────────────────────────────────────────────────────────────────────
-  function loop() {
-    tick++;
-    drawScene();
-    raf = requestAnimationFrame(loop);
-  }
-
+  function loop() { tick++; drawScene(); raf = requestAnimationFrame(loop); }
   function start() { if (!raf) raf = requestAnimationFrame(loop); }
   function stop()  { if (raf)  { cancelAnimationFrame(raf); raf = null; } }
 
-  // Only run when the story panel is visible (saves CPU while playing)
   const wip = document.getElementById('story-wip');
   if (!wip) return;
-  const obs = new MutationObserver(() => {
-    const visible = wip.style.display !== 'none';
-    visible ? start() : stop();
-  });
+  const obs = new MutationObserver(() => { wip.style.display !== 'none' ? start() : stop(); });
   obs.observe(wip, { attributes: true, attributeFilter: ['style'] });
-  // Kick off if already visible on load
   if (wip.style.display !== 'none') start();
 })();
 
