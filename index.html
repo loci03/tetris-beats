@@ -1414,7 +1414,7 @@
   </div>
   <div id="mode-select" data-active-tab="arcade">
     <!-- ARCADE: pick your vibe, play from L1 difficulty, advance through levels -->
-    <button class="mode-btn mode-active" data-mode="solo" data-tab="arcade" title="Pick any vibe to start. Clear 15 lines to advance to the next level.">ARCADE</button>
+    <!-- Arcade has no sub-modes; gameMode='solo' is set directly by setTab -->
     <!-- VS sub-modes -->
     <button class="mode-btn" data-mode="vs"    data-tab="vs"   style="display:none;">VS ALFRED</button>
     <button class="mode-btn" data-mode="human" data-tab="vs"   style="display:none;">VS FRIEND</button>
@@ -12776,16 +12776,19 @@ window.addEventListener('resize', () => positionP2Monitor());
       if (levelSelect) levelSelect.style.display = 'none';
       return; // no sub-mode to auto-select
     }
-    const prev = document.querySelector(`.mode-btn.mode-active[data-tab="${tab}"]`);
-    if (!prev) {
-      const target = document.querySelector(`.mode-btn[data-tab="${tab}"][data-mode="${tabSubmodes[tab]}"]`)
-                   || document.querySelector(`.mode-btn[data-tab="${tab}"]`);
-      if (target) target.click();
+    // Arcade tab has no sub-mode buttons — set gameMode directly
+    if (tab === 'arcade') {
+      gameMode = 'solo';
+      btns.forEach(b => b.classList.remove('mode-active'));
+    } else {
+      const prev = document.querySelector(`.mode-btn.mode-active[data-tab="${tab}"]`);
+      if (!prev) {
+        const target = document.querySelector(`.mode-btn[data-tab="${tab}"][data-mode="${tabSubmodes[tab]}"]`)
+                     || document.querySelector(`.mode-btn[data-tab="${tab}"]`);
+        if (target) target.click();
+      }
     }
-    // Always enforce level-select visibility for the active mode (Arcade never shows picker)
-    const activeMode = document.querySelector('.mode-btn.mode-active');
-    const activeM = activeMode ? activeMode.dataset.mode : gameMode;
-    if (levelSelect) levelSelect.style.display = (activeM === 'sprint') ? 'flex' : 'none';
+    if (levelSelect) levelSelect.style.display = (gameMode === 'sprint') ? 'flex' : 'none';
   }
   tabs.forEach(tab => tab.addEventListener('click', () => setTab(tab.dataset.tab)));
   btns.forEach(btn => btn.addEventListener('click', () => {
