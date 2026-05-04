@@ -2231,22 +2231,24 @@ const LEVEL_THEMES = [
     chords: [[196, 261.63, 311.13], [220, 293.66, 369.99], [174.61, 220, 293.66]],
     synthType: 'industrial',
   },
-  { // Level 13 - Bully (extended outro)
-    name: 'Bully',
-    bpm: 118,
-    colors: { bg1: '#002010', bg2: '#001008', accent: '#00ff66', glow: '#00ff44' },
-    particleHue: 140,
-    particleStyle: 'fireflies', // slow bioluminescent fireflies
-    blockGlow: 14,
-    kick:  [1,0,0,1, 0,0,1,0, 1,0,0,0, 0,0,1,0],
-    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
-    hh:    [1,0,1,1, 1,0,1,0, 1,0,1,1, 1,0,1,0],
+  { // Level 13 - Higher (stoner rooftop haze — Rooftop Ember Haze track)
+    name: 'Higher',
+    bpm: 82,
+    track: 'rooftop-ember-haze.mp3',
+    colors: { bg1: '#0d1a00', bg2: '#070f00', accent: '#7fff00', glow: '#aaff44' },
+    particleHue: 95,
+    blockStyle: 'leaf',
+    particleStyle: 'haze',
+    blockGlow: 10,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
     hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
-    bass:  [1,0,0,1, 0,0,0,0, 1,0,0,1, 0,0,0,0],
-    bassNote: 55,
-    scale: [220, 261.63, 293.66, 329.63, 392, 440, 493.88, 523.25],
-    chords: [[220, 293.66, 392], [261.63, 329.63, 440], [293.66, 392, 493.88]],
-    synthType: 'autotune',
+    bass:  [1,0,0,0, 1,0,0,0, 0,0,1,0, 0,0,0,0],
+    bassNote: 49.00,
+    scale: [196, 220, 261.63, 293.66, 329.63, 392, 440, 523.25],
+    chords: [[196, 261.63, 329.63], [220, 293.66, 392], [174.61, 220, 293.66]],
+    synthType: 'choir',
   },
   { // Level 14 - Back to College Dropout (full circle)
     name: 'The College Dropout',
@@ -2426,7 +2428,7 @@ function _marathonRotateVibe() {
   // Swap theme + audio at the dark midpoint (when alpha=1).
   setTimeout(() => {
     _marathonActiveTheme = next;
-    _gxScene = _dhScene = _jzScene = _ofScene = _zenScene = _wzScene = null;
+    _gxScene = _dhScene = _jzScene = _ofScene = _zenScene = _wzScene = _hzScene = null;
     _jzBgCanvas = null;
     _blockMiniCache.clear();
     _playRectsCache = null;
@@ -5182,7 +5184,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   // active piece, ghost). Only skips time-dependent styles (matrix, star).
   if (_bs === 'beefpatty' || _bs === 'trumpet' || _bs === 'brain' ||
       _bs === 'mug' || _bs === 'tetrisEffect' || _bs === 'tires' || _bs === 'macncheese' ||
-      _bs === 'bullet') {
+      _bs === 'bullet' || _bs === 'leaf') {
     const key = `${_bs}-${color}-${size}`;
     let mini = _blockMiniCache.get(key);
     if (!mini) {
@@ -5197,6 +5199,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
       else if (_bs === 'trumpet')      drawBlockTrumpet(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'mug')          drawBlockMug(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'bullet')       drawBlockBullet(mc, 0, 0, color, size, 1, theme);
+      else if (_bs === 'leaf')         drawBlockLeaf(mc, 0, 0, color, size, 1, theme);
       _blockMiniCache.set(key, mini);
     }
     if (alpha !== 1) context.globalAlpha = alpha;
@@ -5238,6 +5241,10 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   }
   if (theme && theme.blockStyle === 'bullet') {
     drawBlockBullet(context, x, y, color, size, alpha, theme);
+    return;
+  }
+  if (theme && theme.blockStyle === 'leaf') {
+    drawBlockLeaf(context, x, y, color, size, alpha, theme);
     return;
   }
   if (theme && theme.blockStyle === 'star') {
@@ -9720,6 +9727,116 @@ function drawBlockBullet(context, x, y, color, size, alpha, theme) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// LEAF BLOCK (Level 13 - Higher)
+// A 7-pointed marijuana leaf rendered in the cell. Serrated leaflets radiate
+// from a central stem. Glows green at the glow color of the theme.
+// ─────────────────────────────────────────────────────────────────────────────
+function drawBlockLeaf(context, x, y, color, size, alpha, theme) {
+  context.globalAlpha = alpha;
+  context.save();
+  const glow = (theme && theme.colors && theme.colors.glow) || '#aaff44';
+  context.shadowColor = glow;
+  context.shadowBlur  = Math.min(10, size * 0.28);
+
+  const cx = x + size * 0.5, cy = y + size * 0.52;
+  const r  = size * 0.40;   // outer radius of leaf tips
+
+  // ── Leaf fill gradient ──
+  const lg = context.createRadialGradient(cx, cy - r * 0.2, 0, cx, cy, r * 1.1);
+  lg.addColorStop(0,   '#c8ff60');
+  lg.addColorStop(0.4, '#6abf20');
+  lg.addColorStop(1,   '#2d6b00');
+  context.fillStyle = lg;
+
+  // Draw 7 leaflets using a fan of bezier curves
+  const leaflets = 7;
+  context.beginPath();
+  for (let i = 0; i < leaflets; i++) {
+    // Each leaflet: two curved sides meeting at a pointed tip
+    const baseAngle = -Math.PI / 2 + (i / leaflets) * Math.PI * 2;
+    const tipAngle  = baseAngle;
+    const halfSpan  = (Math.PI / leaflets) * 0.62;
+
+    const tip  = { x: cx + Math.cos(tipAngle) * r, y: cy + Math.sin(tipAngle) * r };
+    const lBase = {
+      x: cx + Math.cos(baseAngle - halfSpan) * r * 0.22,
+      y: cy + Math.sin(baseAngle - halfSpan) * r * 0.22,
+    };
+    const rBase = {
+      x: cx + Math.cos(baseAngle + halfSpan) * r * 0.22,
+      y: cy + Math.sin(baseAngle + halfSpan) * r * 0.22,
+    };
+    // Control points — pulled outward to give the leaflet a fat shape
+    const lCtrl = {
+      x: cx + Math.cos(baseAngle - halfSpan * 0.45) * r * 0.85,
+      y: cy + Math.sin(baseAngle - halfSpan * 0.45) * r * 0.85,
+    };
+    const rCtrl = {
+      x: cx + Math.cos(baseAngle + halfSpan * 0.45) * r * 0.85,
+      y: cy + Math.sin(baseAngle + halfSpan * 0.45) * r * 0.85,
+    };
+    // Serration notch on each side
+    const notchL = {
+      x: (lBase.x * 0.35 + lCtrl.x * 0.50 + tip.x * 0.15),
+      y: (lBase.y * 0.35 + lCtrl.y * 0.50 + tip.y * 0.15),
+    };
+    const notchR = {
+      x: (rBase.x * 0.35 + rCtrl.x * 0.50 + tip.x * 0.15),
+      y: (rBase.y * 0.35 + rCtrl.y * 0.50 + tip.y * 0.15),
+    };
+    if (i === 0) context.moveTo(lBase.x, lBase.y);
+    else         context.lineTo(lBase.x, lBase.y);
+    // Left side with notch
+    context.quadraticCurveTo(
+      (lBase.x + lCtrl.x) * 0.5, (lBase.y + lCtrl.y) * 0.5,
+      notchL.x - Math.cos(baseAngle - Math.PI / 2) * r * 0.07,
+      notchL.y - Math.sin(baseAngle - Math.PI / 2) * r * 0.07,
+    );
+    context.quadraticCurveTo(lCtrl.x, lCtrl.y, tip.x, tip.y);
+    // Right side with notch
+    context.quadraticCurveTo(rCtrl.x, rCtrl.y,
+      notchR.x + Math.cos(baseAngle + Math.PI / 2) * r * 0.07,
+      notchR.y + Math.sin(baseAngle + Math.PI / 2) * r * 0.07,
+    );
+    context.quadraticCurveTo(
+      (rBase.x + rCtrl.x) * 0.5, (rBase.y + rCtrl.y) * 0.5,
+      rBase.x, rBase.y,
+    );
+  }
+  context.closePath();
+  context.fill();
+
+  // ── Vein lines ──
+  context.strokeStyle = 'rgba(30,80,0,0.55)';
+  context.lineWidth   = Math.max(0.6, size * 0.022);
+  for (let i = 0; i < leaflets; i++) {
+    const angle = -Math.PI / 2 + (i / leaflets) * Math.PI * 2;
+    context.beginPath();
+    context.moveTo(cx, cy);
+    context.lineTo(cx + Math.cos(angle) * r * 0.88, cy + Math.sin(angle) * r * 0.88);
+    context.stroke();
+  }
+
+  // ── Stem ──
+  context.strokeStyle = '#3a7a00';
+  context.lineWidth   = Math.max(1, size * 0.045);
+  context.lineCap     = 'round';
+  context.beginPath();
+  context.moveTo(cx, cy);
+  context.lineTo(cx, y + size * 0.92);
+  context.stroke();
+
+  // ── Highlight sheen ──
+  context.fillStyle = 'rgba(200,255,100,0.18)';
+  context.beginPath();
+  context.ellipse(cx - r * 0.18, cy - r * 0.25, r * 0.20, r * 0.10, -0.5, 0, Math.PI * 2);
+  context.fill();
+
+  context.restore();
+  context.globalAlpha = 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // WARZONE SCENE (Level 12 - Triggered)
 // Full combat zone: concrete bunker, fires, embers, bullet tracers, artillery
 // flashes, explosions, muzzle flashes, helicopter crossing, shell casings
@@ -10678,6 +10795,315 @@ function drawBlockStar(context, x, y, color, size, alpha, theme) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// HAZE SCENE (Level 13 - Higher)
+// Rooftop at golden hour. Thick green-amber haze rolls across the scene.
+// Smoke puffs drift upward from joints/blunts in the wings. Floating leaves
+// spin lazily. City skyline silhouette at the bottom. Ember particles pulse
+// to the beat. On line clears: a wave of deep haze floods the screen.
+// On hard drop: pieces land with a satisfying "thud" ripple. The whole
+// scene breathes — slower when chill, more alive when the player is on fire.
+// ─────────────────────────────────────────────────────────────────────────────
+let _hzScene = null;
+
+function _initHazeScene(w, h) {
+  // Drifting smoke puffs
+  const puffs = [];
+  for (let i = 0; i < 18; i++) {
+    puffs.push({
+      x: Math.random() * w,
+      y: h * (0.20 + Math.random() * 0.65),
+      r: w * (0.04 + Math.random() * 0.06),
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: -(Math.random() * 0.40 + 0.12),
+      life: Math.random(),
+      maxLife: 1.2 + Math.random() * 0.8,
+      hue: 80 + Math.random() * 40,
+    });
+  }
+  // Floating leaf particles
+  const floatLeaves = [];
+  for (let i = 0; i < 12; i++) {
+    floatLeaves.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: w * (0.012 + Math.random() * 0.018),
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: -(Math.random() * 0.30 + 0.08),
+      rot: Math.random() * Math.PI * 2,
+      vrot: (Math.random() - 0.5) * 0.025,
+      life: Math.random(),
+      maxLife: 2.0 + Math.random() * 1.5,
+    });
+  }
+  // Ember sparks
+  const embers = [];
+  for (let i = 0; i < 30; i++) {
+    embers.push({
+      x: Math.random() * w,
+      y: h * (0.5 + Math.random() * 0.4),
+      vx: (Math.random() - 0.5) * 0.6,
+      vy: -(Math.random() * 0.8 + 0.3),
+      r: Math.random() * 2.2 + 0.6,
+      life: Math.random(),
+      maxLife: Math.random() * 0.5 + 0.3,
+    });
+  }
+  // Joint/blunt smoke sources on flanks
+  const joints = [
+    { x: w * 0.07, y: h * 0.68 },
+    { x: w * 0.91, y: h * 0.71 },
+  ];
+  _hzScene = { puffs, floatLeaves, embers, joints, hazeFlood: 0, ripple: 0, bgCanvas: null, w, h };
+}
+
+function _buildHazeStaticBg(w, h) {
+  const oc = document.createElement('canvas');
+  oc.width = w; oc.height = h;
+  const c = oc.getContext('2d');
+
+  // Sky gradient — golden-hour amber fading into deep green-tinted dusk
+  const sky = c.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0,    '#1a2800');
+  sky.addColorStop(0.35, '#2e4a00');
+  sky.addColorStop(0.65, '#4a3800');
+  sky.addColorStop(0.85, '#6b4800');
+  sky.addColorStop(1,    '#3d2800');
+  c.fillStyle = sky;
+  c.fillRect(0, 0, w, h);
+
+  // Distant sun glow on the horizon
+  const sunY = h * 0.72;
+  const sunGrad = c.createRadialGradient(w * 0.5, sunY, 0, w * 0.5, sunY, w * 0.45);
+  sunGrad.addColorStop(0,   'rgba(255,180,40,0.28)');
+  sunGrad.addColorStop(0.4, 'rgba(200,120,0,0.12)');
+  sunGrad.addColorStop(1,   'rgba(0,0,0,0)');
+  c.fillStyle = sunGrad;
+  c.fillRect(0, 0, w, h);
+
+  // City skyline silhouette
+  const skylineY = h * 0.70;
+  c.fillStyle = '#0d1500';
+  const buildings = [
+    { x: 0,        bw: w * 0.10, bh: h * 0.12 },
+    { x: w * 0.08, bw: w * 0.07, bh: h * 0.18 },
+    { x: w * 0.14, bw: w * 0.06, bh: h * 0.10 },
+    { x: w * 0.19, bw: w * 0.08, bh: h * 0.22 },
+    { x: w * 0.26, bw: w * 0.06, bh: h * 0.14 },
+    { x: w * 0.71, bw: w * 0.06, bh: h * 0.16 },
+    { x: w * 0.76, bw: w * 0.09, bh: h * 0.24 },
+    { x: w * 0.84, bw: w * 0.07, bh: h * 0.13 },
+    { x: w * 0.90, bw: w * 0.10, bh: h * 0.19 },
+  ];
+  for (const b of buildings) {
+    c.fillRect(b.x, skylineY - b.bh, b.bw, b.bh + (h - skylineY));
+    // Antenna
+    c.fillRect(b.x + b.bw * 0.45, skylineY - b.bh - h * 0.035, b.bw * 0.06, h * 0.035);
+    // Windows (tiny lit squares)
+    c.fillStyle = 'rgba(255,200,60,0.25)';
+    for (let wr = 0; wr < 4; wr++) {
+      for (let wc = 0; wc < 3; wc++) {
+        if (Math.random() > 0.55) {
+          c.fillRect(b.x + b.bw * (0.15 + wc * 0.28), skylineY - b.bh + b.bh * (0.12 + wr * 0.22), b.bw * 0.14, b.bh * 0.12);
+        }
+      }
+    }
+    c.fillStyle = '#0d1500';
+  }
+
+  // Rooftop ledge / floor
+  const floorY = h * 0.78;
+  const floorGrad = c.createLinearGradient(0, floorY, 0, h);
+  floorGrad.addColorStop(0, '#1a2800');
+  floorGrad.addColorStop(1, '#0a1000');
+  c.fillStyle = floorGrad;
+  c.fillRect(0, floorY, w, h - floorY);
+
+  // Ledge edge highlight
+  c.strokeStyle = 'rgba(180,140,40,0.30)';
+  c.lineWidth   = 2;
+  c.beginPath();
+  c.moveTo(0, floorY); c.lineTo(w, floorY);
+  c.stroke();
+
+  return oc;
+}
+
+function drawHazeScene(theme, now, playRects) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (!_hzScene || _hzScene.w !== w || _hzScene.h !== h) _initHazeScene(w, h);
+  const sc = _hzScene;
+  if (!sc.bgCanvas || sc.bgCanvas.width !== w) sc.bgCanvas = _buildHazeStaticBg(w, h);
+
+  const cheer          = typeof cheerEnergy   !== 'undefined' ? cheerEnergy   : 0;
+  const energy         = typeof beatEnergy    !== 'undefined' ? beatEnergy    : 0;
+  const movePulse      = typeof _movePulse      !== 'undefined' ? _movePulse      : 0;
+  const boardDropPulse = typeof _boardDropPulse !== 'undefined' ? _boardDropPulse : 0;
+  const ctx = bgCtx;
+  const floorY = h * 0.78;
+
+  ctx.drawImage(sc.bgCanvas, 0, 0);
+
+  // ── Rolling haze layers (3 overlapping gradients drift at different speeds) ──
+  for (let li = 0; li < 3; li++) {
+    const speed  = 0.00018 + li * 0.00012;
+    const offset = (now * speed + li * w * 0.33) % (w * 2) - w * 0.5;
+    const hazy = h * (0.28 + li * 0.14);
+    const hazeAlpha = (0.10 + energy * 0.08 + cheer * 0.06) * (1 - li * 0.2);
+    const hg = ctx.createRadialGradient(offset, hazy, 0, offset, hazy, w * (0.38 + li * 0.08));
+    hg.addColorStop(0,   `hsla(${90 + li * 15},60%,28%,${hazeAlpha})`);
+    hg.addColorStop(0.5, `hsla(${75 + li * 20},50%,20%,${hazeAlpha * 0.55})`);
+    hg.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = hg;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // ── Smoke puffs from joints + ambient ──
+  for (const pf of sc.puffs) {
+    pf.x  += pf.vx + Math.sin(now * 0.0005 + pf.y * 0.01) * 0.3;
+    pf.y  += pf.vy * (0.7 + energy * 0.5);
+    pf.r  += 0.25;
+    pf.life -= 0.0035 + energy * 0.002;
+    if (pf.life <= 0 || pf.y < -pf.r) {
+      // Respawn near a joint or random point
+      const src = Math.random() < 0.5 ? sc.joints[0] : (Math.random() < 0.5 ? sc.joints[1] : null);
+      pf.x = src ? src.x + (Math.random() - 0.5) * 12 : Math.random() * w;
+      pf.y = src ? src.y - 10 : floorY * (0.6 + Math.random() * 0.3);
+      pf.r = w * (0.03 + Math.random() * 0.04);
+      pf.life = pf.maxLife;
+      pf.vy = -(Math.random() * 0.35 + 0.10);
+      pf.vx = (Math.random() - 0.5) * 0.3;
+    }
+    const a = (pf.life / pf.maxLife) * (0.14 + energy * 0.06);
+    ctx.fillStyle = `hsla(${pf.hue},45%,42%,${a})`;
+    ctx.beginPath();
+    ctx.arc(pf.x, pf.y, pf.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Joint/blunt silhouettes ──
+  for (const j of sc.joints) {
+    ctx.fillStyle = 'rgba(20,12,2,0.90)';
+    // Blunt body
+    ctx.beginPath();
+    ctx.roundRect(j.x - 18, j.y - 3, 36, 6, 3);
+    ctx.fill();
+    // Ash tip (lit end)
+    const litX = j.x + 18;
+    ctx.fillStyle = `rgba(255,${100 + (energy * 80)|0},20,${0.70 + energy * 0.25})`;
+    ctx.beginPath();
+    ctx.arc(litX, j.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Smoke wisp from lit end
+    ctx.strokeStyle = `rgba(180,200,120,${0.22 + energy * 0.12})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(litX, j.y);
+    ctx.bezierCurveTo(litX + 6, j.y - 14, litX - 6, j.y - 24, litX + 4, j.y - 36);
+    ctx.stroke();
+  }
+
+  // ── Floating leaf particles ──
+  for (const fl of sc.floatLeaves) {
+    fl.x   += fl.vx + Math.sin(now * 0.0008 + fl.y * 0.008) * 0.25;
+    fl.y   += fl.vy * (0.8 + energy * 0.4);
+    fl.rot += fl.vrot + energy * 0.008;
+    fl.life -= 0.002 + energy * 0.001;
+    if (fl.life <= 0 || fl.y < -fl.r * 3) {
+      fl.x = Math.random() * w;
+      fl.y = floorY + fl.r;
+      fl.life = fl.maxLife;
+      fl.rot  = Math.random() * Math.PI * 2;
+    }
+    const a = Math.min(1, fl.life / fl.maxLife) * (0.55 + energy * 0.25);
+    ctx.save();
+    ctx.translate(fl.x, fl.y);
+    ctx.rotate(fl.rot);
+    ctx.globalAlpha = a;
+    // Tiny leaf shape
+    ctx.fillStyle = `hsl(${100 + Math.sin(now * 0.001 + fl.x) * 15},65%,35%)`;
+    ctx.beginPath();
+    const s = fl.r;
+    for (let i = 0; i < 7; i++) {
+      const ang = -Math.PI / 2 + (i / 7) * Math.PI * 2;
+      const tx = Math.cos(ang) * s, ty = Math.sin(ang) * s;
+      if (i === 0) ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(Math.cos(ang) * s * 1.1, Math.sin(ang) * s * 1.1, tx, ty);
+      ctx.lineTo(0, 0);
+    }
+    ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Embers from lit joints — pulse on beat ──
+  for (const em of sc.embers) {
+    em.x  += em.vx;
+    em.y  += em.vy * (0.7 + energy * 0.5);
+    em.life -= 0.008 + energy * 0.005;
+    if (em.life <= 0 || em.y < 0) {
+      const j = sc.joints[Math.floor(Math.random() * sc.joints.length)];
+      em.x = j.x + 18 + (Math.random() - 0.5) * 6;
+      em.y = j.y;
+      em.life = em.maxLife;
+      em.vy   = -(Math.random() * 0.8 + 0.4);
+      em.vx   = (Math.random() - 0.5) * 0.8;
+    }
+    const a = (em.life / em.maxLife) * (0.7 + energy * 0.3);
+    ctx.fillStyle = `rgba(255,${(140 + energy * 80)|0},30,${a})`;
+    ctx.beginPath();
+    ctx.arc(em.x, em.y, em.r * (0.8 + energy * 0.5), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Drop ripple on hard drop ──
+  if (boardDropPulse > 0.3) sc.ripple = Math.min(1, sc.ripple + boardDropPulse * 0.9);
+  sc.ripple *= 0.78;
+  if (sc.ripple > 0.02) {
+    const ry = floorY;
+    for (let ri = 0; ri < 3; ri++) {
+      const rr = (1 - sc.ripple) * w * 0.30 * (1 + ri * 0.4);
+      ctx.strokeStyle = `rgba(160,255,80,${sc.ripple * (0.35 - ri * 0.10)})`;
+      ctx.lineWidth   = 2;
+      ctx.beginPath();
+      ctx.ellipse(w * 0.5, ry, rr, rr * 0.18, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // ── Haze flood on line clear ──
+  if (cheer > 0.65) sc.hazeFlood = Math.min(1, sc.hazeFlood + 0.12);
+  sc.hazeFlood *= 0.84;
+  if (sc.hazeFlood > 0.01) {
+    ctx.fillStyle = `rgba(100,180,40,${sc.hazeFlood * 0.22})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // ── Golden beat pulse — warm glow on strong beat ──
+  if (energy > 0.60) {
+    const gp = (energy - 0.60) * 0.25;
+    ctx.fillStyle = `rgba(180,120,0,${gp})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // ── Play-area mask ──
+  if (playRects.length) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    for (const r of playRects) {
+      const clip = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
+      clip.addColorStop(0,   'rgba(0,0,0,0)');
+      clip.addColorStop(0.12,'rgba(0,0,0,0.50)');
+      clip.addColorStop(0.5, 'rgba(0,0,0,0.62)');
+      clip.addColorStop(0.88,'rgba(0,0,0,0.50)');
+      clip.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = clip;
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    }
+    ctx.restore();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GALAXY SCENE (Marathon — Galaxy)
 // Sir's "crazy artistry" mode. Layered:
 //   1. Deep-space gradient sky (purple → black)
@@ -11014,7 +11440,7 @@ function drawBackground() {
   // future "physical" background object) from rendering on top of the
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone' || style === 'haze');
   // Cache getBoundingClientRect — forced layout reflow every frame is very
   // expensive. Invalidate only when canvas size or vs-mode changes.
   const _vsMode = document.body.classList.contains('vs-mode');
@@ -11117,6 +11543,10 @@ function drawBackground() {
   }
   if (style === 'warzone') {
     drawWarzoneScene(theme, now, playRects);
+    return;
+  }
+  if (style === 'haze') {
+    drawHazeScene(theme, now, playRects);
     return;
   }
 
