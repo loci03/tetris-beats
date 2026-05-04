@@ -12118,10 +12118,11 @@ function startGame() {
   paused = false;
   beatPhase = 0;
 
-  // Marathon: each new run starts on the Galaxy vibe and rotates from
-  // there as tracks finish. Reset the active-theme pointer so a previous
-  // run's last-rotated theme doesn't leak across game-overs.
-  if (gameMode === 'marathon') _marathonActiveTheme = MARATHON_THEME;
+  // Marathon: start on the user's chosen vibe (default L19 Singularity).
+  // Rotates through other vibes as tracks finish.
+  if (gameMode === 'marathon') {
+    _marathonActiveTheme = LEVEL_THEMES[startLevel] || LEVEL_THEMES[LEVEL_THEMES.length - 1] || MARATHON_THEME;
+  }
   // Theme + canvas glow follow the seeded level so the HUD, boxShadow, and
   // (further down) audio track all match the picker on the very first frame.
   const theme = getTheme(level);
@@ -12788,7 +12789,7 @@ window.addEventListener('resize', () => positionP2Monitor());
         if (target) target.click();
       }
     }
-    if (levelSelect) levelSelect.style.display = (gameMode === 'sprint') ? 'flex' : 'none';
+    if (levelSelect) levelSelect.style.display = (gameMode === 'sprint' || gameMode === 'marathon') ? 'flex' : 'none';
   }
   tabs.forEach(tab => tab.addEventListener('click', () => setTab(tab.dataset.tab)));
   btns.forEach(btn => btn.addEventListener('click', () => {
@@ -12796,10 +12797,10 @@ window.addEventListener('resize', () => positionP2Monitor());
     btns.forEach(b => b.classList.toggle('mode-active', b === btn));
     tabSubmodes[btn.dataset.tab] = btn.dataset.mode;
     if (diff) diff.style.display = (gameMode === 'vs') ? 'flex' : 'none';
+    // Marathon defaults to L19 (The Singularity) when selected
+    if (gameMode === 'marathon') setStartLevel(LEVEL_THEMES.length - 1);
     const levelSelect = document.getElementById('level-select');
-    // Arcade (solo) always starts at L1 — no level picker needed.
-    // Sprint uses the picker to choose which vibe to run on.
-    const showsPicker = (gameMode === 'sprint');
+    const showsPicker = (gameMode === 'sprint' || gameMode === 'marathon');
     if (levelSelect) levelSelect.style.display = showsPicker ? 'flex' : 'none';
     refreshLb();
   }));
@@ -12902,10 +12903,9 @@ window.addEventListener('resize', () => positionP2Monitor());
   // both players to L1 so the match stays fair.
   const modeBtns = document.querySelectorAll('.mode-btn');
   const sync = () => {
-    // Arcade (solo) always starts L1 — no vibe picker needed.
-    // Sprint uses the picker to choose which vibe to run on.
-    const showsPicker = (gameMode === 'sprint');
+    const showsPicker = (gameMode === 'sprint' || gameMode === 'marathon');
     wrap.style.display = showsPicker ? 'flex' : 'none';
+    refresh(); // keep label in sync whenever mode changes
   };
   modeBtns.forEach(mb => mb.addEventListener('click', sync));
   sync();
