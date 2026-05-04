@@ -1424,14 +1424,11 @@
     <button class="mode-btn" data-mode="ultra"    data-tab="more" style="display:none;" title="Score as much as possible in 2 minutes.">ULTRA</button>
   </div>
   <!-- STORY WIP overlay — shown when the STORY tab is active -->
-  <div id="story-wip" style="display:none; flex-direction:column; align-items:center; gap:16px; padding:24px 16px; max-width:380px; margin:0 auto;">
-    <div style="font-size:48px; line-height:1;">🚧</div>
-    <div style="font-size:20px; font-weight:800; letter-spacing:3px; color:#ffd700;">COMING SOON</div>
-    <div style="font-size:13px; color:rgba(255,255,255,0.60); line-height:1.6; text-align:center; max-width:300px;">
-      The Story mode is under construction.<br>Our crew is hard at work building something special.
-    </div>
-    <div style="display:flex; gap:12px; font-size:28px;">🎮 🎵 🏆</div>
-    <div style="font-size:11px; color:rgba(255,255,255,0.35); letter-spacing:2px;">WORK IN PROGRESS</div>
+  <div id="story-wip" style="display:none; flex-direction:column; align-items:center; gap:10px; padding:18px 12px 10px; max-width:380px; margin:0 auto; width:100%;">
+    <div style="font-size:19px; font-weight:900; letter-spacing:4px; color:#ffd700; text-shadow:0 0 14px #ff9900;">🚧 UNDER CONSTRUCTION 🚧</div>
+    <canvas id="construction-canvas" width="340" height="180" style="border-radius:10px; background:#1a1200; width:100%; max-width:340px; display:block;"></canvas>
+    <div id="construction-quote" style="font-size:12px; color:rgba(255,200,60,0.80); font-style:italic; text-align:center; min-height:32px; line-height:1.5; max-width:300px; transition:opacity 0.3s;"></div>
+    <div style="font-size:10px; color:rgba(255,255,255,0.28); letter-spacing:3px;">COMING SOON · WE PROMISE</div>
   </div>
   <!-- Difficulty picker - visible only when "VS ALFRED" mode is selected.
        Three tiers wired to AI_DIFFICULTIES presets in JS. Persists across
@@ -13690,6 +13687,574 @@ render(0);
 // Kick off background prefetch of the heaviest backing tracks while the user
 // is still on the start screen. _prefetchTrack pulls the raw bytes into
 // memory so _playTrack can decode instantly when Start fires - critical for
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTRUCTION SCENE — animated canvas in the Story WIP panel.
+// Workers dig, carry bricks, drink coffee, argue about blueprints, fall asleep
+// on the job, and get told off by the foreman. Runs only while the story tab
+// is visible; stops automatically when hidden to save CPU.
+// ─────────────────────────────────────────────────────────────────────────────
+(function wireConstructionScene() {
+  const canvas  = document.getElementById('construction-canvas');
+  const quoteEl = document.getElementById('construction-quote');
+  if (!canvas || !quoteEl) return;
+
+  const ctx  = canvas.getContext('2d');
+  const W    = canvas.width;
+  const H    = canvas.height;
+  let   raf  = null;
+  let   tick = 0;
+
+  const WORKER_QUOTES = [
+    '"I said the BLUEPRINT goes HERE, Gerald."',
+    '"We\'re gonna need more coffee."',
+    '"I\'ve been digging this same hole for 3 weeks."',
+    '"This is definitely load-bearing. Probably."',
+    '"OSHA would like a word."',
+    '"My back. My BACK."',
+    '"Did you read the spec? There IS no spec."',
+    '"I quit. ...okay I\'m back."',
+    '"This gap ain\'t gonna fill itself. Or will it?"',
+    '"I-piece delivery? Wrong address again."',
+    '"They said six weeks. It\'s been six months."',
+    '"Hold my hard hat. I\'m about to do something stupid."',
+    '"Foreman says hurry up. Foreman ain\'t here."',
+    '"If we just flip the blueprint upside-down it works."',
+    '"That\'s not a load-bearing wall. ...it was a load-bearing wall."',
+    '"I just work here."',
+    '"Four guys watching one guy dig. Peak productivity."',
+    '"We lost Dave. Dave is in the hole."',
+    '"The deadline is \'soon.\' It\'s been \'soon\' for months."',
+    '"Someone stole my sandwich AGAIN."',
+  ];
+
+  let quoteIdx  = Math.floor(Math.random() * WORKER_QUOTES.length);
+  let quoteTimer = 0;
+  const QUOTE_INTERVAL = 240; // ticks between quote changes
+
+  // ── Scene objects ──────────────────────────────────────────────────────────
+
+  // Ground / pit geometry
+  const GROUND_Y = H * 0.68;
+  const PIT_X    = W * 0.28;
+  const PIT_W    = W * 0.26;
+  const PIT_D    = H * 0.22;
+
+  // Scaffold
+  const SCAF_X  = W * 0.62;
+  const SCAF_Y  = GROUND_Y - H * 0.30;
+  const SCAF_W  = W * 0.22;
+  const SCAF_H  = H * 0.30;
+
+  // Characters — each has a role, position, and internal state machine
+  const workers = [
+    // Digger — digs in the pit
+    {
+      role: 'digger', x: PIT_X + PIT_W*0.30, baseY: GROUND_Y + PIT_D*0.45,
+      frame: 0, frameTimer: 0, frameSpeed: 18,
+      dirtTimer: 0, facing: 1,
+      state: 'digging', stateTimer: 0,
+    },
+    // Brick carrier — walks back and forth carrying a brick
+    {
+      role: 'carrier', x: W*0.03, baseY: GROUND_Y,
+      frame: 0, frameTimer: 0, frameSpeed: 10,
+      dir: 1, speed: 0.55, destX: SCAF_X,
+      hasBrick: true, brickDelay: 0,
+      state: 'walking', stateTimer: 0,
+    },
+    // Foreman — paces left/right near the pit, clipboard in hand
+    {
+      role: 'foreman', x: PIT_X - W*0.08, baseY: GROUND_Y,
+      frame: 0, frameTimer: 0, frameSpeed: 22,
+      dir: 1, speed: 0.30, patrolMin: PIT_X - W*0.16, patrolMax: PIT_X + PIT_W + W*0.04,
+      state: 'pacing', stateTimer: 0, angryTimer: 0,
+    },
+    // Napper — sitting/sleeping by the scaffold
+    {
+      role: 'napper', x: W*0.88, baseY: GROUND_Y,
+      frame: 0, frameTimer: 0, frameSpeed: 60,
+      state: 'sleeping', zTimer: 0, zOffset: 0,
+    },
+    // Blueprint guy — stands still arguing with himself over a paper
+    {
+      role: 'blueprint', x: W*0.10, baseY: GROUND_Y,
+      frame: 0, frameTimer: 0, frameSpeed: 40,
+      state: 'reading', headBob: 0, headDir: 1,
+    },
+  ];
+
+  // Dirt particles thrown from the pit
+  const dirtParticles = [];
+
+  // Coffee cups that appear/disappear
+  let coffeeVisible = false, coffeeTimer = 0;
+
+  // Scaffold bricks being placed
+  const brickStack = [];  // { x, y }
+  for (let bi = 0; bi < 4; bi++) {
+    brickStack.push({ x: SCAF_X + W*0.02, y: GROUND_Y - bi * H*0.055 - H*0.01 });
+  }
+
+  // ── Drawing helpers ─────────────────────────────────────────────────────────
+
+  function drawHardHat(x, y, size, col) {
+    ctx.fillStyle = col || '#ffd700';
+    ctx.beginPath();
+    ctx.ellipse(x, y, size*0.95, size*0.45, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = col || '#ffd700';
+    ctx.fillRect(x - size*1.05, y - size*0.08, size*2.1, size*0.22);
+  }
+
+  function drawStickFigure(x, y, size, facing, options) {
+    const o = options || {};
+    const col    = o.col    || '#fff';
+    const hatCol = o.hatCol || '#ffd700';
+    const armAng = o.armAng || 0;   // extra arm angle (radians)
+    const legAng = o.legAng || 0;   // leg swing phase
+    const holdTool = o.holdTool || null; // 'shovel'|'brick'|'clipboard'|'coffee'
+
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = Math.max(1.5, size * 0.12);
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+
+    const hd   = size * 0.55; // head radius
+    const torH = size * 1.10;
+    const legL = size * 0.95;
+
+    const headY = y - torH - hd;
+
+    // Head
+    ctx.fillStyle = '#f5cba7';
+    ctx.beginPath();
+    ctx.arc(x, headY, hd, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#d4a07a';
+    ctx.lineWidth = Math.max(1, size*0.08);
+    ctx.stroke();
+
+    // Hard hat
+    drawHardHat(x, headY - hd*0.25, hd*0.95, hatCol);
+
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = Math.max(1.5, size*0.12);
+
+    // Torso
+    ctx.beginPath();
+    ctx.moveTo(x, headY + hd);
+    ctx.lineTo(x, y - legL * 0.02);
+    ctx.stroke();
+
+    // Arms
+    const armLen = size * 0.78;
+    const shoulderY = headY + hd + torH * 0.28;
+    // Left arm
+    const laBase = armAng - 0.4 * facing;
+    ctx.beginPath();
+    ctx.moveTo(x, shoulderY);
+    ctx.lineTo(x - facing * Math.cos(laBase) * armLen, shoulderY + Math.abs(Math.sin(laBase)) * armLen * 0.9 + Math.sin(laBase) * armLen * 0.6);
+    ctx.stroke();
+    // Right arm
+    const raBase = armAng + 0.4 * facing;
+    const raEndX = x + facing * Math.cos(raBase) * armLen * 0.85;
+    const raEndY = shoulderY + Math.sin(raBase) * armLen * 0.7;
+    ctx.beginPath();
+    ctx.moveTo(x, shoulderY);
+    ctx.lineTo(raEndX, raEndY);
+    ctx.stroke();
+
+    // Legs
+    const hipY = y - legL * 0.05;
+    const swingL = Math.sin(legAng) * 0.35;
+    ctx.beginPath();
+    ctx.moveTo(x, hipY);
+    ctx.lineTo(x - facing*legL*0.35 + Math.sin(legAng)*legL*0.22, y + legL*0.04);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, hipY);
+    ctx.lineTo(x + facing*legL*0.25 - Math.sin(legAng)*legL*0.22, y + legL*0.04);
+    ctx.stroke();
+
+    // Tool overlays
+    if (holdTool === 'shovel') {
+      ctx.strokeStyle = '#8B6914';
+      ctx.lineWidth   = Math.max(1.5, size*0.11);
+      const sx = raEndX + facing*size*0.1;
+      const sy = raEndY;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + facing*size*0.15, sy + size*1.4);
+      ctx.stroke();
+      ctx.fillStyle = '#aaa';
+      ctx.beginPath();
+      ctx.ellipse(sx + facing*size*0.15, sy + size*1.55, size*0.22, size*0.12, 0.3*facing, 0, Math.PI*2);
+      ctx.fill();
+    }
+    if (holdTool === 'brick') {
+      ctx.fillStyle = '#c0392b';
+      ctx.strokeStyle = '#922b21';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(raEndX + facing*size*0.05, raEndY - size*0.12, size*0.65*facing||size*0.65, size*0.28);
+      ctx.fill(); ctx.stroke();
+    }
+    if (holdTool === 'clipboard') {
+      ctx.fillStyle = '#f5e6c8';
+      ctx.strokeStyle = '#a08050';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const cbW = size*0.55, cbH = size*0.70;
+      ctx.rect(raEndX + facing*size*0.05 - cbW*0.5, raEndY - cbH*0.5, cbW, cbH);
+      ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 0.7;
+      for (let ln = 0; ln < 3; ln++) {
+        ctx.beginPath();
+        ctx.moveTo(raEndX + facing*size*0.05 - cbW*0.35, raEndY - cbH*0.25 + ln*cbH*0.22);
+        ctx.lineTo(raEndX + facing*size*0.05 + cbW*0.35, raEndY - cbH*0.25 + ln*cbH*0.22);
+        ctx.stroke();
+      }
+    }
+    if (holdTool === 'coffee') {
+      ctx.fillStyle = '#5d4037';
+      ctx.strokeStyle = '#3e2723';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(raEndX + facing*size*0.05, raEndY - size*0.18, size*0.30, size*0.38);
+      ctx.fill(); ctx.stroke();
+      // steam
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 1;
+      for (let st = 0; st < 2; st++) {
+        ctx.beginPath();
+        const bx = raEndX + facing*size*0.12 + st*size*0.12;
+        ctx.moveTo(bx, raEndY - size*0.18);
+        ctx.bezierCurveTo(bx + 3, raEndY - size*0.35, bx - 3, raEndY - size*0.52, bx, raEndY - size*0.65);
+        ctx.stroke();
+      }
+    }
+
+    // Eyes
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(x + facing*hd*0.30, headY - hd*0.10, hd*0.14, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawSleepingFigure(x, y, size, zOff) {
+    // Lying on back
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth   = Math.max(1.5, size*0.12);
+    ctx.lineCap     = 'round';
+    // Body horizontal
+    ctx.beginPath();
+    ctx.moveTo(x - size*1.2, y);
+    ctx.lineTo(x + size*0.5, y);
+    ctx.stroke();
+    // Head (circle)
+    ctx.fillStyle = '#f5cba7';
+    ctx.beginPath();
+    ctx.arc(x + size*0.8, y, size*0.42, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#d4a07a';
+    ctx.lineWidth = Math.max(1, size*0.08);
+    ctx.stroke();
+    // Hard hat fallen off
+    drawHardHat(x + size*1.1, y + size*0.52, size*0.42*0.95, '#ffd700');
+    // Legs sticking up slightly
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth   = Math.max(1.5, size*0.12);
+    ctx.beginPath();
+    ctx.moveTo(x - size*1.2, y);
+    ctx.lineTo(x - size*1.6, y - size*0.6);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - size*1.0, y);
+    ctx.lineTo(x - size*1.4, y - size*0.5);
+    ctx.stroke();
+    // Z Z Z
+    const zA = 0.55 + Math.sin(tick*0.05 + zOff) * 0.35;
+    ctx.fillStyle = `rgba(180,220,255,${zA})`;
+    ctx.font = `bold ${size*0.55|0}px monospace`;
+    ctx.textAlign = 'left';
+    for (let zi = 0; zi < 3; zi++) {
+      const zx = x + size*(0.6 + zi*0.45);
+      const zy = y - size*(0.35 + zi*0.32) + Math.sin(tick*0.04 + zi)*size*0.08;
+      const za = zA * (1 - zi*0.28);
+      ctx.globalAlpha = za;
+      ctx.fillText('z', zx, zy);
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
+  }
+
+  function drawDirtParticle(p) {
+    ctx.fillStyle = `rgba(139,90,43,${p.life})`;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // ── Scene draw ──────────────────────────────────────────────────────────────
+
+  function drawScene() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Sky gradient
+    const sky = ctx.createLinearGradient(0,0,0,H);
+    sky.addColorStop(0, '#1a1200');
+    sky.addColorStop(1, '#2d1f00');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0,0,W,H);
+
+    // Sun (barely visible through haze)
+    const sunG = ctx.createRadialGradient(W*0.82, H*0.14, 0, W*0.82, H*0.14, W*0.18);
+    sunG.addColorStop(0,   'rgba(255,200,60,0.22)');
+    sunG.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = sunG;
+    ctx.fillRect(0,0,W,H);
+
+    // Ground
+    ctx.fillStyle = '#5c4a1e';
+    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    ctx.fillStyle = '#7a6128';
+    ctx.fillRect(0, GROUND_Y, W, H*0.032);
+
+    // Construction tape stripe along ground
+    const tapeH = H*0.022;
+    const tapeY = GROUND_Y - tapeH;
+    for (let ti = 0; ti < Math.ceil(W/30); ti++) {
+      ctx.fillStyle = ti%2===0 ? '#ffd700' : '#000';
+      ctx.fillRect(ti*30, tapeY, 30, tapeH);
+    }
+
+    // Pit
+    ctx.fillStyle = '#3b2d10';
+    ctx.beginPath();
+    ctx.rect(PIT_X, GROUND_Y - H*0.01, PIT_W, PIT_D);
+    ctx.fill();
+    ctx.strokeStyle = '#7a6128';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(PIT_X, GROUND_Y - H*0.01, PIT_W, PIT_D);
+    // Ladder in pit
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 2;
+    const ladX = PIT_X + PIT_W*0.12;
+    ctx.beginPath(); ctx.moveTo(ladX, GROUND_Y); ctx.lineTo(ladX, GROUND_Y + PIT_D*0.9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ladX+W*0.04, GROUND_Y); ctx.lineTo(ladX+W*0.04, GROUND_Y + PIT_D*0.9); ctx.stroke();
+    for (let ri = 0; ri < 5; ri++) {
+      const ry = GROUND_Y + ri * PIT_D*0.18 + PIT_D*0.05;
+      ctx.beginPath(); ctx.moveTo(ladX, ry); ctx.lineTo(ladX+W*0.04, ry); ctx.stroke();
+    }
+
+    // Scaffold poles
+    ctx.strokeStyle = '#bbb';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(SCAF_X, GROUND_Y); ctx.lineTo(SCAF_X, SCAF_Y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(SCAF_X+SCAF_W, GROUND_Y); ctx.lineTo(SCAF_X+SCAF_W, SCAF_Y); ctx.stroke();
+    // Scaffold planks
+    for (let pi = 0; pi < 3; pi++) {
+      const py = GROUND_Y - (pi+1)*SCAF_H/3;
+      ctx.fillStyle = '#8B6914';
+      ctx.fillRect(SCAF_X - W*0.01, py - H*0.012, SCAF_W + W*0.02, H*0.024);
+      ctx.strokeStyle = '#5d4b14';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(SCAF_X - W*0.01, py - H*0.012, SCAF_W + W*0.02, H*0.024);
+    }
+
+    // Brick stack near scaffold
+    for (const br of brickStack) {
+      ctx.fillStyle = '#c0392b';
+      ctx.strokeStyle = '#7b241c';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(br.x - W*0.045, br.y - H*0.028, W*0.09, H*0.028);
+      ctx.fill(); ctx.stroke();
+    }
+
+    // Pile of dirt beside pit
+    ctx.fillStyle = '#7a6128';
+    ctx.beginPath();
+    ctx.ellipse(PIT_X + PIT_W + W*0.06, GROUND_Y + H*0.01, W*0.07, H*0.04, 0, Math.PI, 0);
+    ctx.fill();
+
+    // Wheelbarrow (static prop)
+    const wbX = PIT_X - W*0.14, wbY = GROUND_Y - H*0.035;
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 2;
+    ctx.fillStyle = '#888';
+    ctx.beginPath();
+    ctx.moveTo(wbX, wbY); ctx.lineTo(wbX + W*0.08, wbY); ctx.lineTo(wbX + W*0.06, wbY + H*0.04);
+    ctx.lineTo(wbX + W*0.02, wbY + H*0.04); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(wbX + W*0.04, wbY + H*0.055, H*0.025, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(wbX, wbY); ctx.lineTo(wbX - W*0.04, wbY + H*0.065);
+    ctx.moveTo(wbX + W*0.08, wbY); ctx.lineTo(wbX + W*0.12, wbY + H*0.065);
+    ctx.stroke();
+
+    // ── WORKER: Blueprint guy ──────────────────────────────────────────
+    const bp = workers[4];
+    bp.headBob += 0.045 * bp.headDir;
+    if (Math.abs(bp.headBob) > 0.22) bp.headDir *= -1;
+    const bobY = Math.sin(bp.headBob * 4) * H*0.005;
+    const sz = H * 0.092;
+    drawStickFigure(bp.x, bp.baseY + bobY, sz, 1, {
+      col: '#88ccff', hatCol: '#e74c3c', holdTool: 'clipboard',
+      armAng: 0.15 + bp.headBob,
+    });
+
+    // ── WORKER: Foreman ────────────────────────────────────────────────
+    const fm = workers[2];
+    fm.frameTimer++;
+    if (fm.frameTimer >= fm.frameSpeed) { fm.frame = (fm.frame+1)%4; fm.frameTimer = 0; }
+    fm.x += fm.dir * fm.speed;
+    if (fm.x < fm.patrolMin || fm.x > fm.patrolMax) fm.dir *= -1;
+    const legSwingFm = Math.sin(tick * 0.12) * (fm.speed > 0.15 ? 2.5 : 0);
+    const szFm = H * 0.10;
+    const fmAngry = fm.angryTimer > 0;
+    fm.angryTimer = Math.max(0, fm.angryTimer - 1);
+    const fmArmAng = fmAngry ? Math.sin(tick*0.3)*0.6 : 0.2;
+    drawStickFigure(fm.x, fm.baseY, szFm, fm.dir > 0 ? 1 : -1, {
+      col: '#ff9900', hatCol: '#e67e22', holdTool: 'clipboard',
+      armAng: fmArmAng, legAng: legSwingFm,
+    });
+    // Shout bubble when angry
+    if (fmAngry) {
+      ctx.fillStyle = 'rgba(255,60,0,0.88)';
+      ctx.beginPath();
+      ctx.roundRect(fm.x + fm.dir*szFm*0.6, fm.baseY - szFm*2.6, W*0.10, H*0.07, 5);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${H*0.032|0}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('HEY!!', fm.x + fm.dir*szFm*0.6 + W*0.05, fm.baseY - szFm*2.25);
+      ctx.textAlign = 'left';
+    }
+
+    // ── WORKER: Carrier ────────────────────────────────────────────────
+    const cr = workers[1];
+    cr.frameTimer++;
+    if (cr.frameTimer >= cr.frameSpeed) { cr.frame = (cr.frame+1)%4; cr.frameTimer = 0; }
+    if (cr.brickDelay > 0) {
+      cr.brickDelay--;
+    } else {
+      cr.x += cr.dir * cr.speed;
+      if (cr.dir > 0 && cr.x >= cr.destX) {
+        cr.dir = -1; cr.hasBrick = false;
+        cr.destX = W*0.03;
+        cr.brickDelay = 35;
+        // Make foreman angry occasionally
+        if (Math.random() < 0.25) workers[2].angryTimer = 80;
+      } else if (cr.dir < 0 && cr.x <= cr.destX) {
+        cr.dir = 1; cr.hasBrick = true;
+        cr.destX = SCAF_X + W*0.04;
+        cr.brickDelay = 25;
+      }
+    }
+    const legSwingCr = Math.sin(tick * 0.14) * (cr.brickDelay > 0 ? 0 : 2.5);
+    const szCr = H * 0.088;
+    drawStickFigure(cr.x, cr.baseY, szCr, cr.dir > 0 ? 1 : -1, {
+      col: '#b8ff88', hatCol: '#27ae60',
+      holdTool: cr.hasBrick ? 'brick' : null,
+      armAng: cr.hasBrick ? 0.45 : 0.15,
+      legAng: legSwingCr,
+    });
+
+    // ── WORKER: Digger ─────────────────────────────────────────────────
+    const dg = workers[0];
+    dg.frameTimer++;
+    if (dg.frameTimer >= dg.frameSpeed) {
+      dg.frame = (dg.frame+1)%4;
+      dg.frameTimer = 0;
+      dg.dirtTimer++;
+      if (dg.dirtTimer % 2 === 0) {
+        // Fling a dirt particle
+        dirtParticles.push({
+          x: dg.x + W*0.04, y: dg.baseY - H*0.06,
+          vx: 1.2 + Math.random()*1.5,
+          vy: -(1.5 + Math.random()*1.5),
+          r: 2.5 + Math.random()*3,
+          life: 0.9,
+        });
+      }
+    }
+    const digArmAng = Math.sin(dg.frame * 1.6) * 0.65 + 0.3;
+    drawStickFigure(dg.x, dg.baseY, H*0.082, dg.facing, {
+      col: '#ffcc55', hatCol: '#f39c12', holdTool: 'shovel',
+      armAng: digArmAng, legAng: 0,
+    });
+
+    // ── Dirt particles ─────────────────────────────────────────────────
+    for (let pi = dirtParticles.length-1; pi >= 0; pi--) {
+      const p = dirtParticles[pi];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.life -= 0.035;
+      if (p.life <= 0) { dirtParticles.splice(pi,1); continue; }
+      drawDirtParticle(p);
+    }
+
+    // ── WORKER: Napper ─────────────────────────────────────────────────
+    const np = workers[3];
+    np.zTimer += 0.04;
+    drawSleepingFigure(np.x, np.baseY - H*0.015, H*0.08, np.zTimer);
+
+    // ── Hard-hat on napper's head sign ─────────────────────────────────
+    // Sign above site
+    ctx.fillStyle = '#1a0a00';
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 2;
+    const signX = W*0.32, signY = H*0.065, signW = W*0.36, signH = H*0.13;
+    ctx.beginPath();
+    ctx.roundRect(signX, signY, signW, signH, 6);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffd700';
+    ctx.font = `bold ${H*0.038|0}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText('STORY MODE', signX + signW*0.5, signY + signH*0.42);
+    ctx.fillStyle = 'rgba(255,200,60,0.65)';
+    ctx.font = `${H*0.028|0}px monospace`;
+    ctx.fillText('Est. "Soon"™', signX + signW*0.5, signY + signH*0.80);
+    ctx.textAlign = 'left';
+
+    // ── Quote panel ────────────────────────────────────────────────────
+    quoteTimer++;
+    if (quoteTimer >= QUOTE_INTERVAL) {
+      quoteTimer = 0;
+      quoteIdx   = (quoteIdx + 1) % WORKER_QUOTES.length;
+      quoteEl.style.opacity = '0';
+      setTimeout(() => {
+        quoteEl.textContent = WORKER_QUOTES[quoteIdx];
+        quoteEl.style.opacity = '1';
+      }, 320);
+    }
+    if (quoteEl.textContent === '') quoteEl.textContent = WORKER_QUOTES[quoteIdx];
+  }
+
+  // ── Loop ────────────────────────────────────────────────────────────────────
+  function loop() {
+    tick++;
+    drawScene();
+    raf = requestAnimationFrame(loop);
+  }
+
+  function start() { if (!raf) raf = requestAnimationFrame(loop); }
+  function stop()  { if (raf)  { cancelAnimationFrame(raf); raf = null; } }
+
+  // Only run when the story panel is visible (saves CPU while playing)
+  const wip = document.getElementById('story-wip');
+  if (!wip) return;
+  const obs = new MutationObserver(() => {
+    const visible = wip.style.display !== 'none';
+    visible ? start() : stop();
+  });
+  obs.observe(wip, { attributes: true, attributeFilter: ['style'] });
+  // Kick off if already visible on load
+  if (wip.style.display !== 'none') start();
+})();
+
 // galaxy.mp3 (9 MB) on slower connections, where users were hitting silence
 // for 5-10 s before audio kicked in. Runs after first paint so it doesn't
 // block the start-screen render.
