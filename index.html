@@ -1184,6 +1184,10 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(255, 0, 255, 0.25); }
     50%      { box-shadow: 0 0 18px 2px rgba(255, 0, 255, 0.25); }
   }
+  @keyframes splashPulse {
+    0%, 100% { transform: scale(1);    box-shadow: 0 0 32px rgba(123,47,247,0.55), 0 0 64px rgba(241,7,163,0.30); }
+    50%      { transform: scale(1.05); box-shadow: 0 0 48px rgba(123,47,247,0.85), 0 0 96px rgba(241,7,163,0.55); }
+  }
 
   #new-hs-banner {
     font-size: 18px;
@@ -1381,6 +1385,23 @@
   <!-- Cycles through map names so the front page advertises the breadth
        of vibes available. Updates via wireTagline IIFE. -->
   <div class="tagline" id="start-tagline">19 VIBES · 4 MODES · ONE BEAT</div>
+
+  <!-- ── SPLASH GATE: shown first; hides on tap to reveal mode options ── -->
+  <div id="splash-gate" style="display:flex; flex-direction:column; align-items:center; gap:0; margin-top:8px;">
+    <button id="splash-start-btn" style="
+      background: linear-gradient(135deg,#7b2ff7,#f107a3);
+      color:#fff; border:none; border-radius:14px;
+      padding:18px 52px; font-size:22px; font-weight:900;
+      letter-spacing:3px; cursor:pointer; text-transform:uppercase;
+      box-shadow:0 0 32px rgba(123,47,247,0.55), 0 0 64px rgba(241,7,163,0.30);
+      animation: splashPulse 1.8s ease-in-out infinite;
+      font-family:inherit;
+    ">TAP TO PLAY</button>
+    <div style="font-size:11px; color:rgba(255,255,255,0.35); letter-spacing:2px; margin-top:10px;">TAP ANYWHERE TO START</div>
+  </div>
+
+  <!-- ── MODE OPTIONS: hidden until splash is dismissed ── -->
+  <div id="mode-options" style="display:none; flex-direction:column; align-items:center; gap:0; width:100%;">
   <!-- Two-tier mode picker:
          Tier 1  : SOLO | VS  (big tabs)
          Tier 2  : sub-modes specific to the active tab
@@ -1469,6 +1490,7 @@
     <h3>High Scores <span class="lb-mode" id="lb-mode-label">STORY</span></h3>
     <div class="lb-body"></div>
   </div>
+  </div><!-- /#mode-options -->
 </div>
 
 <!-- PvP lobby - shown when mode=human, replaces direct game start -->
@@ -9697,35 +9719,54 @@ function drawBlockBullet(context, x, y, color, size, alpha, theme) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // WARZONE SCENE (Level 12 - Triggered)
-// A brutal concrete bunker at night. Barbed wire silhouettes, sandbag
-// barricades, fire and embers, distant artillery flashes on cheer, bullet
-// tracer streaks on movePulse, soldier silhouette aiming from the wings.
-// Muzzle flash on boardDropPulse. Fully reactive — the more the player
-// clears, the more the front heats up.
+// Full combat zone: concrete bunker, fires, embers, bullet tracers, artillery
+// flashes, explosions, muzzle flashes, helicopter crossing, shell casings
+// raining down, smoke columns, distant burning buildings, shockwave rings.
+// Every game event triggers a distinct visual reaction.
 // ─────────────────────────────────────────────────────────────────────────────
 let _wzScene = null;
 
 function _initWarzoneScene(w, h) {
   const embers = [];
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 60; i++) {
     embers.push({
       x: Math.random() * w,
-      y: Math.random() * h,
-      vx: (Math.random() - 0.5) * 0.6,
-      vy: -(Math.random() * 0.8 + 0.3),
-      r:  Math.random() * 2.5 + 0.8,
+      y: h * (0.3 + Math.random() * 0.7),
+      vx: (Math.random() - 0.5) * 0.8,
+      vy: -(Math.random() * 1.2 + 0.4),
+      r:  Math.random() * 3.0 + 0.8,
       life: Math.random(),
-      maxLife: Math.random() * 0.6 + 0.4,
-      hue: Math.random() * 30,
+      maxLife: Math.random() * 0.5 + 0.35,
+      hue: Math.random() * 35,
+    });
+  }
+  // Shell casings
+  const casings = [];
+  // Smoke puffs
+  const smoke = [];
+  for (let i = 0; i < 8; i++) {
+    smoke.push({
+      x: [w * 0.06, w * 0.14, w * 0.82, w * 0.92][i % 4] + (Math.random() - 0.5) * w * 0.04,
+      y: h * (0.50 + Math.random() * 0.15),
+      r:  w * (0.03 + Math.random() * 0.03),
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: -(Math.random() * 0.5 + 0.2),
+      life: Math.random(),
+      maxLife: 0.9 + Math.random() * 0.6,
+      alpha: 0.18 + Math.random() * 0.12,
     });
   }
   const tracers = [];
   const explosions = [];
+  const shockwaves = [];
+  // Helicopter state
+  const heli = { x: -w * 0.25, y: h * 0.22, vx: w * 0.003, phase: 0, active: false, timer: 600 };
   _wzScene = {
-    embers, tracers, explosions,
+    embers, tracers, explosions, casings, smoke, shockwaves, heli,
     flashAlpha: 0,
     muzzleFlash: 0,
     artilleryFlash: 0,
+    shakeX: 0, shakeY: 0,
     bgCanvas: null,
     w, h,
   };
@@ -9848,42 +9889,104 @@ function drawWarzoneScene(theme, now, playRects) {
     sc.bgCanvas = _buildWarzoneStaticBg(w, h);
   }
 
-  const cheer   = typeof cheerEnergy   !== 'undefined' ? cheerEnergy   : 0;
-  const energy  = typeof beatEnergy    !== 'undefined' ? beatEnergy    : 0;
+  const cheer          = typeof cheerEnergy   !== 'undefined' ? cheerEnergy   : 0;
+  const energy         = typeof beatEnergy    !== 'undefined' ? beatEnergy    : 0;
   const movePulse      = typeof _movePulse      !== 'undefined' ? _movePulse      : 0;
   const boardDropPulse = typeof _boardDropPulse !== 'undefined' ? _boardDropPulse : 0;
   const ctx = bgCtx;
+  const floorY = h * 0.75;
+
+  // ── Canvas shake on hard drop ──
+  if (boardDropPulse > 0.5) {
+    sc.shakeX = (Math.random() - 0.5) * boardDropPulse * 8;
+    sc.shakeY = (Math.random() - 0.5) * boardDropPulse * 6;
+  }
+  sc.shakeX *= 0.65; sc.shakeY *= 0.65;
+  const shakeX = sc.shakeX | 0, shakeY = sc.shakeY | 0;
+  ctx.save();
+  if (shakeX || shakeY) ctx.translate(shakeX, shakeY);
 
   // Static layer
   ctx.drawImage(sc.bgCanvas, 0, 0);
 
+  // ── Distant burning building silhouettes (intensity scales with cheer) ──
+  const buildingCount = 5;
+  for (let bi = 0; bi < buildingCount; bi++) {
+    const bx   = w * (0.05 + bi * 0.20 + 0.04 * Math.sin(bi * 7.3));
+    const bh   = h * (0.10 + (bi % 3) * 0.06);
+    const bw   = w * (0.07 + (bi % 2) * 0.03);
+    const by   = floorY - bh;
+    ctx.fillStyle = `rgba(10,5,2,${0.75 + cheer * 0.20})`;
+    ctx.fillRect(bx, by, bw, bh);
+    // Windows (dim orange glow)
+    for (let wr = 0; wr < 3; wr++) {
+      for (let wc = 0; wc < 3; wc++) {
+        const lit = Math.sin(now * 0.001 + bi * 3.1 + wr * 5 + wc) > 0.2;
+        if (!lit) continue;
+        ctx.fillStyle = `rgba(255,${100 + wc * 30},10,${0.5 + energy * 0.3})`;
+        ctx.fillRect(bx + bw * (0.18 + wc * 0.28), by + bh * (0.15 + wr * 0.28), bw * 0.14, bh * 0.12);
+      }
+    }
+    // Fire on top of buildings on high cheer
+    if (cheer > 0.4) {
+      const fh = h * (0.05 + cheer * 0.06);
+      const fg = ctx.createLinearGradient(bx + bw * 0.5, by - fh, bx + bw * 0.5, by);
+      fg.addColorStop(0, 'rgba(255,60,0,0)');
+      fg.addColorStop(0.5, `rgba(255,120,0,${cheer * 0.7})`);
+      fg.addColorStop(1,   `rgba(255,230,80,${cheer * 0.8})`);
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.ellipse(bx + bw * 0.5, by, bw * 0.4 + Math.sin(now * 0.003 + bi) * bw * 0.05, fh, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   // ── Artillery flash on cheer (distant explosion glow) ──
-  if (cheer > 0.6) sc.artilleryFlash = Math.min(1, sc.artilleryFlash + 0.08);
-  sc.artilleryFlash *= 0.88;
+  if (cheer > 0.55) sc.artilleryFlash = Math.min(1, sc.artilleryFlash + 0.10);
+  sc.artilleryFlash *= 0.86;
   if (sc.artilleryFlash > 0.01) {
-    const sides = ['left', 'right'];
-    for (const side of sides) {
-      const fx = side === 'left' ? w * 0.12 : w * 0.88;
-      const aGrad = ctx.createRadialGradient(fx, h * 0.45, 0, fx, h * 0.45, w * 0.25);
-      aGrad.addColorStop(0,   `rgba(255,200,60,${sc.artilleryFlash * 0.55})`);
-      aGrad.addColorStop(0.4, `rgba(255,80,0,${sc.artilleryFlash * 0.28})`);
+    for (const fx of [w * 0.10, w * 0.90]) {
+      const aGrad = ctx.createRadialGradient(fx, h * 0.40, 0, fx, h * 0.40, w * 0.30);
+      aGrad.addColorStop(0,   `rgba(255,220,80,${sc.artilleryFlash * 0.65})`);
+      aGrad.addColorStop(0.4, `rgba(255,80,0,${sc.artilleryFlash * 0.35})`);
       aGrad.addColorStop(1,   'rgba(0,0,0,0)');
       ctx.fillStyle = aGrad;
       ctx.fillRect(0, 0, w, h);
     }
   }
 
-  // ── Fire columns (left and right flanks) ──
-  const floorY = h * 0.75;
-  const firePositions = [w * 0.08, w * 0.18, w * 0.80, w * 0.90];
+  // ── Smoke columns (slow billowing) ──
+  for (const sm of sc.smoke) {
+    sm.x  += sm.vx + Math.sin(now * 0.0008 + sm.x) * 0.2;
+    sm.y  += sm.vy;
+    sm.life -= 0.004;
+    sm.r  += 0.35;
+    if (sm.life <= 0 || sm.y < -sm.r * 2) {
+      const side = Math.floor(Math.random() * 4);
+      sm.x = [w * 0.06, w * 0.14, w * 0.82, w * 0.92][side] + (Math.random() - 0.5) * w * 0.04;
+      sm.y = floorY - h * 0.05;
+      sm.r = w * (0.025 + Math.random() * 0.02);
+      sm.vy = -(Math.random() * 0.5 + 0.25);
+      sm.life = sm.maxLife;
+    }
+    const a = sm.alpha * Math.min(1, sm.life / sm.maxLife) * (0.55 + energy * 0.25);
+    const dark = 20 + (cheer * 30) | 0;
+    ctx.fillStyle = `rgba(${dark},${dark},${dark},${a})`;
+    ctx.beginPath();
+    ctx.arc(sm.x, sm.y, sm.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Fire columns (left and right flanks — 6 positions) ──
+  const firePositions = [w * 0.04, w * 0.10, w * 0.18, w * 0.78, w * 0.88, w * 0.95];
   for (const fx of firePositions) {
-    const fh = h * (0.18 + energy * 0.12 + cheer * 0.08);
+    const fh = h * (0.16 + energy * 0.14 + cheer * 0.10 + Math.sin(now * 0.002 + fx) * 0.02);
     const fireGrad = ctx.createLinearGradient(fx, floorY - fh, fx, floorY);
     fireGrad.addColorStop(0,   'rgba(255,60,0,0)');
-    fireGrad.addColorStop(0.4, `rgba(255,120,0,${0.55 + energy * 0.2})`);
-    fireGrad.addColorStop(0.8, `rgba(255,200,30,${0.65 + energy * 0.2})`);
-    fireGrad.addColorStop(1,   `rgba(255,255,120,${0.50 + energy * 0.15})`);
-    const fw = w * (0.045 + energy * 0.015);
+    fireGrad.addColorStop(0.35,`rgba(255,100,0,${0.50 + energy * 0.25})`);
+    fireGrad.addColorStop(0.70,`rgba(255,180,20,${0.70 + energy * 0.20})`);
+    fireGrad.addColorStop(1,   `rgba(255,255,100,${0.55 + energy * 0.20})`);
+    const fw = w * (0.040 + energy * 0.018 + Math.sin(now * 0.003 + fx * 0.01) * 0.004);
     ctx.fillStyle = fireGrad;
     ctx.beginPath();
     ctx.ellipse(fx, floorY, fw, fh, 0, 0, Math.PI * 2);
@@ -9892,150 +9995,285 @@ function drawWarzoneScene(theme, now, playRects) {
 
   // ── Embers ──
   for (const em of sc.embers) {
-    em.x  += em.vx + (energy - 0.5) * 0.3;
-    em.y  += em.vy * (0.8 + energy * 0.4);
-    em.life -= 0.004 + energy * 0.003;
+    em.x  += em.vx + (energy - 0.4) * 0.5;
+    em.y  += em.vy * (0.8 + energy * 0.5);
+    em.life -= 0.003 + energy * 0.004;
     if (em.life <= 0 || em.y < 0) {
       em.x    = Math.random() * w;
-      em.y    = floorY - 20;
+      em.y    = floorY - Math.random() * h * 0.15;
       em.life = em.maxLife;
-      em.vy   = -(Math.random() * 0.8 + 0.3);
+      em.vy   = -(Math.random() * 1.2 + 0.4);
+      em.vx   = (Math.random() - 0.5) * 0.8;
     }
-    const a = Math.min(1, em.life / em.maxLife) * (0.6 + energy * 0.3);
-    ctx.fillStyle = `hsla(${30 + em.hue},100%,${55 + em.hue * 0.8}%,${a})`;
+    const a = Math.min(1, em.life / em.maxLife) * (0.55 + energy * 0.35);
+    ctx.fillStyle = `hsla(${25 + em.hue},100%,${52 + em.hue},${a})`;
     ctx.beginPath();
-    ctx.arc(em.x, em.y, em.r * (0.7 + energy * 0.5), 0, Math.PI * 2);
+    ctx.arc(em.x, em.y, em.r * (0.6 + energy * 0.6), 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // ── Bullet tracers on movePulse ──
-  if (movePulse > 0.4 && Math.random() < movePulse * 0.55) {
+  // ── Bullet tracers — fire on every piece move, burst on cheer ──
+  const tracerRate = movePulse > 0.3 ? movePulse * 0.7 : (energy * 0.08);
+  if (Math.random() < tracerRate) {
+    const fromRight = Math.random() > 0.5;
     sc.tracers.push({
-      x: Math.random() > 0.5 ? -10 : w + 10,
-      y: h * (0.25 + Math.random() * 0.45),
-      vx: (Math.random() > 0.5 ? 1 : -1) * (w * 0.035 + Math.random() * w * 0.02),
-      vy: (Math.random() - 0.5) * h * 0.01,
+      x:  fromRight ? w + 10 : -10,
+      y:  h * (0.22 + Math.random() * 0.50),
+      vx: (fromRight ? -1 : 1) * (w * 0.030 + Math.random() * w * 0.025),
+      vy: (Math.random() - 0.5) * h * 0.012,
       life: 1,
-      len: w * (0.06 + Math.random() * 0.06),
+      len: w * (0.055 + Math.random() * 0.07),
+      thick: 1.2 + Math.random() * 1.0,
     });
   }
   for (let i = sc.tracers.length - 1; i >= 0; i--) {
     const tr = sc.tracers[i];
-    tr.x += tr.vx; tr.y += tr.vy; tr.life -= 0.08;
-    if (tr.life <= 0 || tr.x < -tr.len || tr.x > w + tr.len) {
+    tr.x += tr.vx; tr.y += tr.vy; tr.life -= 0.07;
+    if (tr.life <= 0 || tr.x < -tr.len - 20 || tr.x > w + tr.len + 20) {
       sc.tracers.splice(i, 1); continue;
     }
-    const a = tr.life * 0.85;
-    ctx.strokeStyle = `rgba(255,255,180,${a})`;
-    ctx.lineWidth   = 1.5;
-    ctx.shadowColor = 'rgba(255,220,100,0.8)';
-    ctx.shadowBlur  = 4;
+    const a = tr.life * 0.90;
+    const tailLen = tr.len / Math.abs(tr.vx);
+    ctx.strokeStyle = `rgba(255,255,160,${a})`;
+    ctx.lineWidth   = tr.thick;
+    ctx.shadowColor = 'rgba(255,230,80,0.9)';
+    ctx.shadowBlur  = 5;
     ctx.beginPath();
     ctx.moveTo(tr.x, tr.y);
-    ctx.lineTo(tr.x - tr.vx * (tr.len / Math.abs(tr.vx)), tr.y - tr.vy * (tr.len / Math.abs(tr.vx)));
+    ctx.lineTo(tr.x - tr.vx * tailLen, tr.y - tr.vy * tailLen);
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
 
-  // ── Explosions on cheer / line clear ──
-  if (cheer > 0.7 && Math.random() < 0.12) {
-    sc.explosions.push({
-      x: Math.random() * w,
-      y: h * (0.2 + Math.random() * 0.5),
-      r: 0,
-      maxR: w * (0.04 + Math.random() * 0.06),
+  // ── Shell casings fall on piece moves ──
+  if (movePulse > 0.5 && Math.random() < movePulse * 0.4) {
+    const cx = Math.random() > 0.5 ? w * (0.03 + Math.random() * 0.10) : w * (0.88 + Math.random() * 0.10);
+    sc.casings.push({
+      x: cx,
+      y: floorY * (0.55 + Math.random() * 0.15),
+      vx: (Math.random() - 0.5) * 2.5,
+      vy: Math.random() * 1.5 + 0.5,
+      rot: Math.random() * Math.PI * 2,
+      vrot: (Math.random() - 0.5) * 0.25,
       life: 1,
     });
   }
+  for (let i = sc.casings.length - 1; i >= 0; i--) {
+    const cs = sc.casings[i];
+    cs.x += cs.vx; cs.y += cs.vy * 1.2; cs.rot += cs.vrot;
+    cs.vy += 0.12; // gravity
+    cs.life -= 0.018;
+    if (cs.life <= 0 || cs.y > floorY + 10) { sc.casings.splice(i, 1); continue; }
+    const a = cs.life * 0.85;
+    ctx.save();
+    ctx.translate(cs.x, cs.y);
+    ctx.rotate(cs.rot);
+    ctx.fillStyle = `rgba(200,150,40,${a})`;
+    ctx.fillRect(-4, -1.5, 8, 3);
+    ctx.restore();
+  }
+
+  // ── Explosions on cheer / line clears — with shockwave ring ──
+  if (cheer > 0.60 && Math.random() < cheer * 0.15) {
+    const ex = {
+      x: Math.random() * w,
+      y: h * (0.15 + Math.random() * 0.55),
+      r: 0,
+      maxR: w * (0.04 + Math.random() * 0.07),
+      life: 1,
+    };
+    sc.explosions.push(ex);
+    sc.shockwaves.push({ x: ex.x, y: ex.y, r: 0, maxR: ex.maxR * 2.2, life: 1 });
+  }
   for (let i = sc.explosions.length - 1; i >= 0; i--) {
     const ex = sc.explosions[i];
-    ex.r    += ex.maxR * 0.12;
-    ex.life -= 0.07;
+    ex.r    += ex.maxR * 0.14;
+    ex.life -= 0.065;
     if (ex.life <= 0) { sc.explosions.splice(i, 1); continue; }
-    const a = ex.life * 0.8;
+    const a = ex.life * 0.85;
     const exGrad = ctx.createRadialGradient(ex.x, ex.y, 0, ex.x, ex.y, ex.r);
-    exGrad.addColorStop(0,   `rgba(255,255,200,${a})`);
-    exGrad.addColorStop(0.3, `rgba(255,140,0,${a * 0.8})`);
-    exGrad.addColorStop(0.7, `rgba(180,40,0,${a * 0.4})`);
+    exGrad.addColorStop(0,   `rgba(255,255,220,${a})`);
+    exGrad.addColorStop(0.25,`rgba(255,180,30,${a * 0.85})`);
+    exGrad.addColorStop(0.6, `rgba(200,50,0,${a * 0.50})`);
     exGrad.addColorStop(1,   'rgba(0,0,0,0)');
     ctx.fillStyle = exGrad;
     ctx.beginPath();
     ctx.arc(ex.x, ex.y, ex.r, 0, Math.PI * 2);
     ctx.fill();
   }
+  // Shockwave rings
+  for (let i = sc.shockwaves.length - 1; i >= 0; i--) {
+    const sw = sc.shockwaves[i];
+    sw.r    += sw.maxR * 0.08;
+    sw.life -= 0.055;
+    if (sw.life <= 0) { sc.shockwaves.splice(i, 1); continue; }
+    ctx.strokeStyle = `rgba(255,160,60,${sw.life * 0.55})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(sw.x, sw.y, sw.r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
-  // ── Muzzle flash on hard drop ──
-  if (boardDropPulse > 0.3) sc.muzzleFlash = Math.min(1, sc.muzzleFlash + boardDropPulse * 0.9);
-  sc.muzzleFlash *= 0.72;
+  // ── Muzzle flash on hard drop — screen-wide blast ──
+  if (boardDropPulse > 0.3) sc.muzzleFlash = Math.min(1, sc.muzzleFlash + boardDropPulse * 1.1);
+  sc.muzzleFlash *= 0.70;
   if (sc.muzzleFlash > 0.02) {
-    const mfSides = [{ x: w * 0.05, dir: 1 }, { x: w * 0.95, dir: -1 }];
-    for (const { x: mfx, dir } of mfSides) {
-      const mfY = h * 0.65;
+    for (const { x: mfx, dir } of [{ x: w * 0.04, dir: 1 }, { x: w * 0.96, dir: -1 }]) {
+      const mfY = floorY * 0.85;
       ctx.save();
       ctx.translate(mfx, mfY);
-      // Flash cone
-      const flashGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.12);
-      flashGrad.addColorStop(0,   `rgba(255,255,200,${sc.muzzleFlash * 0.95})`);
-      flashGrad.addColorStop(0.3, `rgba(255,160,30,${sc.muzzleFlash * 0.65})`);
-      flashGrad.addColorStop(1,   'rgba(0,0,0,0)');
-      ctx.fillStyle = flashGrad;
+      const fg = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.15);
+      fg.addColorStop(0,   `rgba(255,255,220,${sc.muzzleFlash})`);
+      fg.addColorStop(0.25,`rgba(255,170,30,${sc.muzzleFlash * 0.80})`);
+      fg.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = fg;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.lineTo(dir * w * 0.14, -h * 0.04);
-      ctx.lineTo(dir * w * 0.14,  h * 0.04);
+      ctx.lineTo(dir * w * 0.18, -h * 0.06);
+      ctx.lineTo(dir * w * 0.18,  h * 0.06);
       ctx.closePath();
       ctx.fill();
+      // Secondary streaks
+      for (let s = 0; s < 4; s++) {
+        const angle = (Math.random() - 0.5) * 0.5;
+        const dist  = w * (0.06 + Math.random() * 0.08);
+        ctx.strokeStyle = `rgba(255,240,140,${sc.muzzleFlash * 0.6})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(dir * dist * Math.cos(angle), dist * Math.sin(angle));
+        ctx.stroke();
+      }
       ctx.restore();
+    }
+    // Full-screen white flash on very hard drop
+    if (sc.muzzleFlash > 0.55) {
+      ctx.fillStyle = `rgba(255,200,100,${(sc.muzzleFlash - 0.55) * 0.30})`;
+      ctx.fillRect(0, 0, w, h);
     }
   }
 
-  // ── Soldier silhouettes (flanking the play area) ──
-  const soldierPositions = [
-    { x: w * 0.06, flip: false, crouching: energy > 0.55 },
-    { x: w * 0.92, flip: true,  crouching: cheer > 0.4   },
+  // ── Helicopter crossing (auto-launches every ~12s, faster at high cheer) ──
+  sc.heli.timer--;
+  const heliInterval = 720 - cheer * 400;
+  if (!sc.heli.active && sc.heli.timer <= 0) {
+    sc.heli.x  = -w * 0.20;
+    sc.heli.y  = h * (0.10 + Math.random() * 0.18);
+    sc.heli.vx = w * (0.0022 + energy * 0.0012);
+    sc.heli.active = true;
+    sc.heli.timer  = heliInterval;
+  }
+  if (sc.heli.active) {
+    sc.heli.x += sc.heli.vx;
+    sc.heli.phase += 0.18;
+    if (sc.heli.x > w + w * 0.20) sc.heli.active = false;
+    const hx = sc.heli.x, hy = sc.heli.y + Math.sin(sc.heli.phase * 0.4) * 3;
+    const hs = w * 0.06; // scale
+    ctx.save();
+    ctx.fillStyle = 'rgba(8,6,3,0.92)';
+    // Fuselage
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, hs * 0.55, hs * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Tail boom
+    ctx.fillRect(hx + hs * 0.40, hy - hs * 0.04, hs * 0.45, hs * 0.07);
+    // Tail rotor
+    ctx.strokeStyle = 'rgba(12,8,3,0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(hx + hs * 0.85, hy - hs * 0.10);
+    ctx.lineTo(hx + hs * 0.85, hy + hs * 0.10);
+    ctx.stroke();
+    // Main rotor blades (spinning)
+    ctx.strokeStyle = 'rgba(6,4,2,0.80)';
+    ctx.lineWidth = 2.5;
+    for (let b = 0; b < 3; b++) {
+      const ang = sc.heli.phase + (b * Math.PI * 2 / 3);
+      ctx.beginPath();
+      ctx.moveTo(hx + Math.cos(ang) * hs * 0.65, hy - hs * 0.16 + Math.sin(ang) * hs * 0.15);
+      ctx.lineTo(hx - Math.cos(ang) * hs * 0.65, hy - hs * 0.16 - Math.sin(ang) * hs * 0.15);
+      ctx.stroke();
+    }
+    // Searchlight cone downward
+    if (energy > 0.3 || cheer > 0.2) {
+      const slGrad = ctx.createRadialGradient(hx, hy, 0, hx, hy + hs * 2.5, hs * 1.2);
+      slGrad.addColorStop(0,   `rgba(255,240,180,${0.18 + energy * 0.12})`);
+      slGrad.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = slGrad;
+      ctx.beginPath();
+      ctx.moveTo(hx - hs * 0.12, hy);
+      ctx.lineTo(hx - hs * 0.80, hy + hs * 2.5);
+      ctx.lineTo(hx + hs * 0.80, hy + hs * 2.5);
+      ctx.lineTo(hx + hs * 0.12, hy);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ── Soldier silhouettes — 3 soldiers, reactive stances ──
+  const soldierDefs = [
+    { x: w * 0.05, flip: false, crouching: energy > 0.55, shooting: movePulse > 0.6 },
+    { x: w * 0.93, flip: true,  crouching: cheer  > 0.45, shooting: boardDropPulse > 0.4 },
+    { x: w * 0.14, flip: false, crouching: true,           shooting: energy > 0.7 },
   ];
-  for (const sol of soldierPositions) {
-    const { x: sx, flip, crouching } = sol;
-    const sh = h * (crouching ? 0.22 : 0.28);
+  for (const sol of soldierDefs) {
+    const { x: sx, flip, crouching, shooting } = sol;
+    const sh = h * (crouching ? 0.20 : 0.26);
     const sy = floorY - sh;
     ctx.save();
     if (flip) { ctx.translate(sx * 2, 0); ctx.scale(-1, 1); }
-    ctx.fillStyle = 'rgba(8,5,2,0.92)';
+    ctx.fillStyle = `rgba(8,5,2,${0.88 + cheer * 0.10})`;
     // Torso
     ctx.beginPath();
-    ctx.roundRect(sx - sh * 0.14, sy + sh * (crouching ? 0.30 : 0.25),
-                  sh * 0.28, sh * (crouching ? 0.42 : 0.46), 3);
+    ctx.roundRect(sx - sh * 0.13, sy + sh * (crouching ? 0.28 : 0.24),
+                  sh * 0.26, sh * (crouching ? 0.40 : 0.44), 3);
     ctx.fill();
-    // Head with helmet
-    const hx = sx, hy = sy + sh * (crouching ? 0.10 : 0.08);
-    const hr = sh * 0.12;
-    ctx.beginPath(); ctx.arc(hx, hy, hr, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(20,14,6,0.95)';
+    // Head + helmet
+    const hx2 = sx, hy2 = sy + sh * (crouching ? 0.10 : 0.08);
+    const hr   = sh * 0.11;
+    ctx.beginPath(); ctx.arc(hx2, hy2, hr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(18,12,5,0.95)';
     ctx.beginPath();
-    ctx.ellipse(hx, hy - hr * 0.3, hr * 1.3, hr * 0.55, 0, Math.PI, 0);
+    ctx.ellipse(hx2, hy2 - hr * 0.3, hr * 1.25, hr * 0.50, 0, Math.PI, 0);
     ctx.fill();
-    // Rifle barrel extending outward
-    const armY = sy + sh * (crouching ? 0.38 : 0.34);
-    ctx.fillStyle = 'rgba(15,10,4,0.95)';
+    // Rifle
+    const armY2 = sy + sh * (crouching ? 0.36 : 0.32);
+    ctx.fillStyle = `rgba(14,9,3,0.95)`;
     ctx.beginPath();
-    ctx.roundRect(sx + sh * 0.10, armY - 3, sh * (crouching ? 0.45 : 0.50), 5, 2);
+    ctx.roundRect(sx + sh * 0.09, armY2 - 3,
+                  sh * (crouching ? 0.42 : 0.48) + (shooting ? sh * 0.08 : 0), 5, 2);
     ctx.fill();
+    // Muzzle flash on shooting
+    if (shooting && sc.muzzleFlash > 0.1) {
+      ctx.fillStyle = `rgba(255,230,80,${sc.muzzleFlash * 0.80})`;
+      const mfx2 = sx + sh * (crouching ? 0.54 : 0.60);
+      ctx.beginPath();
+      ctx.ellipse(mfx2, armY2, sh * 0.08, sh * 0.05, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     // Legs
     ctx.fillStyle = 'rgba(8,5,2,0.92)';
-    const legTop  = sy + sh * (crouching ? 0.68 : 0.70);
-    const legBot  = floorY;
+    const legTop2 = sy + sh * (crouching ? 0.66 : 0.68);
     if (crouching) {
       ctx.beginPath();
-      ctx.roundRect(sx - sh * 0.12, legTop, sh * 0.11, legBot - legTop, 2); ctx.fill();
+      ctx.roundRect(sx - sh * 0.11, legTop2, sh * 0.10, floorY - legTop2, 2); ctx.fill();
       ctx.beginPath();
-      ctx.roundRect(sx + sh * 0.01, legTop - sh * 0.08, sh * 0.11, (legBot - legTop) * 0.85, 2); ctx.fill();
+      ctx.roundRect(sx + sh * 0.01, legTop2 - sh * 0.07, sh * 0.10, (floorY - legTop2) * 0.80, 2); ctx.fill();
     } else {
       ctx.beginPath();
-      ctx.roundRect(sx - sh * 0.10, legTop, sh * 0.10, legBot - legTop, 2); ctx.fill();
+      ctx.roundRect(sx - sh * 0.09, legTop2, sh * 0.09, floorY - legTop2, 2); ctx.fill();
       ctx.beginPath();
-      ctx.roundRect(sx + sh * 0.02, legTop, sh * 0.10, legBot - legTop, 2); ctx.fill();
+      ctx.roundRect(sx + sh * 0.02, legTop2, sh * 0.09, floorY - legTop2, 2); ctx.fill();
     }
     ctx.restore();
+  }
+
+  // ── Red warning light flicker on beat ──
+  const redAlpha = (energy > 0.65) ? (energy - 0.65) * 0.22 * (0.5 + 0.5 * Math.sin(now * 0.018)) : 0;
+  if (redAlpha > 0.005) {
+    ctx.fillStyle = `rgba(255,0,0,${redAlpha})`;
+    ctx.fillRect(0, 0, w, h);
   }
 
   // ── Play-area mask (keep board readable) ──
@@ -10045,9 +10283,9 @@ function drawWarzoneScene(theme, now, playRects) {
     for (const r of playRects) {
       const clip = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
       clip.addColorStop(0,   'rgba(0,0,0,0)');
-      clip.addColorStop(0.1, 'rgba(0,0,0,0.45)');
-      clip.addColorStop(0.5, 'rgba(0,0,0,0.60)');
-      clip.addColorStop(0.9, 'rgba(0,0,0,0.45)');
+      clip.addColorStop(0.1, 'rgba(0,0,0,0.48)');
+      clip.addColorStop(0.5, 'rgba(0,0,0,0.64)');
+      clip.addColorStop(0.9, 'rgba(0,0,0,0.48)');
       clip.addColorStop(1,   'rgba(0,0,0,0)');
       ctx.fillStyle = clip;
       ctx.fillRect(r.x, r.y, r.w, r.h);
@@ -10055,13 +10293,15 @@ function drawWarzoneScene(theme, now, playRects) {
     ctx.restore();
   }
 
-  // ── Screen flash on full-screen cheer spike ──
-  if (cheer > 0.9) sc.flashAlpha = Math.min(0.22, sc.flashAlpha + 0.06);
-  sc.flashAlpha *= 0.80;
+  // ── Screen flash on full cheer spike ──
+  if (cheer > 0.85) sc.flashAlpha = Math.min(0.28, sc.flashAlpha + 0.08);
+  sc.flashAlpha *= 0.78;
   if (sc.flashAlpha > 0.005) {
-    ctx.fillStyle = `rgba(255,80,0,${sc.flashAlpha})`;
+    ctx.fillStyle = `rgba(255,60,0,${sc.flashAlpha})`;
     ctx.fillRect(0, 0, w, h);
   }
+
+  ctx.restore(); // end shake transform
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -11841,8 +12081,10 @@ function startGame() {
   // honest. Marathon / Ultra / VS always start L1.
   let seedLevel, seedLines;
   if (gameMode === 'solo') {
-    seedLevel = Math.max(1, Math.min(maxLvl, startLevel | 0));
-    seedLines = (seedLevel - 1) * LINES_PER_LEVEL;
+    // Arcade always starts at L1 difficulty (slow speed), regardless of
+    // any previous level selection. Player advances naturally from there.
+    seedLevel = 1;
+    seedLines = 0;
   } else if (gameMode === 'sprint') {
     seedLevel = Math.max(1, Math.min(maxLvl, startLevel | 0));
     seedLines = 0;     // 40-line target is honest, not pre-seeded
@@ -12540,6 +12782,10 @@ window.addEventListener('resize', () => positionP2Monitor());
                    || document.querySelector(`.mode-btn[data-tab="${tab}"]`);
       if (target) target.click();
     }
+    // Always enforce level-select visibility for the active mode (Arcade never shows picker)
+    const activeMode = document.querySelector('.mode-btn.mode-active');
+    const activeM = activeMode ? activeMode.dataset.mode : gameMode;
+    if (levelSelect) levelSelect.style.display = (activeM === 'sprint') ? 'flex' : 'none';
   }
   tabs.forEach(tab => tab.addEventListener('click', () => setTab(tab.dataset.tab)));
   btns.forEach(btn => btn.addEventListener('click', () => {
@@ -12548,13 +12794,38 @@ window.addEventListener('resize', () => positionP2Monitor());
     tabSubmodes[btn.dataset.tab] = btn.dataset.mode;
     if (diff) diff.style.display = (gameMode === 'vs') ? 'flex' : 'none';
     const levelSelect = document.getElementById('level-select');
-    const showsPicker = (gameMode === 'solo' || gameMode === 'sprint');
+    // Arcade (solo) always starts at L1 — no level picker needed.
+    // Sprint uses the picker to choose which vibe to run on.
+    const showsPicker = (gameMode === 'sprint');
     if (levelSelect) levelSelect.style.display = showsPicker ? 'flex' : 'none';
     refreshLb();
   }));
   // Init: ARCADE tab active.
   setTab('arcade');
   refreshLb();
+})();
+
+// ── Splash gate: show TAP TO PLAY first; reveal mode options on tap ──
+(function wireSplashGate() {
+  const gate    = document.getElementById('splash-gate');
+  const options = document.getElementById('mode-options');
+  if (!gate || !options) return;
+  function revealOptions() {
+    gate.style.display    = 'none';
+    options.style.display = 'flex';
+    // Remove the whole-screen listener so normal gameplay clicks aren't caught
+    document.getElementById('start-screen').removeEventListener('click', revealOptions);
+  }
+  document.getElementById('start-btn').addEventListener('click', () => {
+    // start-btn click already calls startGame — make sure options are visible
+    // (edge case: someone triggers it before the gate is dismissed)
+    revealOptions();
+  });
+  // Tap anywhere on the start-screen to dismiss
+  document.getElementById('start-screen').addEventListener('click', function handler(e) {
+    // Ignore clicks on the splash button itself (handled separately)
+    revealOptions();
+  });
 })();
 
 // Difficulty picker - reflects + writes aiDifficulty.
@@ -12628,9 +12899,9 @@ window.addEventListener('resize', () => positionP2Monitor());
   // both players to L1 so the match stays fair.
   const modeBtns = document.querySelectorAll('.mode-btn');
   const sync = () => {
-    // Sir's spec: vibe picker shows under STORY + SPRINT, hidden in
-    // Marathon (Galaxy lock) / Ultra (L1 lock) / VS (forced L1 symmetry).
-    const showsPicker = (gameMode === 'solo' || gameMode === 'sprint');
+    // Arcade (solo) always starts L1 — no vibe picker needed.
+    // Sprint uses the picker to choose which vibe to run on.
+    const showsPicker = (gameMode === 'sprint');
     wrap.style.display = showsPicker ? 'flex' : 'none';
   };
   modeBtns.forEach(mb => mb.addEventListener('click', sync));
