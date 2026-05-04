@@ -1386,18 +1386,31 @@
          Tier 2  : sub-modes specific to the active tab
        Mobile-friendly: each tier is its own row that wraps cleanly. -->
   <div id="mode-tabs" class="mode-tabs">
-    <button class="mode-tab mode-tab-active" data-tab="solo">SOLO</button>
-    <button class="mode-tab" data-tab="vs">VERSUS</button>
+    <button class="mode-tab mode-tab-active" data-tab="arcade">ARCADE</button>
+    <button class="mode-tab" data-tab="vs">VS</button>
+    <button class="mode-tab" data-tab="story">STORY</button>
+    <button class="mode-tab" data-tab="more">MORE</button>
   </div>
-  <div id="mode-select" data-active-tab="solo">
-    <!-- SOLO sub-modes -->
-    <button class="mode-btn mode-active" data-mode="solo"     data-tab="solo" title="Pick any of the 19 themed levels — each with its own track + visual scene.">STORY</button>
-    <button class="mode-btn"             data-mode="marathon" data-tab="solo" title="150-line endurance run. Levels speed up every 15 lines, capping at L19. Score chase.">MARATHON</button>
-    <button class="mode-btn"             data-mode="sprint"   data-tab="solo" title="Clear 40 lines as fast as possible. Locked at L1 gravity — pure speed. Top-out fails the run.">SPRINT</button>
-    <button class="mode-btn"             data-mode="ultra"    data-tab="solo" title="Score as much as possible in 2 minutes flat. Locked at L1 gravity.">ULTRA</button>
+  <div id="mode-select" data-active-tab="arcade">
+    <!-- ARCADE: pick your vibe, play from L1 difficulty, advance through levels -->
+    <button class="mode-btn mode-active" data-mode="solo" data-tab="arcade" title="Pick any vibe to start. Clear 15 lines to advance to the next level.">ARCADE</button>
     <!-- VS sub-modes -->
-    <button class="mode-btn"             data-mode="vs"       data-tab="vs"   style="display:none;">VS ALFRED</button>
-    <button class="mode-btn"             data-mode="human"    data-tab="vs"   style="display:none;">VS FRIEND</button>
+    <button class="mode-btn" data-mode="vs"    data-tab="vs"   style="display:none;">VS ALFRED</button>
+    <button class="mode-btn" data-mode="human" data-tab="vs"   style="display:none;">VS FRIEND</button>
+    <!-- MORE sub-modes -->
+    <button class="mode-btn" data-mode="marathon" data-tab="more" style="display:none;" title="150-line endurance run. Levels speed up every 15 lines.">MARATHON</button>
+    <button class="mode-btn" data-mode="sprint"   data-tab="more" style="display:none;" title="Clear 40 lines as fast as possible.">SPRINT</button>
+    <button class="mode-btn" data-mode="ultra"    data-tab="more" style="display:none;" title="Score as much as possible in 2 minutes.">ULTRA</button>
+  </div>
+  <!-- STORY WIP overlay — shown when the STORY tab is active -->
+  <div id="story-wip" style="display:none; flex-direction:column; align-items:center; gap:16px; padding:24px 16px; max-width:380px; margin:0 auto;">
+    <div style="font-size:48px; line-height:1;">🚧</div>
+    <div style="font-size:20px; font-weight:800; letter-spacing:3px; color:#ffd700;">COMING SOON</div>
+    <div style="font-size:13px; color:rgba(255,255,255,0.60); line-height:1.6; text-align:center; max-width:300px;">
+      The Story mode is under construction.<br>Our crew is hard at work building something special.
+    </div>
+    <div style="display:flex; gap:12px; font-size:28px;">🎮 🎵 🏆</div>
+    <div style="font-size:11px; color:rgba(255,255,255,0.35); letter-spacing:2px;">WORK IN PROGRESS</div>
   </div>
   <!-- Difficulty picker - visible only when "VS ALFRED" mode is selected.
        Three tiers wired to AI_DIFFICULTIES presets in JS. Persists across
@@ -2176,22 +2189,25 @@ const LEVEL_THEMES = [
     chords: [[196, 246.94, 293.66], [220, 261.63, 329.63], [196, 233.08, 277.18]],
     synthType: 'industrial',
   },
-  { // Level 12 - Bully
-    name: 'Bully',
-    bpm: 118,
-    colors: { bg1: '#001828', bg2: '#000d18', accent: '#00ffaa', glow: '#00dd88' },
-    particleHue: 155,
-    particleStyle: 'waves', // rippling water/tear drop feel
-    blockGlow: 10,
-    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
-    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
-    hh:    [1,0,1,1, 1,0,1,0, 1,0,1,1, 1,0,1,0],
+  { // Level 12 - Triggered (aggressive warzone — Trigger On track)
+    name: 'Triggered',
+    bpm: 140,
+    track: 'trigger-on.mp3',
+    // Deep red + military olive. Aggressive, high-contrast.
+    colors: { bg1: '#0a0000', bg2: '#050000', accent: '#ff2200', glow: '#ff6600' },
+    particleHue: 10,
+    blockStyle: 'bullet',
+    particleStyle: 'warzone',
+    blockGlow: 14,
+    kick:  [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,1,1,0],
+    snare: [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,1],
+    hh:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
     hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
-    bass:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
-    bassNote: 55, // A1
-    scale: [220, 261.63, 293.66, 329.63, 392, 440, 493.88, 523.25],
-    chords: [[220, 293.66, 392], [261.63, 329.63, 440], [293.66, 392, 493.88]],
-    synthType: 'autotune',
+    bass:  [1,0,0,1, 0,1,0,0, 1,0,0,1, 0,0,1,0],
+    bassNote: 41.20, // E1 — heavy, aggressive bass
+    scale: [196, 220, 261.63, 293.66, 311.13, 369.99, 415.30, 493.88],
+    chords: [[196, 261.63, 311.13], [220, 293.66, 369.99], [174.61, 220, 293.66]],
+    synthType: 'industrial',
   },
   { // Level 13 - Bully (extended outro)
     name: 'Bully',
@@ -2386,7 +2402,10 @@ function _marathonRotateVibe() {
   // Swap theme + audio at the dark midpoint (when alpha=1).
   setTimeout(() => {
     _marathonActiveTheme = next;
-    _gxScene = _dhScene = _jzScene = _ofScene = _zenScene = null;
+    _gxScene = _dhScene = _jzScene = _ofScene = _zenScene = _wzScene = null;
+    _jzBgCanvas = null;
+    _blockMiniCache.clear();
+    _playRectsCache = null;
     const eraEl = document.getElementById('era-display');
     if (eraEl) eraEl.textContent = next.name;
     if (typeof mainCanvas !== 'undefined' && mainCanvas) {
@@ -2604,6 +2623,19 @@ var _pieceLockCount = 0;
 var _marathonGoal = 150;
 var bgParticles;
 var beatPhase = 0;
+// Board render cache: locked cells baked to an offscreen canvas so complex
+// block renderers (beefpatty, trumpet, brain, etc.) don't run every frame
+// for every filled cell. Only redrawn when _boardCacheDirty is true.
+var _boardCache = null;
+var _boardCacheDirty = true;
+// Per-cell block image cache: each style+color combination rendered once to a
+// tiny offscreen canvas so drawBlock becomes a single drawImage call.
+// Eliminates shadowBlur + gradient allocations from active/ghost AND cache rebuild.
+var _blockMiniCache = new Map();
+// play-area rect cache: getBoundingClientRect is expensive (forced reflow).
+// Recomputed only when canvas size or game state changes.
+var _playRectsCache = null;
+var _playRectsCacheKey = '';
 // ─── Tetris Effect-style FX (shared, not per-player) ──────────────
 // Shockwaves: rings emitted from cleared rows that expand and fade.
 // Each entry: { x, y, r, maxR, alpha, color, life }
@@ -2768,7 +2800,10 @@ function nextFromBag() {
 }
 function fillNextQueue() { while (nextQueue.length < 5) nextQueue.push(nextFromBag()); }
 
-function initBoard() { board = Array.from({ length: ROWS }, () => Array(COLS).fill(null)); }
+function initBoard() {
+  board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+  _boardCacheDirty = true;
+}
 
 function spawnPiece() {
   fillNextQueue();
@@ -2923,6 +2958,7 @@ function lockPiece() {
     const nx = currentX + bx, ny = currentY + by;
     if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) board[ny][nx] = color;
   }
+  _boardCacheDirty = true;
   for (const [bx, by] of currentPiece) {
     spawnParticles((currentX + bx) * CELL + CELL / 2, (currentY + by) * CELL + CELL / 2, color, 3);
   }
@@ -2998,6 +3034,7 @@ function riseGarbage(n) {
     row[holeCol] = null;
     board.push(row);
   }
+  _boardCacheDirty = true;
 }
 
 function clearLines() {
@@ -3009,6 +3046,7 @@ function clearLines() {
     if (board[r].every(c => c !== null)) { clearRows.push(r); cleared++; }
   }
   if (cleared > 0) {
+    _boardCacheDirty = true;
     for (const r of clearRows) {
       for (let c = 0; c < COLS; c++) spawnParticles(c * CELL + CELL / 2, r * CELL + CELL / 2, board[r][c], 5);
     }
@@ -3088,6 +3126,9 @@ function clearLines() {
       if (newLevel !== level) {
         prevLevel = level;
         level = newLevel;
+        _boardCacheDirty = true; // block style may change at new level
+        _blockMiniCache.clear();
+        _playRectsCache = null;
         dropInterval = computeDropInterval(level);
         lockDelay = computeLockDelay(level);
         onLevelChange();
@@ -5111,6 +5152,34 @@ const COLOR_TO_TYPE = Object.fromEntries(
 
 function drawBlock(context, x, y, color, size, alpha = 1) {
   const theme = getTheme(level);
+  const _bs = (theme && theme.blockStyle) || 'default';
+  // Mini-canvas cache: render expensive static styles once, blit via drawImage.
+  // Cuts shadowBlur + gradient cost to zero for cached calls (board rebuild,
+  // active piece, ghost). Only skips time-dependent styles (matrix, star).
+  if (_bs === 'beefpatty' || _bs === 'trumpet' || _bs === 'brain' ||
+      _bs === 'mug' || _bs === 'tetrisEffect' || _bs === 'tires' || _bs === 'macncheese' ||
+      _bs === 'bullet') {
+    const key = `${_bs}-${color}-${size}`;
+    let mini = _blockMiniCache.get(key);
+    if (!mini) {
+      mini = document.createElement('canvas');
+      mini.width = size; mini.height = size;
+      const mc = mini.getContext('2d');
+      if      (_bs === 'tetrisEffect') drawBlockTE(mc, 0, 0, color, size, 1);
+      else if (_bs === 'tires')        drawBlockTires(mc, 0, 0, color, size, 1, theme);
+      else if (_bs === 'macncheese')   drawBlockMacNCheese(mc, 0, 0, color, size, 1, theme);
+      else if (_bs === 'beefpatty')    drawBlockBeefPatty(mc, 0, 0, color, size, 1, theme);
+      else if (_bs === 'brain')        drawBlockBrain(mc, 0, 0, color, size, 1, theme);
+      else if (_bs === 'trumpet')      drawBlockTrumpet(mc, 0, 0, color, size, 1, theme);
+      else if (_bs === 'mug')          drawBlockMug(mc, 0, 0, color, size, 1, theme);
+      else if (_bs === 'bullet')       drawBlockBullet(mc, 0, 0, color, size, 1, theme);
+      _blockMiniCache.set(key, mini);
+    }
+    if (alpha !== 1) context.globalAlpha = alpha;
+    context.drawImage(mini, x, y);
+    if (alpha !== 1) context.globalAlpha = 1;
+    return;
+  }
   if (theme && theme.blockStyle === 'tetrisEffect') {
     drawBlockTE(context, x, y, color, size, alpha);
     return;
@@ -5141,6 +5210,10 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   }
   if (theme && theme.blockStyle === 'mug') {
     drawBlockMug(context, x, y, color, size, alpha, theme);
+    return;
+  }
+  if (theme && theme.blockStyle === 'bullet') {
+    drawBlockBullet(context, x, y, color, size, alpha, theme);
     return;
   }
   if (theme && theme.blockStyle === 'star') {
@@ -5526,51 +5599,61 @@ function glyphPath(context, cx, cy, r, type) {
 function drawBoard() {
   const theme = getTheme(level);
   const [r, g, b] = hexToRgb(theme.colors.bg2);
-  // Underground (Tetris-Effect style) renders the board background semi-
-  // translucent so the warehouse crowd shows through the empty cells. Other
-  // levels keep the opaque fill so their procedural backdrops aren't fighting
-  // the play area. Translucent fills require clearing first, otherwise the
-  // previous frame's pixels leak through and stack into a smear over time.
-  // tetrisEffect (Falling Violins), matrix (Back for More / White Rabbit),
-  // and tires (Ferrari Window) all use a semi-translucent board so their
-  // reactive backgrounds (violins / matrix-rain / Ferrari highway) read
-  // through the empty cells. Other levels stay opaque.
-  if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star')) {
-    ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
-    const fillAlpha = (theme.blockStyle === 'tires') ? 0.82
-                    : (theme.blockStyle === 'brain') ? 0.42
-                    : (theme.blockStyle === 'trumpet') ? 0.50
-                    : (theme.blockStyle === 'mug') ? 0.55
-                    : (theme.blockStyle === 'star') ? 0.30  // very dim so stars + nebula glow through
-                    : 0.55;
-    ctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
-  } else {
-    ctx.fillStyle = `rgb(${r},${g},${b})`;
-  }
-  ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+  const cw = mainCanvas.width, ch = mainCanvas.height;
 
-  // Grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-  ctx.lineWidth = 1;
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) ctx.strokeRect(c * CELL, r * CELL, CELL, CELL);
+  const useAlpha = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star');
+  const fillAlpha = !useAlpha ? null
+    : (theme.blockStyle === 'tires')    ? 0.82
+    : (theme.blockStyle === 'brain')    ? 0.42
+    : (theme.blockStyle === 'trumpet')  ? 0.50
+    : (theme.blockStyle === 'mug')      ? 0.55
+    : (theme.blockStyle === 'star')     ? 0.30
+    : 0.55;
+
+  // ── BOARD CACHE ── bake locked cells to an offscreen canvas only when dirty.
+  // Complex block styles (beefpatty, trumpet, brain…) allocate 2-3 gradient
+  // objects per cell per call. At a half-full board that's 300+ allocations/frame.
+  // Caching cuts that to zero between piece locks/line clears.
+  if (_boardCacheDirty || !_boardCache || _boardCache.width !== cw || _boardCache.height !== ch) {
+    if (!_boardCache || _boardCache.width !== cw || _boardCache.height !== ch) {
+      _boardCache = document.createElement('canvas');
+      _boardCache.width = cw; _boardCache.height = ch;
+    }
+    const bctx = _boardCache.getContext('2d');
+    // Background fill (same logic as before)
+    if (useAlpha) {
+      bctx.clearRect(0, 0, cw, ch);
+      bctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
+    } else {
+      bctx.fillStyle = `rgb(${r},${g},${b})`;
+    }
+    bctx.fillRect(0, 0, cw, ch);
+    // Grid lines
+    bctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    bctx.lineWidth = 1;
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) bctx.strokeRect(col * CELL, row * CELL, CELL, CELL);
+    }
+    // Locked blocks — the expensive part, now only runs on board changes
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        if (board[row][col]) drawBlock(bctx, col * CELL, row * CELL, board[row][col], CELL);
+      }
+    }
+    _boardCacheDirty = false;
   }
 
-  // Beat pulse - gets meaningfully more intense as you climb past L13 so the
-  // late-game eras feel like they're physically vibrating with the track.
+  // Blit cached board in one drawImage call
+  if (useAlpha) ctx.clearRect(0, 0, cw, ch);
+  ctx.drawImage(_boardCache, 0, 0);
+
+  // Beat pulse — still per-frame, but just a fillRect (cheap)
   const pulseIntensity = 0.04 + Math.max(0, level - 13) * 0.012;
   const pulse = Math.sin(beatPhase / 16 * Math.PI * 2) * pulseIntensity;
   if (pulse > 0) {
     const [ar, ag, ab] = hexToRgb(theme.colors.accent);
     ctx.fillStyle = `rgba(${ar},${ag},${ab},${pulse})`;
-    ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
-  }
-
-  // Locked blocks
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (board[r][c]) drawBlock(ctx, c * CELL, r * CELL, board[r][c], CELL);
-    }
+    ctx.fillRect(0, 0, cw, ch);
   }
 
   if (currentPiece && !gameOver) {
@@ -7566,14 +7649,13 @@ function drawDancehallScene(theme, now, playRects) {
   _drawDjBoothDancehall(now, energy, cheer, onBeat, accentRgb, theme);
 
   // ── 6. FLOOR SPOT LIGHTS (colored pools pulsing on the ground) ────────
+  // No createRadialGradient or 'lighter' composite — both are expensive per frame.
+  // Simple alpha ellipses read identically at background depth.
   bgCtx.save();
-  bgCtx.globalCompositeOperation = 'lighter';
   for (const sp of _dhScene.spots) {
     const pulseR = sp.r * (1 + energy * 0.8 + (onBeat ? 0.4 : 0));
-    const spotGrad = bgCtx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, pulseR);
-    spotGrad.addColorStop(0, `hsla(${sp.hue},90%,65%,${0.22 + energy * 0.15})`);
-    spotGrad.addColorStop(1, 'hsla(0,0%,0%,0)');
-    bgCtx.fillStyle = spotGrad;
+    bgCtx.globalAlpha = 0.13 + energy * 0.10 + (onBeat ? 0.04 : 0);
+    bgCtx.fillStyle = `hsl(${sp.hue},80%,55%)`;
     bgCtx.beginPath();
     bgCtx.ellipse(sp.x, sp.y, pulseR, pulseR * 0.35, 0, 0, Math.PI * 2);
     bgCtx.fill();
@@ -7789,12 +7871,8 @@ function _drawDancehallSpeaker(cx, floorY, now, energy, cheer, onBeat, accentRgb
   const x = cx - spkW / 2;
   const y = floorY - spkH;
 
-  // ── Cabinet ──
-  const cabGrad = bgCtx.createLinearGradient(x, y, x + spkW, y);
-  cabGrad.addColorStop(0, '#0c0c0c');
-  cabGrad.addColorStop(0.5, '#1a1a1a');
-  cabGrad.addColorStop(1, '#080808');
-  bgCtx.fillStyle = cabGrad;
+  // ── Cabinet ── flat fill, no per-frame gradient allocation
+  bgCtx.fillStyle = '#131313';
   bgCtx.fillRect(x, y, spkW, spkH);
   bgCtx.strokeStyle = '#2a2a2a';
   bgCtx.lineWidth = 1;
@@ -7804,15 +7882,13 @@ function _drawDancehallSpeaker(cx, floorY, now, energy, cheer, onBeat, accentRgb
   const coneCx = cx;
   const coneCy = y + spkH * 0.38;
   const coneR = Math.max(8, 14 + bassKick * 18);
-  // Cone glow
-  const glowR = coneR * 1.8;
-  const coneGlow = bgCtx.createRadialGradient(coneCx, coneCy, coneR * 0.3, coneCx, coneCy, glowR);
-  coneGlow.addColorStop(0, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.25 + bassKick * 1.5})`);
-  coneGlow.addColorStop(1, 'rgba(0,0,0,0)');
-  bgCtx.fillStyle = coneGlow;
+  // Cone glow — flat alpha ellipse, no per-frame radial gradient
+  bgCtx.globalAlpha = Math.min(0.55, 0.10 + bassKick * 0.55);
+  bgCtx.fillStyle = `rgb(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]})`;
   bgCtx.beginPath();
-  bgCtx.arc(coneCx, coneCy, glowR, 0, Math.PI * 2);
+  bgCtx.arc(coneCx, coneCy, coneR * 1.7, 0, Math.PI * 2);
   bgCtx.fill();
+  bgCtx.globalAlpha = 1;
   // Cone circle
   bgCtx.fillStyle = '#151515';
   bgCtx.beginPath();
@@ -8778,223 +8854,566 @@ function drawBlockTrumpet(context, x, y, color, size, alpha, theme) {
 // Reactive: spotlights swing wider and brighter on cheer; smoke rings spawn
 // faster on movePulse; the neon sign flickers on hardDrop.
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// TRUMPETS PLEASE — Hollywood stage scene
+// Static layer (sky + hills + curtains + carpet + Walk of Fame star) baked to
+// an offscreen canvas on first use / resize. Only the animated elements are
+// composited per frame: klieg searchlights, marquee bulbs, smoke, audience,
+// camera flashes, band silhouettes.
+// ─────────────────────────────────────────────────────────────────────────────
 let _jzScene = null, _jzSceneW = 0;
+let _jzBgCanvas = null; // static layer cache
 
 function _initJazzScene(w, h) {
+  _jzBgCanvas = null; // force static layer rebuild on next draw
   _jzScene = {
-    bulbs: [],
-    smoke: [],
+    bulbs:    [],
+    smoke:    [],
+    flashes:  [], // paparazzi camera flashes
+    audience: [], // silhouette heads in rows
+    kliegs:   [   // 4 sweeping Hollywood searchlights
+      { phase: 0,              speed: 0.0042 },
+      { phase: Math.PI * 0.5,  speed: 0.0038 },
+      { phase: Math.PI,        speed: 0.0045 },
+      { phase: Math.PI * 1.5,  speed: 0.0040 },
+    ],
+    bgStars: [],
     lastMove: 0,
     flicker: 0,
-    // Two spotlights swing across the stage (swingPhase advances per frame
-    // by their own rate, modulated by beat).
-    spots: [
-      { phase: 0, baseX: w * 0.30, hue: 38, baseT: 0 },
-      { phase: Math.PI, baseX: w * 0.70, hue: 28, baseT: 0 },
-    ],
     floorY: h * 0.78,
+    confetti: [], // ticker-tape / gold confetti particles
+    reactionText: null, // { text, alpha, y } for "BRAVO!" etc.
   };
   _jzSceneW = w;
-  // Stage-valance bulbs: strung across the top in a slight catenary
-  // Cap bulb count at 18 — looks essentially identical to 30+ on a wide
-  // canvas but cuts per-frame shadowBlur overhead massively. Mobile
-  // (narrow w) still gets ~8 bulbs.
-  const bulbCount = Math.max(8, Math.min(18, Math.floor(w / 90)));
-  for (let i = 0; i < bulbCount; i++) {
-    const t = i / (bulbCount - 1);
-    _jzScene.bulbs.push({
-      x: w * 0.06 + t * w * 0.88,
-      y: h * 0.10 + Math.sin(t * Math.PI) * 14,
-      r: 2.2 + (i % 3) * 0.6,
-      hue: 36 + (i % 3) * 8,
-      phase: i * 0.4,
+
+  // Background stars (baked into static layer but need positions here first)
+  const starCount = Math.min(70, Math.floor(w / 22));
+  for (let i = 0; i < starCount; i++) {
+    _jzScene.bgStars.push({
+      x: Math.random() * w,
+      y: Math.random() * h * 0.44,
+      r: 0.5 + Math.random() * 1.4,
+      a: 0.30 + Math.random() * 0.60,
     });
   }
+
+  // Marquee bulbs — two rows, warm gold
+  for (let row = 0; row < 2; row++) {
+    const bulbCount = Math.max(14, Math.min(28, Math.floor(w / 60)));
+    for (let i = 0; i < bulbCount; i++) {
+      const t = i / (bulbCount - 1);
+      _jzScene.bulbs.push({
+        x: w * 0.04 + t * w * 0.92,
+        y: h * (row === 0 ? 0.085 : 0.115) + Math.sin(t * Math.PI) * (row === 0 ? 14 : 8),
+        r: row === 0 ? 3.2 + (i % 3) * 0.6 : 2.0 + (i % 2) * 0.4,
+        hue: 42 + (i % 3) * 8,
+        phase: i * 0.38 + row * 1.2,
+        row,
+      });
+    }
+  }
+
+  // Audience silhouettes: 3 rows of heads at the bottom
+  for (let row = 0; row < 3; row++) {
+    const rowY    = h * 0.86 + row * 18;
+    const spacing = 18 + row * 4;
+    const count   = Math.floor(w / spacing);
+    for (let j = 0; j < count; j++) {
+      _jzScene.audience.push({
+        x:     (j + 0.5) * spacing + (Math.random() - 0.5) * 5,
+        y:     rowY,
+        r:     4 + row * 1.8,
+        phase: Math.random() * Math.PI * 2,
+        row,
+      });
+    }
+  }
+}
+
+// Bake the time-invariant Hollywood backdrop once per resize.
+function _buildJzStaticBg(w, h) {
+  if (!_jzScene) return;
+  const off  = document.createElement('canvas');
+  off.width  = w; off.height = h;
+  const c    = off.getContext('2d');
+
+  // Sky: deep midnight navy → near black
+  const sky = c.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0,    '#04010e');
+  sky.addColorStop(0.50, '#07021a');
+  sky.addColorStop(1,    '#060010');
+  c.fillStyle = sky;
+  c.fillRect(0, 0, w, h);
+
+  // Stars
+  for (const s of _jzScene.bgStars) {
+    c.globalAlpha = s.a;
+    c.fillStyle   = 'rgba(255,222,120,1)';
+    c.beginPath();
+    c.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.globalAlpha = 1;
+
+  // Hollywood Hills silhouette
+  const hillY = h * 0.45;
+  c.fillStyle = '#050210';
+  c.beginPath();
+  c.moveTo(0, h);
+  c.lineTo(0, hillY + h * 0.12);
+  c.quadraticCurveTo(w * 0.10, hillY - h * 0.04, w * 0.22, hillY + h * 0.03);
+  c.quadraticCurveTo(w * 0.32, hillY + h * 0.07, w * 0.40, hillY + h * 0.01);
+  c.quadraticCurveTo(w * 0.48, hillY - h * 0.07, w * 0.55, hillY + h * 0.00);
+  c.quadraticCurveTo(w * 0.66, hillY + h * 0.05, w * 0.80, hillY + h * 0.07);
+  c.quadraticCurveTo(w * 0.92, hillY + h * 0.04, w, hillY + h * 0.10);
+  c.lineTo(w, h);
+  c.closePath();
+  c.fill();
+
+  // HOLLYWOOD sign — bright gold glow on the hillside
+  const sigSize = Math.max(11, Math.floor(w * 0.022));
+  c.font = `bold ${sigSize}px Arial, sans-serif`;
+  c.textAlign = 'center';
+  c.shadowColor = 'rgba(255,215,60,0.70)';
+  c.shadowBlur  = 10;
+  c.fillStyle = 'rgba(255,230,110,0.90)';
+  c.fillText('HOLLYWOOD', w * 0.50, hillY - h * 0.025);
+  c.shadowBlur = 0;
+
+  // Red velvet curtains (deeper, wider — take up more of the wing area)
+  for (const side of [0, 1]) {
+    const cx0 = side === 0 ? 0 : w - w * 0.24;
+    const cwd = w * 0.24;
+    const drape = c.createLinearGradient(cx0, 0, cx0 + cwd, 0);
+    if (side === 0) { drape.addColorStop(0, '#8a0012'); drape.addColorStop(0.7, '#500009'); drape.addColorStop(1, '#0c0001'); }
+    else            { drape.addColorStop(0, '#0c0001'); drape.addColorStop(0.3, '#500009'); drape.addColorStop(1, '#8a0012'); }
+    c.fillStyle = drape;
+    c.fillRect(cx0, 0, cwd, h * 0.84);
+    // Gold fringe at curtain hem
+    c.fillStyle = 'rgba(210,175,50,0.75)';
+    const fringes = Math.floor(cwd / 4);
+    for (let g = 0; g < fringes; g++) {
+      c.fillRect(cx0 + g * 4 + 1, h * 0.81, 2,
+                 h * 0.065 * (0.55 + Math.sin(g * 1.5) * 0.45));
+    }
+    // Gold rod at top
+    c.fillStyle = 'rgba(210,175,50,0.80)';
+    c.fillRect(cx0, 0, cwd, 5);
+    // Pleats (deep folds)
+    c.fillStyle = 'rgba(0,0,0,0.22)';
+    for (let p = 0; p < 7; p++) c.fillRect(cx0 + (p / 7 + 0.02) * cwd, 0, 2, h * 0.84);
+    // Highlight ridges
+    c.fillStyle = 'rgba(255,80,80,0.08)';
+    for (let p = 0; p < 7; p++) c.fillRect(cx0 + (p / 7 + 0.04) * cwd, 0, 1, h * 0.84);
+    // Gold trim edge
+    c.strokeStyle = 'rgba(210,175,50,0.70)';
+    c.lineWidth   = 2.5;
+    c.beginPath();
+    const edgeX = side === 0 ? cx0 + cwd : cx0;
+    c.moveTo(edgeX, 0); c.lineTo(edgeX, h * 0.84);
+    c.stroke();
+    // Gold sconce lamp at mid-curtain height
+    const lampX = side === 0 ? cx0 + cwd * 0.82 : cx0 + cwd * 0.18;
+    const lampY = h * 0.22;
+    c.fillStyle = 'rgba(255,230,100,0.90)';
+    c.beginPath(); c.arc(lampX, lampY, 5, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,230,100,0.25)';
+    c.beginPath(); c.arc(lampX, lampY, 18, 0, Math.PI * 2); c.fill();
+  }
+
+  // Red carpet stage floor
+  const carpetY   = h * 0.78;
+  const carpetGrd = c.createLinearGradient(0, carpetY, 0, h);
+  carpetGrd.addColorStop(0,    '#8a0010');
+  carpetGrd.addColorStop(0.35, '#620009');
+  carpetGrd.addColorStop(1,    '#200003');
+  c.fillStyle = carpetGrd;
+  c.fillRect(0, carpetY, w, h - carpetY);
+  // Gold piping along carpet edge
+  c.strokeStyle = 'rgba(210,175,50,0.80)';
+  c.lineWidth   = 3;
+  c.beginPath(); c.moveTo(0, carpetY); c.lineTo(w, carpetY); c.stroke();
+  c.strokeStyle = 'rgba(210,175,50,0.35)';
+  c.lineWidth   = 1;
+  c.beginPath(); c.moveTo(0, carpetY + 6); c.lineTo(w, carpetY + 6); c.stroke();
+
+  // Walk of Fame stars — centre + left + right
+  const starR = Math.min(w, h) * 0.030;
+  const starY = carpetY + (h - carpetY) * 0.45;
+  _drawHollywoodStar(c, w * 0.25, starY, starR * 0.75);
+  _drawHollywoodStar(c, w * 0.50, starY, starR);
+  _drawHollywoodStar(c, w * 0.75, starY, starR * 0.75);
+
+  _jzBgCanvas = off;
+}
+
+function _drawHollywoodStar(c, cx, cy, r) {
+  c.save();
+  c.translate(cx, cy);
+  c.fillStyle   = 'rgba(200,165,50,0.38)';
+  c.strokeStyle = 'rgba(200,165,50,0.65)';
+  c.lineWidth   = 1;
+  c.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const outer = (i / 5) * Math.PI * 2 - Math.PI / 2;
+    const inner = outer + Math.PI / 5;
+    const ix    = Math.cos(inner) * r * 0.38, iy = Math.sin(inner) * r * 0.38;
+    if (i === 0) c.moveTo(Math.cos(outer) * r, Math.sin(outer) * r);
+    else         c.lineTo(Math.cos(outer) * r, Math.sin(outer) * r);
+    c.lineTo(ix, iy);
+  }
+  c.closePath(); c.fill(); c.stroke();
+  c.restore();
 }
 
 function drawJazzClubScene(theme, now, playRects) {
   const w = bgCanvas.width, h = bgCanvas.height;
   if (w <= 0 || h <= 0) return;
   if (!_jzScene || _jzSceneW !== w) _initJazzScene(w, h);
+  if (!_jzBgCanvas || _jzBgCanvas.width !== w || _jzBgCanvas.height !== h) _buildJzStaticBg(w, h);
 
-  const cheer = (typeof cheerPulse === 'number') ? cheerPulse : 0;
-  const move  = (typeof movePulse === 'number') ? movePulse : 0;
-  const dropP = (typeof boardDropPulse === 'number') ? boardDropPulse : 0;
-  const onBeat = (beatPhase % 4 === 0);
+  const cheer  = (typeof cheerPulse      === 'number') ? cheerPulse      : 0;
+  const move   = (typeof movePulse       === 'number') ? movePulse       : 0;
+  const dropP  = (typeof boardDropPulse  === 'number') ? boardDropPulse  : 0;
   const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
-  const [ar, ag, ab] = hexToRgb(theme.colors.accent);
+  const onBeat = (beatPhase % 4 === 0);
+  const floorY = _jzScene.floorY;
 
-  // ── 1. VELVET BACKDROP ── deep plum→burgundy gradient
-  const sky = bgCtx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0,    '#1c0820');
-  sky.addColorStop(0.55, '#330c2a');
-  sky.addColorStop(1,    '#0a0410');
-  bgCtx.fillStyle = sky;
-  bgCtx.fillRect(0, 0, w, h);
+  // ── 1. STATIC BG
+  bgCtx.drawImage(_jzBgCanvas, 0, 0);
 
-  // ── 2. CURTAINS ── two vertical drapes on the sides with vertical pleats
+  // ── 2. KLIEG SEARCHLIGHTS ── 6 wide beams — very bright, very Hollywood
   bgCtx.save();
-  for (const side of [0, 1]) {
-    const cx0 = side === 0 ? 0 : w - w * 0.18;
-    const cwd = w * 0.18;
-    const drapeGrad = bgCtx.createLinearGradient(cx0, 0, cx0 + cwd, 0);
-    if (side === 0) {
-      drapeGrad.addColorStop(0, '#5a0e2e');
-      drapeGrad.addColorStop(1, '#1a0410');
-    } else {
-      drapeGrad.addColorStop(0, '#1a0410');
-      drapeGrad.addColorStop(1, '#5a0e2e');
-    }
-    bgCtx.fillStyle = drapeGrad;
-    bgCtx.fillRect(cx0, 0, cwd, h * 0.85);
-    // Vertical pleats: a few darker stripes
-    bgCtx.fillStyle = 'rgba(0,0,0,0.18)';
-    for (let p = 0; p < 4; p++) {
-      const px = cx0 + (p / 4 + 0.05) * cwd;
-      bgCtx.fillRect(px, 0, 2, h * 0.85);
-    }
+  bgCtx.globalCompositeOperation = 'screen';
+  const kliegOrigins = [
+    { x: w * 0.02 }, { x: w * 0.14 }, { x: w * 0.30 },
+    { x: w * 0.70 }, { x: w * 0.86 }, { x: w * 0.98 },
+  ];
+  // Add two extra kliegs if scene was init'd with only 4
+  while (_jzScene.kliegs.length < 6) {
+    _jzScene.kliegs.push({ phase: Math.random() * Math.PI * 2, speed: 0.0035 + Math.random() * 0.001 });
   }
-  bgCtx.restore();
-
-  // ── 3. VALANCE BULBS ── steady warm pinpoints, brighter on beat
-  // PERF: shadowBlur is the single most expensive canvas op, and on a
-  // wide bgCanvas there can be 30+ bulbs (was the dominant L10 cost,
-  // mirroring the original L8 issue). Two-pass split so the majority of
-  // bulbs paint with NO shadow at all, and only the on-beat brightening
-  // gets a capped 6px blur.
-  // Pass 1: all bulbs as flat dots, no shadow.
-  bgCtx.save();
-  bgCtx.shadowBlur = 0;
-  for (const b of _jzScene.bulbs) {
-    const tw = 0.7 + Math.sin(now / 600 + b.phase) * 0.2;
-    bgCtx.globalAlpha = 0.75 * tw;
-    bgCtx.fillStyle = `hsl(${b.hue},85%,72%)`;
+  for (let ki = 0; ki < 6; ki++) {
+    const kl    = _jzScene.kliegs[ki];
+    kl.phase   += kl.speed + move * 0.025 + cheer * 0.018;
+    const ox    = kliegOrigins[ki].x;
+    const oy    = floorY + 8;
+    const sweep = Math.sin(kl.phase) * (w * (ki < 3 ? 0.22 : 0.22));
+    const tx    = ox + sweep;
+    const ty    = h * 0.02;
+    const bw    = 18 + energy * 14 + cheer * 22 + (onBeat ? 8 : 0);
+    const alpha = 0.32 + energy * 0.18 + cheer * 0.20 + (onBeat ? 0.08 : 0);
+    const grad  = bgCtx.createLinearGradient(tx, ty, ox, oy);
+    grad.addColorStop(0,   `rgba(255,248,240,${Math.min(0.95, alpha)})`);
+    grad.addColorStop(0.5, `rgba(240,230,255,${alpha * 0.50})`);
+    grad.addColorStop(1,   'rgba(200,180,255,0)');
+    bgCtx.fillStyle = grad;
     bgCtx.beginPath();
-    bgCtx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+    bgCtx.moveTo(tx - bw, ty);
+    bgCtx.lineTo(tx + bw, ty);
+    bgCtx.lineTo(ox + bw * 0.18, oy);
+    bgCtx.lineTo(ox - bw * 0.18, oy);
+    bgCtx.closePath();
     bgCtx.fill();
+    // Bright base circle where beam meets floor
+    bgCtx.globalAlpha = 0.25 + energy * 0.20;
+    bgCtx.fillStyle   = 'rgba(255,245,220,1)';
+    bgCtx.beginPath();
+    bgCtx.ellipse(ox, oy, bw * 0.18 + 4, 5, 0, 0, Math.PI * 2);
+    bgCtx.fill();
+    bgCtx.globalAlpha = 1;
   }
   bgCtx.restore();
-  // Pass 2: only on the kick beat, paint a brighter pulse with capped
-  // shadowBlur. Burns shadowBlur ~25% of frames instead of every frame.
-  if (onBeat) {
-    bgCtx.save();
-    for (const b of _jzScene.bulbs) {
-      bgCtx.globalAlpha = 0.95;
-      bgCtx.shadowColor = `hsl(${b.hue},90%,75%)`;
-      bgCtx.shadowBlur = 6;
-      bgCtx.fillStyle = `hsl(${b.hue},90%,80%)`;
+
+  // ── 3. MARQUEE BULBS ── two rows, fast chaser pattern
+  const chaserT = (now / 220) % (Math.PI * 2);
+  bgCtx.save();
+  for (const b of _jzScene.bulbs) {
+    const chaserOn = Math.sin(chaserT - b.phase * 0.65) > 0.18;
+    const tw       = 0.55 + Math.sin(now / 400 + b.phase) * 0.35;
+    bgCtx.globalAlpha = chaserOn ? 0.96 : 0.45 * tw;
+    bgCtx.fillStyle   = `hsl(${b.hue},90%,${chaserOn ? 82 : 60}%)`;
+    bgCtx.beginPath();
+    bgCtx.arc(b.x, b.y, b.r * (chaserOn ? 1.4 : 0.9), 0, Math.PI * 2);
+    bgCtx.fill();
+    // Soft glow for lit bulbs
+    if (chaserOn) {
+      bgCtx.globalAlpha = 0.25;
+      bgCtx.fillStyle   = `hsl(${b.hue},90%,80%)`;
       bgCtx.beginPath();
-      bgCtx.arc(b.x, b.y, b.r * 1.4, 0, Math.PI * 2);
+      bgCtx.arc(b.x, b.y, b.r * 3.5, 0, Math.PI * 2);
       bgCtx.fill();
+    }
+  }
+  bgCtx.restore();
+
+  // ── 4. NEON MARQUEE SIGN ── "★ TRUMPETS, PLEASE ★" flickers on drops
+  bgCtx.save();
+  if (dropP > _jzScene.flicker + 0.10) _jzScene.flicker = dropP;
+  const flickerOff = _jzScene.flicker > 0 && Math.random() < 0.22;
+  _jzScene.flicker = Math.max(0, _jzScene.flicker - 0.035);
+  if (!flickerOff) {
+    const signAlpha = 0.88 + energy * 0.10 + (onBeat ? 0.08 : 0);
+    const signSize  = Math.max(15, Math.floor(w * 0.024));
+    bgCtx.globalAlpha  = signAlpha;
+    bgCtx.shadowColor  = 'rgba(255,215,40,0.95)';
+    bgCtx.shadowBlur   = 14 + cheer * 12;
+    bgCtx.fillStyle    = '#ffe040';
+    bgCtx.font         = `italic bold ${signSize}px "Pacifico","Brush Script MT",cursive`;
+    bgCtx.textAlign    = 'center';
+    bgCtx.textBaseline = 'top';
+    bgCtx.fillText('★  Trumpets, Please  ★', w * 0.50, h * 0.135);
+  }
+  bgCtx.restore();
+
+  // ── 5. FILM CAMERAS ON TRIPODS ── in the wings, angled toward center
+  bgCtx.save();
+  bgCtx.fillStyle   = 'rgba(15,8,5,0.90)';
+  bgCtx.strokeStyle = 'rgba(15,8,5,0.90)';
+  bgCtx.lineWidth   = 2;
+  bgCtx.lineCap     = 'round';
+  const camY = floorY - h * 0.12;
+  for (const [camX, flip] of [[w * 0.09, 1], [w * 0.91, -1]]) {
+    // Tripod legs
+    bgCtx.beginPath();
+    bgCtx.moveTo(camX, camY); bgCtx.lineTo(camX - 18 * flip, floorY);
+    bgCtx.moveTo(camX, camY); bgCtx.lineTo(camX,              floorY);
+    bgCtx.moveTo(camX, camY); bgCtx.lineTo(camX + 10 * flip,  floorY);
+    bgCtx.stroke();
+    // Camera body
+    const cw2 = 20, ch2 = 13;
+    bgCtx.fillRect(camX - cw2 / 2, camY - ch2 / 2, cw2, ch2);
+    // Lens
+    bgCtx.beginPath();
+    bgCtx.arc(camX + flip * 10, camY, 6, 0, Math.PI * 2);
+    bgCtx.fill();
+    // Red recording light — pulses on beat
+    bgCtx.fillStyle = onBeat ? 'rgba(255,40,40,0.95)' : 'rgba(200,0,0,0.50)';
+    bgCtx.beginPath();
+    bgCtx.arc(camX - flip * 7, camY - 4, 2.5, 0, Math.PI * 2);
+    bgCtx.fill();
+    bgCtx.fillStyle = 'rgba(15,8,5,0.90)';
+  }
+  bgCtx.restore();
+
+  // ── 6. OSCAR TROPHY SILHOUETTE ── golden figure center-below the board
+  bgCtx.save();
+  const trophyX = w * 0.50, trophyBase = floorY + (h - floorY) * 0.22;
+  const trophyH = (h - floorY) * 0.55;
+  const trophyPulse = 0.85 + energy * 0.15 + cheer * 0.20;
+  bgCtx.globalAlpha = 0.55 * trophyPulse + (onBeat ? 0.10 : 0);
+  bgCtx.fillStyle   = '#d4a017';
+  // Base plinth
+  const pw = trophyH * 0.28, ph = trophyH * 0.14;
+  bgCtx.fillRect(trophyX - pw / 2, trophyBase - ph, pw, ph);
+  bgCtx.fillRect(trophyX - pw * 0.65 / 2, trophyBase - ph * 1.6, pw * 0.65, ph * 0.6);
+  // Stem
+  const stemW = trophyH * 0.07;
+  bgCtx.fillRect(trophyX - stemW / 2, trophyBase - ph * 1.6 - trophyH * 0.3, stemW, trophyH * 0.3);
+  // Figure body (elongated teardrop / person silhouette)
+  const figTop = trophyBase - ph * 1.6 - trophyH * 0.3 - trophyH * 0.42;
+  bgCtx.beginPath();
+  bgCtx.ellipse(trophyX, figTop + trophyH * 0.12, trophyH * 0.10, trophyH * 0.12, 0, 0, Math.PI * 2);
+  bgCtx.fill();
+  bgCtx.beginPath();
+  bgCtx.moveTo(trophyX - trophyH * 0.085, figTop + trophyH * 0.22);
+  bgCtx.lineTo(trophyX + trophyH * 0.085, figTop + trophyH * 0.22);
+  bgCtx.lineTo(trophyX + trophyH * 0.065, figTop + trophyH * 0.44);
+  bgCtx.lineTo(trophyX - trophyH * 0.065, figTop + trophyH * 0.44);
+  bgCtx.closePath();
+  bgCtx.fill();
+  // Arms raised
+  bgCtx.lineWidth = stemW * 0.9;
+  bgCtx.strokeStyle = '#d4a017';
+  bgCtx.globalAlpha = bgCtx.globalAlpha;
+  bgCtx.lineCap = 'round';
+  bgCtx.beginPath();
+  bgCtx.moveTo(trophyX - trophyH * 0.085, figTop + trophyH * 0.26);
+  bgCtx.lineTo(trophyX - trophyH * 0.22, figTop + trophyH * 0.14);
+  bgCtx.stroke();
+  bgCtx.beginPath();
+  bgCtx.moveTo(trophyX + trophyH * 0.085, figTop + trophyH * 0.26);
+  bgCtx.lineTo(trophyX + trophyH * 0.22, figTop + trophyH * 0.14);
+  bgCtx.stroke();
+  bgCtx.globalAlpha = 1;
+  bgCtx.restore();
+
+  // ── 7. GOLD CONFETTI / TICKER TAPE ── falls constantly, burst on clears
+  const confettiSpawnRate = 0.12 + cheer * 0.55 + dropP * 0.30;
+  if (Math.random() < confettiSpawnRate && _jzScene.confetti.length < 80) {
+    // Spawn from the top, outside play area if possible
+    const cx = playRects.length
+      ? (Math.random() < 0.5 ? Math.random() * (playRects[0].x - 10) : playRects[0].x + playRects[0].w + 10 + Math.random() * (w - playRects[0].x - playRects[0].w - 10))
+      : Math.random() * w;
+    const gold = Math.random() < 0.65;
+    _jzScene.confetti.push({
+      x:     cx,
+      y:     -8,
+      vy:    1.2 + Math.random() * 2.0,
+      vx:    (Math.random() - 0.5) * 1.4,
+      rot:   Math.random() * Math.PI * 2,
+      drot:  (Math.random() - 0.5) * 0.18,
+      w:     3 + Math.random() * 4,
+      h:     6 + Math.random() * 8,
+      hue:   gold ? (38 + Math.random() * 14) : (0 + Math.random() * 10),
+      alpha: 0.75 + Math.random() * 0.25,
+      isTape: Math.random() < 0.25,
+    });
+  }
+  bgCtx.save();
+  for (let i = _jzScene.confetti.length - 1; i >= 0; i--) {
+    const cf = _jzScene.confetti[i];
+    cf.y   += cf.vy;
+    cf.x   += cf.vx + Math.sin(now / 800 + i) * 0.4;
+    cf.rot += cf.drot;
+    if (cf.y > h + 10) { _jzScene.confetti.splice(i, 1); continue; }
+    bgCtx.save();
+    bgCtx.globalAlpha = cf.alpha;
+    bgCtx.translate(cf.x, cf.y);
+    bgCtx.rotate(cf.rot);
+    bgCtx.fillStyle = cf.isTape ? `rgba(255,245,200,${cf.alpha})` : `hsl(${cf.hue},90%,62%)`;
+    if (cf.isTape) {
+      bgCtx.fillRect(-cf.w * 3, -cf.h * 0.25, cf.w * 6, cf.h * 0.5);
+    } else {
+      bgCtx.fillRect(-cf.w / 2, -cf.h / 2, cf.w, cf.h);
     }
     bgCtx.restore();
   }
-
-  // ── 4. SPOTLIGHTS ── warm cones that sweep across the stage on the beat
-  bgCtx.save();
-  bgCtx.globalCompositeOperation = 'lighter';
-  for (const s of _jzScene.spots) {
-    s.phase += 0.006 + cheer * 0.012;
-    const sweep = Math.sin(s.phase) * (w * 0.12);
-    const tipX = s.baseX + sweep;
-    const tipY = h * 0.16;
-    const beamLen = h * 0.55;
-    const beamHalf = w * 0.04 + cheer * w * 0.02;
-    const grad = bgCtx.createLinearGradient(tipX, tipY, tipX, tipY + beamLen);
-    grad.addColorStop(0, `hsla(${s.hue},90%,75%,${0.36 + cheer * 0.20})`);
-    grad.addColorStop(1, `hsla(${s.hue},90%,40%,0)`);
-    bgCtx.fillStyle = grad;
-    bgCtx.beginPath();
-    bgCtx.moveTo(tipX, tipY);
-    bgCtx.lineTo(tipX - beamHalf, tipY + beamLen);
-    bgCtx.lineTo(tipX + beamHalf, tipY + beamLen);
-    bgCtx.closePath();
-    bgCtx.fill();
-  }
   bgCtx.restore();
 
-  // ── 5. NEON SIGN (TRUMPETS PLEASE) ── Glowing pink script tucked top-left
-  bgCtx.save();
-  bgCtx.globalAlpha = 0.85;
-  // Slight per-frame flicker on hardDrop
-  if (dropP > _jzScene.flicker + 0.10) _jzScene.flicker = dropP;
-  const flickerOff = _jzScene.flicker > 0 && Math.random() < 0.30;
-  _jzScene.flicker = Math.max(0, _jzScene.flicker - 0.04);
-  if (!flickerOff) {
-    bgCtx.shadowColor = 'rgba(255,80,200,0.95)';
-    bgCtx.shadowBlur  = 12;
-    bgCtx.fillStyle   = '#ff66c8';
-    bgCtx.font        = `italic ${Math.max(14, Math.floor(w * 0.022))}px "Pacifico", "Brush Script MT", cursive`;
-    bgCtx.textAlign   = 'left';
-    bgCtx.textBaseline = 'top';
-    bgCtx.fillText('Trumpets, Please', w * 0.05, h * 0.04);
-  }
-  bgCtx.restore();
-
-  // ── 6. SMOKE RINGS ── drift up from the neon sign; spawn faster on movePulse
-  if (move > _jzScene.lastMove + 0.06 || Math.random() < 0.04) {
+  // ── 8. SMOKE RINGS ── drift from sign area
+  if (move > _jzScene.lastMove + 0.06 || Math.random() < 0.03) {
     _jzScene.smoke.push({
-      x: w * 0.18 + (Math.random() - 0.5) * w * 0.06,
-      y: h * 0.10,
-      r: 4 + Math.random() * 5,
-      vy: -0.25 - Math.random() * 0.25,
-      alpha: 0.30 + move * 0.20,
-      twist: (Math.random() - 0.5) * 0.4,
+      x:     w * 0.35 + (Math.random() - 0.5) * w * 0.06,
+      y:     h * 0.16,
+      r:     3 + Math.random() * 4,
+      vy:    -0.20 - Math.random() * 0.18,
+      alpha: 0.22 + move * 0.14,
+      twist: (Math.random() - 0.5) * 0.3,
     });
-    if (_jzScene.smoke.length > 18) _jzScene.smoke.shift();
+    if (_jzScene.smoke.length > 14) _jzScene.smoke.shift();
   }
   _jzScene.lastMove = move;
   bgCtx.save();
   for (let i = _jzScene.smoke.length - 1; i >= 0; i--) {
     const s = _jzScene.smoke[i];
-    s.y += s.vy;
-    s.r += 0.25;
-    s.alpha -= 0.005;
-    s.x += Math.sin(s.y * 0.04) * 0.2 + s.twist * 0.04;
+    s.y += s.vy; s.r += 0.20; s.alpha -= 0.005;
+    s.x += Math.sin(s.y * 0.04) * 0.15 + s.twist * 0.04;
     if (s.alpha <= 0) { _jzScene.smoke.splice(i, 1); continue; }
-    bgCtx.strokeStyle = `rgba(220,210,230,${s.alpha})`;
-    bgCtx.lineWidth = 1.4;
+    bgCtx.strokeStyle = `rgba(220,210,195,${s.alpha})`;
+    bgCtx.lineWidth   = 1;
     bgCtx.beginPath();
     bgCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     bgCtx.stroke();
   }
   bgCtx.restore();
 
-  // ── 7. SILHOUETTE BAND ── three musicians along the stage floor
-  // Cheap silhouettes: filled black-purple shapes, no per-frame randomness.
-  // Slight per-musician sway driven by movePulse + beat.
-  const floorY = _jzScene.floorY;
+  // ── 9. AUDIENCE ── 3 rows, bob aggressively on beat, raise arms on cheer
   bgCtx.save();
-  bgCtx.fillStyle = 'rgba(8,3,14,0.95)';
-  // Bassist (left): tall figure with an upright bass silhouette
-  const sway = Math.sin(now / 600) * 3 + (onBeat ? 4 : 0);
-  _drawJazzBassist(w * 0.25, floorY, sway);
-  // Drummer (centre): figure behind a drum kit
-  _drawJazzDrummer(w * 0.50, floorY, sway * 0.6, onBeat);
-  // Saxophonist (right): figure raising a sax to the spotlights
-  _drawJazzSaxophonist(w * 0.74, floorY, sway, cheer);
+  bgCtx.fillStyle   = 'rgba(3,0,6,0.95)';
+  bgCtx.strokeStyle = 'rgba(3,0,6,0.95)';
+  bgCtx.lineWidth   = 2;
+  bgCtx.lineCap     = 'round';
+  for (const a of _jzScene.audience) {
+    const bobAmt = 2.0 + cheer * 8 + energy * 4;
+    const bob    = (onBeat || cheer > 0.18) ? Math.sin(now / 240 + a.phase) * bobAmt : 0;
+    const armUp  = cheer > 0.35 && Math.sin(now / 170 + a.phase) > 0;
+    const scale  = 1 + energy * 0.08;
+    bgCtx.beginPath();
+    bgCtx.arc(a.x, a.y + bob, a.r * scale, 0, Math.PI * 2);
+    bgCtx.fill();
+    bgCtx.fillRect(a.x - a.r * 1.8 * scale, a.y + bob + a.r * 0.5 * scale, a.r * 3.6 * scale, a.r * 0.8 * scale);
+    if (armUp) {
+      bgCtx.beginPath();
+      bgCtx.moveTo(a.x - a.r * 1.4, a.y + bob + a.r * 0.6);
+      bgCtx.lineTo(a.x - a.r * 2.4, a.y + bob - a.r * 1.5);
+      bgCtx.stroke();
+      bgCtx.beginPath();
+      bgCtx.moveTo(a.x + a.r * 1.4, a.y + bob + a.r * 0.6);
+      bgCtx.lineTo(a.x + a.r * 2.4, a.y + bob - a.r * 1.5);
+      bgCtx.stroke();
+    }
+  }
   bgCtx.restore();
 
-  // ── 8. FLOOR REFLECTION ── thin horizontal bar of ambient warm glow
-  const floorGrad = bgCtx.createLinearGradient(0, floorY, 0, h);
-  floorGrad.addColorStop(0, `rgba(${ar},${ag},${ab},${0.04 + energy * 0.05})`);
-  floorGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
-  bgCtx.fillStyle = floorGrad;
-  bgCtx.fillRect(0, floorY, w, h - floorY);
+  // ── 10. BAND SILHOUETTES
+  bgCtx.save();
+  bgCtx.fillStyle   = 'rgba(5,1,10,0.96)';
+  bgCtx.strokeStyle = 'rgba(5,1,10,0.96)';
+  const sway = Math.sin(now / 550) * 4 + (onBeat ? 5 : 0);
+  _drawJazzBassist(w * 0.20, floorY, sway);
+  _drawJazzDrummer(w * 0.50, floorY, sway * 0.6, onBeat);
+  _drawJazzSaxophonist(w * 0.80, floorY, sway, cheer);
+  bgCtx.restore();
 
-  // ── 9. PLAY-AREA MASK ── punch hole over the player's board
+  // ── 11. CAMERA FLASHES ── paparazzi, heavy on hard drops and 4-line clears
+  if (dropP > 0.18) {
+    for (let fi = 0; fi < 2; fi++) {
+      const fx = playRects.length
+        ? (Math.random() < 0.5 ? playRects[0].x * Math.random() * 0.9 : playRects[0].x + playRects[0].w + Math.random() * (w - playRects[0].x - playRects[0].w) * 0.9)
+        : Math.random() * w;
+      _jzScene.flashes.push({ x: fx, y: h * (0.10 + Math.random() * 0.55), r: 0, maxR: 40 + Math.random() * 50, alpha: 0.70 });
+    }
+  }
+  if (cheer > 0.50 && Math.random() < 0.45) {
+    const count = 2 + (cheer > 0.80 ? 2 : 0);
+    for (let fi = 0; fi < count; fi++) {
+      _jzScene.flashes.push({ x: Math.random() * w, y: h * (0.08 + Math.random() * 0.60), r: 0, maxR: 50 + Math.random() * 70, alpha: 0.65 });
+    }
+  }
+  bgCtx.save();
+  for (let i = _jzScene.flashes.length - 1; i >= 0; i--) {
+    const f = _jzScene.flashes[i];
+    f.r += 6; f.alpha -= 0.055;
+    if (f.alpha <= 0 || f.r >= f.maxR) { _jzScene.flashes.splice(i, 1); continue; }
+    bgCtx.globalAlpha = f.alpha;
+    bgCtx.fillStyle   = '#ffffff';
+    bgCtx.beginPath();
+    bgCtx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+  bgCtx.restore();
+
+  // ── 12. "BRAVO!" REACTION TEXT ── flashes on 4-line clears (cheer > 0.85)
+  if (cheer > 0.85 && !_jzScene.reactionText) {
+    const reactions = ['BRAVO!', 'ENCORE!', 'MAGNIFICENT!', 'LIGHTS! CAMERA!', 'ACTION!', 'THE WINNER IS...'];
+    _jzScene.reactionText = { text: reactions[Math.floor(Math.random() * reactions.length)], alpha: 1.0, y: h * 0.40 };
+  }
+  if (_jzScene.reactionText) {
+    const rt = _jzScene.reactionText;
+    rt.y   -= 0.5;
+    rt.alpha -= 0.012;
+    if (rt.alpha <= 0) { _jzScene.reactionText = null; }
+    else {
+      bgCtx.save();
+      bgCtx.globalAlpha  = rt.alpha;
+      bgCtx.shadowColor  = 'rgba(255,200,30,0.95)';
+      bgCtx.shadowBlur   = 20;
+      bgCtx.fillStyle    = '#ffe840';
+      bgCtx.font         = `bold ${Math.max(22, Math.floor(w * 0.038))}px Arial, sans-serif`;
+      bgCtx.textAlign    = 'center';
+      bgCtx.textBaseline = 'middle';
+      bgCtx.fillText(rt.text, w * 0.50, rt.y);
+      bgCtx.restore();
+    }
+  }
+
+  // ── 13. FLOOR GLOW ── deep red carpet warmth
+  bgCtx.globalAlpha = 0.5 + energy * 0.35;
+  bgCtx.fillStyle   = `rgba(160,0,18,${0.06 + energy * 0.08 + cheer * 0.06})`;
+  bgCtx.fillRect(0, floorY, w, h - floorY);
+  bgCtx.globalAlpha = 1;
+
+  // ── 14. PLAY-AREA MASK
   if (playRects.length) {
     bgCtx.save();
     bgCtx.globalCompositeOperation = 'destination-out';
-    for (const pr of playRects) {
-      bgCtx.fillStyle = '#000';
-      bgCtx.fillRect(pr.x, pr.y, pr.w, pr.h);
-    }
+    for (const pr of playRects) { bgCtx.fillStyle = '#000'; bgCtx.fillRect(pr.x, pr.y, pr.w, pr.h); }
     bgCtx.restore();
   }
 }
 
-// ── Tiny helpers for the band silhouettes (cheap, no per-frame allocations) ──
+// ── Band silhouette helpers ──
 function _drawJazzBassist(cx, baseY, sway) {
   // Body
   bgCtx.beginPath();
@@ -9177,6 +9596,472 @@ function drawBlockMug(context, x, y, color, size, alpha, theme) {
 
   context.restore();
   context.globalAlpha = 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BULLET BLOCK (Level 12 - Triggered)
+// A brass rifle cartridge standing upright. Ogive tip at the top, cylindrical
+// brass case below, primer circle at the base. Glints on the casing catch the
+// level's orange-red glow. Fits cleanly at ~30px CELL size.
+// ─────────────────────────────────────────────────────────────────────────────
+function drawBlockBullet(context, x, y, color, size, alpha, theme) {
+  context.globalAlpha = alpha;
+  context.save();
+  context.shadowColor = (theme && theme.colors && theme.colors.glow) || '#ff6600';
+  context.shadowBlur  = Math.min(8, size * 0.22);
+
+  const cx   = x + size * 0.5;
+  const pad  = size * 0.18;
+  const caseTop    = y + size * 0.42;    // top of brass case
+  const caseBot    = y + size * 0.90;    // base / bottom
+  const caseLeft   = x + pad;
+  const caseRight  = x + size - pad;
+  const caseW      = caseRight - caseLeft;
+
+  // ── Brass casing ──
+  const caseGrad = context.createLinearGradient(caseLeft, 0, caseRight, 0);
+  caseGrad.addColorStop(0,    '#6b4c1a');
+  caseGrad.addColorStop(0.25, '#c8921a');
+  caseGrad.addColorStop(0.50, '#f0c040');
+  caseGrad.addColorStop(0.75, '#c8921a');
+  caseGrad.addColorStop(1,    '#6b4c1a');
+  context.fillStyle = caseGrad;
+  context.beginPath();
+  context.roundRect(caseLeft, caseTop, caseW, caseBot - caseTop, [2, 2, 3, 3]);
+  context.fill();
+
+  // ── Case shoulder / neck transition line ──
+  context.strokeStyle = 'rgba(0,0,0,0.4)';
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(caseLeft,  caseTop + size * 0.04);
+  context.lineTo(caseRight, caseTop + size * 0.04);
+  context.stroke();
+
+  // ── Ogive (bullet tip) — tapered to a point ──
+  const tipTop   = y + size * 0.08;
+  const tipBase  = caseTop + size * 0.02;
+  const halfCaseW = caseW * 0.5;
+  const tipGrad = context.createLinearGradient(caseLeft, 0, caseRight, 0);
+  tipGrad.addColorStop(0,    '#444');
+  tipGrad.addColorStop(0.30, '#aaa');
+  tipGrad.addColorStop(0.55, '#ddd');
+  tipGrad.addColorStop(0.75, '#888');
+  tipGrad.addColorStop(1,    '#333');
+  context.fillStyle = tipGrad;
+  context.beginPath();
+  context.moveTo(cx, tipTop);
+  context.bezierCurveTo(
+    cx + halfCaseW * 0.9, tipTop + (tipBase - tipTop) * 0.4,
+    cx + halfCaseW,        tipBase - size * 0.05,
+    caseRight, tipBase
+  );
+  context.lineTo(caseLeft, tipBase);
+  context.bezierCurveTo(
+    cx - halfCaseW,        tipBase - size * 0.05,
+    cx - halfCaseW * 0.9, tipTop + (tipBase - tipTop) * 0.4,
+    cx, tipTop
+  );
+  context.fill();
+
+  // ── Tip highlight glint ──
+  context.fillStyle = 'rgba(255,255,255,0.45)';
+  context.beginPath();
+  context.ellipse(cx - caseW * 0.10, tipTop + size * 0.06, caseW * 0.08, size * 0.06, -0.4, 0, Math.PI * 2);
+  context.fill();
+
+  // ── Primer circle at the base ──
+  const primerR = caseW * 0.24;
+  const primerY = caseBot - primerR - size * 0.04;
+  const primerGrad = context.createRadialGradient(cx, primerY, 0, cx, primerY, primerR);
+  primerGrad.addColorStop(0,   '#ffe080');
+  primerGrad.addColorStop(0.6, '#b87010');
+  primerGrad.addColorStop(1,   '#5a3800');
+  context.fillStyle = primerGrad;
+  context.beginPath();
+  context.arc(cx, primerY, primerR, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = 'rgba(0,0,0,0.5)';
+  context.lineWidth = 0.8;
+  context.stroke();
+
+  // ── Case glint streak ──
+  context.fillStyle = 'rgba(255,240,180,0.30)';
+  context.beginPath();
+  context.roundRect(cx - caseW * 0.07, caseTop + size * 0.07, caseW * 0.11, (caseBot - caseTop) * 0.55, 2);
+  context.fill();
+
+  context.restore();
+  context.globalAlpha = 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WARZONE SCENE (Level 12 - Triggered)
+// A brutal concrete bunker at night. Barbed wire silhouettes, sandbag
+// barricades, fire and embers, distant artillery flashes on cheer, bullet
+// tracer streaks on movePulse, soldier silhouette aiming from the wings.
+// Muzzle flash on boardDropPulse. Fully reactive — the more the player
+// clears, the more the front heats up.
+// ─────────────────────────────────────────────────────────────────────────────
+let _wzScene = null;
+
+function _initWarzoneScene(w, h) {
+  const embers = [];
+  for (let i = 0; i < 40; i++) {
+    embers.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.6,
+      vy: -(Math.random() * 0.8 + 0.3),
+      r:  Math.random() * 2.5 + 0.8,
+      life: Math.random(),
+      maxLife: Math.random() * 0.6 + 0.4,
+      hue: Math.random() * 30,
+    });
+  }
+  const tracers = [];
+  const explosions = [];
+  _wzScene = {
+    embers, tracers, explosions,
+    flashAlpha: 0,
+    muzzleFlash: 0,
+    artilleryFlash: 0,
+    bgCanvas: null,
+    w, h,
+  };
+}
+
+function _buildWarzoneStaticBg(w, h) {
+  const oc = document.createElement('canvas');
+  oc.width = w; oc.height = h;
+  const c = oc.getContext('2d');
+
+  // Night sky gradient — deep red-orange glow on the horizon (fires)
+  const sky = c.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0,    '#050002');
+  sky.addColorStop(0.55, '#0d0000');
+  sky.addColorStop(0.80, '#3a0800');
+  sky.addColorStop(1,    '#5c1200');
+  c.fillStyle = sky;
+  c.fillRect(0, 0, w, h);
+
+  // Distant city-fire glow on the horizon
+  for (let i = 0; i < 5; i++) {
+    const fx = w * (0.1 + i * 0.19 + Math.random() * 0.06);
+    const fg = c.createRadialGradient(fx, h * 0.72, 0, fx, h * 0.72, w * 0.12);
+    fg.addColorStop(0,   'rgba(255,80,0,0.22)');
+    fg.addColorStop(0.5, 'rgba(180,30,0,0.10)');
+    fg.addColorStop(1,   'rgba(0,0,0,0)');
+    c.fillStyle = fg;
+    c.fillRect(0, 0, w, h);
+  }
+
+  // Concrete floor
+  const floorY = h * 0.75;
+  const floorGrad = c.createLinearGradient(0, floorY, 0, h);
+  floorGrad.addColorStop(0, '#2a2018');
+  floorGrad.addColorStop(1, '#1a1208');
+  c.fillStyle = floorGrad;
+  c.fillRect(0, floorY, w, h - floorY);
+
+  // Concrete texture — thin cracks
+  c.strokeStyle = 'rgba(0,0,0,0.35)';
+  c.lineWidth = 0.8;
+  for (let i = 0; i < 6; i++) {
+    const sx = Math.random() * w;
+    const sy = floorY + Math.random() * (h - floorY) * 0.5;
+    c.beginPath();
+    c.moveTo(sx, sy);
+    for (let j = 0; j < 4; j++) {
+      c.lineTo(sx + (Math.random() - 0.5) * 40, sy + (j + 1) * 10 + Math.random() * 8);
+    }
+    c.stroke();
+  }
+
+  // Sandbag wall — stacked rows
+  const bagColors = ['#5c4a22', '#4a3a18', '#6a5528'];
+  const bagRowY = [h * 0.70, h * 0.76];
+  const bagH = h * 0.065;
+  const bagW = w * 0.095;
+  for (const rowY of bagRowY) {
+    const offset = rowY === bagRowY[1] ? bagW * 0.5 : 0;
+    for (let bx = -bagW + offset; bx < w + bagW; bx += bagW * 1.02) {
+      c.fillStyle = bagColors[Math.floor(Math.random() * bagColors.length)];
+      c.beginPath();
+      c.ellipse(bx + bagW * 0.5, rowY + bagH * 0.5, bagW * 0.5, bagH * 0.5, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = 'rgba(0,0,0,0.4)';
+      c.lineWidth = 0.7;
+      c.stroke();
+    }
+  }
+
+  // Barbed wire silhouette across the middle
+  const wireY = h * 0.58;
+  c.strokeStyle = 'rgba(60,40,20,0.85)';
+  c.lineWidth = 1.2;
+  c.beginPath();
+  c.moveTo(0, wireY);
+  for (let wx = 0; wx <= w; wx += 18) {
+    c.lineTo(wx, wireY + Math.sin(wx * 0.35) * 5);
+  }
+  c.stroke();
+  // barbs
+  c.strokeStyle = 'rgba(80,60,30,0.70)';
+  c.lineWidth = 0.9;
+  for (let wx = 8; wx < w; wx += 14) {
+    const wy = wireY + Math.sin(wx * 0.35) * 5;
+    c.beginPath(); c.moveTo(wx - 4, wy - 4); c.lineTo(wx + 4, wy + 4); c.stroke();
+    c.beginPath(); c.moveTo(wx + 4, wy - 4); c.lineTo(wx - 4, wy + 4); c.stroke();
+  }
+
+  // Broken concrete wall chunks left/right (frame the scene)
+  for (const side of ['left', 'right']) {
+    const wallX = side === 'left' ? 0 : w * 0.82;
+    const wallW = w * 0.18;
+    const wallGrad = c.createLinearGradient(wallX, 0, wallX + wallW, 0);
+    wallGrad.addColorStop(0, side === 'left' ? '#2a2520' : '#1a1510');
+    wallGrad.addColorStop(1, side === 'left' ? 'rgba(30,28,22,0)' : '#1e1a14');
+    c.fillStyle = wallGrad;
+    c.fillRect(wallX, h * 0.30, wallW, h * 0.70);
+    // rubble chunks
+    c.fillStyle = '#3a3020';
+    for (let ri = 0; ri < 5; ri++) {
+      const rx = wallX + Math.random() * wallW * 0.8;
+      const ry = h * (0.65 + Math.random() * 0.25);
+      const rw = 8 + Math.random() * 16;
+      const rh = 5 + Math.random() * 10;
+      c.beginPath();
+      c.ellipse(rx, ry, rw, rh, Math.random() * Math.PI, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+
+  return oc;
+}
+
+function drawWarzoneScene(theme, now, playRects) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (!_wzScene || _wzScene.w !== w || _wzScene.h !== h) _initWarzoneScene(w, h);
+  const sc = _wzScene;
+  if (!sc.bgCanvas || sc.bgCanvas.width !== w) {
+    sc.bgCanvas = _buildWarzoneStaticBg(w, h);
+  }
+
+  const cheer   = typeof cheerEnergy   !== 'undefined' ? cheerEnergy   : 0;
+  const energy  = typeof beatEnergy    !== 'undefined' ? beatEnergy    : 0;
+  const movePulse      = typeof _movePulse      !== 'undefined' ? _movePulse      : 0;
+  const boardDropPulse = typeof _boardDropPulse !== 'undefined' ? _boardDropPulse : 0;
+  const ctx = bgCtx;
+
+  // Static layer
+  ctx.drawImage(sc.bgCanvas, 0, 0);
+
+  // ── Artillery flash on cheer (distant explosion glow) ──
+  if (cheer > 0.6) sc.artilleryFlash = Math.min(1, sc.artilleryFlash + 0.08);
+  sc.artilleryFlash *= 0.88;
+  if (sc.artilleryFlash > 0.01) {
+    const sides = ['left', 'right'];
+    for (const side of sides) {
+      const fx = side === 'left' ? w * 0.12 : w * 0.88;
+      const aGrad = ctx.createRadialGradient(fx, h * 0.45, 0, fx, h * 0.45, w * 0.25);
+      aGrad.addColorStop(0,   `rgba(255,200,60,${sc.artilleryFlash * 0.55})`);
+      aGrad.addColorStop(0.4, `rgba(255,80,0,${sc.artilleryFlash * 0.28})`);
+      aGrad.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = aGrad;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+
+  // ── Fire columns (left and right flanks) ──
+  const floorY = h * 0.75;
+  const firePositions = [w * 0.08, w * 0.18, w * 0.80, w * 0.90];
+  for (const fx of firePositions) {
+    const fh = h * (0.18 + energy * 0.12 + cheer * 0.08);
+    const fireGrad = ctx.createLinearGradient(fx, floorY - fh, fx, floorY);
+    fireGrad.addColorStop(0,   'rgba(255,60,0,0)');
+    fireGrad.addColorStop(0.4, `rgba(255,120,0,${0.55 + energy * 0.2})`);
+    fireGrad.addColorStop(0.8, `rgba(255,200,30,${0.65 + energy * 0.2})`);
+    fireGrad.addColorStop(1,   `rgba(255,255,120,${0.50 + energy * 0.15})`);
+    const fw = w * (0.045 + energy * 0.015);
+    ctx.fillStyle = fireGrad;
+    ctx.beginPath();
+    ctx.ellipse(fx, floorY, fw, fh, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Embers ──
+  for (const em of sc.embers) {
+    em.x  += em.vx + (energy - 0.5) * 0.3;
+    em.y  += em.vy * (0.8 + energy * 0.4);
+    em.life -= 0.004 + energy * 0.003;
+    if (em.life <= 0 || em.y < 0) {
+      em.x    = Math.random() * w;
+      em.y    = floorY - 20;
+      em.life = em.maxLife;
+      em.vy   = -(Math.random() * 0.8 + 0.3);
+    }
+    const a = Math.min(1, em.life / em.maxLife) * (0.6 + energy * 0.3);
+    ctx.fillStyle = `hsla(${30 + em.hue},100%,${55 + em.hue * 0.8}%,${a})`;
+    ctx.beginPath();
+    ctx.arc(em.x, em.y, em.r * (0.7 + energy * 0.5), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Bullet tracers on movePulse ──
+  if (movePulse > 0.4 && Math.random() < movePulse * 0.55) {
+    sc.tracers.push({
+      x: Math.random() > 0.5 ? -10 : w + 10,
+      y: h * (0.25 + Math.random() * 0.45),
+      vx: (Math.random() > 0.5 ? 1 : -1) * (w * 0.035 + Math.random() * w * 0.02),
+      vy: (Math.random() - 0.5) * h * 0.01,
+      life: 1,
+      len: w * (0.06 + Math.random() * 0.06),
+    });
+  }
+  for (let i = sc.tracers.length - 1; i >= 0; i--) {
+    const tr = sc.tracers[i];
+    tr.x += tr.vx; tr.y += tr.vy; tr.life -= 0.08;
+    if (tr.life <= 0 || tr.x < -tr.len || tr.x > w + tr.len) {
+      sc.tracers.splice(i, 1); continue;
+    }
+    const a = tr.life * 0.85;
+    ctx.strokeStyle = `rgba(255,255,180,${a})`;
+    ctx.lineWidth   = 1.5;
+    ctx.shadowColor = 'rgba(255,220,100,0.8)';
+    ctx.shadowBlur  = 4;
+    ctx.beginPath();
+    ctx.moveTo(tr.x, tr.y);
+    ctx.lineTo(tr.x - tr.vx * (tr.len / Math.abs(tr.vx)), tr.y - tr.vy * (tr.len / Math.abs(tr.vx)));
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  // ── Explosions on cheer / line clear ──
+  if (cheer > 0.7 && Math.random() < 0.12) {
+    sc.explosions.push({
+      x: Math.random() * w,
+      y: h * (0.2 + Math.random() * 0.5),
+      r: 0,
+      maxR: w * (0.04 + Math.random() * 0.06),
+      life: 1,
+    });
+  }
+  for (let i = sc.explosions.length - 1; i >= 0; i--) {
+    const ex = sc.explosions[i];
+    ex.r    += ex.maxR * 0.12;
+    ex.life -= 0.07;
+    if (ex.life <= 0) { sc.explosions.splice(i, 1); continue; }
+    const a = ex.life * 0.8;
+    const exGrad = ctx.createRadialGradient(ex.x, ex.y, 0, ex.x, ex.y, ex.r);
+    exGrad.addColorStop(0,   `rgba(255,255,200,${a})`);
+    exGrad.addColorStop(0.3, `rgba(255,140,0,${a * 0.8})`);
+    exGrad.addColorStop(0.7, `rgba(180,40,0,${a * 0.4})`);
+    exGrad.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = exGrad;
+    ctx.beginPath();
+    ctx.arc(ex.x, ex.y, ex.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Muzzle flash on hard drop ──
+  if (boardDropPulse > 0.3) sc.muzzleFlash = Math.min(1, sc.muzzleFlash + boardDropPulse * 0.9);
+  sc.muzzleFlash *= 0.72;
+  if (sc.muzzleFlash > 0.02) {
+    const mfSides = [{ x: w * 0.05, dir: 1 }, { x: w * 0.95, dir: -1 }];
+    for (const { x: mfx, dir } of mfSides) {
+      const mfY = h * 0.65;
+      ctx.save();
+      ctx.translate(mfx, mfY);
+      // Flash cone
+      const flashGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.12);
+      flashGrad.addColorStop(0,   `rgba(255,255,200,${sc.muzzleFlash * 0.95})`);
+      flashGrad.addColorStop(0.3, `rgba(255,160,30,${sc.muzzleFlash * 0.65})`);
+      flashGrad.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = flashGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(dir * w * 0.14, -h * 0.04);
+      ctx.lineTo(dir * w * 0.14,  h * 0.04);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // ── Soldier silhouettes (flanking the play area) ──
+  const soldierPositions = [
+    { x: w * 0.06, flip: false, crouching: energy > 0.55 },
+    { x: w * 0.92, flip: true,  crouching: cheer > 0.4   },
+  ];
+  for (const sol of soldierPositions) {
+    const { x: sx, flip, crouching } = sol;
+    const sh = h * (crouching ? 0.22 : 0.28);
+    const sy = floorY - sh;
+    ctx.save();
+    if (flip) { ctx.translate(sx * 2, 0); ctx.scale(-1, 1); }
+    ctx.fillStyle = 'rgba(8,5,2,0.92)';
+    // Torso
+    ctx.beginPath();
+    ctx.roundRect(sx - sh * 0.14, sy + sh * (crouching ? 0.30 : 0.25),
+                  sh * 0.28, sh * (crouching ? 0.42 : 0.46), 3);
+    ctx.fill();
+    // Head with helmet
+    const hx = sx, hy = sy + sh * (crouching ? 0.10 : 0.08);
+    const hr = sh * 0.12;
+    ctx.beginPath(); ctx.arc(hx, hy, hr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(20,14,6,0.95)';
+    ctx.beginPath();
+    ctx.ellipse(hx, hy - hr * 0.3, hr * 1.3, hr * 0.55, 0, Math.PI, 0);
+    ctx.fill();
+    // Rifle barrel extending outward
+    const armY = sy + sh * (crouching ? 0.38 : 0.34);
+    ctx.fillStyle = 'rgba(15,10,4,0.95)';
+    ctx.beginPath();
+    ctx.roundRect(sx + sh * 0.10, armY - 3, sh * (crouching ? 0.45 : 0.50), 5, 2);
+    ctx.fill();
+    // Legs
+    ctx.fillStyle = 'rgba(8,5,2,0.92)';
+    const legTop  = sy + sh * (crouching ? 0.68 : 0.70);
+    const legBot  = floorY;
+    if (crouching) {
+      ctx.beginPath();
+      ctx.roundRect(sx - sh * 0.12, legTop, sh * 0.11, legBot - legTop, 2); ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(sx + sh * 0.01, legTop - sh * 0.08, sh * 0.11, (legBot - legTop) * 0.85, 2); ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.roundRect(sx - sh * 0.10, legTop, sh * 0.10, legBot - legTop, 2); ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(sx + sh * 0.02, legTop, sh * 0.10, legBot - legTop, 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ── Play-area mask (keep board readable) ──
+  if (playRects.length) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    for (const r of playRects) {
+      const clip = ctx.createLinearGradient(r.x, r.y, r.x, r.y + r.h);
+      clip.addColorStop(0,   'rgba(0,0,0,0)');
+      clip.addColorStop(0.1, 'rgba(0,0,0,0.45)');
+      clip.addColorStop(0.5, 'rgba(0,0,0,0.60)');
+      clip.addColorStop(0.9, 'rgba(0,0,0,0.45)');
+      clip.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle = clip;
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    }
+    ctx.restore();
+  }
+
+  // ── Screen flash on full-screen cheer spike ──
+  if (cheer > 0.9) sc.flashAlpha = Math.min(0.22, sc.flashAlpha + 0.06);
+  sc.flashAlpha *= 0.80;
+  if (sc.flashAlpha > 0.005) {
+    ctx.fillStyle = `rgba(255,80,0,${sc.flashAlpha})`;
+    ctx.fillRect(0, 0, w, h);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9887,20 +10772,22 @@ function drawBackground() {
   // future "physical" background object) from rendering on top of the
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
-  const playRects = [];
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy');
-  if (gameStarted && usesPlayAreaMask) {
-    const c1 = document.getElementById('main-canvas');
-    if (c1) {
-      const r = c1.getBoundingClientRect();
-      if (r.width > 0) playRects.push({ x: r.left - 12, y: r.top - 12, w: r.width + 24, h: r.height + 24 });
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone');
+  // Cache getBoundingClientRect — forced layout reflow every frame is very
+  // expensive. Invalidate only when canvas size or vs-mode changes.
+  const _vsMode = document.body.classList.contains('vs-mode');
+  const _prKey  = `${bgCanvas.width},${bgCanvas.height},${gameStarted ? 1 : 0},${_vsMode ? 1 : 0}`;
+  if (!_playRectsCache || _playRectsCacheKey !== _prKey) {
+    _playRectsCache = [];
+    if (gameStarted && usesPlayAreaMask) {
+      const c1 = document.getElementById('main-canvas');
+      if (c1) { const r = c1.getBoundingClientRect(); if (r.width > 0) _playRectsCache.push({ x: r.left - 12, y: r.top - 12, w: r.width + 24, h: r.height + 24 }); }
+      const c2 = document.getElementById('main-canvas-2');
+      if (c2 && _vsMode) { const r = c2.getBoundingClientRect(); if (r.width > 0) _playRectsCache.push({ x: r.left - 8, y: r.top - 8, w: r.width + 16, h: r.height + 16 }); }
     }
-    const c2 = document.getElementById('main-canvas-2');
-    if (c2 && document.body.classList.contains('vs-mode')) {
-      const r = c2.getBoundingClientRect();
-      if (r.width > 0) playRects.push({ x: r.left - 8, y: r.top - 8, w: r.width + 16, h: r.height + 16 });
-    }
+    _playRectsCacheKey = _prKey;
   }
+  const playRects = _playRectsCache;
   // Pick a fresh x outside every play-area rect. Used when a violin wraps
   // back to the top so it doesn't immediately fall behind the board.
   const _pickXOutsidePlayArea = () => {
@@ -9984,6 +10871,10 @@ function drawBackground() {
   // spiral, planets in the distance, all reactive.
   if (style === 'galaxy') {
     drawGalaxyScene(theme, now, playRects);
+    return;
+  }
+  if (style === 'warzone') {
+    drawWarzoneScene(theme, now, playRects);
     return;
   }
 
@@ -11623,16 +12514,26 @@ window.addEventListener('resize', () => positionP2Monitor());
   // the first sub-mode of the new tab so a quick tap doesn't leave the
   // game in the previous tab's mode.
   const tabSubmodes = {
-    solo: 'solo',  // default sub-mode for SOLO tab
-    vs:   'vs',    // default sub-mode for VS tab
+    arcade: 'solo',
+    vs:     'vs',
+    story:  null,   // no sub-mode — shows WIP overlay
+    more:   'marathon',
   };
+  const storyWip = document.getElementById('story-wip');
+  const startBtn = document.getElementById('start-btn');
   function setTab(tab) {
     if (select) select.dataset.activeTab = tab;
     tabs.forEach(t => t.classList.toggle('mode-tab-active', t.dataset.tab === tab));
     btns.forEach(b => b.style.display = b.dataset.tab === tab ? '' : 'none');
-    // Auto-select first sub-mode of this tab so the start button works
-    // immediately. Honours the previously-active sub-mode if it belongs
-    // to this tab.
+    // STORY tab: show WIP, hide start button and vibe picker
+    const isStory = (tab === 'story');
+    if (storyWip) storyWip.style.display = isStory ? 'flex' : 'none';
+    if (startBtn) startBtn.style.display  = isStory ? 'none'  : '';
+    const levelSelect = document.getElementById('level-select');
+    if (isStory) {
+      if (levelSelect) levelSelect.style.display = 'none';
+      return; // no sub-mode to auto-select
+    }
     const prev = document.querySelector(`.mode-btn.mode-active[data-tab="${tab}"]`);
     if (!prev) {
       const target = document.querySelector(`.mode-btn[data-tab="${tab}"][data-mode="${tabSubmodes[tab]}"]`)
@@ -11644,19 +12545,15 @@ window.addEventListener('resize', () => positionP2Monitor());
   btns.forEach(btn => btn.addEventListener('click', () => {
     gameMode = btn.dataset.mode;
     btns.forEach(b => b.classList.toggle('mode-active', b === btn));
-    // Remember last sub-mode per tab so re-entering keeps Sir's choice.
     tabSubmodes[btn.dataset.tab] = btn.dataset.mode;
     if (diff) diff.style.display = (gameMode === 'vs') ? 'flex' : 'none';
-    // Vibe picker shows under STORY (pick where in the campaign to start)
-    // and SPRINT (pick which map to do your 40-line run on). Hidden for
-    // Marathon (locked to Galaxy), Ultra (always Underground L1), and VS.
     const levelSelect = document.getElementById('level-select');
     const showsPicker = (gameMode === 'solo' || gameMode === 'sprint');
     if (levelSelect) levelSelect.style.display = showsPicker ? 'flex' : 'none';
     refreshLb();
   }));
-  // Init: SOLO tab + STORY sub-mode visible.
-  setTab('solo');
+  // Init: ARCADE tab active.
+  setTab('arcade');
   refreshLb();
 })();
 
