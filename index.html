@@ -12807,7 +12807,20 @@ document.addEventListener('keydown', (e) => {
     case 'v': case 'V': setVoiceEnabled(!voiceEnabled); break;
     case 'p': case 'P':
       paused = !paused;
-      if (paused) audioEngine.stop(); else audioEngine.start();
+      _pausedByHide = false;  // user explicitly chose pause state
+      if (paused) {
+        audioEngine.stop();
+      } else {
+        // Resume the AudioContext FIRST (if suspended by a prior tab-hide)
+        // so that audioEngine.start()'s scheduled notes actually fire.
+        try {
+          if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+            audioEngine.ctx.resume().then(() => audioEngine.start());
+          } else {
+            audioEngine.start();
+          }
+        } catch { audioEngine.start(); }
+      }
       break;
   }
 });
@@ -12820,27 +12833,58 @@ document.addEventListener('keyup', (e) => {
   }
 });
 
-// Auto-pause when tab is hidden. iOS Safari + some Chrome configs suspend
-// the AudioContext on hide, leaving audio/visual desynced when the tab
-// returns. Explicitly pause + clear input state so a held key doesn't
-// carry across the hide. Resume requires a tap (the "TAP TO RESUME" overlay
-// rendered by the existing pause flow).
-document.addEventListener('visibilitychange', () => {
+// Pause-on-hide / resume-on-return. iOS Safari + some Chrome configs
+// suspend the AudioContext when the tab is hidden, so explicitly pausing
+// the gameplay loop avoids pieces dropping silently while the player is
+// elsewhere. Tracks the pause source so a tab-hide pause auto-resumes
+// when the tab returns, but a manual `P` pause stays paused.
+let _pausedByHide = false;
+document.addEventListener('visibilitychange', async () => {
   if (document.hidden) {
     if (gameStarted && !gameOver && !paused) {
       paused = true;
+      _pausedByHide = true;
       try { audioEngine.stop(); } catch {}
     }
     // Clear DAS state so a key held during hide doesn't fire on resume.
     for (const k of Object.keys(keys)) keys[k] = false;
-  } else {
-    // Resume the AudioContext if the browser suspended it. Don't unpause —
-    // let the player tap P (or the resume button) on purpose.
-    try {
-      if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
-        audioEngine.ctx.resume().catch(() => {});
-      }
-    } catch {}
+    return;
+  }
+  // Tab is back. Always try to wake the AudioContext — browsers usually
+  // auto-resume on focus, but iOS Safari is inconsistent.
+  try {
+    if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+      await audioEngine.ctx.resume();
+    }
+  } catch {}
+  // Auto-unpause + restart audio ONLY when the pause came from us hiding
+  // the tab. A user-initiated P pause stays paused on return.
+  if (_pausedByHide) {
+    _pausedByHide = false;
+    if (gameStarted && !gameOver) {
+      paused = false;
+      try { audioEngine.start(); } catch {}
+    }
+  } else if (gameStarted && !gameOver && !paused && audioEngine.ctx) {
+    // Game wasn't paused but audio scheduler may have been killed by a
+    // browser that fully tore down the context. Defensive restart.
+    if (!audioEngine.isPlaying) {
+      try { audioEngine.start(); } catch {}
+    }
+  }
+});
+
+// Some browsers (mobile Safari especially) fire `pagehide`/`pageshow`
+// instead of (or in addition to) visibilitychange when the user swipes
+// away to another app. Mirror the same logic so the music recovers.
+window.addEventListener('pageshow', () => {
+  try {
+    if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+      audioEngine.ctx.resume().catch(() => {});
+    }
+  } catch {}
+  if (gameStarted && !gameOver && !paused && audioEngine.ctx && !audioEngine.isPlaying) {
+    try { audioEngine.start(); } catch {}
   }
 });
 
@@ -12871,7 +12915,18 @@ setInterval(() => {
 function togglePause() {
   if (!gameStarted || gameOver) return;
   paused = !paused;
-  if (paused) audioEngine.stop(); else audioEngine.start();
+  _pausedByHide = false;  // user explicitly chose pause state
+  if (paused) {
+    audioEngine.stop();
+  } else {
+    try {
+      if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+        audioEngine.ctx.resume().then(() => audioEngine.start());
+      } else {
+        audioEngine.start();
+      }
+    } catch { audioEngine.start(); }
+  }
 }
 
 function doAction(action) {
