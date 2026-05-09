@@ -1937,6 +1937,19 @@ const PIECES = {
 };
 const PIECE_KEYS = Object.keys(PIECES);
 
+// Resolve a piece's render color through the active theme's optional
+// `piecePalette` override. Themes that want a uniform palette (Dream or
+// Nightmare → all-purple, He Got Me → all-gold) define this map; everything
+// else falls through to the canon PIECES[type].color.
+function _themePieceColor(type) {
+  if (!type) return null;
+  try {
+    const t = (typeof getTheme === 'function') ? getTheme(level) : null;
+    if (t && t.piecePalette && t.piecePalette[type]) return t.piecePalette[type];
+  } catch {}
+  return PIECES[type].color;
+}
+
 // ============================================================
 // LEVEL THEMES - Kanye Eras
 // ============================================================
@@ -2249,17 +2262,30 @@ const LEVEL_THEMES = [
     chords: [[196, 261.63, 329.63], [220, 293.66, 392], [174.61, 220, 293.66]],
     synthType: 'choir',
   },
-  { // Level 14 - Dream or Nightmare (giant robots dancing in a neon megacity)
+  { // Level 14 - Dream or Nightmare (giant robots dancing in a neon megacity,
+    //                                  helicopters circling overhead)
     name: 'Dream or Nightmare',
     bpm: 96,
-    track: 'dream-or-nightmare.mp3',
+    track: 'valley-808-drop.mp3',
     // Cyberpunk palette: deep indigo dream sky → magenta neon haze.
     // Accent (electric magenta) drives robot eyes + rim lights.
     // Glow (cyan) drives crowd glowsticks + window lights.
     colors: { bg1: '#0d0820', bg2: '#070418', accent: '#ff2dd0', glow: '#22e8ff' },
     particleHue: 290,
-    particleStyle: 'robot-city', // giant dancing robots over neon skyline
-    blockGlow: 12,
+    particleStyle: 'robot-city', // giant dancing robots + helicopters over neon skyline
+    blockGlow: 14,
+    // Purple piece palette: every Tetris piece is rendered as a purple
+    // variant on this level so the play board fits the dream-or-nightmare
+    // mood instead of clashing with the canon piece colours.
+    piecePalette: {
+      I: '#b266ff',  // electric violet
+      O: '#a855f7',  // saturated purple
+      T: '#9333ea',  // deep purple
+      S: '#c084fc',  // soft lavender
+      Z: '#d946ef',  // fuchsia-purple
+      J: '#7c3aed',  // royal purple
+      L: '#e879f9',  // pink-purple
+    },
     kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,1, 1,0,0,0],
     hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
@@ -2270,7 +2296,38 @@ const LEVEL_THEMES = [
     chords: [[261.63, 329.63, 392], [220, 277.18, 329.63], [293.66, 349.23, 440]],
     synthType: 'soulChop',
   },
-  { // Level 15 - Late Registration (final form)
+  { // Level 15 - He Got Me (gospel/holy — choir of angels, cathedral light)
+    name: 'He Got Me',
+    bpm: 80,
+    // Procedural audio for now (no track field) — synth uses gospel choir
+    // pads + a slow kick. Drop a 'he-got-me.mp3' into audio/levels/ later
+    // and add `track: 'he-got-me.mp3'` here.
+    colors: { bg1: '#221608', bg2: '#0f0a04', accent: '#ffd97a', glow: '#fff3c4' },
+    particleHue: 45,
+    particleStyle: 'cathedral', // angels + light rays + reactive stained glass
+    blockGlow: 16,
+    // Holy palette: every piece is a warm gold/cream tone so the board
+    // reads like a stained-glass window lit from within.
+    piecePalette: {
+      I: '#ffe27a',  // pale gold
+      O: '#ffd166',  // sun gold
+      T: '#fff4c2',  // ivory
+      S: '#f9c74f',  // honey
+      Z: '#f0a04b',  // copper
+      J: '#fbe9a0',  // wheat
+      L: '#fff7d6',  // cream
+    },
+    kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+    bassNote: 49.0,
+    scale: [196, 246.94, 293.66, 349.23, 392, 440, 493.88, 587.33],
+    chords: [[196, 246.94, 293.66], [220, 277.18, 329.63], [261.63, 329.63, 392]],
+    synthType: 'gospel',
+  },
+  { // Level 16 - Late Registration (final form)
     name: 'Late Registration',
     bpm: 92,
     colors: { bg1: '#1a0000', bg2: '#0a0005', accent: '#ff3344', glow: '#ff0033' },
@@ -2287,7 +2344,7 @@ const LEVEL_THEMES = [
     chords: [[220, 261.63, 329.63], [196, 246.94, 293.66], [174.61, 220, 261.63]],
     synthType: 'strings',
   },
-  { // Level 16 - Cruel Summer (G.O.O.D. Music compilation, sun-drenched and lush)
+  { // Level 17 - Cruel Summer (G.O.O.D. Music compilation, sun-drenched and lush)
     name: 'Cruel Summer',
     bpm: 108,
     colors: { bg1: '#2a1a00', bg2: '#1a0d00', accent: '#ffcc44', glow: '#ffaa22' },
@@ -2304,7 +2361,7 @@ const LEVEL_THEMES = [
     chords: [[196, 246.94, 293.66], [220, 277.18, 329.63], [261.63, 329.63, 392]],
     synthType: 'gospel',
   },
-  { // Level 17 - Watch the Throne (Jay-Z + Kanye, regal and grand)
+  { // Level 18 - Watch the Throne (Jay-Z + Kanye, regal and grand)
     name: 'Watch the Throne',
     bpm: 118,
     colors: { bg1: '#1a0a05', bg2: '#0a0500', accent: '#ffd700', glow: '#ffaa00' },
@@ -2321,7 +2378,7 @@ const LEVEL_THEMES = [
     chords: [[220, 277.18, 329.63], [233.08, 293.66, 349.23], [261.63, 311.13, 392]],
     synthType: 'power',
   },
-  { // Level 18 - Jesus Is King (gospel, soaring choir)
+  { // Level 19 - Jesus Is King (gospel, soaring choir)
     name: 'Jesus Is King',
     bpm: 102,
     colors: { bg1: '#0a1a28', bg2: '#040d18', accent: '#88ddff', glow: '#aaeeff' },
@@ -2338,7 +2395,7 @@ const LEVEL_THEMES = [
     chords: [[261.63, 329.63, 392], [349.23, 440, 523.25], [392, 493.88, 587.33], [440, 523.25, 659.25]],
     synthType: 'gospel',
   },
-  { // Level 19 - Galaxy (the Marathon classic — deep-space endurance vibe)
+  { // Level 20 - Galaxy (the Marathon classic — deep-space endurance vibe)
     name: 'Galaxy',
     bpm: 92,
     track: 'galaxy.mp3',
@@ -3113,7 +3170,7 @@ function rotatePiece(dir) {
         }
       }
       audioEngine.playRotate();
-      spawnParticles(currentX * CELL + CELL * 2, currentY * CELL + CELL, PIECES[currentType].color, 6);
+      spawnParticles(currentX * CELL + CELL * 2, currentY * CELL + CELL, _themePieceColor(currentType), 6);
       _resetLockIfBudget();
       nudgeMovePulse(0.10);
       recordReplayEvent(dir > 0 ? 'r' : 'l');
@@ -3181,7 +3238,9 @@ function lockPiece() {
   // Only counted on the human player's lock so AI activity doesn't
   // pollute Sir's PPS.
   if (!activePlayer || !activePlayer.isAI) _pieceLockCount++;
-  const color = PIECES[currentType].color;
+  // Use the active theme's piece-palette override so locked cells render
+  // in the level's color set (e.g. purple on Dream or Nightmare).
+  const color = _themePieceColor(currentType);
   for (const [bx, by] of currentPiece) {
     const nx = currentX + bx, ny = currentY + by;
     if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS) board[ny][nx] = color;
@@ -6016,7 +6075,7 @@ function drawBoard() {
   }
 
   if (currentPiece && !gameOver) {
-    const color = PIECES[currentType].color;
+    const color = _themePieceColor(currentType);
     if (showGhost) {
       const ghostY = getGhostY();
       // Only draw ghost if it's actually below the piece (not at same spot)
@@ -6142,7 +6201,10 @@ function drawBoard() {
 function drawMiniPiece(context, type, ox, oy, cs) {
   if (!type) return;
   const def = PIECES[type];
-  for (const [bx, by] of def.shape) drawBlock(context, ox + bx * cs, oy + by * cs, def.color, cs);
+  // Honour the active theme's piece-palette so the HOLD/NEXT preview matches
+  // what'll show on the play board.
+  const color = _themePieceColor(type);
+  for (const [bx, by] of def.shape) drawBlock(context, ox + bx * cs, oy + by * cs, color, cs);
 }
 
 function drawHold() {
@@ -11951,29 +12013,22 @@ function drawGalaxyScene(theme, now, playRects) {
 let _robotCityScene = null;
 
 function _initRobotCityScene(w, h) {
-  // Three giant humanoid robots, staggered in depth so they don't all fall
-  // exactly on the same beat. Each robot has its own dance "phase" so they
-  // groove out of sync with each other (more interesting than a chorus line).
-  // x is normalised 0..1; we resolve to pixels each frame so resize is free.
   _robotCityScene = {
     w, h,
     bgCanvas: null,
-    // Two foreground giants flanking the play area (stage-left + stage-right
-    // stomping in time with the music) plus one DISTANT robot way in the
-    // back — small, slow, visible above the skyline silhouette.
+    // Two foreground giants flanking the play area + one distant robot
+    // peeking from behind the skyline.
     robots: [
-      { xN: 0.14, scale: 1.00, danceOff: 0.0,           hueShift:  0,  stompT: 0, distant: false },
-      { xN: 0.86, scale: 0.92, danceOff: Math.PI * 1.1, hueShift: -20, stompT: 0, distant: false },
-      { xN: 0.66, scale: 0.45, danceOff: Math.PI * 0.5, hueShift:  20, stompT: 0, distant: true  },
+      { xN: 0.14, scale: 1.00, danceOff: 0.0,           hueShift:  0,  stompT: 0, distant: false, diveT: 0 },
+      { xN: 0.86, scale: 0.92, danceOff: Math.PI * 1.1, hueShift: -20, stompT: 0, distant: false, diveT: 0 },
+      { xN: 0.66, scale: 0.45, danceOff: Math.PI * 0.5, hueShift:  20, stompT: 0, distant: true,  diveT: 0 },
     ],
-    // Tiny crowd silhouettes at street level — bob with the beat, cheer on clears.
     crowd: Array.from({ length: 60 }, (_, i) => ({
       xN: (i + Math.random() * 0.6) / 60,
-      h:  0.018 + Math.random() * 0.014,   // height fraction of canvas
+      h:  0.018 + Math.random() * 0.014,
       bobOff: Math.random() * Math.PI * 2,
       glowHue: Math.random() < 0.5 ? 280 : 190,
     })),
-    // Distant flying drones with blinking lights.
     drones: Array.from({ length: 8 }, (_, i) => ({
       x: Math.random() * w,
       y: h * (0.10 + Math.random() * 0.25),
@@ -11981,8 +12036,24 @@ function _initRobotCityScene(w, h) {
       blinkOff: Math.random() * Math.PI * 2,
       hue: Math.random() < 0.5 ? 320 : 200,
     })),
-    lightning: 0,        // 0..1, decays each frame, spikes on hard drops
-    moodSwing: 0,        // smoothed dream↔nightmare oscillator (line clears push toward dream)
+    // ── HELICOPTERS ── three patrol choppers in a loose V formation.
+    // Two cruise left-to-right, one cuts across the other way. Searchlight
+    // cones aim down toward the street and sweep based on the beat.
+    helicopters: [
+      { xN: -0.05, yN: 0.18, scale: 1.00, vxN: 0.0014, rotor: 0, sweepOff: 0.0,           lightHue: 50,  size: 1.0 },
+      { xN:  0.40, yN: 0.10, scale: 0.85, vxN: 0.0010, rotor: 0, sweepOff: Math.PI,       lightHue: 50,  size: 0.85 },
+      { xN:  1.10, yN: 0.30, scale: 1.10, vxN:-0.0017, rotor: 0, sweepOff: Math.PI * 0.5, lightHue: 200, size: 1.10 },
+    ],
+    // Explosion flashes — pop on perfect-clear / big combos
+    blasts: [],   // { x, y, r, maxR, life, hue }
+    // Laser beams — fire from robot eyes on big cheer pulses
+    lasers: [],   // { fromX, fromY, toX, toY, life, hue }
+    lightning: 0,
+    moodSwing: 0,
+    flash: 0,        // full-screen flash on hard drops
+    lastDrop: 0,     // edge-detect for drop events
+    lastCheer: 0,    // edge-detect for cheer events
+    rotorSpinSpeed: 0.55, // base rotor velocity (ramps with audio energy)
   };
 }
 
@@ -12083,6 +12154,130 @@ function _buildRobotCityBg(w, h, theme) {
   c.fillStyle = stripG; c.fillRect(0, horizon - 2, w, 10);
 
   return oc;
+}
+
+// One patrol helicopter. Body, tail boom, spinning main + tail rotors,
+// downward searchlight cone whose intensity rides audio energy.
+function _drawHelicopter(ctx, cx, cy, size, rotorAng, sweepAng, lightHue, energy, cheer, w, h) {
+  const W = 70 * size;          // body width
+  const H = 22 * size;          // body height
+  const tailL = 65 * size;      // tail boom length
+  const rotorR = 70 * size;     // main rotor radius
+  // Searchlight cone — pointed straight down with a sweep angle modulated
+  // by music + cheer (cheer widens + brightens it).
+  const beamLen = (h - cy) + 10;
+  const beamHalfAngle = (10 + 4 * Math.sin(sweepAng) + cheer * 6) * Math.PI / 180;
+  const beamCx = cx;
+  const beamCy = cy + 6 * size;
+  // Cone (left + right edges)
+  const left  = -beamHalfAngle;
+  const right =  beamHalfAngle;
+  const baseAngle = Math.PI / 2; // pointing down
+  const x1 = beamCx + Math.cos(baseAngle + left)  * beamLen;
+  const y1 = beamCy + Math.sin(baseAngle + left)  * beamLen;
+  const x2 = beamCx + Math.cos(baseAngle + right) * beamLen;
+  const y2 = beamCy + Math.sin(baseAngle + right) * beamLen;
+  const beamGrad = ctx.createLinearGradient(beamCx, beamCy, beamCx, y1);
+  const beamA = 0.18 + energy * 0.14 + cheer * 0.18;
+  beamGrad.addColorStop(0,   `hsla(${lightHue},95%,80%,${beamA * 0.9})`);
+  beamGrad.addColorStop(0.5, `hsla(${lightHue},95%,70%,${beamA * 0.55})`);
+  beamGrad.addColorStop(1,   `hsla(${lightHue},95%,60%,0)`);
+  ctx.fillStyle = beamGrad;
+  ctx.beginPath();
+  ctx.moveTo(beamCx, beamCy);
+  ctx.lineTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.closePath();
+  ctx.fill();
+  // Bright bulb at the helicopter's belly
+  const bulbG = ctx.createRadialGradient(beamCx, beamCy, 0, beamCx, beamCy, 14 * size);
+  bulbG.addColorStop(0, `hsla(${lightHue},95%,90%,${0.7 + cheer * 0.3})`);
+  bulbG.addColorStop(1, `hsla(${lightHue},95%,80%,0)`);
+  ctx.fillStyle = bulbG;
+  ctx.beginPath(); ctx.arc(beamCx, beamCy, 14 * size, 0, Math.PI * 2); ctx.fill();
+
+  // Main body (rounded fuselage)
+  ctx.fillStyle = 'rgba(28,26,40,1)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, W * 0.5, H * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Cockpit window — angled cyan/magenta glow
+  const cockpitX = cx + W * 0.18, cockpitY = cy - H * 0.10;
+  const cockpitG = ctx.createLinearGradient(cockpitX - 14 * size, cockpitY, cockpitX + 14 * size, cockpitY);
+  cockpitG.addColorStop(0, `rgba(120,200,255,0.9)`);
+  cockpitG.addColorStop(1, `rgba(255,80,200,0.5)`);
+  ctx.fillStyle = cockpitG;
+  ctx.beginPath();
+  ctx.ellipse(cockpitX, cockpitY, W * 0.22, H * 0.36, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  // Side panel highlight
+  ctx.fillStyle = 'rgba(60,55,85,1)';
+  ctx.fillRect(cx - W * 0.4, cy + H * 0.05, W * 0.4, 3 * size);
+
+  // Tail boom
+  ctx.fillStyle = 'rgba(28,26,40,1)';
+  ctx.fillRect(cx - W * 0.5 - tailL, cy - 3 * size, tailL, 6 * size);
+  // Tail fin
+  ctx.beginPath();
+  ctx.moveTo(cx - W * 0.5 - tailL, cy - 3 * size);
+  ctx.lineTo(cx - W * 0.5 - tailL - 10 * size, cy - 12 * size);
+  ctx.lineTo(cx - W * 0.5 - tailL + 4 * size, cy - 3 * size);
+  ctx.closePath();
+  ctx.fill();
+  // Tail rotor (spinning ellipse at the tail tip)
+  const tailRotorCx = cx - W * 0.5 - tailL - 4 * size;
+  const tailRotorCy = cy - 6 * size;
+  ctx.save();
+  ctx.translate(tailRotorCx, tailRotorCy);
+  ctx.rotate(rotorAng * 4);
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 12 * size, 1.6 * size, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // Landing skids
+  ctx.strokeStyle = 'rgba(45,42,60,1)';
+  ctx.lineWidth = 1.5 * size;
+  ctx.beginPath();
+  ctx.moveTo(cx - W * 0.35, cy + H * 0.7);
+  ctx.lineTo(cx + W * 0.35, cy + H * 0.7);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - W * 0.20, cy + H * 0.5);
+  ctx.lineTo(cx - W * 0.20, cy + H * 0.7);
+  ctx.moveTo(cx + W * 0.20, cy + H * 0.5);
+  ctx.lineTo(cx + W * 0.20, cy + H * 0.7);
+  ctx.stroke();
+
+  // Main rotor — three-blade blur (ellipses rotated). Faster spin = blurrier.
+  ctx.save();
+  ctx.translate(cx, cy - H * 0.55);
+  for (let b = 0; b < 3; b++) {
+    ctx.save();
+    ctx.rotate(rotorAng + b * (Math.PI * 2 / 3));
+    ctx.fillStyle = `rgba(255,255,255,${0.12 + 0.08 * (1 - Math.min(1, energy * 2))})`;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rotorR, 2 * size, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // Rotor hub
+  ctx.fillStyle = 'rgba(50,48,70,1)';
+  ctx.beginPath(); ctx.arc(0, 0, 4 * size, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // Nav lights — red on left, green on right, white blinker on bottom.
+  // Blink rate ~3Hz; brighten on cheer.
+  const navAlpha = 0.7 + cheer * 0.3;
+  const blinkOn = (rotorAng % (Math.PI * 0.6)) < (Math.PI * 0.3);
+  if (blinkOn) {
+    ctx.fillStyle = `rgba(255,40,40,${navAlpha})`;
+    ctx.beginPath(); ctx.arc(cx - W * 0.45, cy, 2 * size, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(40,255,80,${navAlpha})`;
+    ctx.beginPath(); ctx.arc(cx + W * 0.45, cy, 2 * size, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${navAlpha})`;
+    ctx.beginPath(); ctx.arc(cx, cy + H * 0.45, 1.8 * size, 0, Math.PI * 2); ctx.fill();
+  }
 }
 
 // One robot. Drawn at (cx, footY) with given height. `phase` drives all
@@ -12314,36 +12509,87 @@ function drawRobotCityScene(theme, now, playRects) {
     ctx.stroke();
   }
 
-  // Drones drifting across the sky.
+  // Drones drifting across the sky — speed boosts with audio energy.
   for (const d of sc.drones) {
-    d.x += d.vx;
+    d.x += d.vx * (1 + energy * 1.2);
     if (d.x < -10) d.x = w + 10;
     if (d.x > w + 10) d.x = -10;
     const blink = (Math.sin(now * 0.008 + d.blinkOff) > 0.6) ? 1 : 0.25;
     ctx.fillStyle = `rgba(20,20,35,1)`;
     ctx.fillRect(d.x - 4, d.y - 1.5, 8, 3);
-    ctx.fillStyle = `hsla(${d.hue},90%,65%,${blink})`;
+    ctx.fillStyle = `hsla(${d.hue},90%,65%,${blink + cheer * 0.2})`;
     ctx.beginPath(); ctx.arc(d.x, d.y, 2, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Robots — grouped in a single transform pass for cheap depth darkening.
-  // BPM is 96 in this theme; we map it directly to phase speed so the dance
-  // syncs to the music rather than to wall-clock.
+  // ── HELICOPTERS ── patrol back-of-frame, in front of the skyline but
+  // behind the foreground robots. Rotors spin faster with audio energy;
+  // searchlights brighten on cheer.
+  sc.rotorSpinSpeed = sc.rotorSpinSpeed * 0.92 + (0.55 + energy * 1.2) * 0.08;
+  for (const heli of sc.helicopters) {
+    heli.xN += heli.vxN * (1 + energy * 0.6);
+    if (heli.xN > 1.10) heli.xN = -0.10;
+    if (heli.xN < -0.10) heli.xN = 1.10;
+    heli.rotor += sc.rotorSpinSpeed;
+    const hx = w * heli.xN;
+    const hy = h * heli.yN + Math.sin(now * 0.0011 + heli.sweepOff) * 6 * heli.size;
+    const sweep = now * 0.0014 + heli.sweepOff;
+    _drawHelicopter(ctx, hx, hy, heli.size, heli.rotor, sweep, heli.lightHue, energy, cheer, w, h);
+  }
+
+  // BPM-locked dance phase
   const bpm = (theme.bpm || 96);
   const beatT = (now / 1000) * (bpm / 60);
   const horizon = h * 0.78;
+
+  // ── Edge-detected events ── react ONCE per spike, not per frame
+  if (drop > 0.85 && (drop - sc.lastDrop) > 0.20) {
+    // Hard drop just happened: stomp the biggest foreground robot AND
+    // tell the LEFT helicopter to dive low.
+    sc.flash = Math.min(1, sc.flash + 0.6);
+    sc.helicopters[0].yN = Math.max(0.05, sc.helicopters[0].yN + 0.04);
+    // Short ground blast at the play area (a "shock ring")
+    sc.blasts.push({
+      x: w * 0.5, y: horizon - h * 0.02,
+      r: 6, maxR: w * 0.18, life: 1, hue: 320,
+    });
+  }
+  if (cheer > 0.85 && (cheer - sc.lastCheer) > 0.30) {
+    // Big line clear: laser beams from BOTH foreground robots toward sky.
+    for (const r of sc.robots) {
+      if (r.distant) continue;
+      const cx = w * r.xN;
+      const headY = horizon - h * 0.55 * r.scale + 22;
+      sc.lasers.push({
+        fromX: cx - 12, fromY: headY,
+        toX: cx - 60 + Math.random() * 120,
+        toY: 0,
+        life: 1, hue: 320 + Math.random() * 40,
+      });
+      sc.lasers.push({
+        fromX: cx + 12, fromY: headY,
+        toX: cx - 60 + Math.random() * 120,
+        toY: 0,
+        life: 1, hue: 200 + Math.random() * 40,
+      });
+    }
+    // Confetti-style purple blast over the play area
+    sc.blasts.push({
+      x: w * 0.5, y: h * 0.30,
+      r: 10, maxR: w * 0.30, life: 1, hue: 290,
+    });
+  }
+  sc.lastDrop  = drop;
+  sc.lastCheer = cheer;
+  sc.flash = Math.max(0, sc.flash - 0.05);
+
+  // Robots
   for (const r of sc.robots) {
-    // Decay stomp animation
     if (r.stompT > 0) r.stompT = Math.max(0, r.stompT - 0.022);
-    // Trigger a stomp on the LARGEST foreground robot when boardDropPulse
-    // spikes (one stomp per drop event; threshold prevents re-fires).
     if (drop > 0.7 && !r.distant && r.scale >= 0.95 && r.stompT < 0.05) r.stompT = 1.0;
 
     const phase = beatT * Math.PI + r.danceOff;
     const rH    = h * 0.55 * r.scale;
     const cx    = w * r.xN;
-    // Distant robot stands further "back" (higher up the screen, on the
-    // skyline ridge) and at half-energy so its dance reads as in the haze.
     const footY = r.distant
       ? horizon - h * 0.16
       : horizon + h * 0.005;
@@ -12357,6 +12603,46 @@ function drawRobotCityScene(theme, now, playRects) {
     }
   }
 
+  // Laser beams from robot eyes (decays over ~16 frames)
+  for (let li = sc.lasers.length - 1; li >= 0; li--) {
+    const L = sc.lasers[li];
+    L.life -= 0.06;
+    if (L.life <= 0) { sc.lasers.splice(li, 1); continue; }
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const grad = ctx.createLinearGradient(L.fromX, L.fromY, L.toX, L.toY);
+    grad.addColorStop(0,   `hsla(${L.hue},95%,75%,${L.life})`);
+    grad.addColorStop(0.5, `hsla(${L.hue},95%,65%,${L.life * 0.7})`);
+    grad.addColorStop(1,   `hsla(${L.hue},95%,55%,0)`);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 4 + L.life * 4;
+    ctx.beginPath();
+    ctx.moveTo(L.fromX, L.fromY);
+    ctx.lineTo(L.toX, L.toY);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Shock blasts (expanding rings over the city)
+  for (let bi = sc.blasts.length - 1; bi >= 0; bi--) {
+    const B = sc.blasts[bi];
+    B.r += (B.maxR - B.r) * 0.12;
+    B.life -= 0.04;
+    if (B.life <= 0 || B.r >= B.maxR * 0.98) { sc.blasts.splice(bi, 1); continue; }
+    ctx.save();
+    ctx.strokeStyle = `hsla(${B.hue},90%,75%,${B.life * 0.85})`;
+    ctx.lineWidth = 3 + B.life * 3;
+    ctx.beginPath();
+    ctx.arc(B.x, B.y, B.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = `hsla(${B.hue},90%,90%,${B.life * 0.5})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(B.x, B.y, B.r * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // Tiny crowd silhouettes at the very front, bobbing.
   const crowdBaseY = h * 0.94;
   for (const p of sc.crowd) {
@@ -12364,7 +12650,6 @@ function drawRobotCityScene(theme, now, playRects) {
     const ph = h * p.h * (1 + Math.sin(beatT * Math.PI * 2 + p.bobOff) * 0.10 * (0.6 + energy));
     ctx.fillStyle = `rgba(8,4,18,1)`;
     ctx.fillRect(px - 3, crowdBaseY - ph, 6, ph);
-    // Glowstick — tiny dot bobbing above each silhouette
     if (cheer > 0.2 || (Math.sin(beatT * Math.PI * 2 + p.bobOff) > 0.7)) {
       const gx = px + Math.sin(beatT * Math.PI + p.bobOff) * 4;
       const gy = crowdBaseY - ph - 4;
@@ -12373,9 +12658,419 @@ function drawRobotCityScene(theme, now, playRects) {
     }
   }
 
+  // Full-screen flash on hard drops (subtle but punchy)
+  if (sc.flash > 0.02) {
+    ctx.fillStyle = `rgba(255,200,255,${sc.flash * 0.20})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+
   ctx.restore();
 
   // Cut out the play area so the robots don't render over the board.
+  if (playRects.length) {
+    bgCtx.save();
+    bgCtx.globalCompositeOperation = 'destination-out';
+    for (const pr of playRects) {
+      bgCtx.fillStyle = '#000';
+      bgCtx.fillRect(pr.x, pr.y, pr.w, pr.h);
+    }
+    bgCtx.restore();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Level 15 — He Got Me: holy cathedral. Stained-glass arches flank the play
+// area, golden god-rays stream from above, a choir of angels bobs in the
+// foreground. Halos pulse around the board on combos; perfect-clear summons
+// a cross of light from the ceiling.
+// ─────────────────────────────────────────────────────────────────────────────
+let _cathedralScene = null;
+
+function _initCathedralScene(w, h) {
+  _cathedralScene = {
+    w, h,
+    bgCanvas: null,
+    // Choir of angels — two rows. Wings flap to the beat. Each has a
+    // slightly different bob so they don't perfectly sync (more lifelike).
+    angels: Array.from({ length: 9 }, (_, i) => ({
+      xN: 0.06 + (i / 9) * 0.88 + (Math.random() - 0.5) * 0.02,
+      row: i % 2,                       // 0 = front row, 1 = back row
+      flapOff: Math.random() * Math.PI * 2,
+      bobOff:  Math.random() * Math.PI * 2,
+      haloHue: 50 + Math.random() * 10,
+    })),
+    // Floating golden particles ("dust of the saints")
+    sparks: Array.from({ length: 35 }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vy: -(0.15 + Math.random() * 0.35),
+      r: 1 + Math.random() * 2,
+      a: 0.4 + Math.random() * 0.5,
+    })),
+    halo: 0,            // 0..1, halo intensity around the board on combos
+    lightCross: 0,      // 0..1, big descending cross-of-light on perfect clear
+    bellRing: 0,        // 0..1, peal flash on hard drops
+    organSwell: 0,      // smoothed swell from audio energy → window brightness
+    lastCheer: 0,
+    lastDrop: 0,
+  };
+}
+
+// Build the cathedral interior background (columns + stained glass + altar).
+// Static layer, so we bake it once and blit each frame.
+function _buildCathedralBg(w, h) {
+  const oc = document.createElement('canvas');
+  oc.width = w; oc.height = h;
+  const c = oc.getContext('2d');
+
+  // Vault gradient: warm honey at top → deeper amber at the floor.
+  const vault = c.createLinearGradient(0, 0, 0, h);
+  vault.addColorStop(0,   '#3a2208');
+  vault.addColorStop(0.4, '#1f1304');
+  vault.addColorStop(1,   '#0a0602');
+  c.fillStyle = vault; c.fillRect(0, 0, w, h);
+
+  // Vault arches — three concentric pointed arches at the top of the frame.
+  const archCx = w * 0.5;
+  const archTopY = h * 0.04;
+  const archBottomY = h * 0.32;
+  for (let aR = 3; aR >= 1; aR--) {
+    const aw = w * (0.18 + aR * 0.10);
+    const grad = c.createLinearGradient(archCx, archTopY, archCx, archBottomY);
+    grad.addColorStop(0, `rgba(${30 + aR * 12},${20 + aR * 10},${5 + aR * 2},1)`);
+    grad.addColorStop(1, 'rgba(8,5,2,1)');
+    c.fillStyle = grad;
+    c.beginPath();
+    c.moveTo(archCx - aw, archBottomY);
+    c.quadraticCurveTo(archCx - aw, archTopY + aR * 6, archCx, archTopY);
+    c.quadraticCurveTo(archCx + aw, archTopY + aR * 6, archCx + aw, archBottomY);
+    c.lineTo(archCx + aw, h);
+    c.lineTo(archCx - aw, h);
+    c.closePath();
+    c.fill();
+  }
+
+  // Stained-glass windows — rows of tall pointed-arch windows along both
+  // side walls. Each window has 3-4 vertical mullion bars with colored
+  // glass between them.
+  const drawStainedWindow = (cx, cy, ww, hh, hue) => {
+    // Frame
+    c.fillStyle = 'rgba(20,12,4,1)';
+    c.beginPath();
+    c.moveTo(cx - ww * 0.5, cy + hh * 0.5);
+    c.lineTo(cx - ww * 0.5, cy - hh * 0.4);
+    c.quadraticCurveTo(cx, cy - hh * 0.55, cx + ww * 0.5, cy - hh * 0.4);
+    c.lineTo(cx + ww * 0.5, cy + hh * 0.5);
+    c.closePath();
+    c.fill();
+    // Glass panels
+    const panels = 3;
+    for (let p = 0; p < panels; p++) {
+      const px = cx - ww * 0.5 + ww * (p + 0.5) / panels;
+      const pw = ww / panels - 2;
+      const ph = hh * 0.85;
+      const py = cy - hh * 0.30;
+      const panelHue = hue + (p - 1) * 25;
+      const pGrad = c.createLinearGradient(px, py, px, py + ph);
+      pGrad.addColorStop(0,   `hsla(${panelHue},75%,55%,0.92)`);
+      pGrad.addColorStop(0.5, `hsla(${panelHue + 15},75%,40%,0.88)`);
+      pGrad.addColorStop(1,   `hsla(${panelHue + 30},75%,30%,0.92)`);
+      c.fillStyle = pGrad;
+      c.fillRect(px - pw / 2, py, pw, ph);
+      // Lead came (cross-mullion)
+      c.strokeStyle = 'rgba(20,12,4,0.85)'; c.lineWidth = 1;
+      c.strokeRect(px - pw / 2, py, pw, ph);
+      c.beginPath();
+      c.moveTo(px - pw / 2, py + ph * 0.5);
+      c.lineTo(px + pw / 2, py + ph * 0.5);
+      c.stroke();
+    }
+    // Top arch glass (rosette circle)
+    const rosCx = cx, rosCy = cy - hh * 0.43;
+    const rosR = ww * 0.18;
+    const rosG = c.createRadialGradient(rosCx, rosCy, 0, rosCx, rosCy, rosR);
+    rosG.addColorStop(0,   `hsla(${hue + 60},85%,75%,0.95)`);
+    rosG.addColorStop(0.6, `hsla(${hue + 30},80%,55%,0.85)`);
+    rosG.addColorStop(1,   `hsla(${hue},80%,40%,0.85)`);
+    c.fillStyle = rosG;
+    c.beginPath(); c.arc(rosCx, rosCy, rosR, 0, Math.PI * 2); c.fill();
+  };
+  // Left and right walls — 3 windows each.
+  const winH = h * 0.36, winW = w * 0.10;
+  for (let r = 0; r < 3; r++) {
+    const winY = h * (0.20 + r * 0.18);
+    drawStainedWindow(w * 0.05, winY, winW, winH, 220);  // left = blues
+    drawStainedWindow(w * 0.95, winY, winW, winH, 0);    // right = reds
+  }
+
+  // Floor (dark stone with subtle perspective lines)
+  const floorG = c.createLinearGradient(0, h * 0.78, 0, h);
+  floorG.addColorStop(0, 'rgba(50,32,12,1)');
+  floorG.addColorStop(1, 'rgba(15,9,3,1)');
+  c.fillStyle = floorG; c.fillRect(0, h * 0.78, w, h * 0.22);
+  c.strokeStyle = 'rgba(120,90,40,0.18)'; c.lineWidth = 1;
+  for (let i = 1; i < 12; i++) {
+    const fy = h * (0.78 + i * 0.018);
+    c.beginPath(); c.moveTo(0, fy); c.lineTo(w, fy); c.stroke();
+  }
+
+  // Altar candles in the back (5 candle silhouettes — flames are reactive
+  // and drawn each frame, not baked).
+  // (placeholder for static altar table)
+  c.fillStyle = 'rgba(35,22,8,1)';
+  c.fillRect(w * 0.34, h * 0.72, w * 0.32, h * 0.04);
+  c.fillStyle = 'rgba(60,38,14,1)';
+  c.fillRect(w * 0.32, h * 0.71, w * 0.36, h * 0.012);
+
+  return oc;
+}
+
+function _drawAngel(ctx, cx, cy, scale, flap, bobY, haloHue, energy, cheer) {
+  // Robe (silhouette — soft white/cream gradient)
+  const robeH = 80 * scale;
+  const robeW = 30 * scale;
+  const robeY = cy + bobY;
+  const robeG = ctx.createLinearGradient(cx, robeY - robeH * 0.5, cx, robeY + robeH * 0.5);
+  robeG.addColorStop(0,   `rgba(255,245,220,${0.85 + cheer * 0.15})`);
+  robeG.addColorStop(0.6, `rgba(255,225,170,${0.75 + cheer * 0.20})`);
+  robeG.addColorStop(1,   `rgba(220,180,90,${0.55 + cheer * 0.25})`);
+  ctx.fillStyle = robeG;
+  ctx.beginPath();
+  ctx.moveTo(cx - robeW * 0.5, robeY - robeH * 0.5);
+  ctx.lineTo(cx + robeW * 0.5, robeY - robeH * 0.5);
+  ctx.lineTo(cx + robeW * 0.7, robeY + robeH * 0.5);
+  ctx.lineTo(cx - robeW * 0.7, robeY + robeH * 0.5);
+  ctx.closePath();
+  ctx.fill();
+  // Head
+  ctx.fillStyle = `rgba(245,220,180,1)`;
+  ctx.beginPath(); ctx.arc(cx, robeY - robeH * 0.55, 8 * scale, 0, Math.PI * 2); ctx.fill();
+  // Halo — golden ring above head; brightens on cheer
+  const haloR = 14 * scale;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const haloA = 0.55 + cheer * 0.45;
+  ctx.strokeStyle = `hsla(${haloHue},90%,${65 + cheer * 25}%,${haloA})`;
+  ctx.lineWidth = 2 + cheer * 2;
+  ctx.beginPath(); ctx.ellipse(cx, robeY - robeH * 0.66, haloR, haloR * 0.4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  // Halo glow
+  const glowG = ctx.createRadialGradient(cx, robeY - robeH * 0.66, 0, cx, robeY - robeH * 0.66, haloR * 1.6);
+  glowG.addColorStop(0, `hsla(${haloHue},90%,80%,${0.35 + cheer * 0.4})`);
+  glowG.addColorStop(1, `hsla(${haloHue},90%,80%,0)`);
+  ctx.fillStyle = glowG;
+  ctx.beginPath(); ctx.arc(cx, robeY - robeH * 0.66, haloR * 1.6, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // Wings — two arcs that flap (open/close) with `flap` 0..1
+  const wingSpan = 26 * scale * (0.6 + flap * 0.7 + energy * 0.3);
+  const wingY = robeY - robeH * 0.30;
+  ctx.fillStyle = `rgba(255,250,235,${0.55 + cheer * 0.3})`;
+  // Left wing
+  ctx.beginPath();
+  ctx.moveTo(cx - 6, wingY);
+  ctx.quadraticCurveTo(cx - wingSpan, wingY - 14 * scale, cx - wingSpan * 0.7, wingY + 18 * scale);
+  ctx.quadraticCurveTo(cx - wingSpan * 0.4, wingY + 6 * scale, cx - 6, wingY + 4);
+  ctx.closePath(); ctx.fill();
+  // Right wing
+  ctx.beginPath();
+  ctx.moveTo(cx + 6, wingY);
+  ctx.quadraticCurveTo(cx + wingSpan, wingY - 14 * scale, cx + wingSpan * 0.7, wingY + 18 * scale);
+  ctx.quadraticCurveTo(cx + wingSpan * 0.4, wingY + 6 * scale, cx + 6, wingY + 4);
+  ctx.closePath(); ctx.fill();
+
+  // Wing rim highlight
+  ctx.strokeStyle = `hsla(${haloHue},80%,80%,${0.3 + cheer * 0.4})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 6, wingY);
+  ctx.quadraticCurveTo(cx - wingSpan, wingY - 14 * scale, cx - wingSpan * 0.7, wingY + 18 * scale);
+  ctx.moveTo(cx + 6, wingY);
+  ctx.quadraticCurveTo(cx + wingSpan, wingY - 14 * scale, cx + wingSpan * 0.7, wingY + 18 * scale);
+  ctx.stroke();
+}
+
+function drawCathedralScene(theme, now, playRects) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (!_cathedralScene || _cathedralScene.w !== w || _cathedralScene.h !== h) _initCathedralScene(w, h);
+  const sc = _cathedralScene;
+  if (!sc.bgCanvas || sc.bgCanvas.width !== w) sc.bgCanvas = _buildCathedralBg(w, h);
+
+  const ctx = bgCtx;
+  const cheer  = (typeof cheerPulse === 'number') ? cheerPulse : 0;
+  const drop   = (typeof boardDropPulse === 'number') ? boardDropPulse : 0;
+  const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+  const accentRgb = hexToRgb(theme.colors.accent);
+  const glowRgb   = hexToRgb(theme.colors.glow);
+
+  // Slow gentle camera sway (this is HOLY, not action — no shake)
+  ctx.save();
+
+  // Static cathedral
+  ctx.drawImage(sc.bgCanvas, 0, 0);
+
+  // ── Organ swell tint (audio energy → warm wash over the whole scene) ──
+  sc.organSwell = sc.organSwell * 0.90 + energy * 0.10;
+  if (sc.organSwell > 0.05) {
+    ctx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${sc.organSwell * 0.12})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // ── God-rays from the rose window above the arch ──
+  // Three angled light shafts that brighten with energy and pulse on cheer.
+  const rayCx = w * 0.5;
+  const rayCy = h * 0.06;
+  const rayCount = 5;
+  for (let r = 0; r < rayCount; r++) {
+    const rA = (r - (rayCount - 1) / 2) * 0.22 + Math.sin(now * 0.0003) * 0.04;
+    const rayLen = h * 1.2;
+    const rayEndX = rayCx + Math.sin(rA) * rayLen;
+    const rayEndY = rayCy + Math.cos(rA) * rayLen;
+    const rg = ctx.createLinearGradient(rayCx, rayCy, rayEndX, rayEndY);
+    const a = 0.06 + energy * 0.10 + cheer * 0.18;
+    rg.addColorStop(0, `rgba(255,235,170,${a * 1.3})`);
+    rg.addColorStop(0.5, `rgba(255,210,130,${a})`);
+    rg.addColorStop(1, `rgba(255,200,100,0)`);
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.moveTo(rayCx, rayCy);
+    const perp = rA + Math.PI / 2;
+    const wWidth = w * 0.04;
+    ctx.lineTo(rayCx + Math.cos(perp) * wWidth, rayCy + Math.sin(perp) * wWidth);
+    ctx.lineTo(rayEndX + Math.cos(perp) * wWidth * 4, rayEndY + Math.sin(perp) * wWidth * 4);
+    ctx.lineTo(rayEndX - Math.cos(perp) * wWidth * 4, rayEndY - Math.sin(perp) * wWidth * 4);
+    ctx.lineTo(rayCx - Math.cos(perp) * wWidth, rayCy - Math.sin(perp) * wWidth);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ── Stained-glass window pulse ── windows brighten with energy
+  if (energy > 0.1) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let r = 0; r < 3; r++) {
+      const winY = h * (0.20 + r * 0.18);
+      const a = energy * 0.15;
+      // Left window glow
+      const lg = ctx.createRadialGradient(w * 0.05, winY, 0, w * 0.05, winY, w * 0.18);
+      lg.addColorStop(0, `rgba(120,180,255,${a})`);
+      lg.addColorStop(1, 'rgba(120,180,255,0)');
+      ctx.fillStyle = lg; ctx.fillRect(0, 0, w * 0.35, h);
+      // Right window glow (red)
+      const rg = ctx.createRadialGradient(w * 0.95, winY, 0, w * 0.95, winY, w * 0.18);
+      rg.addColorStop(0, `rgba(255,140,140,${a})`);
+      rg.addColorStop(1, 'rgba(255,140,140,0)');
+      ctx.fillStyle = rg; ctx.fillRect(w * 0.65, 0, w * 0.35, h);
+    }
+    ctx.restore();
+  }
+
+  // ── Altar candles ── 5 flames, flicker continuously, flare on cheer
+  const altarY = h * 0.71;
+  for (let ci = 0; ci < 5; ci++) {
+    const cxC = w * (0.36 + ci * 0.07);
+    // Candle stick
+    ctx.fillStyle = 'rgba(220,200,160,1)';
+    ctx.fillRect(cxC - 1.5, altarY - 14, 3, 14);
+    // Flame
+    const flicker = 1 + Math.sin(now * 0.012 + ci * 1.7) * 0.15;
+    const fH = 12 * flicker * (1 + cheer * 0.6);
+    const fG = ctx.createRadialGradient(cxC, altarY - 18, 0, cxC, altarY - 18, fH);
+    fG.addColorStop(0, `rgba(255,255,200,${0.95})`);
+    fG.addColorStop(0.4, `rgba(255,200,80,${0.85})`);
+    fG.addColorStop(1, `rgba(255,120,0,0)`);
+    ctx.fillStyle = fG;
+    ctx.beginPath();
+    ctx.ellipse(cxC, altarY - 18, fH * 0.5, fH, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── ANGELS (choir) ──
+  // Wing flap is BPM-locked. Bob is half-time so the breath looks slow + holy.
+  const bpm = (theme.bpm || 80);
+  const beatT = (now / 1000) * (bpm / 60);
+  for (const a of sc.angels) {
+    const flapPhase = beatT * Math.PI + a.flapOff;
+    const flap = (Math.sin(flapPhase) * 0.5 + 0.5);
+    const bob  = Math.sin(beatT * Math.PI * 0.5 + a.bobOff) * 6;
+    const ax = w * a.xN;
+    // Front row stands lower + larger; back row higher + smaller
+    const ay = a.row === 0 ? h * 0.85 : h * 0.76;
+    const sc2 = a.row === 0 ? 1.1 : 0.78;
+    _drawAngel(ctx, ax, ay, sc2, flap, bob, a.haloHue, energy, cheer);
+  }
+
+  // ── Floating golden sparks ──
+  for (const sp of sc.sparks) {
+    sp.y += sp.vy * (0.6 + energy * 1.2);
+    sp.x += Math.sin(now * 0.001 + sp.y * 0.01) * 0.3;
+    if (sp.y < -10) { sp.y = h + 10; sp.x = Math.random() * w; }
+    ctx.fillStyle = `rgba(255,${220 + cheer * 30},${140 + cheer * 60},${sp.a * (0.6 + cheer * 0.4)})`;
+    ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.r + cheer * 0.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // ── HALO around the play board on combo / line clears ──
+  if (cheer > 0.2 && (cheer - sc.lastCheer) > 0.10) sc.halo = Math.min(1, sc.halo + cheer * 0.6);
+  sc.halo *= 0.94;
+  if (sc.halo > 0.05 && playRects.length > 0) {
+    const pr = playRects[0];
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const haloG = ctx.createRadialGradient(
+      pr.x + pr.w / 2, pr.y + pr.h / 2, 0,
+      pr.x + pr.w / 2, pr.y + pr.h / 2, Math.max(pr.w, pr.h) * 0.7
+    );
+    haloG.addColorStop(0,   `rgba(255,235,140,0)`);
+    haloG.addColorStop(0.55, `rgba(255,235,140,${sc.halo * 0.50})`);
+    haloG.addColorStop(0.75, `rgba(255,210,80,${sc.halo * 0.65})`);
+    haloG.addColorStop(1,   `rgba(255,180,40,0)`);
+    ctx.fillStyle = haloG;
+    ctx.fillRect(pr.x - pr.w * 0.4, pr.y - pr.h * 0.2, pr.w * 1.8, pr.h * 1.4);
+    ctx.restore();
+  }
+
+  // ── BELL RING flash on hard drops ──
+  if (drop > 0.7 && (drop - sc.lastDrop) > 0.30) sc.bellRing = Math.min(1, sc.bellRing + 0.7);
+  sc.bellRing *= 0.92;
+  if (sc.bellRing > 0.05) {
+    ctx.fillStyle = `rgba(255,235,140,${sc.bellRing * 0.10})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // ── DESCENDING CROSS OF LIGHT on perfect-clear cheer (cheer >= 1.0) ──
+  if (cheer > 0.95 && (cheer - sc.lastCheer) > 0.20) sc.lightCross = 1.0;
+  sc.lightCross = Math.max(0, sc.lightCross - 0.012);
+  if (sc.lightCross > 0.02 && playRects.length > 0) {
+    const pr = playRects[0];
+    const ccx = pr.x + pr.w / 2;
+    const ccy = pr.y + pr.h / 2;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const a = sc.lightCross;
+    // Vertical beam
+    const vGrad = ctx.createLinearGradient(ccx, 0, ccx, h);
+    vGrad.addColorStop(0,   `rgba(255,250,200,${a * 0.95})`);
+    vGrad.addColorStop(0.5, `rgba(255,235,150,${a * 0.7})`);
+    vGrad.addColorStop(1,   `rgba(255,210,90,0)`);
+    ctx.fillStyle = vGrad;
+    const beamW = 26 + a * 24;
+    ctx.fillRect(ccx - beamW / 2, 0, beamW, h);
+    // Horizontal arm of the cross
+    const hGrad = ctx.createLinearGradient(0, ccy, w, ccy);
+    hGrad.addColorStop(0,   `rgba(255,210,90,0)`);
+    hGrad.addColorStop(0.5, `rgba(255,250,200,${a * 0.85})`);
+    hGrad.addColorStop(1,   `rgba(255,210,90,0)`);
+    ctx.fillStyle = hGrad;
+    ctx.fillRect(0, ccy - beamW / 2, w, beamW);
+    ctx.restore();
+  }
+
+  sc.lastCheer = cheer;
+  sc.lastDrop  = drop;
+
+  ctx.restore();
+
+  // Cut out the play area
   if (playRects.length) {
     bgCtx.save();
     bgCtx.globalCompositeOperation = 'destination-out';
@@ -12405,7 +13100,7 @@ function drawBackground() {
   // future "physical" background object) from rendering on top of the
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone' || style === 'haze' || style === 'robot-city');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone' || style === 'haze' || style === 'robot-city' || style === 'cathedral');
   // Cache getBoundingClientRect — forced layout reflow every frame is very
   // expensive. Invalidate only when canvas size or vs-mode changes.
   const _vsMode = document.body.classList.contains('vs-mode');
@@ -12521,6 +13216,13 @@ function drawBackground() {
   // sync with combos.
   if (style === 'robot-city') {
     drawRobotCityScene(theme, now, playRects);
+    return;
+  }
+  // He Got Me (Level 15): cathedral interior with stained-glass arches,
+  // a choir of angels with flapping wings, golden god-rays from above,
+  // and halos around the play area on combos.
+  if (style === 'cathedral') {
+    drawCathedralScene(theme, now, playRects);
     return;
   }
 
