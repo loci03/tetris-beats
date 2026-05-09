@@ -12688,11 +12688,10 @@ function _initCathedralScene(w, h) {
   _cathedralScene = {
     w, h,
     bgCanvas: null,
-    // Choir of angels — two rows. Wings flap to the beat. Each has a
-    // slightly different bob so they don't perfectly sync (more lifelike).
+    // Choir of angels — two rows. Wings flap to the beat.
     angels: Array.from({ length: 9 }, (_, i) => ({
       xN: 0.06 + (i / 9) * 0.88 + (Math.random() - 0.5) * 0.02,
-      row: i % 2,                       // 0 = front row, 1 = back row
+      row: i % 2,
       flapOff: Math.random() * Math.PI * 2,
       bobOff:  Math.random() * Math.PI * 2,
       haloHue: 50 + Math.random() * 10,
@@ -12705,10 +12704,59 @@ function _initCathedralScene(w, h) {
       r: 1 + Math.random() * 2,
       a: 0.4 + Math.random() * 0.5,
     })),
-    halo: 0,            // 0..1, halo intensity around the board on combos
-    lightCross: 0,      // 0..1, big descending cross-of-light on perfect clear
-    bellRing: 0,        // 0..1, peal flash on hard drops
-    organSwell: 0,      // smoothed swell from audio energy → window brightness
+    // Flock of doves. Most fly in the top strip (above the play canvas
+    // so they're always visible); two patrol the side gutters so the
+    // flock has both high and low presence around the board.
+    doves: Array.from({ length: 8 }, (_, i) => {
+      const lane = i < 6 ? 'top' : (i === 6 ? 'leftGutter' : 'rightGutter');
+      let x, y, vx;
+      if (lane === 'top') {
+        x = Math.random() * w;
+        y = h * (0.03 + Math.random() * 0.07);
+        vx = 0.6 + Math.random() * 0.6;
+      } else if (lane === 'leftGutter') {
+        x = Math.random() * w * 0.30;
+        y = h * (0.30 + Math.random() * 0.30);
+        vx = 0.5 + Math.random() * 0.4;
+      } else {
+        x = w * 0.70 + Math.random() * w * 0.30;
+        y = h * (0.30 + Math.random() * 0.30);
+        vx = -(0.5 + Math.random() * 0.4);
+      }
+      return { x, y, vx, vy: 0, flapOff: Math.random() * Math.PI * 2, flap: 0, scared: 0, lane };
+    }),
+    // Three swinging chandeliers across the upper third of the cathedral.
+    // Pendulum physics — angular velocity gets a kick on hard drops.
+    chandeliers: [
+      { xN: 0.20, ang: 0.08,  vel: 0.005, baseY: 0.16, candles: 5 },
+      { xN: 0.50, ang: -0.05, vel: -0.004, baseY: 0.12, candles: 7 },
+      { xN: 0.80, ang: 0.03,  vel: 0.006, baseY: 0.16, candles: 5 },
+    ],
+    // Pews with congregation silhouettes — front of stage. Each row has
+    // 16 worshippers; bob to the half-beat, raise their hands on big cheer.
+    pews: [
+      { yN: 0.88, count: 18, scale: 1.00, off: Math.random() * 0.7 },
+      { yN: 0.92, count: 22, scale: 0.90, off: Math.random() * 0.7 },
+    ],
+    // Floating glyphs (cross, alleluia, music notes) that rise up from the
+    // choir on cheer events. Spawned in the cheer-edge handler.
+    glyphs: [],   // { x, y, vy, life, hue, glyph }
+    // Stained-glass light projections on the floor — colored patches that
+    // shift with the windows.
+    lightPatches: [
+      { xN: 0.20, hue: 220, off: 0 },
+      { xN: 0.35, hue: 240, off: Math.PI * 0.7 },
+      { xN: 0.65, hue: 0,   off: Math.PI * 1.2 },
+      { xN: 0.80, hue: 350, off: Math.PI * 0.3 },
+    ],
+    halo: 0,            // halo intensity around the board on combos
+    lightCross: 0,      // descending cross-of-light on perfect clear
+    bellRing: 0,        // peal flash on hard drops
+    bellSwing: 0,       // bell tower pendulum
+    organSwell: 0,      // audio energy → window brightness
+    pillarPulse: 0,     // beat-locked pillar pulse
+    pastorRaise: 0,     // pastor's arm raise (on cheer)
+    floorRipple: 0,     // ripple on floor when bass hits
     lastCheer: 0,
     lastDrop: 0,
   };
@@ -12888,6 +12936,193 @@ function _drawAngel(ctx, cx, cy, scale, flap, bobY, haloHue, energy, cheer) {
   ctx.stroke();
 }
 
+// One swinging chandelier — pendulum physics from a fixed cord at the top.
+// `ang` is the current angle (radians) from vertical; the scene loop
+// updates it via simple harmonic motion + dampening.
+function _drawChandelier(ctx, anchorX, cordLen, ang, candleCount, energy, cheer) {
+  const fixtureCx = anchorX + Math.sin(ang) * cordLen;
+  const fixtureCy = Math.cos(ang) * cordLen;
+  // Cord from ceiling to chandelier
+  ctx.strokeStyle = 'rgba(80,55,20,0.85)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(anchorX, 0);
+  ctx.lineTo(fixtureCx, fixtureCy);
+  ctx.stroke();
+  // Bronze ring fixture
+  const ringR = 22 + candleCount * 2;
+  ctx.save();
+  ctx.translate(fixtureCx, fixtureCy);
+  ctx.rotate(ang * 0.4);  // ring tilts slightly with swing
+  ctx.strokeStyle = 'rgba(120,85,30,0.95)';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(0, 0, ringR, ringR * 0.30, 0, 0, Math.PI * 2); ctx.stroke();
+  // Outer rim highlight
+  ctx.strokeStyle = `rgba(220,180,90,${0.5 + cheer * 0.3})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(0, 0, ringR, ringR * 0.30, 0, 0, Math.PI * 2); ctx.stroke();
+  // Small connecting struts from cord to ring
+  ctx.strokeStyle = 'rgba(80,55,20,0.7)';
+  ctx.lineWidth = 1;
+  for (let s = 0; s < 4; s++) {
+    const a = s * Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -ringR * 0.7);
+    ctx.lineTo(Math.cos(a) * ringR * 0.6, ringR * 0.20);
+    ctx.stroke();
+  }
+  // Candles spaced around the ring
+  for (let ci = 0; ci < candleCount; ci++) {
+    const a = (ci / candleCount) * Math.PI * 2;
+    const cx = Math.cos(a) * ringR * 0.85;
+    const cy = Math.sin(a) * ringR * 0.30;
+    // Candle stick
+    ctx.fillStyle = 'rgba(245,225,175,1)';
+    ctx.fillRect(cx - 1.2, cy - 8, 2.4, 8);
+    // Flame — subtle wobble from the swing motion
+    const flameWobble = ang * 6 + Math.sin(ci * 7 + Date.now() * 0.012) * 0.4;
+    const flameH = 8 + cheer * 5 + energy * 4;
+    const flameG = ctx.createRadialGradient(cx + flameWobble, cy - 12, 0, cx + flameWobble, cy - 12, flameH);
+    flameG.addColorStop(0, 'rgba(255,255,210,0.95)');
+    flameG.addColorStop(0.4, 'rgba(255,200,80,0.85)');
+    flameG.addColorStop(1, 'rgba(255,120,0,0)');
+    ctx.fillStyle = flameG;
+    ctx.beginPath();
+    ctx.ellipse(cx + flameWobble, cy - 12, flameH * 0.42, flameH, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  // Soft warm glow under the chandelier (drops light onto the cathedral floor)
+  const glowG = ctx.createRadialGradient(fixtureCx, fixtureCy, 0, fixtureCx, fixtureCy, ringR * 3.5);
+  glowG.addColorStop(0, `rgba(255,220,140,${0.10 + cheer * 0.10 + energy * 0.06})`);
+  glowG.addColorStop(1, 'rgba(255,220,140,0)');
+  ctx.fillStyle = glowG;
+  ctx.beginPath(); ctx.arc(fixtureCx, fixtureCy, ringR * 3.5, 0, Math.PI * 2); ctx.fill();
+}
+
+// A flying dove — body + flapping wings. Wings open/close each frame
+// based on `flap` (0 = closed, 1 = fully open).
+function _drawDove(ctx, x, y, flap, vx, energy, cheer) {
+  // Body (a small white ellipse, banked toward velocity direction)
+  const bank = Math.sign(vx) * 0.25;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(bank * 0.3);
+  // Body
+  ctx.fillStyle = `rgba(255,250,235,${0.92 + cheer * 0.08})`;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 7, 3.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Tail
+  ctx.beginPath();
+  ctx.moveTo(-7, 0);
+  ctx.lineTo(-12, -2);
+  ctx.lineTo(-12, 2);
+  ctx.closePath();
+  ctx.fill();
+  // Head + beak
+  ctx.beginPath();
+  ctx.arc(6, -0.5, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(220,180,80,1)';
+  ctx.beginPath();
+  ctx.moveTo(8, -0.5);
+  ctx.lineTo(11, 0);
+  ctx.lineTo(8, 1);
+  ctx.closePath();
+  ctx.fill();
+  // Wings — symmetric, flap up/down
+  const wingY = -2 - flap * 6;
+  const wingX = 4 * (1 - flap * 0.4);
+  ctx.fillStyle = `rgba(255,250,235,${0.85 + cheer * 0.15})`;
+  ctx.beginPath();
+  ctx.moveTo(0, -1);
+  ctx.quadraticCurveTo(-wingX, wingY, -wingX - 4, wingY + 4);
+  ctx.quadraticCurveTo(-wingX * 0.5, 1, 0, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, -1);
+  ctx.quadraticCurveTo(wingX, wingY, wingX + 4, wingY + 4);
+  ctx.quadraticCurveTo(wingX * 0.5, 1, 0, 0);
+  ctx.closePath();
+  ctx.fill();
+  // Wingtip glow on cheer
+  if (cheer > 0.3) {
+    ctx.strokeStyle = `rgba(255,235,140,${cheer * 0.5})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -1); ctx.lineTo(-wingX - 4, wingY + 4);
+    ctx.moveTo(0, -1); ctx.lineTo( wingX + 4, wingY + 4);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Pastor / preacher figure at the altar — robe, raised arms that climb
+// higher with cheer (peaks of the song). Slow side-to-side sway with the
+// beat. Subtle halo on big clears.
+function _drawPastor(ctx, cx, cy, raise, sway, cheer, energy) {
+  const robeH = 70;
+  const robeW = 24;
+  const robeY = cy + Math.sin(sway) * 1.5;
+  // Robe
+  const robeG = ctx.createLinearGradient(cx, robeY - robeH * 0.5, cx, robeY + robeH * 0.5);
+  robeG.addColorStop(0, `rgba(245,230,190,${0.95})`);
+  robeG.addColorStop(0.6, `rgba(220,190,130,${0.90})`);
+  robeG.addColorStop(1,   `rgba(170,130,70,${0.85})`);
+  ctx.fillStyle = robeG;
+  ctx.beginPath();
+  ctx.moveTo(cx - robeW * 0.5, robeY - robeH * 0.5);
+  ctx.lineTo(cx + robeW * 0.5, robeY - robeH * 0.5);
+  ctx.lineTo(cx + robeW * 0.85, robeY + robeH * 0.5);
+  ctx.lineTo(cx - robeW * 0.85, robeY + robeH * 0.5);
+  ctx.closePath();
+  ctx.fill();
+  // Sash belt
+  ctx.fillStyle = `rgba(200,80,80,0.9)`;
+  ctx.fillRect(cx - robeW * 0.5, robeY + robeH * 0.05, robeW, 3);
+  // Head
+  ctx.fillStyle = `rgba(200,170,130,1)`;
+  ctx.beginPath(); ctx.arc(cx, robeY - robeH * 0.55, 7, 0, Math.PI * 2); ctx.fill();
+  // Subtle halo when cheer is high
+  if (cheer > 0.2) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = `rgba(255,235,150,${cheer * 0.7})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(cx, robeY - robeH * 0.66, 11, 4, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  // Arms — raised toward heaven; raise factor 0..1 lifts them from
+  // shoulder-level to fully overhead.
+  const shoulderY = robeY - robeH * 0.40;
+  const handY = shoulderY - 10 - raise * 30;
+  const handSpread = 16 - raise * 8;     // arms come closer overhead as they raise
+  ctx.strokeStyle = `rgba(220,190,130,1)`;
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - 6, shoulderY);
+  ctx.lineTo(cx - handSpread, handY);
+  ctx.moveTo(cx + 6, shoulderY);
+  ctx.lineTo(cx + handSpread, handY);
+  ctx.stroke();
+  // Light streak from raised hands to the rose window when raise > 0.6
+  if (raise > 0.6) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const a = (raise - 0.6) * 2;
+    ctx.strokeStyle = `rgba(255,230,140,${a * 0.55})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - handSpread, handY); ctx.lineTo(cx, 0);
+    ctx.moveTo(cx + handSpread, handY); ctx.lineTo(cx, 0);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawCathedralScene(theme, now, playRects) {
   const w = bgCanvas.width, h = bgCanvas.height;
   if (!_cathedralScene || _cathedralScene.w !== w || _cathedralScene.h !== h) _initCathedralScene(w, h);
@@ -12949,12 +13184,10 @@ function drawCathedralScene(theme, now, playRects) {
     for (let r = 0; r < 3; r++) {
       const winY = h * (0.20 + r * 0.18);
       const a = energy * 0.15;
-      // Left window glow
       const lg = ctx.createRadialGradient(w * 0.05, winY, 0, w * 0.05, winY, w * 0.18);
       lg.addColorStop(0, `rgba(120,180,255,${a})`);
       lg.addColorStop(1, 'rgba(120,180,255,0)');
       ctx.fillStyle = lg; ctx.fillRect(0, 0, w * 0.35, h);
-      // Right window glow (red)
       const rg = ctx.createRadialGradient(w * 0.95, winY, 0, w * 0.95, winY, w * 0.18);
       rg.addColorStop(0, `rgba(255,140,140,${a})`);
       rg.addColorStop(1, 'rgba(255,140,140,0)');
@@ -12962,6 +13195,66 @@ function drawCathedralScene(theme, now, playRects) {
     }
     ctx.restore();
   }
+
+  // ── BPM-locked beat pulse for pillars + congregation ──
+  const bpm = (theme.bpm || 80);
+  const beatT = (now / 1000) * (bpm / 60);
+  const beatPulse = Math.max(0, Math.sin(beatT * Math.PI * 2));
+  sc.pillarPulse = sc.pillarPulse * 0.85 + beatPulse * 0.15 + energy * 0.05;
+
+  // ── COLUMN PILLARS between the windows on each wall ──
+  // Three on each side, illuminated more brightly when the bass kicks.
+  const pillarPositions = [
+    { x: w * 0.16, side: 'L' }, { x: w * 0.28, side: 'L' },
+    { x: w * 0.72, side: 'R' }, { x: w * 0.84, side: 'R' },
+  ];
+  for (const p of pillarPositions) {
+    // Pillar shaft
+    const pw = w * 0.018;
+    const ph = h * 0.62;
+    const py = h * 0.10;
+    const grad = ctx.createLinearGradient(p.x - pw / 2, 0, p.x + pw / 2, 0);
+    grad.addColorStop(0,   'rgba(40,28,12,1)');
+    grad.addColorStop(0.5, `rgba(${85 + sc.pillarPulse * 50},${65 + sc.pillarPulse * 40},${30 + sc.pillarPulse * 20},1)`);
+    grad.addColorStop(1,   'rgba(30,20,8,1)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(p.x - pw / 2, py, pw, ph);
+    // Capital + base
+    ctx.fillStyle = `rgba(120,90,40,${0.85 + sc.pillarPulse * 0.15})`;
+    ctx.fillRect(p.x - pw * 0.7, py, pw * 1.4, 6);
+    ctx.fillRect(p.x - pw * 0.7, py + ph - 6, pw * 1.4, 6);
+    // Vertical fluting (3 thin lines per pillar)
+    ctx.strokeStyle = 'rgba(20,12,4,0.4)';
+    ctx.lineWidth = 1;
+    for (let f = -1; f <= 1; f++) {
+      ctx.beginPath();
+      ctx.moveTo(p.x + f * pw * 0.20, py + 8);
+      ctx.lineTo(p.x + f * pw * 0.20, py + ph - 8);
+      ctx.stroke();
+    }
+  }
+
+  // ── STAINED-GLASS LIGHT PROJECTIONS on the floor ──
+  // Colored ovals where the windows would cast light. Pulse with the
+  // beat + energy. Use 'lighter' so they tint the floor warmly.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const floorY = h * 0.84;
+  for (const lp of sc.lightPatches) {
+    const px = w * lp.xN + Math.sin(beatT * Math.PI + lp.off) * 6;
+    const py = floorY + Math.sin(beatT * Math.PI * 0.5 + lp.off) * 2;
+    const pr = w * (0.06 + sc.pillarPulse * 0.012);
+    const pg = ctx.createRadialGradient(px, py, 0, px, py, pr);
+    const pa = 0.18 + energy * 0.12 + cheer * 0.20;
+    pg.addColorStop(0,   `hsla(${lp.hue},85%,75%,${pa})`);
+    pg.addColorStop(0.7, `hsla(${lp.hue + 20},75%,55%,${pa * 0.5})`);
+    pg.addColorStop(1,   `hsla(${lp.hue},75%,55%,0)`);
+    ctx.fillStyle = pg;
+    ctx.beginPath();
+    ctx.ellipse(px, py, pr, pr * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 
   // ── Altar candles ── 5 flames, flicker continuously, flare on cheer
   const altarY = h * 0.71;
@@ -12983,19 +13276,169 @@ function drawCathedralScene(theme, now, playRects) {
     ctx.fill();
   }
 
+  // ── PASTORS / DEACONS flanking the play area ── one each side, slowly
+  // sway with the beat, raise arms on cheer (preaching). Two figures on
+  // opposite sides keeps them visible despite the play-area mask.
+  sc.pastorRaise = sc.pastorRaise * 0.90 + Math.min(1, cheer * 1.2) * 0.10;
+  const pastorCy = altarY - 14;
+  _drawPastor(ctx, w * 0.18, pastorCy, sc.pastorRaise, beatT * Math.PI,         cheer, energy);
+  _drawPastor(ctx, w * 0.82, pastorCy, sc.pastorRaise, beatT * Math.PI + Math.PI, cheer, energy);
+
+  // ── CHANDELIERS (3 across the upper third) ──
+  // Pendulum SHM with mild damping. Hard drops kick angular velocity
+  // randomly L/R so each chandelier ends up swaying out of sync.
+  if (drop > 0.7 && (drop - sc.lastDrop) > 0.30) {
+    for (const ch of sc.chandeliers) {
+      ch.vel += (Math.random() - 0.5) * 0.08 * drop;
+    }
+    sc.bellSwing = 1;
+  }
+  sc.bellSwing *= 0.94;
+  for (const ch of sc.chandeliers) {
+    // SHM: ang'' = -k * ang. Damped.
+    const k = 0.0042;
+    ch.vel += -k * ch.ang;
+    ch.vel *= 0.992;
+    ch.ang += ch.vel;
+    const anchorX = w * ch.xN;
+    const cordLen = h * ch.baseY;
+    _drawChandelier(ctx, anchorX, cordLen, ch.ang, ch.candles, energy, cheer);
+  }
+
+  // ── CONGREGATION pews ──
+  // Worshippers bob at the half-beat, raise arms on big cheer pulses.
+  // Drawn in front of the choir line so they're more "near camera".
+  for (const pew of sc.pews) {
+    // Pew bench
+    const pewY = h * pew.yN;
+    ctx.fillStyle = 'rgba(40,25,10,1)';
+    ctx.fillRect(w * 0.05, pewY + 16, w * 0.90, 4);
+    // Pew side panels
+    ctx.fillStyle = 'rgba(60,38,16,1)';
+    ctx.fillRect(w * 0.05, pewY + 12, 4, 14);
+    ctx.fillRect(w * 0.95 - 4, pewY + 12, 4, 14);
+    // Worshippers
+    for (let i = 0; i < pew.count; i++) {
+      const wx = w * (0.07 + (i / (pew.count - 1)) * 0.86);
+      const bobPhase = beatT * Math.PI + pew.off + i * 0.4;
+      const bob = Math.sin(bobPhase) * 1.5 * (0.8 + energy * 0.4);
+      const wh = 14 * pew.scale;
+      // Body silhouette
+      ctx.fillStyle = `rgba(20,12,4,${0.95})`;
+      ctx.beginPath();
+      ctx.moveTo(wx - 3 * pew.scale, pewY + bob);
+      ctx.lineTo(wx + 3 * pew.scale, pewY + bob);
+      ctx.lineTo(wx + 4 * pew.scale, pewY + wh + bob);
+      ctx.lineTo(wx - 4 * pew.scale, pewY + wh + bob);
+      ctx.closePath();
+      ctx.fill();
+      // Head
+      ctx.beginPath();
+      ctx.arc(wx, pewY - 3 * pew.scale + bob, 3 * pew.scale, 0, Math.PI * 2);
+      ctx.fill();
+      // Arms raised on cheer (alternating worshippers raise on heavy cheer)
+      if (cheer > 0.4 && (i & 1) === Math.floor(beatT) % 2) {
+        ctx.strokeStyle = `rgba(20,12,4,${0.85})`;
+        ctx.lineWidth = 1.6 * pew.scale;
+        const handY = pewY + bob - 8 * pew.scale - cheer * 6;
+        ctx.beginPath();
+        ctx.moveTo(wx - 2.5 * pew.scale, pewY + bob + 3 * pew.scale);
+        ctx.lineTo(wx - 4 * pew.scale,   handY);
+        ctx.moveTo(wx + 2.5 * pew.scale, pewY + bob + 3 * pew.scale);
+        ctx.lineTo(wx + 4 * pew.scale,   handY);
+        ctx.stroke();
+      }
+    }
+  }
+
   // ── ANGELS (choir) ──
-  // Wing flap is BPM-locked. Bob is half-time so the breath looks slow + holy.
-  const bpm = (theme.bpm || 80);
-  const beatT = (now / 1000) * (bpm / 60);
   for (const a of sc.angels) {
     const flapPhase = beatT * Math.PI + a.flapOff;
     const flap = (Math.sin(flapPhase) * 0.5 + 0.5);
     const bob  = Math.sin(beatT * Math.PI * 0.5 + a.bobOff) * 6;
     const ax = w * a.xN;
-    // Front row stands lower + larger; back row higher + smaller
     const ay = a.row === 0 ? h * 0.85 : h * 0.76;
     const sc2 = a.row === 0 ? 1.1 : 0.78;
     _drawAngel(ctx, ax, ay, sc2, flap, bob, a.haloHue, energy, cheer);
+  }
+
+  // ── DOVES flying across the cathedral ──
+  // Hard drops scatter the flock (vy spike + scared flag); the doves
+  // gradually re-orient back to drifting horizontally.
+  if (drop > 0.8 && (drop - sc.lastDrop) > 0.25) {
+    for (const d of sc.doves) {
+      d.scared = 1;
+      d.vy = (Math.random() - 0.5) * 4;
+      d.vx += (Math.random() - 0.5) * 1.5;
+    }
+  }
+  for (const d of sc.doves) {
+    d.flap += 0.18 + energy * 0.10;     // flap rate scales with audio energy
+    const flap = (Math.sin(d.flap) * 0.5 + 0.5);
+    d.x += d.vx * (1 + energy * 0.4);
+    d.y += d.vy;
+    // Decay scared state — return to gentle drift
+    if (d.scared > 0) {
+      d.scared *= 0.94;
+      d.vy *= 0.88;
+      d.vx = d.vx * 0.97 + (d.vx > 0 ? 0.6 : -0.6) * 0.03;
+    } else {
+      // Tiny sinusoidal lift
+      d.y += Math.sin(now * 0.002 + d.flapOff) * 0.18;
+    }
+    if (d.x > w + 30) {
+      d.x = -30;
+      if (d.lane === 'top')        { d.y = h * (0.03 + Math.random() * 0.07); d.vx = 0.6 + Math.random() * 0.6; }
+      else if (d.lane === 'leftGutter')  { d.y = h * (0.30 + Math.random() * 0.30); d.vx = 0.5 + Math.random() * 0.4; }
+      else                          { d.y = h * (0.30 + Math.random() * 0.30); d.vx = -(0.5 + Math.random() * 0.4); }
+    }
+    if (d.x < -30)    {
+      d.x = w + 30;
+      if (d.lane === 'rightGutter') { d.y = h * (0.30 + Math.random() * 0.30); d.vx = -(0.5 + Math.random() * 0.4); }
+      else                          { d.y = h * (0.03 + Math.random() * 0.07); d.vx = 0.6 + Math.random() * 0.6; }
+    }
+    _drawDove(ctx, d.x, d.y, flap, d.vx, energy, cheer);
+  }
+
+  // ── FLOATING GLYPHS (✝, ♪, ✦) ── spawn from choir on cheer events.
+  // Only the SIDE angels (xN < 0.30 or > 0.70) spawn — center angels are
+  // hidden behind the play-area cutout so glyphs from there'd be invisible.
+  if (cheer > 0.4 && (cheer - sc.lastCheer) > 0.15) {
+    const sideAngels = sc.angels.filter(a => a.xN < 0.30 || a.xN > 0.70);
+    const burst = 1 + Math.floor(cheer * 4);
+    for (let g = 0; g < burst; g++) {
+      const a = sideAngels[Math.floor(Math.random() * sideAngels.length)];
+      const ax = w * a.xN;
+      const ay = h * (a.row === 0 ? 0.84 : 0.74);
+      const glyph = ['♪', '✝', '✦', '♫'][Math.floor(Math.random() * 4)];
+      sc.glyphs.push({
+        x: ax + (Math.random() - 0.5) * 30,
+        y: ay - 20,
+        vy: -0.6 - Math.random() * 0.4,
+        // Drift outward (away from the play area) so they don't sail into
+        // the cutout. Doubles as a "rising into heaven" visual.
+        vx: (a.xN < 0.5 ? -1 : 1) * (0.15 + Math.random() * 0.25),
+        life: 1,
+        size: 14 + Math.random() * 10,
+        hue: 45 + Math.random() * 15,
+        glyph,
+      });
+    }
+  }
+  for (let gi = sc.glyphs.length - 1; gi >= 0; gi--) {
+    const G = sc.glyphs[gi];
+    G.x += G.vx;
+    G.y += G.vy;
+    G.life -= 0.006;
+    if (G.life <= 0) { sc.glyphs.splice(gi, 1); continue; }
+    ctx.save();
+    ctx.font = `bold ${G.size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `hsla(${G.hue},85%,${65 + G.life * 15}%,${G.life})`;
+    ctx.shadowColor = `hsla(${G.hue},85%,80%,${G.life * 0.8})`;
+    ctx.shadowBlur = 12;
+    ctx.fillText(G.glyph, G.x, G.y);
+    ctx.restore();
   }
 
   // ── Floating golden sparks ──
