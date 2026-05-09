@@ -1422,6 +1422,7 @@
     <button class="mode-btn" data-mode="marathon" data-tab="more" style="display:none;" title="150-line endurance run. Levels speed up every 15 lines.">MARATHON</button>
     <button class="mode-btn" data-mode="sprint"   data-tab="more" style="display:none;" title="Clear 40 lines as fast as possible.">SPRINT</button>
     <button class="mode-btn" data-mode="ultra"    data-tab="more" style="display:none;" title="Score as much as possible in 2 minutes.">ULTRA</button>
+    <button class="mode-btn" data-mode="daily"    data-tab="more" style="display:none;" title="Today's seeded run. Same pieces for everyone, leaderboard resets daily.">DAILY ★</button>
   </div>
   <!-- STORY WIP overlay — shown when the STORY tab is active -->
   <div id="story-wip" style="display:none; flex-direction:column; align-items:center; gap:10px; padding:18px 12px 10px; max-width:380px; margin:0 auto; width:100%;">
@@ -1466,9 +1467,10 @@
   </div>
   <button id="start-btn">DROP THE BEAT</button>
   <div class="controls-info desktop-only">
-    Arrow Keys / WASD - Move & Rotate<br>
+    Arrow Keys / WASD - Move<br>
+    ↑ / X - Rotate CW &nbsp;·&nbsp; Z - Rotate CCW<br>
     Space - Hard Drop | Shift / C - Hold<br>
-    Z - Zone | P - Pause
+    Q - Zone | P - Pause
   </div>
   <div class="controls-info mobile-only" style="display:none;">
     Buttons below to play<br>
@@ -2604,10 +2606,15 @@ window.addEventListener('orientationchange', () => setTimeout(scheduleResize, 10
 // iOS Safari changes visualViewport.height as the URL bar auto-hides on scroll.
 // Listen on BOTH `resize` (keyboard show/hide, orientation) and `scroll`
 // (URL-bar slide as the user scrolls) so the board is always sized to the
-// actually-visible region.
+// actually-visible region. `scroll` fires per frame during URL-bar animation —
+// debounce to ~150ms so we don't reallocate canvas GPU memory continuously.
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', scheduleResize);
-  window.visualViewport.addEventListener('scroll', scheduleResize);
+  let _scrollDebounce = null;
+  window.visualViewport.addEventListener('scroll', () => {
+    clearTimeout(_scrollDebounce);
+    _scrollDebounce = setTimeout(scheduleResize, 150);
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -2616,10 +2623,11 @@ if (window.visualViewport) {
 // refactor. In solo mode there is one player and these behave as
 // regular globals.
 // ─────────────────────────────────────────────────────────────────
-var board, currentPiece, currentX, currentY, currentType;
+var board, currentPiece, currentX, currentY, currentType, currentRotation;
 var holdPieceType, canHold, nextQueue, score, lines, level, prevLevel;
-var gameOver, dropInterval, lastDrop, lockDelay, lockTimer, isLocking;
-var zoneEnergy, zoneActive, zoneTimer, combo;
+var gameOver, dropInterval, lastDrop, lockDelay, lockTimer, isLocking, lockResets;
+const LOCK_RESET_LIMIT = 15;
+var zoneEnergy, zoneActive, zoneTimer, combo, b2bChain;
 var particles;
 var bag = [];
 var levelTransitionAlpha = 0;
@@ -2649,6 +2657,8 @@ var beatPhase = 0;
 // Board render cache: locked cells baked to an offscreen canvas so complex
 // block renderers (beefpatty, trumpet, brain, etc.) don't run every frame
 // for every filled cell. Only redrawn when _boardCacheDirty is true.
+// NOTE: these globals shadow the per-player fields via setActivePlayer's
+// global-swap. Reads/writes here always target the active player's cache.
 var _boardCache = null;
 var _boardCacheDirty = true;
 // Per-cell block image cache: each style+color combination rendered once to a
@@ -2734,12 +2744,14 @@ function setStartLevel(v) {
 // Fields that live in the globals and belong to whichever player is currently
 // "active". Swapped by setActivePlayer().
 const PLAYER_FIELDS = [
-  'board','currentPiece','currentX','currentY','currentType',
+  'board','currentPiece','currentX','currentY','currentType','currentRotation',
   'holdPieceType','canHold','nextQueue','bag',
   'score','lines','level','prevLevel',
   'gameOver','dropInterval','lastDrop','lockDelay','lockTimer','isLocking',
-  'zoneEnergy','zoneActive','zoneTimer','combo',
+  'lockResets',
+  'zoneEnergy','zoneActive','zoneTimer','combo','b2bChain',
   'particles','levelTransitionAlpha','levelTransitionColor',
+  '_boardCache','_boardCacheDirty',
 ];
 // Canvas refs that also differ per player in vs mode. `CELL` is also in
 // here because P2's mini-board uses a smaller cell size than P1's full one.
@@ -2761,10 +2773,14 @@ function createPlayer({ id, isAI, name, mainCanvas: mc, holdCanvas: hc, nextCanv
     gameOver: false,
     dropInterval: 800, lastDrop: 0, lockDelay: 500, lockTimer: 0, isLocking: false,
     zoneEnergy: 0, zoneActive: false, zoneTimer: 0,
-    combo: -1,
+    combo: -1, b2bChain: 0,
     particles: [],
     levelTransitionAlpha: 0, levelTransitionColor: '#fff',
     incomingGarbage: 0,         // reserved for Turn 2 (garbage exchange)
+    // Per-player board cache. Was a single shared global, but P1 and P2 use
+    // different CELL sizes — sharing thrashed the cache to a full rebuild
+    // every frame in vs/PvP mode. Each player now owns its own.
+    _boardCache: null, _boardCacheDirty: true,
     // AI difficulty tuning. Pulled from a preset in AI_DIFFICULTIES keyed on
     // the global aiDifficulty (set via the start-screen selector).
     ai: isAI ? Object.assign({
@@ -2791,16 +2807,29 @@ function setActivePlayer(p) {
 // Mulberry32: tiny, fast, good enough that both sides see the same pieces.
 // Not cryptographic - that's not the goal. Fed by the server-provided seed
 // string (hex bytes) hashed to a uint32 on match start.
-let _netRand = null;
-function setNetworkSeed(seed) {
-  if (!seed) { _netRand = null; return; }
+//
+// HISTORICAL BUG: previous implementation kept ONE shared PRNG. Both players
+// consumed from it as their bags refilled — P1 took positions 0-6, P2 took
+// 7-13, P1's second refill took 14-20. Despite a "shared seed" promise, the
+// two players saw DIFFERENT bags. Same seed, divergent state.
+//
+// Fix: each side gets its OWN PRNG instance, both seeded from the same
+// string. Both sides call `_pieceRand()` exactly the same number of times
+// for their own bag → both sides see identical bag orderings. The seed
+// string is also stashed for `riseGarbage` (so PvP garbage hole columns
+// match between players too).
+let _netSeed = null;
+let _seedRandPlayer = null;   // PRNG used for piece bag (player 1's view)
+let _seedRandGarbage = null;  // PRNG used for garbage hole columns
+function _seededMulberry32(seedStr, salt) {
   let h = 2166136261 >>> 0;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
+  const s = (salt || '') + seedStr;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
     h = Math.imul(h, 16777619) >>> 0;
   }
   let a = h >>> 0;
-  _netRand = function() {
+  return function() {
     a = (a + 0x6D2B79F5) >>> 0;
     let t = a;
     t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -2808,7 +2837,70 @@ function setNetworkSeed(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-function _pieceRand() { return _netRand ? _netRand() : Math.random(); }
+function setNetworkSeed(seed) {
+  _netSeed = seed || null;
+  if (!seed) { _seedRandPlayer = null; _seedRandGarbage = null; return; }
+  // Both sides salt the PRNG identically — the SEED is the synchronization
+  // primitive, not which side is consuming. (The old "single instance"
+  // approach guaranteed divergence whenever each side independently asked
+  // for its next piece.)
+  _seedRandPlayer  = _seededMulberry32(seed, 'pieces:');
+  _seedRandGarbage = _seededMulberry32(seed, 'garbage:');
+}
+function _pieceRand()   { return _seedRandPlayer  ? _seedRandPlayer()  : Math.random(); }
+function _garbageRand() { return _seedRandGarbage ? _seedRandGarbage() : Math.random(); }
+
+// ── Replay recorder ──────────────────────────────────────────────────────
+// Records (offsetMs, action) tuples plus the seed used for the run, so a
+// replay is deterministic IFF the run used a seeded PRNG (Daily, PvP,
+// future replay-only modes). Solo runs without a seed are recorded but
+// won't replay byte-identically because Math.random() drives bag/garbage.
+// Storage: localStorage `tetris.replays.v1` keyed by start-timestamp.
+const REPLAY_KEY = 'tetris.replays.v1';
+const REPLAY_MAX_KEEP = 25;
+const _replay = {
+  recording: false,
+  events: [],
+  startedAt: 0,
+  seed: null,
+  mode: null,
+};
+function startReplayRecording(seed, mode) {
+  _replay.recording = true;
+  _replay.events = [];
+  _replay.startedAt = performance.now();
+  _replay.seed = seed || null;
+  _replay.mode = mode || 'story';
+}
+function recordReplayEvent(action) {
+  if (!_replay.recording) return;
+  // Skip frames where the same action is dispatched at sub-1ms intervals
+  // (auto-repeat). The replay is small enough as-is.
+  _replay.events.push([Math.round(performance.now() - _replay.startedAt), action]);
+}
+function stopReplayRecording(finalScore, finalLines, finalLevel) {
+  if (!_replay.recording) return null;
+  _replay.recording = false;
+  if (_replay.events.length === 0) return null;
+  const id = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const replay = {
+    id,
+    seed: _replay.seed,
+    mode: _replay.mode,
+    startedAt: Date.now(),
+    durationMs: Math.round(performance.now() - _replay.startedAt),
+    events: _replay.events,
+    score: finalScore | 0,
+    lines: finalLines | 0,
+    level: finalLevel | 0,
+  };
+  try {
+    const all = JSON.parse(localStorage.getItem(REPLAY_KEY) || '[]');
+    all.unshift(replay);
+    localStorage.setItem(REPLAY_KEY, JSON.stringify(all.slice(0, REPLAY_MAX_KEEP)));
+  } catch {}
+  return replay;
+}
 
 function nextFromBag() {
   if (bag.length === 0) {
@@ -2832,11 +2924,20 @@ function spawnPiece() {
   fillNextQueue();
   currentType = nextQueue.shift();
   fillNextQueue();
-  currentPiece = PIECES[currentType].shape.map(p => [...p]);
+  currentPiece = SRS_STATES[currentType][0].map(p => [...p]);
+  currentRotation = 0;
   currentX = Math.floor(COLS / 2) - 2;
   currentY = 0;
   canHold = true;
   isLocking = false;
+  // Lock-delay-reset budget per modern Tetris guideline: each piece can reset
+  // its lock timer at most LOCK_RESET_LIMIT times by movement/rotation while
+  // grounded. Closes the infinite-spin exploit at L1-10 where lockDelay=500ms.
+  lockResets = 0;
+  // Clear T-spin sticky state from the previous piece.
+  _lastRotation.wasKick = false;
+  _lastRotation.isTSpin = false;
+  _lastRotation.isTSpinMini = false;
   if (collides(currentPiece, currentX, currentY)) {
     gameOver = true;
     handleTopOut();
@@ -2904,26 +3005,115 @@ function collides(piece, px, py) {
   return false;
 }
 
+// ── Super Rotation System (SRS) ────────────────────────────────────────────
+// Pre-build per-piece rotation tables by rotating the spawn shape 90° CW
+// around the bounding box center. Honours each piece's existing spawn
+// orientation (T spawns stem-down, S/Z as defined in PIECES) so the visual
+// at piece spawn doesn't change — only rotation feel does.
+const SRS_STATES = {};
+(function buildSrsStates() {
+  for (const t of PIECE_KEYS) {
+    const spawn = PIECES[t].shape;
+    // Pieces use a 4×4 box for I, 3×3 for everything else (O included — its
+    // kicks are no-ops anyway). Center of rotation is the box midpoint.
+    const box = (t === 'I') ? 4 : 3;
+    const cx = (box - 1) / 2, cy = (box - 1) / 2;
+    const states = [spawn.map(p => [...p])];
+    for (let i = 0; i < 3; i++) {
+      const prev = states[states.length - 1];
+      states.push(prev.map(([x, y]) => [
+        Math.round(cx - (y - cy)),
+        Math.round(cy + (x - cx)),
+      ]));
+    }
+    SRS_STATES[t] = states;
+  }
+})();
+
+// SRS kick tables (y-flipped from y-up wiki convention to our y-down screen).
+// Indexed by (fromState, dir) → list of [dx, dy] attempts to try in order.
+// dir = +1 → CW, -1 → CCW.
+const _SRS_KICK_JLSTZ = {
+  '0,1':  [[0,0],[-1,0],[-1,-1],[0,2],[-1,2]],
+  '1,0':  [[0,0],[1,0],[1,1],[0,-2],[1,-2]],
+  '1,2':  [[0,0],[1,0],[1,1],[0,-2],[1,-2]],
+  '2,1':  [[0,0],[-1,0],[-1,-1],[0,2],[-1,2]],
+  '2,3':  [[0,0],[1,0],[1,-1],[0,2],[1,2]],
+  '3,2':  [[0,0],[-1,0],[-1,1],[0,-2],[-1,-2]],
+  '3,0':  [[0,0],[-1,0],[-1,1],[0,-2],[-1,-2]],
+  '0,3':  [[0,0],[1,0],[1,-1],[0,2],[1,2]],
+};
+const _SRS_KICK_I = {
+  '0,1':  [[0,0],[-2,0],[1,0],[-2,1],[1,-2]],
+  '1,0':  [[0,0],[2,0],[-1,0],[2,-1],[-1,2]],
+  '1,2':  [[0,0],[-1,0],[2,0],[-1,-2],[2,1]],
+  '2,1':  [[0,0],[1,0],[-2,0],[1,2],[-2,-1]],
+  '2,3':  [[0,0],[2,0],[-1,0],[2,-1],[-1,2]],
+  '3,2':  [[0,0],[-2,0],[1,0],[-2,1],[1,-2]],
+  '3,0':  [[0,0],[1,0],[-2,0],[1,2],[-2,-1]],
+  '0,3':  [[0,0],[-1,0],[2,0],[-1,-2],[2,1]],
+};
+function _kicksFor(type, fromState, toState) {
+  if (type === 'O') return [[0,0]];
+  const key = `${fromState},${toState}`;
+  return (type === 'I') ? (_SRS_KICK_I[key] || [[0,0]]) : (_SRS_KICK_JLSTZ[key] || [[0,0]]);
+}
+
+// Last successful kick recorded for T-spin detection. Consumed (and reset)
+// by clearLines.
+var _lastRotation = { wasKick: false, isTSpin: false, isTSpinMini: false };
+
 function rotatePiece(dir) {
-  let cx = 0, cy = 0;
-  for (const [bx, by] of currentPiece) { cx += bx; cy += by; }
-  cx /= currentPiece.length; cy /= currentPiece.length;
-  const rotated = currentPiece.map(([bx, by]) => {
-    const rx = bx - cx, ry = by - cy;
-    return dir === 1 ? [Math.round(cx - ry), Math.round(cy + rx)] : [Math.round(cx + ry), Math.round(cy - rx)];
-  });
-  for (const kick of [0, -1, 1, -2, 2]) {
-    for (const yOff of [0, -1]) {
-      if (!collides(rotated, currentX + kick, currentY + yOff)) {
-        currentPiece = rotated;
-        currentX += kick;
-        currentY += yOff;
-        audioEngine.playRotate();
-        spawnParticles(currentX * CELL + CELL * 2, currentY * CELL + CELL, PIECES[currentType].color, 6);
-        isLocking = false;
-        nudgeMovePulse(0.10);
-        return;
+  if (currentType === 'O') return;
+  const fromState = currentRotation | 0;
+  const toState = ((fromState + (dir > 0 ? 1 : 3)) % 4);
+  const targetShape = SRS_STATES[currentType][toState];
+  const kicks = _kicksFor(currentType, fromState, toState);
+  for (const [kx, ky] of kicks) {
+    if (!collides(targetShape, currentX + kx, currentY + ky)) {
+      currentPiece = targetShape.map(p => [...p]);
+      currentX += kx;
+      currentY += ky;
+      currentRotation = toState;
+      _lastRotation.wasKick = (kx !== 0 || ky !== 0);
+      _lastRotation.isTSpin = false;
+      _lastRotation.isTSpinMini = false;
+      // T-spin detection (3-corner rule): if T just rotated, check the four
+      // corners of its 3×3 box. T-spin if 3+ corners are blocked AND the
+      // rotation needed a kick (or normally-locked T position). Mini T-spin
+      // if the front two corners aren't both blocked.
+      if (currentType === 'T') {
+        const corners = [
+          [currentX + 0, currentY + 0],
+          [currentX + 2, currentY + 0],
+          [currentX + 0, currentY + 2],
+          [currentX + 2, currentY + 2],
+        ];
+        let blocked = 0;
+        for (const [bx, by] of corners) {
+          if (bx < 0 || bx >= COLS || by >= ROWS) { blocked++; continue; }
+          if (by >= 0 && board[by] && board[by][bx]) blocked++;
+        }
+        if (blocked >= 3) {
+          _lastRotation.isTSpin = true;
+          // "Mini" if we needed a wall kick to fit AND only 2 of front
+          // corners are filled. Simplified: T-spin mini if not the last
+          // kick (the special "(-1,-2)/(1,-2)" SRS escapes).
+          const lastKick = kicks[kicks.length - 1];
+          if (!(kx === lastKick[0] && ky === lastKick[1])) {
+            // Not the rare double-jump kick → flag mini if the two "front"
+            // corners (relative to T's stem orientation) aren't both filled.
+            // Approximate: if blocked === 3, treat as mini.
+            _lastRotation.isTSpinMini = (blocked === 3);
+          }
+        }
       }
+      audioEngine.playRotate();
+      spawnParticles(currentX * CELL + CELL * 2, currentY * CELL + CELL, PIECES[currentType].color, 6);
+      _resetLockIfBudget();
+      nudgeMovePulse(0.10);
+      recordReplayEvent(dir > 0 ? 'r' : 'l');
+      return;
     }
   }
 }
@@ -2937,19 +3127,29 @@ function nudgeMovePulse(amt) {
   movePulse = Math.min(0.7, movePulse + amt);
 }
 
+// Reset the lock timer only if the piece's reset budget hasn't been spent.
+// `forceUnlock` is for the "piece moved off ground" case where the timer
+// should reset even after the budget — those don't count as resets-while-grounded.
+function _resetLockIfBudget(forceUnlock) {
+  if (forceUnlock) { isLocking = false; return; }
+  if (lockResets < LOCK_RESET_LIMIT) { isLocking = false; lockResets++; }
+}
 function moveLeft() {
   if (!collides(currentPiece, currentX - 1, currentY)) {
-    currentX--; audioEngine.playMove(); isLocking = false; nudgeMovePulse(0.08);
+    currentX--; audioEngine.playMove(); _resetLockIfBudget(); nudgeMovePulse(0.08);
+    recordReplayEvent('L');
   }
 }
 function moveRight() {
   if (!collides(currentPiece, currentX + 1, currentY)) {
-    currentX++; audioEngine.playMove(); isLocking = false; nudgeMovePulse(0.08);
+    currentX++; audioEngine.playMove(); _resetLockIfBudget(); nudgeMovePulse(0.08);
+    recordReplayEvent('R');
   }
 }
 function softDrop() {
   if (!collides(currentPiece, currentX, currentY + 1)) {
-    currentY++; score += 1; audioEngine.playMove(); isLocking = false; nudgeMovePulse(0.06);
+    currentY++; score += 1; audioEngine.playMove(); _resetLockIfBudget(); nudgeMovePulse(0.06);
+    recordReplayEvent('D');
   }
 }
 
@@ -2958,6 +3158,7 @@ function hardDrop() {
   while (!collides(currentPiece, currentX, currentY + 1)) { currentY++; drop++; }
   score += drop * 2;
   audioEngine.playHardDrop();
+  recordReplayEvent('H');
   nudgeMovePulse(0.4); // big crowd reaction on slam
   // Board edge pulse — golden ring flash around the play area on every drop
   // Only for human players; AI slams shouldn't strobe the screen
@@ -3050,7 +3251,9 @@ function riseGarbage(n) {
       return;
     }
   }
-  const holeCol = Math.floor(Math.random() * COLS);
+  // PvP: derive hole column from the seeded garbage PRNG so both players
+  // observe identical hole positions for the same attack. Solo: Math.random.
+  const holeCol = Math.floor(_garbageRand() * COLS);
   for (let i = 0; i < n; i++) {
     board.shift();
     const row = new Array(COLS).fill('#4a4a4a');
@@ -3135,8 +3338,61 @@ function clearLines() {
     // means a Tetris-while-Zoned with a 3-combo is huge - exactly the burst
     // of points the user is supposed to want from chaining clears.
     const zoneMul = zoneActive ? 2.5 : 1;
-    score += (basePoints[cleared] || 800) * level * (1 + combo * 0.5) * zoneMul;
+    // Modern Tetris scoring: T-Spin and Tetris are "difficult" line clears.
+    // Chain them back-to-back (no non-difficult clear between) for a +50%
+    // multiplier on the next difficult clear. A perfect-clear (board empty
+    // after the clear) is a separate flat bonus.
+    const tSpin = (currentType === 'T') && _lastRotation.isTSpin;
+    const tSpinMini = tSpin && _lastRotation.isTSpinMini;
+    const isDifficult = (cleared === 4) || (tSpin && cleared > 0);
+    let baseScore;
+    if (tSpin) {
+      // T-spin scoring: mini single 200, single 800, double 1200, triple 1600
+      const tspinPts = tSpinMini
+        ? [0, 200, 400][cleared] || 200
+        : [400, 800, 1200, 1600][cleared] || 1600;
+      baseScore = tspinPts;
+    } else {
+      baseScore = (basePoints[cleared] || 800);
+    }
+    const b2bMul = (isDifficult && b2bChain > 0) ? 1.5 : 1;
+    // Round at award time so two identical-looking runs always submit the
+    // same score. Floating combo*0.5 + zoneMul*2.5 stacking would otherwise
+    // accumulate fractional drift that's only floor()'d on display.
+    score += Math.round(baseScore * level * (1 + combo * 0.5) * zoneMul * b2bMul);
     lines += cleared;
+    // Update B2B chain: difficult clear extends, anything else breaks it.
+    if (cleared > 0) b2bChain = isDifficult ? b2bChain + 1 : 0;
+    // Perfect Clear: board empty after the splice. Big flat bonus per spec
+    // (1.5k single, 2.3k double, 2.8k triple, 3.6k tetris-PC).
+    let isPerfectClear = true;
+    for (let r = 0; r < ROWS && isPerfectClear; r++) {
+      for (let c = 0; c < COLS; c++) if (board[r][c]) { isPerfectClear = false; break; }
+    }
+    if (isPerfectClear && cleared > 0) {
+      const pcBonus = [0, 1500, 2300, 2800, 3600][cleared] || 3600;
+      score += Math.round(pcBonus * level);
+      // Flash the announce banner - same vehicle as combo banner.
+      if (typeof showAlfredClearBanner === 'function') showAlfredClearBanner('PERFECT CLEAR');
+    } else if (tSpin) {
+      if (typeof showAlfredClearBanner === 'function') {
+        showAlfredClearBanner((tSpinMini ? 'T-SPIN MINI ' : 'T-SPIN ') +
+          (cleared === 0 ? '' : ['', 'SINGLE', 'DOUBLE', 'TRIPLE'][cleared] || ''));
+      }
+    } else if (cleared === 4 && b2bChain >= 2) {
+      if (typeof showAlfredClearBanner === 'function') {
+        showAlfredClearBanner('B2B TETRIS ×' + b2bChain);
+      }
+    }
+    // Consume the rotation flag so the next non-rotated lock can't fake a T-spin.
+    _lastRotation.isTSpin = false;
+    _lastRotation.isTSpinMini = false;
+    _lastRotation.wasKick = false;
+    // Stamp the sprint finish exactly when the threshold is crossed, not
+    // one render frame later. Sprint times are measured to centiseconds.
+    if (gameMode === 'sprint' && _sprintTarget && lines >= _sprintTarget && !_modeFinishTime) {
+      _modeFinishTime = performance.now();
+    }
     // Sprint and Ultra LOCK gravity at L1 — pure speed/score modes per the
     // standard Tetris guideline (TETR.IO 40 LINES, Tetris Effect Ultra).
     // Levels still tick visually for theme cycling? No — keep them static
@@ -3170,11 +3426,13 @@ function holdCurrentPiece() {
   if (!canHold) return;
   canHold = false;
   audioEngine.playHold();
+  recordReplayEvent('hold');
   if (holdPieceType) {
     const temp = holdPieceType;
     holdPieceType = currentType;
     currentType = temp;
-    currentPiece = PIECES[currentType].shape.map(p => [...p]);
+    currentPiece = SRS_STATES[currentType][0].map(p => [...p]);
+    currentRotation = 0;
     currentX = Math.floor(COLS / 2) - 2;
     currentY = 0;
     isLocking = false;
@@ -3226,7 +3484,9 @@ function onLevelChange() {
   el.style.color = theme.colors.accent;
   el.innerHTML = `Level ${level}<span class="era-name">${theme.name}</span>`;
   el.style.opacity = 1;
-  setTimeout(() => el.style.opacity = 0, 2500);
+  // Clear any previous fade timer so rapid level-ups don't hide late.
+  if (onLevelChange._fadeT) clearTimeout(onLevelChange._fadeT);
+  onLevelChange._fadeT = setTimeout(() => el.style.opacity = 0, 2500);
 
   // Update era display
   document.getElementById('era-display').textContent = theme.name;
@@ -3237,8 +3497,20 @@ function onLevelChange() {
   // Regenerate bg particles for new theme
   initBgParticles();
 
-  // Update audio
-  audioEngine.onLevelChange();
+  // Audio: if the new level has its own track, reuse the Marathon-style
+  // crossfade (fade-to-black overlay + audio fade) so Story-mode level
+  // transitions don't hard-cut. Otherwise just call onLevelChange directly.
+  const prevTheme = (typeof prevLevel !== 'undefined' && prevLevel !== level)
+    ? getTheme(prevLevel) : null;
+  const trackChanging = !!(theme && theme.track && (!prevTheme || theme.track !== prevTheme.track));
+  if (trackChanging && gameMode !== 'marathon' && typeof _themeXfade !== 'undefined') {
+    const now = performance.now();
+    _themeXfade = { start: now, peak: now + 500, end: now + 1100 };
+    if (audioEngine && audioEngine._stopTrack) audioEngine._stopTrack(0.45);
+    setTimeout(() => audioEngine.onLevelChange(), 500);
+  } else {
+    audioEngine.onLevelChange();
+  }
 }
 
 // ============================================================
@@ -3629,7 +3901,11 @@ const audioEngine = {
       }
       beatPhase = this.currentStep;
     }
-    requestAnimationFrame(() => this._schedule());
+    // setTimeout not rAF — backgrounded tabs throttle rAF to 1Hz which
+    // starves the audio scheduler and dumps a burst of queued steps on
+    // refocus (drum-roll glitch). 25ms keeps the look-ahead window healthy
+    // even when the tab is hidden.
+    setTimeout(() => this._schedule(), 25);
   },
 
   onLevelChange() {
@@ -4507,10 +4783,14 @@ async function probeServer() {
 }
 
 // Pull shared leaderboard from server (falls back to local if unavailable).
-async function fetchSharedScores() {
+// Optional `mode` argument fetches per-mode boards (story/marathon/sprint/
+// ultra/daily). Daily uses today's UTC date on the server side automatically.
+async function fetchSharedScores(mode) {
   if (!(await probeServer())) return null;
   try {
-    const r = await fetch(apiUrl('/api/scores'), { cache: 'no-store' });
+    const url = mode ? apiUrl('/api/scores?mode=' + encodeURIComponent(mode))
+                     : apiUrl('/api/scores');
+    const r = await fetch(url, { cache: 'no-store' });
     if (!r.ok) return null;
     const j = await r.json();
     return Array.isArray(j.scores) ? j.scores : null;
@@ -4528,8 +4808,13 @@ function loadPendingScores() {
 function savePendingScores(list) {
   try { localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(0, 20))); } catch {}
 }
-async function submitSharedScore(name, score, linesVal, levelVal) {
-  const payload = { name, score: Math.floor(score), lines: linesVal|0, level: levelVal|0 };
+async function submitSharedScore(name, score, linesVal, levelVal, opts) {
+  opts = opts || {};
+  const payload = {
+    name, score: Math.floor(score), lines: linesVal|0, level: levelVal|0,
+    mode: opts.mode || 'story',
+  };
+  if (typeof opts.timeMs === 'number') payload.timeMs = opts.timeMs | 0;
   if (!(await probeServer())) {
     // Server down - queue for next reachability cycle.
     const q = loadPendingScores(); q.push(payload); savePendingScores(q);
@@ -4726,7 +5011,36 @@ function handleNetMessage(msg) {
       break;
     }
     case 'state': {
-      if (typeof applyRemoteState === 'function') applyRemoteState(msg);
+      // Spectator: route message to the right player slot based on `side`.
+      // PvP players: only one peer streams to them, so this collapses to the
+      // existing P2-only path inside applyRemoteState.
+      if (NET.spectator && msg.side) {
+        const slotId = (msg.side === 'host') ? 1 : 2;
+        const target = (players || []).find(p => p.id === slotId);
+        if (target) {
+          const prev = activePlayer;
+          setActivePlayer(target);
+          // Inline: paint into the active player. (applyRemoteState assumes
+          // P2; the swap above redirects it to slot 1 on host updates.)
+          if (Array.isArray(msg.board) && Array.isArray(msg.palette)) {
+            const b = target.board || Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+            for (let r = 0; r < ROWS; r++) {
+              for (let c = 0; c < COLS; c++) {
+                const idx = msg.board[r * COLS + c];
+                b[r][c] = idx < 0 ? null : (msg.palette[idx] || null);
+              }
+            }
+            target.board = b;
+          }
+          target.score = msg.score | 0; target.lines = msg.lines | 0; target.level = msg.level | 0;
+          target.currentType = msg.pieceType || null;
+          target.currentX = msg.px | 0; target.currentY = msg.py | 0;
+          target.currentPiece = Array.isArray(msg.piece) ? msg.piece : null;
+          if (prev) setActivePlayer(prev);
+        }
+      } else if (typeof applyRemoteState === 'function') {
+        applyRemoteState(msg);
+      }
       break;
     }
     case 'garbage': {
@@ -4790,11 +5104,24 @@ function lobbyLeave() {
 // backwards compatibility — old players' best runs aren't lost.
 const LB_KEY_BASE = 'tetris.leaderboard.v1';
 const LB_MAX = 10;
-const LB_MODES = ['story', 'marathon', 'sprint', 'ultra'];
+const LB_MODES = ['story', 'marathon', 'sprint', 'ultra', 'daily'];
+// UTC date string YYYY-MM-DD — used as the daily-challenge seed AND as a
+// per-day leaderboard suffix. UTC keeps every player on the same "day"
+// regardless of timezone. Returns the date for "now" by default.
+function dailyDateStr(now) {
+  const d = now ? new Date(now) : new Date();
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 function lbKeyFor(mode) {
   // 'solo' is the original (story) mode. Map it to 'story' so the menu
   // labels match the storage keys.
   if (mode === 'solo') mode = 'story';
+  // Daily challenge has a separate board PER DAY so yesterday's run
+  // doesn't pollute today's chart.
+  if (mode === 'daily') return LB_KEY_BASE + '.daily.' + dailyDateStr();
   return LB_KEY_BASE + '.' + mode;
 }
 // Currently-displayed leaderboard mode on the start screen (defaults to
@@ -4936,22 +5263,17 @@ async function refreshSharedLeaderboard() {
   // Piggy-back the queued-score retry on this same cycle so any score posted
   // while the server was down eventually lands.
   await flushPendingScores();
-  const remote = await fetchSharedScores();
+  // Fetch the board for whichever mode the user is currently viewing on the
+  // start screen. Cross-device shared board now supports per-mode lookups.
+  const mode = _currentLbMode || 'story';
+  const remote = await fetchSharedScores(mode);
   if (remote == null) {
     updateSyncBadge('offline');
     return;
   }
-  // Shared cross-device board today is STORY only. Always write it to the
-  // STORY key (NOT _currentLbMode — that would clobber ULTRA / SPRINT /
-  // MARATHON local boards with story scores when the user happens to be
-  // viewing one of those when sync fires).
-  saveLeaderboard(remote, 'story');
-  // Only re-render the visible leaderboard if the user is currently viewing
-  // STORY; otherwise leave their selected mode's board on screen.
-  if (_currentLbMode === 'story') {
-    renderLeaderboardInto(document.getElementById('start-leaderboard'));
-    renderLeaderboardInto(document.getElementById('gameover-leaderboard'));
-  }
+  saveLeaderboard(remote, mode);
+  renderLeaderboardInto(document.getElementById('start-leaderboard'));
+  renderLeaderboardInto(document.getElementById('gameover-leaderboard'));
   updateSyncBadge('synced');
 }
 
@@ -4964,6 +5286,10 @@ let _pendingMode = 'story';
 let _pendingTimeMs = null;
 async function showGameOver() {
   const finalScore = Math.floor(score);
+  // Persist the replay (if anything was recorded). Returned ID is used by
+  // the share button on the game-over screen.
+  const _replayMeta = stopReplayRecording(finalScore, lines, level);
+  if (_replayMeta) window._lastReplayId = _replayMeta.id;
   const banner = document.getElementById('new-hs-banner');
   const entry = document.getElementById('initials-entry');
   const replayBtn = document.getElementById('start-btn-2');
@@ -4973,6 +5299,7 @@ async function showGameOver() {
   _pendingMode = (gameMode === 'marathon') ? 'marathon'
                : (gameMode === 'sprint') ? 'sprint'
                : (gameMode === 'ultra')  ? 'ultra'
+               : (gameMode === 'daily')  ? 'daily'
                : 'story';
   _currentLbMode = _pendingMode;
   let rankMetric = finalScore;
@@ -5052,20 +5379,20 @@ async function submitInitials() {
   document.getElementById('start-btn-2').style.display = '';
   renderLeaderboardInto(document.getElementById('gameover-leaderboard'), entry);
   renderStartLeaderboard();
-  // Post to the shared server leaderboard (best effort, story mode only —
-  // per-mode shared boards are a follow-up). If it comes back with an
-  // authoritative list, overwrite the local STORY cache so every client on
-  // the network sees the same board.
-  if (_pendingMode === 'story') {
-    const result = await submitSharedScore(name, score, lines, level);
-    if (result && Array.isArray(result.scores)) {
-      saveLeaderboard(result.scores, 'story');
-      const kept = result.scores.find(e =>
-        e.name === entry.name && e.score === entry.score
-      );
-      renderLeaderboardInto(document.getElementById('gameover-leaderboard'), kept);
-      renderLeaderboardInto(document.getElementById('start-leaderboard'), kept);
-    }
+  // Post to the shared server leaderboard. Per-mode boards: story/marathon/
+  // ultra/daily/sprint each have their own server-side file. Sprint sends
+  // timeMs; everything else sends score.
+  const result = await submitSharedScore(name, score, lines, level, {
+    mode: _pendingMode,
+    timeMs: _pendingTimeMs,
+  });
+  if (result && Array.isArray(result.scores)) {
+    saveLeaderboard(result.scores, _pendingMode);
+    const kept = result.scores.find(e =>
+      e.name === entry.name && e.score === entry.score && e.timeMs === entry.timeMs
+    );
+    renderLeaderboardInto(document.getElementById('gameover-leaderboard'), kept);
+    renderLeaderboardInto(document.getElementById('start-leaderboard'), kept);
   }
 }
 
@@ -12173,7 +12500,22 @@ function updateP2Stats() {
 // cooldown so it looks like a player rather than a snap. Heuristic is a
 // Dellacherie-lite: penalise holes and aggregate height, reward line clears.
 // ============================================================
-function aiRotateShape(piece, dir) {
+function aiRotateShape(piece, dir, type) {
+  // The AI's planning rotations must match the SRS rotation table the human
+  // path actually uses, otherwise Alfred will rotate-then-move to a column
+  // his rotation count doesn't reach. If `type` is provided we look up the
+  // SRS state directly. Falls back to the centroid math for legacy callers.
+  if (type && SRS_STATES[type]) {
+    // Determine current state by string-matching against SRS_STATES[type].
+    const key = JSON.stringify([...piece].sort((a, b) => (a[0] - b[0]) || (a[1] - b[1])));
+    let curState = 0;
+    for (let s = 0; s < 4; s++) {
+      const want = JSON.stringify([...SRS_STATES[type][s]].sort((a, b) => (a[0] - b[0]) || (a[1] - b[1])));
+      if (want === key) { curState = s; break; }
+    }
+    const next = (curState + (dir > 0 ? 1 : 3)) % 4;
+    return SRS_STATES[type][next].map(p => [...p]);
+  }
   let cx = 0, cy = 0;
   for (const [bx, by] of piece) { cx += bx; cy += by; }
   cx /= piece.length; cy /= piece.length;
@@ -12256,7 +12598,7 @@ function aiPlanMove(p) {
       const score = clearBonus - 4.0 * m.holes - 0.55 * m.aggH - 0.25 * m.bump;
       candidates.push({ score, rotations: rot, col: px });
     }
-    shape = aiRotateShape(shape, 1);
+    shape = aiRotateShape(shape, 1, p.currentType);
   }
   if (!candidates.length) return null;
   candidates.sort((a, b) => b.score - a.score);
@@ -12306,17 +12648,27 @@ function update(timestamp) {
   if (timestamp - lastDrop > dropInterval) {
     if (!collides(currentPiece, currentX, currentY + 1)) {
       currentY++;
-      isLocking = false;
+      // Gravity moved the piece off the ground — reset lock state without
+      // burning the move-while-grounded reset budget.
+      _resetLockIfBudget(true);
     } else {
       if (!isLocking) { isLocking = true; lockTimer = timestamp; }
       else if (timestamp - lockTimer > lockDelay) lockPiece();
+      // If the player has spent their reset budget, force-lock now even
+      // if the wall-clock lockDelay hasn't elapsed yet.
+      if (lockResets >= LOCK_RESET_LIMIT && timestamp - lockTimer > 50) lockPiece();
     }
     lastDrop = timestamp;
   }
   if (zoneActive) {
-    zoneTimer -= 16.67;
+    // Use real time delta, not a hard-coded 16.67ms-per-frame assumption.
+    // Old code drained Zone at frame rate — a 30fps drop made Zone last 2×
+    // its real duration. Track last-tick timestamp on the function itself.
+    const dt = update._lastZoneTick ? Math.max(0, timestamp - update._lastZoneTick) : 16.67;
+    zoneTimer -= dt;
     if (zoneTimer <= 0) deactivateZone();
   }
+  update._lastZoneTick = timestamp;
 }
 
 function render(timestamp) {
@@ -12441,9 +12793,14 @@ document.addEventListener('keydown', (e) => {
       if (!keys['down']) { softDrop(); keys['down'] = true; dasTimer['down'] = Date.now(); } break;
     case 'ArrowUp': case 'w': case 'W': case 'x': case 'X':
       rotatePiece(1); break;
+    // Z = counter-clockwise rotate (Tetris-canon: Z=CCW, X=CW). Shift+Z (or Q)
+    // activates Zone — moved off bare-Z so muscle-memory CCW spins don't fire
+    // the bonus-meter button.
     case 'z':
-      if (!e.shiftKey && !e.ctrlKey) activateZone(); break;
-    case 'Z': activateZone(); break;
+      if (e.shiftKey || e.ctrlKey) activateZone(); else rotatePiece(-1);
+      break;
+    case 'Z': rotatePiece(-1); break;
+    case 'q': case 'Q': activateZone(); break;
     case ' ': e.preventDefault(); hardDrop(); break;
     case 'Shift': case 'c': case 'C': holdCurrentPiece(); break;
     case 'g': case 'G': setShowGhost(!showGhost); break;
@@ -12463,12 +12820,49 @@ document.addEventListener('keyup', (e) => {
   }
 });
 
+// Auto-pause when tab is hidden. iOS Safari + some Chrome configs suspend
+// the AudioContext on hide, leaving audio/visual desynced when the tab
+// returns. Explicitly pause + clear input state so a held key doesn't
+// carry across the hide. Resume requires a tap (the "TAP TO RESUME" overlay
+// rendered by the existing pause flow).
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (gameStarted && !gameOver && !paused) {
+      paused = true;
+      try { audioEngine.stop(); } catch {}
+    }
+    // Clear DAS state so a key held during hide doesn't fire on resume.
+    for (const k of Object.keys(keys)) keys[k] = false;
+  } else {
+    // Resume the AudioContext if the browser suspended it. Don't unpause —
+    // let the player tap P (or the resume button) on purpose.
+    try {
+      if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+        audioEngine.ctx.resume().catch(() => {});
+      }
+    } catch {}
+  }
+});
+
+// Soft drop factor: while held, soft drop runs ~20× faster than gravity
+// (modern Tetris guideline). At top levels gravity is ~35ms — without this,
+// holding Down barely beats gravity and feels broken. We dispatch multiple
+// softDrops per tick to approximate ~20G, capped per tick so the loop
+// can't churn the whole board on a single iteration.
+const SOFT_DROP_ROWS_PER_TICK = 8;
 setInterval(() => {
   if (gameOver || !gameStarted || paused) return;
   const now = Date.now();
   if (keys['left'] && now - dasTimer['left'] > DAS) moveLeft();
   if (keys['right'] && now - dasTimer['right'] > DAS) moveRight();
-  if (keys['down'] && now - dasTimer['down'] > DAS) softDrop();
+  if (keys['down']) {
+    // Initial press tap = single drop (handled in keydown). After DAS, drop
+    // many rows per tick — still gated by `collides` inside softDrop so it
+    // naturally stops at the floor.
+    if (now - dasTimer['down'] > DAS) {
+      for (let i = 0; i < SOFT_DROP_ROWS_PER_TICK; i++) softDrop();
+    }
+  }
 }, ARR);
 
 // ============================================================
@@ -12648,6 +13042,19 @@ function startGame() {
     openLobby();
     return;
   }
+  // Daily Challenge: re-seed the piece RNG with today's UTC date BEFORE
+  // any player.bag/nextQueue is filled. Everyone playing today's daily
+  // sees the same piece sequence — the leaderboard is then a pure skill
+  // comparison. Cleared at handleModeFinish so non-daily runs revert to
+  // Math.random().
+  if (gameMode === 'daily') {
+    setNetworkSeed('daily-' + dailyDateStr());
+  } else if (gameMode !== 'human' && gameMode !== 'vs') {
+    setNetworkSeed(null);
+  }
+  // Begin replay capture. Recording is cheap (a few hundred KB max for a
+  // long run); persisted on game-over to localStorage tetris.replays.v1.
+  startReplayRecording(_netSeed, gameMode);
   document.getElementById('start-screen').style.display = 'none';
   document.getElementById('game-over-screen').style.display = 'none';
   const vsRes = document.getElementById('vs-result-screen');
@@ -12727,6 +13134,7 @@ function startGame() {
     initBoard();
     score = 0; lines = seedLines; level = seedLevel; prevLevel = seedLevel; combo = -1;
     zoneEnergy = 0; zoneActive = false;
+    b2bChain = 0;
     holdPieceType = null; bag = []; nextQueue = [];
     gameOver = false;
     dropInterval = computeDropInterval(level); lockDelay = computeLockDelay(level);
@@ -12739,6 +13147,15 @@ function startGame() {
   setActivePlayer(p1);
   paused = false;
   beatPhase = 0;
+
+  // Reset input state so a key held during top-out doesn't carry into the
+  // next run (player tops out gripping Right → next piece DAS-rights instantly).
+  for (const k of Object.keys(keys)) keys[k] = false;
+  for (const k of Object.keys(dasTimer)) delete dasTimer[k];
+  for (const k of Object.keys(touchBtnState)) {
+    clearTimeout(touchBtnState[k]); clearInterval(touchBtnState[k]);
+    delete touchBtnState[k];
+  }
 
   // Marathon: start on the user's chosen vibe (default L19 Singularity).
   // Rotates through other vibes as tracks finish.
@@ -13367,6 +13784,7 @@ window.addEventListener('resize', () => positionP2Monitor());
     if (m === 'marathon') return 'marathon';
     if (m === 'sprint')   return 'sprint';
     if (m === 'ultra')    return 'ultra';
+    if (m === 'daily')    return 'daily';
     return 'story';
   };
   const refreshLb = () => {
@@ -13435,23 +13853,21 @@ window.addEventListener('resize', () => positionP2Monitor());
 (function wireSplashGate() {
   const gate    = document.getElementById('splash-gate');
   const options = document.getElementById('mode-options');
-  if (!gate || !options) return;
+  const screen  = document.getElementById('start-screen');
+  if (!gate || !options || !screen) return;
   function revealOptions() {
     gate.style.display    = 'none';
     options.style.display = 'flex';
-    // Remove the whole-screen listener so normal gameplay clicks aren't caught
-    document.getElementById('start-screen').removeEventListener('click', revealOptions);
+    // Remove the whole-screen listener so normal gameplay clicks aren't caught.
+    // The handler reference must match the one we added — using a named local
+    // function so add/removeEventListener target the same closure.
+    screen.removeEventListener('click', revealOptions);
   }
   document.getElementById('start-btn').addEventListener('click', () => {
-    // start-btn click already calls startGame — make sure options are visible
-    // (edge case: someone triggers it before the gate is dismissed)
     revealOptions();
   });
   // Tap anywhere on the start-screen to dismiss
-  document.getElementById('start-screen').addEventListener('click', function handler(e) {
-    // Ignore clicks on the splash button itself (handled separately)
-    revealOptions();
-  });
+  screen.addEventListener('click', revealOptions);
 })();
 
 // Difficulty picker - reflects + writes aiDifficulty.
@@ -14402,10 +14818,12 @@ render(0);
     }
     const digArmLift = Math.sin(digger.phase) * 0.6 + 0.4;
     const digExpr    = digger.sweat > 0.4 ? 'tired' : 'neutral';
-    // Clip digger to pit area
+    // Clip digger to pit area horizontally + below ground only — keep the
+    // top open so his head pokes above ground (otherwise the head is rendered
+    // at y≈head and gets clipped out, leaving a headless torso in the pit).
     ctx.save();
     ctx.beginPath();
-    ctx.rect(PX+2, GY-4, PW-4, PD+8);
+    ctx.rect(PX+2, 0, PW-4, GY+PD+4);
     ctx.clip();
     worker(digger.x, GY + PD*0.55, 1, { walkPhase:0, armLift:digArmLift, headTilt: Math.sin(digger.phase*0.5)*0.12 },
       { hatCol:'#f39c12', shirtCol:'#7f3a00', vestCol:'#ffd700',
@@ -14490,6 +14908,56 @@ render(0);
   if (document.readyState === 'complete') start();
   else window.addEventListener('load', start, { once: true });
 })();
+
+// Spectator mode: opening the page with ?spectate=ABCD connects to that
+// room's WebSocket as a read-only viewer. The server forwards both players'
+// state messages tagged with `side`. We render them into the existing P1/P2
+// canvases marked isRemote so the local game loop never simulates them.
+async function _initSpectatorIfRequested() {
+  const params = new URLSearchParams(location.search);
+  const code = (params.get('spectate') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  if (!code) return;
+  const ss = document.getElementById('start-screen');
+  if (ss) ss.style.display = 'none';
+  const ov = document.createElement('div');
+  ov.id = 'spectator-banner';
+  ov.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9999;padding:6px 14px;background:rgba(0,0,0,0.6);border:1px solid #ffd700;border-radius:8px;color:#ffd700;font:bold 12px monospace;letter-spacing:2px;';
+  ov.textContent = 'SPECTATING ' + code;
+  document.body.appendChild(ov);
+  document.body.classList.add('vs-mode');
+  gameMode = 'spectate';
+  players = [];
+  const p1 = createPlayer({
+    id: 1, isAI: false, name: 'HOST',
+    mainCanvas: document.getElementById('main-canvas'),
+    holdCanvas: document.getElementById('hold-canvas'),
+    nextCanvas: document.getElementById('next-canvas'),
+  });
+  p1.isRemote = true;
+  const p2 = createPlayer({
+    id: 2, isAI: false, name: 'GUEST',
+    mainCanvas: document.getElementById('main-canvas-2'),
+    holdCanvas: null, nextCanvas: null,
+  });
+  p2.isRemote = true;
+  players.push(p1, p2);
+  setActivePlayer(p1); initBoard(); spawnPiece();
+  setActivePlayer(p2); initBoard(); spawnPiece();
+  setActivePlayer(p1);
+  gameStarted = true;
+  if (typeof positionP2Monitor === 'function') positionP2Monitor();
+  try {
+    await netConnect({ code });
+    netSend({ type: 'spectate', code });
+    NET.spectator = true;
+    if (typeof animFrame === 'undefined' || !animFrame) {
+      animFrame = requestAnimationFrame(render);
+    }
+  } catch (e) {
+    ov.textContent = 'SPECTATE FAILED — ' + (e.message || 'check the room code');
+  }
+}
+window.addEventListener('load', () => { try { _initSpectatorIfRequested(); } catch {} });
 </script>
 </body>
 </html>

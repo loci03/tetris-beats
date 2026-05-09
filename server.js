@@ -31,27 +31,52 @@ const MAX_SCORES = 10;
 // a replay-bot or someone poking the endpoint manually. Real Tetris at
 // reasonable depth maxes around 1–2 M; 10 M is a comfortable ceiling.
 const MAX_SCORE_VALUE = 10_000_000;
+// Per-mode/per-day leaderboards live in separate files under DATA_DIR/leaderboards.
+// Daily key suffixes the UTC date so each day gets its own table.
+const LB_DIR = path.join(DATA_DIR, 'leaderboards');
+const VALID_MODES = new Set(['story', 'marathon', 'sprint', 'ultra', 'daily']);
 
 function ensureDataDir() {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch {}
+  try { fs.mkdirSync(LB_DIR,   { recursive: true }); } catch {}
 }
-function loadScores() {
+function dailyDateStr(now) {
+  const d = now ? new Date(now) : new Date();
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function fileForMode(mode) {
+  if (!VALID_MODES.has(mode)) return SCORES_FILE; // legacy fallback
+  if (mode === 'story') return SCORES_FILE;       // legacy filename for backwards compat
+  if (mode === 'daily') return path.join(LB_DIR, `daily-${dailyDateStr()}.json`);
+  return path.join(LB_DIR, `${mode}.json`);
+}
+function loadScores(mode) {
   try {
-    const raw = fs.readFileSync(SCORES_FILE, 'utf8');
+    const raw = fs.readFileSync(fileForMode(mode || 'story'), 'utf8');
     const list = JSON.parse(raw);
     if (!Array.isArray(list)) return [];
+    const lower = (mode === 'sprint');
     return list
-      .filter(e => e && typeof e.score === 'number')
-      .sort((a, b) => b.score - a.score)
+      .filter(e => e && (typeof e.score === 'number' || typeof e.timeMs === 'number'))
+      .sort((a, b) => lower
+        ? ((a.timeMs || Infinity) - (b.timeMs || Infinity))
+        : (b.score - a.score))
       .slice(0, MAX_SCORES);
   } catch { return []; }
 }
-function saveScores(list) {
+function saveScores(list, mode) {
   ensureDataDir();
-  fs.writeFileSync(SCORES_FILE, JSON.stringify(list.slice(0, MAX_SCORES), null, 2));
+  fs.writeFileSync(fileForMode(mode || 'story'), JSON.stringify(list.slice(0, MAX_SCORES), null, 2));
 }
 function sanitizeName(name) {
   return String(name || 'AAA').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3) || 'AAA';
+}
+function sanitizeMode(m) {
+  m = String(m || 'story').toLowerCase();
+  return VALID_MODES.has(m) ? m : 'story';
 }
 
 // ----------------------------------------------------------------
@@ -76,31 +101,45 @@ function allowPost(ip) {
 const app = express();
 app.use(express.json({ limit: '32kb' }));
 
-app.get('/api/scores', (_req, res) => {
-  res.json({ scores: loadScores() });
+app.get('/api/scores', (req, res) => {
+  const mode = sanitizeMode(req.query.mode);
+  res.json({ scores: loadScores(mode), mode });
 });
 
 app.post('/api/scores', (req, res) => {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   if (!allowPost(ip)) return res.status(429).json({ error: 'rate limited' });
-  const { name, score, lines, level } = req.body || {};
-  const n = Math.floor(Number(score));
-  if (!Number.isFinite(n) || n <= 0 || n > MAX_SCORE_VALUE) {
-    return res.status(400).json({ error: 'invalid score' });
+  const { name, score, lines, level, timeMs, mode } = req.body || {};
+  const m = sanitizeMode(mode);
+  const lower = (m === 'sprint');
+  // Sprint ranks on time; everything else on score. Validate accordingly.
+  if (lower) {
+    const t = Math.floor(Number(timeMs));
+    if (!Number.isFinite(t) || t <= 0 || t > 1000 * 60 * 60) {
+      return res.status(400).json({ error: 'invalid time' });
+    }
+  } else {
+    const n = Math.floor(Number(score));
+    if (!Number.isFinite(n) || n <= 0 || n > MAX_SCORE_VALUE) {
+      return res.status(400).json({ error: 'invalid score' });
+    }
   }
   const entry = {
     name: sanitizeName(name),
-    score: n,
+    score: Math.max(0, Math.floor(Number(score)) || 0),
     lines: Math.max(0, Math.floor(Number(lines)) || 0),
     level: Math.max(1, Math.floor(Number(level)) || 1),
     date: Date.now(),
   };
-  const list = loadScores();
+  if (lower) entry.timeMs = Math.floor(Number(timeMs));
+  const list = loadScores(m);
   list.push(entry);
-  list.sort((a, b) => b.score - a.score);
+  list.sort((a, b) => lower
+    ? ((a.timeMs || Infinity) - (b.timeMs || Infinity))
+    : (b.score - a.score));
   const trimmed = list.slice(0, MAX_SCORES);
-  saveScores(trimmed);
-  res.json({ ok: true, scores: trimmed, rank: trimmed.findIndex(e => e === entry) + 1 || null });
+  saveScores(trimmed, m);
+  res.json({ ok: true, scores: trimmed, mode: m, rank: trimmed.findIndex(e => e === entry) + 1 || null });
 });
 
 app.get('/api/health', (_req, res) => {
@@ -135,7 +174,7 @@ app.use(express.static(ROOT, { index: 'index.html' }));
 //     { type:"result", youWon:bool, reason:"topout"|"disconnect" }
 //     { type:"error", message }
 
-const rooms = new Map();    // code -> { host, guest, started }
+const rooms = new Map();    // code -> { host, guest, started, spectators }
 function randomCode() {
   // 4-char uppercase — easy to read aloud ("tango-oscar-one-seven")
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no I/L/O/0/1 (ambiguous)
@@ -161,6 +200,13 @@ function closeRoom(room, reason) {
     if (!member) continue;
     send(member, { type: 'peer', joined: false, reason });
     member.room = null;
+  }
+  if (room.spectators) {
+    for (const sp of room.spectators) {
+      send(sp, { type: 'result', youWon: false, reason: 'match-ended', spectator: true });
+      sp.room = null;
+    }
+    room.spectators.clear();
   }
   rooms.delete(room.code);
 }
@@ -188,10 +234,30 @@ wss.on('connection', (ws, req) => {
       case 'create': {
         if (ws.room) return send(ws, { type: 'error', message: 'already in room' });
         let code; do { code = randomCode(); } while (rooms.has(code));
-        const room = { code, host: ws, guest: null, started: false };
+        const room = { code, host: ws, guest: null, started: false, spectators: new Set() };
         rooms.set(code, room);
         ws.room = room;
         send(ws, { type: 'room', code, host: true });
+        break;
+      }
+      case 'spectate': {
+        // Read-only join: receive state/result broadcasts but never send any
+        // game-affecting messages. Don't block the second player from joining.
+        const code = String(msg.code || '').toUpperCase();
+        const room = rooms.get(code);
+        if (!room) return send(ws, { type: 'error', message: 'room not found' });
+        if (room.host === ws || room.guest === ws) {
+          return send(ws, { type: 'error', message: 'players cannot spectate own match' });
+        }
+        room.spectators.add(ws);
+        ws.room = room;
+        ws.isSpectator = true;
+        send(ws, { type: 'room', code, host: false, spectator: true });
+        // Replay current state to the new spectator so they don't sit on a
+        // blank board waiting for the next 10Hz tick. Players get a "viewer
+        // joined" notice (cosmetic; doesn't gate gameplay).
+        if (room.host)  send(room.host,  { type: 'spectator-joined' });
+        if (room.guest) send(room.guest, { type: 'spectator-joined' });
         break;
       }
       case 'join': {
@@ -223,8 +289,16 @@ wss.on('connection', (ws, req) => {
       case 'garbage': {
         const room = ws.room;
         if (!room || !room.started) return;
+        if (ws.isSpectator) return; // spectators never push state
         const peer = peerOf(ws, room);
         if (peer) send(peer, msg);
+        // Tag the side that produced the update so spectators can render
+        // both player feeds (server already knows; player code already in
+        // PvP doesn't need the tag because there are exactly 2 sides).
+        if (room.spectators && room.spectators.size) {
+          const tagged = Object.assign({}, msg, { side: room.host === ws ? 'host' : 'guest' });
+          for (const sp of room.spectators) send(sp, tagged);
+        }
         break;
       }
       case 'topout': {
@@ -248,11 +322,15 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
-    if (ws.room) {
-      const peer = peerOf(ws, ws.room);
-      if (peer) send(peer, { type: 'result', youWon: true, reason: 'disconnect' });
-      closeRoom(ws.room, 'disconnect');
+    if (!ws.room) return;
+    if (ws.isSpectator) {
+      // Spectator leaving doesn't end the match.
+      try { ws.room.spectators.delete(ws); } catch {}
+      return;
     }
+    const peer = peerOf(ws, ws.room);
+    if (peer) send(peer, { type: 'result', youWon: true, reason: 'disconnect' });
+    closeRoom(ws.room, 'disconnect');
   });
 });
 

@@ -20,6 +20,7 @@
 
 const MAX_SCORES = 10;
 const MAX_SCORE_VALUE = 10_000_000;
+const VALID_MODES = new Set(['story', 'marathon', 'sprint', 'ultra', 'daily']);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,18 +39,44 @@ function json(body, init = {}) {
 function sanitizeName(name) {
   return String(name || 'AAA').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3) || 'AAA';
 }
+function sanitizeMode(m) {
+  m = String(m || 'story').toLowerCase();
+  return VALID_MODES.has(m) ? m : 'story';
+}
+function dailyDateStr(now) {
+  const d = now ? new Date(now) : new Date();
+  const y = d.getUTCFullYear();
+  const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${mo}-${day}`;
+}
+// Legacy single-key for story so existing prod data isn't orphaned. Other
+// modes get `lb:<mode>`. Daily gets `lb:daily:<YYYY-MM-DD>` so each day is
+// its own ranked list.
+function kvKeyFor(mode) {
+  if (mode === 'story') return 'leaderboard';
+  if (mode === 'daily') return 'lb:daily:' + dailyDateStr();
+  return 'lb:' + mode;
+}
 
-async function loadScores(env) {
+async function loadScores(env, mode) {
   try {
-    const raw = await env.SCORES.get('leaderboard');
+    const raw = await env.SCORES.get(kvKeyFor(mode || 'story'));
     if (!raw) return [];
     const list = JSON.parse(raw);
-    return Array.isArray(list) ? list.slice(0, MAX_SCORES) : [];
+    if (!Array.isArray(list)) return [];
+    const lower = (mode === 'sprint');
+    return list
+      .filter(e => e && (typeof e.score === 'number' || typeof e.timeMs === 'number'))
+      .sort((a, b) => lower
+        ? ((a.timeMs || Infinity) - (b.timeMs || Infinity))
+        : (b.score - a.score))
+      .slice(0, MAX_SCORES);
   } catch { return []; }
 }
 
-async function saveScores(env, list) {
-  await env.SCORES.put('leaderboard', JSON.stringify(list.slice(0, MAX_SCORES)));
+async function saveScores(env, list, mode) {
+  await env.SCORES.put(kvKeyFor(mode || 'story'), JSON.stringify(list.slice(0, MAX_SCORES)));
 }
 
 // Naive per-IP rate limit using a short-lived KV write would burn the free
@@ -89,7 +116,8 @@ export default {
     }
 
     if (path === '/api/scores' && request.method === 'GET') {
-      return json({ scores: await loadScores(env) });
+      const mode = sanitizeMode(url.searchParams.get('mode'));
+      return json({ scores: await loadScores(env, mode), mode });
     }
 
     if (path === '/api/scores' && request.method === 'POST') {
@@ -97,25 +125,38 @@ export default {
       if (!allowPost(ip)) return json({ error: 'rate limited' }, { status: 429 });
       let body;
       try { body = await request.json(); } catch { return json({ error: 'bad json' }, { status: 400 }); }
-      const n = Math.floor(Number(body.score));
-      if (!Number.isFinite(n) || n <= 0 || n > MAX_SCORE_VALUE) {
-        return json({ error: 'invalid score' }, { status: 400 });
+      const m = sanitizeMode(body.mode);
+      const lower = (m === 'sprint');
+      if (lower) {
+        const t = Math.floor(Number(body.timeMs));
+        if (!Number.isFinite(t) || t <= 0 || t > 1000 * 60 * 60) {
+          return json({ error: 'invalid time' }, { status: 400 });
+        }
+      } else {
+        const n = Math.floor(Number(body.score));
+        if (!Number.isFinite(n) || n <= 0 || n > MAX_SCORE_VALUE) {
+          return json({ error: 'invalid score' }, { status: 400 });
+        }
       }
       const entry = {
         name: sanitizeName(body.name),
-        score: n,
+        score: Math.max(0, Math.floor(Number(body.score)) || 0),
         lines: Math.max(0, Math.floor(Number(body.lines)) || 0),
         level: Math.max(1, Math.floor(Number(body.level)) || 1),
         date: Date.now(),
       };
-      const list = await loadScores(env);
+      if (lower) entry.timeMs = Math.floor(Number(body.timeMs));
+      const list = await loadScores(env, m);
       list.push(entry);
-      list.sort((a, b) => b.score - a.score);
+      list.sort((a, b) => lower
+        ? ((a.timeMs || Infinity) - (b.timeMs || Infinity))
+        : (b.score - a.score));
       const trimmed = list.slice(0, MAX_SCORES);
-      await saveScores(env, trimmed);
+      await saveScores(env, trimmed, m);
       return json({
         ok: true,
         scores: trimmed,
+        mode: m,
         rank: trimmed.findIndex(e => e === entry) + 1 || null,
       });
     }
@@ -156,6 +197,7 @@ export class Room {
     this.host = null;
     this.guest = null;
     this.started = false;
+    this.spectators = new Set();
   }
 
   async fetch(request) {
@@ -183,6 +225,11 @@ export class Room {
       this.send(m, { type: 'peer', joined: false, reason });
       try { m.close(1000, reason); } catch {}
     }
+    for (const sp of this.spectators) {
+      this.send(sp, { type: 'result', youWon: false, reason: 'match-ended', spectator: true });
+      try { sp.close(1000, reason); } catch {}
+    }
+    this.spectators.clear();
     this.host = null; this.guest = null; this.started = false;
   }
 
@@ -225,6 +272,21 @@ export class Room {
           // no-ops here; the existing client sends them but we already
           // hello/room'd above.
           break;
+        case 'spectate': {
+          // Read-only join. Demote the role: this socket is now a spectator,
+          // not host/guest. (The Worker's attach() assigned host/guest by
+          // arrival order; if the third+ visitor sent spectate, attach()
+          // already rejected them as 'room full'. So this re-entrancy only
+          // matters for clients that connect early-but-spectate-only.)
+          if (this.host === ws) this.host = null;
+          if (this.guest === ws) this.guest = null;
+          this.spectators.add(ws);
+          ws.isSpectator = true;
+          this.send(ws, { type: 'room', code: msg.code || '', host: false, spectator: true });
+          if (this.host)  this.send(this.host,  { type: 'spectator-joined' });
+          if (this.guest) this.send(this.guest, { type: 'spectator-joined' });
+          break;
+        }
         case 'ready': {
           if (!this.host || !this.guest || this.started) return;
           this.started = true;
@@ -236,8 +298,13 @@ export class Room {
         case 'state':
         case 'garbage': {
           if (!this.started) return;
+          if (ws.isSpectator) return; // spectators never push state
           const peer = this.peerOf(ws);
           if (peer) this.send(peer, msg);
+          if (this.spectators.size) {
+            const tagged = Object.assign({}, msg, { side: this.host === ws ? 'host' : 'guest' });
+            for (const sp of this.spectators) this.send(sp, tagged);
+          }
           break;
         }
         case 'topout': {
@@ -258,6 +325,10 @@ export class Room {
     });
 
     ws.addEventListener('close', () => {
+      if (ws.isSpectator) {
+        this.spectators.delete(ws);
+        return; // spectator leaving doesn't end the match
+      }
       const peer = this.peerOf(ws);
       if (peer && this.started) this.send(peer, { type: 'result', youWon: true, reason: 'disconnect' });
       if (this.host === ws) this.host = null;
