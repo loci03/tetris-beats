@@ -12757,6 +12757,9 @@ function _initCathedralScene(w, h) {
     pillarPulse: 0,     // beat-locked pillar pulse
     pastorRaise: 0,     // pastor's arm raise (on cheer)
     floorRipple: 0,     // ripple on floor when bass hits
+    choirGasp: 0,       // 1 right after a hard drop — drops to 0 over 1 sec
+    choirSwell: 0,      // smoothed sing intensity (audio energy + cheer)
+    vocalNotes: [],     // floating ♪ ♫ from the choir's mouths
     lastCheer: 0,
     lastDrop: 0,
   };
@@ -12871,7 +12874,11 @@ function _buildCathedralBg(w, h) {
   return oc;
 }
 
-function _drawAngel(ctx, cx, cy, scale, flap, bobY, haloHue, energy, cheer) {
+// `sing` 0..1 controls mouth opening (0 = closed, 1 = wide-open chorus).
+// `gasp` 0..1 freezes mouth into a startled "O" right after a hard drop.
+function _drawAngel(ctx, cx, cy, scale, flap, bobY, haloHue, energy, cheer, sing, gasp) {
+  sing = sing || 0;
+  gasp = gasp || 0;
   // Robe (silhouette — soft white/cream gradient)
   const robeH = 80 * scale;
   const robeW = 30 * scale;
@@ -12889,8 +12896,71 @@ function _drawAngel(ctx, cx, cy, scale, flap, bobY, haloHue, energy, cheer) {
   ctx.closePath();
   ctx.fill();
   // Head
+  const headCx = cx;
+  const headCy = robeY - robeH * 0.55;
+  const headR  = 8 * scale;
   ctx.fillStyle = `rgba(245,220,180,1)`;
-  ctx.beginPath(); ctx.arc(cx, robeY - robeH * 0.55, 8 * scale, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(headCx, headCy, headR, 0, Math.PI * 2); ctx.fill();
+  // ── SINGING MOUTH ── opens with the BPM-locked sing intensity. Goes
+  // wide-O on a gasp (hard-drop reaction). When the mouth is open enough,
+  // semi-transparent sound waves emanate from it like cartoon-singing arcs.
+  const mouthY = headCy + headR * 0.45;
+  if (gasp > 0.1) {
+    // Frozen O — the choir all gasped at the slam
+    const og = headR * (0.30 + gasp * 0.30);
+    ctx.fillStyle = `rgba(40,18,6,${0.85 + gasp * 0.15})`;
+    ctx.beginPath();
+    ctx.ellipse(headCx, mouthY, og * 0.7, og, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (sing > 0.05) {
+    // Sustained note — taller mouth on louder sing
+    const mw = headR * (0.32 + sing * 0.18);
+    const mh = headR * (0.10 + sing * 0.55);
+    ctx.fillStyle = `rgba(50,22,8,${0.85})`;
+    ctx.beginPath();
+    ctx.ellipse(headCx, mouthY, mw, mh, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Tongue glint (cute warm tone)
+    if (sing > 0.4) {
+      ctx.fillStyle = `rgba(220,120,90,${0.45 * sing})`;
+      ctx.beginPath();
+      ctx.ellipse(headCx, mouthY + mh * 0.25, mw * 0.55, mh * 0.30, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    // Resting — small smile line
+    ctx.strokeStyle = 'rgba(80,40,20,0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(headCx - headR * 0.32, mouthY);
+    ctx.quadraticCurveTo(headCx, mouthY + headR * 0.20, headCx + headR * 0.32, mouthY);
+    ctx.stroke();
+  }
+  // ── SOUND-WAVE ARCS ── two thin arcs in front of the mouth that pulse
+  // outward when sing intensity is high. Cheap to draw, sells the singing.
+  if (sing > 0.45 && gasp < 0.1) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const waveAlpha = (sing - 0.45) * 1.8;
+    for (let wv = 0; wv < 2; wv++) {
+      const wr = headR * (0.8 + wv * 0.7) * (1 + sing * 0.5);
+      ctx.strokeStyle = `hsla(${haloHue},90%,75%,${waveAlpha * (1 - wv * 0.4)})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(headCx, mouthY + headR * 0.4, wr, -Math.PI * 0.32, Math.PI * 0.32);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  // Closed eyes (devotional) — two thin arcs above the mouth
+  ctx.strokeStyle = 'rgba(80,40,20,0.85)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(headCx - headR * 0.45, headCy - headR * 0.12);
+  ctx.quadraticCurveTo(headCx - headR * 0.25, headCy + headR * 0.05, headCx - headR * 0.05, headCy - headR * 0.12);
+  ctx.moveTo(headCx + headR * 0.05, headCy - headR * 0.12);
+  ctx.quadraticCurveTo(headCx + headR * 0.25, headCy + headR * 0.05, headCx + headR * 0.45, headCy - headR * 0.12);
+  ctx.stroke();
   // Halo — golden ring above head; brightens on cheer
   const haloR = 14 * scale;
   ctx.save();
@@ -13136,6 +13206,16 @@ function drawCathedralScene(theme, now, playRects) {
   const accentRgb = hexToRgb(theme.colors.accent);
   const glowRgb   = hexToRgb(theme.colors.glow);
 
+  // ── Mobile-aware layout ──
+  // On narrow viewports the play canvas covers most of the screen, leaving
+  // tiny side gutters. Compact placement variant keeps figures visible
+  // by parking them in the bottom strip below the play area + the side
+  // gutters, instead of trying to flank the board horizontally.
+  const isMobile = w < 600;
+  const _pr = playRects[0];
+  const botGutterY = _pr ? Math.min(h, _pr.y + _pr.h) : h * 0.78;
+  const topGutterH = _pr ? Math.max(0, _pr.y) : h * 0.10;
+
   // Slow gentle camera sway (this is HOLY, not action — no shake)
   ctx.save();
 
@@ -13203,8 +13283,9 @@ function drawCathedralScene(theme, now, playRects) {
   sc.pillarPulse = sc.pillarPulse * 0.85 + beatPulse * 0.15 + energy * 0.05;
 
   // ── COLUMN PILLARS between the windows on each wall ──
-  // Three on each side, illuminated more brightly when the bass kicks.
-  const pillarPositions = [
+  // Desktop: two each side. Mobile: skip — there's no room to draw them
+  // visibly outside the play-area cutout.
+  const pillarPositions = isMobile ? [] : [
     { x: w * 0.16, side: 'L' }, { x: w * 0.28, side: 'L' },
     { x: w * 0.72, side: 'R' }, { x: w * 0.84, side: 'R' },
   ];
@@ -13256,14 +13337,14 @@ function drawCathedralScene(theme, now, playRects) {
   }
   ctx.restore();
 
-  // ── Altar candles ── 5 flames, flicker continuously, flare on cheer
+  // ── Altar candles ── 5 flames, flicker continuously, flare on cheer.
+  // Hidden by the play-area cutout on mobile (board covers center), so
+  // skip drawing them there to save fillRect cost.
   const altarY = h * 0.71;
-  for (let ci = 0; ci < 5; ci++) {
+  if (!isMobile) for (let ci = 0; ci < 5; ci++) {
     const cxC = w * (0.36 + ci * 0.07);
-    // Candle stick
     ctx.fillStyle = 'rgba(220,200,160,1)';
     ctx.fillRect(cxC - 1.5, altarY - 14, 3, 14);
-    // Flame
     const flicker = 1 + Math.sin(now * 0.012 + ci * 1.7) * 0.15;
     const fH = 12 * flicker * (1 + cheer * 0.6);
     const fG = ctx.createRadialGradient(cxC, altarY - 18, 0, cxC, altarY - 18, fH);
@@ -13276,13 +13357,21 @@ function drawCathedralScene(theme, now, playRects) {
     ctx.fill();
   }
 
-  // ── PASTORS / DEACONS flanking the play area ── one each side, slowly
-  // sway with the beat, raise arms on cheer (preaching). Two figures on
-  // opposite sides keeps them visible despite the play-area mask.
+  // ── PASTORS / DEACONS flanking the play area ──
+  // Slowly sway with the beat, raise arms on cheer.
+  // On mobile the play canvas covers ~80% of the width, so flanking
+  // pastors at xN=0.18/0.82 are inside the cutout. Move them BELOW
+  // the play area into the bottom strip instead.
   sc.pastorRaise = sc.pastorRaise * 0.90 + Math.min(1, cheer * 1.2) * 0.10;
-  const pastorCy = altarY - 14;
-  _drawPastor(ctx, w * 0.18, pastorCy, sc.pastorRaise, beatT * Math.PI,         cheer, energy);
-  _drawPastor(ctx, w * 0.82, pastorCy, sc.pastorRaise, beatT * Math.PI + Math.PI, cheer, energy);
+  if (isMobile) {
+    const py = botGutterY + Math.max(20, (h - botGutterY) * 0.30);
+    _drawPastor(ctx, w * 0.20, py, sc.pastorRaise, beatT * Math.PI,         cheer, energy);
+    _drawPastor(ctx, w * 0.80, py, sc.pastorRaise, beatT * Math.PI + Math.PI, cheer, energy);
+  } else {
+    const pastorCy = altarY - 14;
+    _drawPastor(ctx, w * 0.18, pastorCy, sc.pastorRaise, beatT * Math.PI,         cheer, energy);
+    _drawPastor(ctx, w * 0.82, pastorCy, sc.pastorRaise, beatT * Math.PI + Math.PI, cheer, energy);
+  }
 
   // ── CHANDELIERS (3 across the upper third) ──
   // Pendulum SHM with mild damping. Hard drops kick angular velocity
@@ -13295,20 +13384,25 @@ function drawCathedralScene(theme, now, playRects) {
   }
   sc.bellSwing *= 0.94;
   for (const ch of sc.chandeliers) {
-    // SHM: ang'' = -k * ang. Damped.
     const k = 0.0042;
     ch.vel += -k * ch.ang;
     ch.vel *= 0.992;
     ch.ang += ch.vel;
     const anchorX = w * ch.xN;
-    const cordLen = h * ch.baseY;
+    // On mobile, hang chandeliers from a much shorter cord so the fixture
+    // sits inside the small top gutter above the play canvas.
+    const cordLen = isMobile
+      ? Math.max(18, topGutterH * 0.55)
+      : h * ch.baseY;
     _drawChandelier(ctx, anchorX, cordLen, ch.ang, ch.candles, energy, cheer);
   }
 
   // ── CONGREGATION pews ──
   // Worshippers bob at the half-beat, raise arms on big cheer pulses.
-  // Drawn in front of the choir line so they're more "near camera".
-  for (const pew of sc.pews) {
+  // On mobile we skip pews entirely — there's not enough vertical room
+  // below the play canvas for both the choir AND congregation. The
+  // singing choir does enough of the heavy lifting on small screens.
+  if (!isMobile) for (const pew of sc.pews) {
     // Pew bench
     const pewY = h * pew.yN;
     ctx.fillStyle = 'rgba(40,25,10,1)';
@@ -13351,15 +13445,96 @@ function drawCathedralScene(theme, now, playRects) {
     }
   }
 
-  // ── ANGELS (choir) ──
+  // ── SINGING CHOIR ──
+  // Smoothed sing intensity from audio energy + sustained cheer. Goes
+  // up to ~1.2 on a Tetris/perfect-clear, falls back to a chill ~0.3 hum
+  // when nothing's happening so the choir is always visibly singing.
+  const baseSing = 0.30 + energy * 0.50 + cheer * 0.50;
+  sc.choirSwell = sc.choirSwell * 0.85 + baseSing * 0.15;
+  // Hard drops trigger a "GASP" (everyone stops singing for a beat).
+  if (drop > 0.7 && (drop - sc.lastDrop) > 0.30) sc.choirGasp = 1;
+  sc.choirGasp = Math.max(0, sc.choirGasp - 0.018);
+
   for (const a of sc.angels) {
     const flapPhase = beatT * Math.PI + a.flapOff;
     const flap = (Math.sin(flapPhase) * 0.5 + 0.5);
     const bob  = Math.sin(beatT * Math.PI * 0.5 + a.bobOff) * 6;
-    const ax = w * a.xN;
-    const ay = a.row === 0 ? h * 0.85 : h * 0.76;
-    const sc2 = a.row === 0 ? 1.1 : 0.78;
-    _drawAngel(ctx, ax, ay, sc2, flap, bob, a.haloHue, energy, cheer);
+    // Per-angel sing oscillation — half-time of the beat so mouths open
+    // on each main beat (not every 16th). Phase-offset so the choir
+    // doesn't all open mouths in lock-step.
+    const singOsc = Math.sin(beatT * Math.PI - a.flapOff) * 0.5 + 0.5;
+    const sing = sc.choirSwell * (0.55 + singOsc * 0.55);
+    // Layout: desktop uses two rows behind the altar; mobile clusters
+    // the whole choir into the bottom strip below the play canvas.
+    let ax, ay, sc2;
+    if (isMobile) {
+      const choirY = botGutterY + Math.max(46, (h - botGutterY) * 0.55);
+      ax = w * (0.08 + ((sc.angels.indexOf(a) + 0.5) / sc.angels.length) * 0.84);
+      ay = choirY - (a.row === 0 ? 0 : 14);
+      sc2 = 0.55;     // smaller so they all fit
+    } else {
+      ax = w * a.xN;
+      ay = a.row === 0 ? h * 0.85 : h * 0.76;
+      sc2 = a.row === 0 ? 1.1 : 0.78;
+    }
+    _drawAngel(ctx, ax, ay, sc2, flap, bob, a.haloHue, energy, cheer, sing, sc.choirGasp);
+
+    // Vocal note spawn — every angel emits a ♪ at the peak of its sing
+    // wave (sing > 0.7 AND rising). Throttled per-angel via a "lastSing"
+    // tally so we get one note per cycle, not every frame above threshold.
+    if (!isMobile || a.row === 0) {  // mobile: only front row spawns to keep particle count down
+      if (sing > 0.70 && (sing - (a._lastSing || 0)) > 0.05 && sc.choirGasp < 0.2) {
+        sc.vocalNotes.push({
+          x: ax + (Math.random() - 0.5) * 12,
+          y: ay - 30 * sc2,
+          vy: -0.9 - Math.random() * 0.3,
+          vx: (Math.random() - 0.5) * 0.4,
+          life: 1,
+          size: 11 + Math.random() * 6,
+          hue: a.haloHue,
+          glyph: ['♪', '♫', '♬', '♩'][Math.floor(Math.random() * 4)],
+        });
+      }
+      a._lastSing = sing;
+    }
+  }
+
+  // ── VOCAL NOTES floating up from the choir ──
+  for (let vi = sc.vocalNotes.length - 1; vi >= 0; vi--) {
+    const v = sc.vocalNotes[vi];
+    v.x += v.vx;
+    v.y += v.vy;
+    v.life -= 0.012;
+    if (v.life <= 0) { sc.vocalNotes.splice(vi, 1); continue; }
+    ctx.save();
+    ctx.font = `bold ${v.size}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `hsla(${v.hue},90%,${72 + v.life * 12}%,${v.life * 0.95})`;
+    ctx.shadowColor = `hsla(${v.hue},90%,80%,${v.life * 0.7})`;
+    ctx.shadowBlur = 10;
+    ctx.fillText(v.glyph, v.x, v.y);
+    ctx.restore();
+  }
+  // Cap so a long combo doesn't churn forever.
+  if (sc.vocalNotes.length > 70) sc.vocalNotes.splice(0, sc.vocalNotes.length - 70);
+
+  // ── CHOIR AURA ── soft warm halo behind the choir that pulses with
+  // the swell. On mobile this draws below the play canvas; on desktop
+  // it sits behind the angels' two rows.
+  if (sc.choirSwell > 0.15) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const auraA = (sc.choirSwell - 0.15) * 0.55;
+    const auraY = isMobile
+      ? Math.min(h - 30, botGutterY + (h - botGutterY) * 0.55)
+      : h * 0.84;
+    const auraG = ctx.createRadialGradient(w * 0.5, auraY, 0, w * 0.5, auraY, w * 0.55);
+    auraG.addColorStop(0,   `rgba(255,235,140,${auraA * 0.7})`);
+    auraG.addColorStop(0.6, `rgba(255,200,80,${auraA * 0.30})`);
+    auraG.addColorStop(1,   `rgba(255,180,60,0)`);
+    ctx.fillStyle = auraG;
+    ctx.fillRect(0, auraY - 60, w, 120);
+    ctx.restore();
   }
 
   // ── DOVES flying across the cathedral ──
