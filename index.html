@@ -2249,20 +2249,24 @@ const LEVEL_THEMES = [
     chords: [[196, 261.63, 329.63], [220, 293.66, 392], [174.61, 220, 293.66]],
     synthType: 'choir',
   },
-  { // Level 14 - Back to College Dropout (full circle)
-    name: 'The College Dropout',
-    bpm: 88,
-    colors: { bg1: '#2a1800', bg2: '#0f0800', accent: '#d4943a', glow: '#ff8c00' },
-    particleHue: 30,
-    particleStyle: 'circles',
-    blockGlow: 8,
-    kick:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
-    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+  { // Level 14 - Dream or Nightmare (giant robots dancing in a neon megacity)
+    name: 'Dream or Nightmare',
+    bpm: 96,
+    track: 'dream-or-nightmare.mp3',
+    // Cyberpunk palette: deep indigo dream sky → magenta neon haze.
+    // Accent (electric magenta) drives robot eyes + rim lights.
+    // Glow (cyan) drives crowd glowsticks + window lights.
+    colors: { bg1: '#0d0820', bg2: '#070418', accent: '#ff2dd0', glow: '#22e8ff' },
+    particleHue: 290,
+    particleStyle: 'robot-city', // giant dancing robots over neon skyline
+    blockGlow: 12,
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,1, 1,0,0,0],
     hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
     hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
-    bass:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
+    bass:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     bassNote: 55,
-    scale: [261.63, 293.66, 329.63, 349.23, 392, 440],
+    scale: [261.63, 293.66, 329.63, 349.23, 392, 440, 523.25],
     chords: [[261.63, 329.63, 392], [220, 277.18, 329.63], [293.66, 349.23, 440]],
     synthType: 'soulChop',
   },
@@ -11939,6 +11943,450 @@ function drawGalaxyScene(theme, now, playRects) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Level 14 — Dream or Nightmare: giant robots dancing in a neon megacity.
+// Static skyline + neon haze are baked once into an offscreen canvas and
+// blitted each frame. Reactive layers (robots, crowd, lightning) draw live.
+// ─────────────────────────────────────────────────────────────────────────────
+let _robotCityScene = null;
+
+function _initRobotCityScene(w, h) {
+  // Three giant humanoid robots, staggered in depth so they don't all fall
+  // exactly on the same beat. Each robot has its own dance "phase" so they
+  // groove out of sync with each other (more interesting than a chorus line).
+  // x is normalised 0..1; we resolve to pixels each frame so resize is free.
+  _robotCityScene = {
+    w, h,
+    bgCanvas: null,
+    // Two foreground giants flanking the play area (stage-left + stage-right
+    // stomping in time with the music) plus one DISTANT robot way in the
+    // back — small, slow, visible above the skyline silhouette.
+    robots: [
+      { xN: 0.14, scale: 1.00, danceOff: 0.0,           hueShift:  0,  stompT: 0, distant: false },
+      { xN: 0.86, scale: 0.92, danceOff: Math.PI * 1.1, hueShift: -20, stompT: 0, distant: false },
+      { xN: 0.66, scale: 0.45, danceOff: Math.PI * 0.5, hueShift:  20, stompT: 0, distant: true  },
+    ],
+    // Tiny crowd silhouettes at street level — bob with the beat, cheer on clears.
+    crowd: Array.from({ length: 60 }, (_, i) => ({
+      xN: (i + Math.random() * 0.6) / 60,
+      h:  0.018 + Math.random() * 0.014,   // height fraction of canvas
+      bobOff: Math.random() * Math.PI * 2,
+      glowHue: Math.random() < 0.5 ? 280 : 190,
+    })),
+    // Distant flying drones with blinking lights.
+    drones: Array.from({ length: 8 }, (_, i) => ({
+      x: Math.random() * w,
+      y: h * (0.10 + Math.random() * 0.25),
+      vx: (Math.random() - 0.5) * 0.6,
+      blinkOff: Math.random() * Math.PI * 2,
+      hue: Math.random() < 0.5 ? 320 : 200,
+    })),
+    lightning: 0,        // 0..1, decays each frame, spikes on hard drops
+    moodSwing: 0,        // smoothed dream↔nightmare oscillator (line clears push toward dream)
+  };
+}
+
+// Bake the immobile skyline + ground neon strip into a single offscreen
+// canvas so we draw ~200 buildings only once per resize, not per frame.
+function _buildRobotCityBg(w, h, theme) {
+  const oc = document.createElement('canvas');
+  oc.width = w; oc.height = h;
+  const c = oc.getContext('2d');
+
+  // Sky gradient: cyberpunk dusk (deep indigo at top → magenta haze near horizon).
+  const sky = c.createLinearGradient(0, 0, 0, h * 0.78);
+  sky.addColorStop(0,   '#0a0628');
+  sky.addColorStop(0.55, '#1a0d3d');
+  sky.addColorStop(1,   '#3a0e3a');
+  c.fillStyle = sky; c.fillRect(0, 0, w, h * 0.82);
+
+  // Distant moon — an over-large pale disc for that "dream" vibe.
+  const moonX = w * 0.78, moonY = h * 0.20, moonR = Math.min(w, h) * 0.10;
+  const moonG = c.createRadialGradient(moonX, moonY, 0, moonX, moonY, moonR * 1.4);
+  moonG.addColorStop(0,   'rgba(255,220,250,0.95)');
+  moonG.addColorStop(0.55,'rgba(255,180,240,0.55)');
+  moonG.addColorStop(1,   'rgba(255,180,240,0)');
+  c.fillStyle = moonG; c.fillRect(0, 0, w, h);
+
+  // Stars (sparse, fixed pattern keyed off canvas size — a deterministic
+  // hash so resizes don't twinkle randomly).
+  c.fillStyle = 'rgba(255,255,255,0.85)';
+  for (let i = 0; i < 80; i++) {
+    const sx = (i * 9301 + 49297) % w;
+    const sy = ((i * 7919) % Math.floor(h * 0.55));
+    const sz = ((i * 13) % 7 < 2) ? 1.6 : 0.9;
+    c.fillRect(sx, sy, sz, sz);
+  }
+
+  // Far skyline — small, low-contrast silhouettes for depth.
+  const horizon = h * 0.78;
+  c.fillStyle = 'rgba(20,15,55,0.85)';
+  for (let bx = 0; bx < w; bx += 18) {
+    const bh = h * (0.06 + 0.07 * Math.abs(Math.sin(bx * 0.41)));
+    c.fillRect(bx, horizon - bh, 16, bh);
+  }
+
+  // Mid-skyline buildings — denser, taller, with windows. This is where the
+  // robots will stand in front of, so the windows need to read clearly.
+  c.fillStyle = 'rgba(8,5,30,0.95)';
+  const midSkyline = [];
+  for (let bx = -10; bx < w + 10; ) {
+    const bw = 28 + (Math.abs(Math.sin(bx * 0.13)) * 36) | 0;
+    const bh = h * (0.20 + 0.18 * Math.abs(Math.sin(bx * 0.07 + 1.3)));
+    midSkyline.push({ x: bx, w: bw, h: bh });
+    c.fillRect(bx, horizon - bh, bw, bh);
+    bx += bw + 2;
+  }
+  // Roof antennae — thin spikes that catch the moonlight.
+  c.strokeStyle = 'rgba(60,50,90,0.8)'; c.lineWidth = 1;
+  for (const b of midSkyline) {
+    if (Math.abs(Math.sin(b.x * 0.21)) > 0.7) {
+      c.beginPath();
+      c.moveTo(b.x + b.w * 0.5, horizon - b.h);
+      c.lineTo(b.x + b.w * 0.5, horizon - b.h - h * 0.04);
+      c.stroke();
+    }
+  }
+  // Windows — irregular grid; lit windows alternate magenta and cyan.
+  for (const b of midSkyline) {
+    const cols = Math.max(2, (b.w / 9) | 0);
+    const rows = Math.max(3, (b.h / 14) | 0);
+    for (let r = 0; r < rows; r++) {
+      for (let cc = 0; cc < cols; cc++) {
+        const seed = (b.x * 31 + r * 17 + cc * 7) | 0;
+        if ((seed % 5) === 0) continue; // dark window
+        const isMagenta = (seed & 1) === 0;
+        const wx = b.x + 2 + cc * (b.w / cols);
+        const wy = horizon - b.h + 4 + r * (b.h / rows);
+        const ww = (b.w / cols) - 2.5;
+        const wh = (b.h / rows) - 3;
+        c.fillStyle = isMagenta
+          ? 'rgba(255, 80, 200, 0.45)'
+          : 'rgba(80, 220, 255, 0.40)';
+        c.fillRect(wx, wy, Math.max(2, ww), Math.max(2, wh));
+      }
+    }
+  }
+
+  // Ground / street — dark with a magenta neon strip at the horizon line
+  // (think Blade Runner street-level bounce light).
+  const groundG = c.createLinearGradient(0, horizon, 0, h);
+  groundG.addColorStop(0,   'rgba(30,8,40,0.95)');
+  groundG.addColorStop(0.4, 'rgba(15,5,25,1)');
+  groundG.addColorStop(1,   'rgba(5,2,12,1)');
+  c.fillStyle = groundG; c.fillRect(0, horizon, w, h - horizon);
+  // Neon street strip
+  const stripG = c.createLinearGradient(0, horizon - 2, 0, horizon + 8);
+  stripG.addColorStop(0,   'rgba(255,80,220,0)');
+  stripG.addColorStop(0.5, 'rgba(255,80,220,0.65)');
+  stripG.addColorStop(1,   'rgba(255,80,220,0)');
+  c.fillStyle = stripG; c.fillRect(0, horizon - 2, w, 10);
+
+  return oc;
+}
+
+// One robot. Drawn at (cx, footY) with given height. `phase` drives all
+// joint motion so each robot can be slightly out of sync.
+function _drawRobot(ctx, cx, footY, height, phase, energy, cheer, stompT, accentRgb, glowRgb, beatPhase) {
+  // Body proportions, in fractions of total height.
+  const bodyW = height * 0.22;
+  const bodyH = height * 0.40;
+  const headW = height * 0.18;
+  const headH = height * 0.16;
+  const armL  = height * 0.36;
+  const armW  = height * 0.07;
+  const legL  = height * 0.32;
+  const legW  = height * 0.08;
+
+  // Beat-driven groove (every other beat is a half-step bob).
+  const beatPulse = Math.sin(phase) * 0.5 + 0.5;
+  const grooveX   = Math.sin(phase * 0.5) * height * 0.025;
+  const grooveY   = Math.sin(phase * 1.0) * height * 0.020 * (0.8 + energy * 0.6);
+  // Stomp lifts the whole robot a bit then slams it down — one shot per drop.
+  const stomp     = stompT > 0 ? Math.sin(stompT * Math.PI) * height * 0.08 : 0;
+
+  // Anchor points
+  const hipY      = footY - legL + grooveY - stomp;
+  const torsoTop  = hipY - bodyH;
+  const shoulderY = torsoTop + bodyH * 0.10;
+  const headBaseY = torsoTop;
+  const cxBody    = cx + grooveX;
+
+  // ── LEGS ── slight side-to-side weight shift, feet stay planted unless stomping
+  const legSwing = Math.sin(phase * 2) * 0.12;
+  const lFootX = cx - legW * 1.4 + Math.sin(phase * 2 + 0.3) * height * 0.015;
+  const rFootX = cx + legW * 1.4 + Math.sin(phase * 2 + 1.2) * height * 0.015;
+  ctx.fillStyle = `rgba(40,40,55,0.96)`;
+  ctx.fillRect(lFootX - legW * 0.5, footY - legL + grooveY * 0.5, legW, legL);
+  ctx.fillRect(rFootX - legW * 0.5, footY - legL + grooveY * 0.5, legW, legL);
+  // Knee plate accents (thin glowing lines)
+  ctx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.5 + energy * 0.3})`;
+  ctx.fillRect(lFootX - legW * 0.6, footY - legL * 0.55 + grooveY * 0.5, legW * 1.2, 2);
+  ctx.fillRect(rFootX - legW * 0.6, footY - legL * 0.55 + grooveY * 0.5, legW * 1.2, 2);
+  // Feet
+  ctx.fillStyle = `rgba(20,20,30,1)`;
+  ctx.fillRect(lFootX - legW * 0.9, footY - 4 + grooveY * 0.5, legW * 1.8, 6);
+  ctx.fillRect(rFootX - legW * 0.9, footY - 4 + grooveY * 0.5, legW * 1.8, 6);
+
+  // ── TORSO ── chest plate with a glowing core (the "heart") that brightens
+  // with audio energy. On cheer the heart goes white-hot.
+  ctx.fillStyle = `rgba(60,55,80,1)`;
+  ctx.fillRect(cxBody - bodyW * 0.5, torsoTop, bodyW, bodyH);
+  // Side panels (slightly lighter)
+  ctx.fillStyle = `rgba(75,70,100,1)`;
+  ctx.fillRect(cxBody - bodyW * 0.5, torsoTop, 4, bodyH);
+  ctx.fillRect(cxBody + bodyW * 0.5 - 4, torsoTop, 4, bodyH);
+  // Neon trim along the chest
+  const trimAlpha = 0.5 + beatPulse * 0.3 + energy * 0.2;
+  ctx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${trimAlpha})`;
+  ctx.fillRect(cxBody - bodyW * 0.45, torsoTop + bodyH * 0.35, bodyW * 0.9, 2);
+  ctx.fillRect(cxBody - bodyW * 0.45, torsoTop + bodyH * 0.65, bodyW * 0.9, 2);
+  // Heart core (gradient — brighter on cheer)
+  const heartR = bodyW * (0.22 + cheer * 0.10);
+  const heartCx = cxBody, heartCy = torsoTop + bodyH * 0.50;
+  const heartG = ctx.createRadialGradient(heartCx, heartCy, 0, heartCx, heartCy, heartR);
+  const heartHot = cheer > 0.4;
+  if (heartHot) {
+    heartG.addColorStop(0,   `rgba(255,255,255,${0.95})`);
+    heartG.addColorStop(0.5, `rgba(255,${100 + cheer * 100},255,${0.7})`);
+    heartG.addColorStop(1,   `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0)`);
+  } else {
+    heartG.addColorStop(0,   `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.85})`);
+    heartG.addColorStop(0.6, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.35 + beatPulse * 0.20})`);
+    heartG.addColorStop(1,   `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0)`);
+  }
+  ctx.fillStyle = heartG;
+  ctx.beginPath(); ctx.arc(heartCx, heartCy, heartR, 0, Math.PI * 2); ctx.fill();
+
+  // ── ARMS ── shoulder swing + elbow bend; the "raise the roof" pose
+  // intensifies with audio energy. On big cheer both arms punch up.
+  const punchUp = cheer > 0.5 ? 1 : 0;
+  const armPhase = phase * 1.3;
+  const lArmAng = Math.PI * (0.5 + Math.sin(armPhase) * 0.30 + energy * 0.20) - punchUp * Math.PI * 0.55;
+  const rArmAng = Math.PI * (0.5 + Math.sin(armPhase + Math.PI) * 0.30 + energy * 0.20) - punchUp * Math.PI * 0.55;
+  function arm(ang, sx) {
+    const ex = sx + Math.cos(Math.PI - ang) * armL * 0.55;
+    const ey = shoulderY + Math.sin(Math.PI - ang) * armL * 0.55;
+    // Upper arm
+    ctx.save();
+    ctx.translate(sx, shoulderY);
+    ctx.rotate(Math.PI - ang);
+    ctx.fillStyle = `rgba(55,52,75,1)`;
+    ctx.fillRect(0, -armW * 0.5, armL * 0.55, armW);
+    // Elbow joint
+    ctx.fillStyle = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.7})`;
+    ctx.beginPath(); ctx.arc(armL * 0.55, 0, armW * 0.55, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // Forearm
+    const forearmAng = ang + Math.sin(armPhase * 2) * 0.25 + punchUp * 0.4;
+    ctx.save();
+    ctx.translate(ex, ey);
+    ctx.rotate(Math.PI - forearmAng);
+    ctx.fillStyle = `rgba(70,66,92,1)`;
+    ctx.fillRect(0, -armW * 0.42, armL * 0.50, armW * 0.84);
+    // Hand (square mitt)
+    ctx.fillStyle = `rgba(45,42,60,1)`;
+    ctx.fillRect(armL * 0.50, -armW * 0.5, armW * 0.9, armW);
+    ctx.restore();
+  }
+  arm(lArmAng, cxBody - bodyW * 0.5);
+  arm(rArmAng, cxBody + bodyW * 0.5);
+
+  // ── HEAD ── boxy with two glowing eyes. Eyes flash white on cheer
+  // ("dream"); turn red on a stomp ("nightmare"). Slight tilt with the beat.
+  const headTilt = Math.sin(phase * 0.5) * 0.05;
+  ctx.save();
+  ctx.translate(cxBody, headBaseY);
+  ctx.rotate(headTilt);
+  // Skull
+  ctx.fillStyle = `rgba(70,65,90,1)`;
+  ctx.fillRect(-headW * 0.5, -headH, headW, headH);
+  // Visor band
+  ctx.fillStyle = `rgba(20,18,32,1)`;
+  ctx.fillRect(-headW * 0.5, -headH * 0.65, headW, headH * 0.30);
+  // Eyes — two square LEDs
+  const eyeW = headW * 0.18, eyeH = headH * 0.16;
+  const eyeY = -headH * 0.55;
+  let eyeColor;
+  if (stompT > 0.05) {
+    // Nightmare red on stomp
+    eyeColor = `rgba(255,${30 + stompT * 60},${30 + stompT * 30},1)`;
+  } else if (cheer > 0.3) {
+    // Dream white-hot on big clears
+    eyeColor = `rgba(255,255,255,1)`;
+  } else {
+    // Default — accent color, breathing
+    const a = 0.85 + beatPulse * 0.15;
+    eyeColor = `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${a})`;
+  }
+  ctx.fillStyle = eyeColor;
+  ctx.fillRect(-headW * 0.30, eyeY, eyeW, eyeH);
+  ctx.fillRect( headW * 0.12, eyeY, eyeW, eyeH);
+  // Mouth grille (5 tiny vertical lines)
+  ctx.fillStyle = `rgba(40,38,55,1)`;
+  for (let mi = -2; mi <= 2; mi++) {
+    ctx.fillRect(mi * (headW * 0.08), -headH * 0.22, headW * 0.04, headH * 0.10);
+  }
+  // Antenna with a blinking tip
+  ctx.strokeStyle = `rgba(50,48,70,1)`; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, -headH); ctx.lineTo(0, -headH - height * 0.05); ctx.stroke();
+  const blinkOn = (Math.floor(phase * 1.6) & 1) === 0;
+  if (blinkOn) {
+    ctx.fillStyle = `rgba(${glowRgb[0]},${glowRgb[1]},${glowRgb[2]},0.9)`;
+    ctx.beginPath(); ctx.arc(0, -headH - height * 0.05, 3, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+
+  // Eye glow halo (drawn after head so it sits on top)
+  if (stompT > 0.05 || cheer > 0.3) {
+    ctx.save();
+    ctx.translate(cxBody, headBaseY - headH * 0.55);
+    const haloR = headW * (0.6 + cheer * 0.4 + stompT * 0.5);
+    const haloG = ctx.createRadialGradient(0, 0, 0, 0, 0, haloR);
+    if (stompT > 0.05) {
+      haloG.addColorStop(0,   `rgba(255,40,40,${0.55 * stompT})`);
+      haloG.addColorStop(1,   `rgba(255,40,40,0)`);
+    } else {
+      haloG.addColorStop(0,   `rgba(255,255,255,${0.5 * cheer})`);
+      haloG.addColorStop(0.6, `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},${0.3 * cheer})`);
+      haloG.addColorStop(1,   `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0)`);
+    }
+    ctx.fillStyle = haloG;
+    ctx.beginPath(); ctx.arc(0, 0, haloR, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawRobotCityScene(theme, now, playRects) {
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (!_robotCityScene || _robotCityScene.w !== w || _robotCityScene.h !== h) _initRobotCityScene(w, h);
+  const sc = _robotCityScene;
+  if (!sc.bgCanvas || sc.bgCanvas.width !== w) sc.bgCanvas = _buildRobotCityBg(w, h, theme);
+
+  const ctx = bgCtx;
+  const cheer  = (typeof cheerPulse === 'number') ? cheerPulse : 0;
+  const move   = (typeof movePulse  === 'number') ? movePulse  : 0;
+  const drop   = (typeof boardDropPulse === 'number') ? boardDropPulse : 0;
+  const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+  const accentRgb = hexToRgb(theme.colors.accent);
+  const glowRgb   = hexToRgb(theme.colors.glow);
+
+  // Camera shake on hard drops (a robot just stomped).
+  let shakeX = 0, shakeY = 0;
+  if (drop > 0.5) {
+    shakeX = (Math.random() - 0.5) * drop * 7;
+    shakeY = (Math.random() - 0.5) * drop * 5;
+  }
+  ctx.save();
+  if (shakeX || shakeY) ctx.translate(shakeX | 0, shakeY | 0);
+
+  // Static skyline + ground
+  ctx.drawImage(sc.bgCanvas, 0, 0);
+
+  // Smoothed mood — cheer pushes toward "dream", boardDrop toward "nightmare".
+  sc.moodSwing = sc.moodSwing * 0.92 + (cheer - drop * 0.6) * 0.06;
+
+  // Ambient haze tint that breathes between dream (cyan) and nightmare (red).
+  const hazeAlpha = 0.12 + Math.abs(sc.moodSwing) * 0.18;
+  if (sc.moodSwing >= 0) {
+    ctx.fillStyle = `rgba(${glowRgb[0]},${glowRgb[1]},${glowRgb[2]},${hazeAlpha})`;
+  } else {
+    ctx.fillStyle = `rgba(255,40,80,${hazeAlpha})`;
+  }
+  ctx.fillRect(0, 0, w, h * 0.78);
+
+  // Lightning flashes — boardDropPulse spikes the lightning, then it decays.
+  if (drop > 0.6) sc.lightning = Math.min(1, sc.lightning + drop * 0.7);
+  sc.lightning *= 0.86;
+  if (sc.lightning > 0.02) {
+    ctx.fillStyle = `rgba(255,${200 - sc.lightning * 100},255,${sc.lightning * 0.18})`;
+    ctx.fillRect(0, 0, w, h);
+    // Bolt
+    ctx.strokeStyle = `rgba(255,${220 - sc.lightning * 80},255,${sc.lightning})`;
+    ctx.lineWidth = 1 + sc.lightning * 1.5;
+    ctx.beginPath();
+    let lx = w * (0.2 + Math.random() * 0.6);
+    ctx.moveTo(lx, 0);
+    for (let ly = 0; ly < h * 0.7; ly += 22) {
+      lx += (Math.random() - 0.5) * 30;
+      ctx.lineTo(lx, ly);
+    }
+    ctx.stroke();
+  }
+
+  // Drones drifting across the sky.
+  for (const d of sc.drones) {
+    d.x += d.vx;
+    if (d.x < -10) d.x = w + 10;
+    if (d.x > w + 10) d.x = -10;
+    const blink = (Math.sin(now * 0.008 + d.blinkOff) > 0.6) ? 1 : 0.25;
+    ctx.fillStyle = `rgba(20,20,35,1)`;
+    ctx.fillRect(d.x - 4, d.y - 1.5, 8, 3);
+    ctx.fillStyle = `hsla(${d.hue},90%,65%,${blink})`;
+    ctx.beginPath(); ctx.arc(d.x, d.y, 2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Robots — grouped in a single transform pass for cheap depth darkening.
+  // BPM is 96 in this theme; we map it directly to phase speed so the dance
+  // syncs to the music rather than to wall-clock.
+  const bpm = (theme.bpm || 96);
+  const beatT = (now / 1000) * (bpm / 60);
+  const horizon = h * 0.78;
+  for (const r of sc.robots) {
+    // Decay stomp animation
+    if (r.stompT > 0) r.stompT = Math.max(0, r.stompT - 0.022);
+    // Trigger a stomp on the LARGEST foreground robot when boardDropPulse
+    // spikes (one stomp per drop event; threshold prevents re-fires).
+    if (drop > 0.7 && !r.distant && r.scale >= 0.95 && r.stompT < 0.05) r.stompT = 1.0;
+
+    const phase = beatT * Math.PI + r.danceOff;
+    const rH    = h * 0.55 * r.scale;
+    const cx    = w * r.xN;
+    // Distant robot stands further "back" (higher up the screen, on the
+    // skyline ridge) and at half-energy so its dance reads as in the haze.
+    const footY = r.distant
+      ? horizon - h * 0.16
+      : horizon + h * 0.005;
+    if (r.distant) {
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      _drawRobot(ctx, cx, footY, rH, phase, energy * 0.5, cheer * 0.4, 0, accentRgb, glowRgb, beatT);
+      ctx.restore();
+    } else {
+      _drawRobot(ctx, cx, footY, rH, phase, energy, cheer, r.stompT, accentRgb, glowRgb, beatT);
+    }
+  }
+
+  // Tiny crowd silhouettes at the very front, bobbing.
+  const crowdBaseY = h * 0.94;
+  for (const p of sc.crowd) {
+    const px = w * p.xN;
+    const ph = h * p.h * (1 + Math.sin(beatT * Math.PI * 2 + p.bobOff) * 0.10 * (0.6 + energy));
+    ctx.fillStyle = `rgba(8,4,18,1)`;
+    ctx.fillRect(px - 3, crowdBaseY - ph, 6, ph);
+    // Glowstick — tiny dot bobbing above each silhouette
+    if (cheer > 0.2 || (Math.sin(beatT * Math.PI * 2 + p.bobOff) > 0.7)) {
+      const gx = px + Math.sin(beatT * Math.PI + p.bobOff) * 4;
+      const gy = crowdBaseY - ph - 4;
+      ctx.fillStyle = `hsla(${p.glowHue},85%,${60 + cheer * 20}%,${0.7 + cheer * 0.3})`;
+      ctx.beginPath(); ctx.arc(gx, gy, 1.5 + cheer * 0.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  ctx.restore();
+
+  // Cut out the play area so the robots don't render over the board.
+  if (playRects.length) {
+    bgCtx.save();
+    bgCtx.globalCompositeOperation = 'destination-out';
+    for (const pr of playRects) {
+      bgCtx.fillStyle = '#000';
+      bgCtx.fillRect(pr.x, pr.y, pr.w, pr.h);
+    }
+    bgCtx.restore();
+  }
+}
+
 function drawBackground() {
   const theme = getTheme(level);
   const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
@@ -11957,7 +12405,7 @@ function drawBackground() {
   // future "physical" background object) from rendering on top of the
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone' || style === 'haze');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone' || style === 'haze' || style === 'robot-city');
   // Cache getBoundingClientRect — forced layout reflow every frame is very
   // expensive. Invalidate only when canvas size or vs-mode changes.
   const _vsMode = document.body.classList.contains('vs-mode');
@@ -12064,6 +12512,15 @@ function drawBackground() {
   }
   if (style === 'haze') {
     drawHazeScene(theme, now, playRects);
+    return;
+  }
+  // Dream or Nightmare (Level 14): towering humanoid robots dancing in front
+  // of a neon megacity skyline. Robots groove to the beat (audio-reactive
+  // joint angles), eyes flash on line clears (cheerPulse), one stomps on
+  // hard drops (boardDropPulse), and the crowd at street level cheers in
+  // sync with combos.
+  if (style === 'robot-city') {
+    drawRobotCityScene(theme, now, playRects);
     return;
   }
 
