@@ -185,10 +185,8 @@
     margin-top: 4px;
   }
   /* ── Score panel redesign ── */
-  .spb-score-label { display: none; }   /* hidden on desktop, shown on mobile */
-  .spb-lines-row   { display: none; }   /* same */
-  .spb-bar-wrap    { display: none; }   /* same */
-  #spb-rank-target { display: none; }   /* same */
+  /* SPB rows + rank: hidden on desktop, revealed on mobile */
+  .spb-row1, .spb-row2, .spb-rank-target { display: none; }
 
   #zone-bar-container {
     width: 100%;
@@ -1123,58 +1121,77 @@
     #next-canvas { width: 56px; height: 46px; }
 
     /* ── SCORE BOX: grows to fill remaining space, fixed row height ── */
+    /* Reveal SPB rows on mobile */
+    .spb-row1, .spb-row2, .spb-rank-target { display: flex; }
+
+    /* ── Score box: 2-row layout, fills space cleanly ── */
     #score-panel-box {
       flex: 1 1 auto;
-      height: 80px;          /* same as hold/next so the row is uniform */
+      height: 80px;
       align-self: flex-start;
-      padding: 5px 8px 5px;
+      padding: 6px 10px;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
+      justify-content: space-between;
+      overflow: hidden;
       background: linear-gradient(160deg, rgba(20,12,40,0.92), rgba(8,8,22,0.95));
       border-color: rgba(180,120,255,0.22);
     }
 
-    /* Reveal mobile-only score-panel elements */
-    .spb-lines-row { display: flex; }
-    .spb-bar-wrap  { display: block; }
-
-    /* Tiny "SCORE" eyebrow label */
-    .spb-score-label {
-      display: block;
-      font-size: 7px;
-      letter-spacing: 3px;
-      font-weight: 800;
-      color: rgba(255,255,255,0.28);
-      text-transform: uppercase;
-      line-height: 1;
+    /* ROW 1: score number (left) + rank target (right) */
+    .spb-row1 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      flex: 0 0 auto;
     }
-
-    /* Score number — dominant, tabular so digits don't jump */
     #score-display {
-      font-size: 26px;
+      font-size: 28px;
       font-weight: 900;
       line-height: 1;
       letter-spacing: -0.5px;
       font-variant-numeric: tabular-nums;
       text-shadow: 0 0 14px rgba(160,80,255,0.55);
     }
+    /* Rank target — stacked right-aligned next to score */
+    .spb-rank-target {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      flex-shrink: 0;
+      margin-left: 6px;
+    }
+    #spb-rank-label {
+      font-size: 7px;
+      letter-spacing: 1.5px;
+      font-weight: 800;
+      color: rgba(255,200,80,0.70);
+      text-transform: uppercase;
+      line-height: 1;
+    }
+    #spb-rank-score {
+      font-size: 12px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255,220,100,0.95);
+      text-shadow: 0 0 6px rgba(255,180,0,0.40);
+      line-height: 1.1;
+    }
 
-    /* Lines progress row: [L2] [6 / 15] [LN] */
-    .spb-lines-row {
+    /* ROW 2: [L2 chip] [bar — grows] [6/15] */
+    .spb-row2 {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 4px;
-      margin-top: 2px;
+      gap: 6px;
+      width: 100%;
+      flex: 0 0 auto;
     }
     .spb-chip {
       background: rgba(255,255,255,0.07);
-      border: 1px solid rgba(255,255,255,0.11);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 5px;
-      padding: 2px 5px;
+      padding: 2px 6px;
       font-size: 11px;
       font-weight: 800;
       font-variant-numeric: tabular-nums;
@@ -1187,34 +1204,15 @@
     }
     .spb-chip-lbl {
       font-size: 7px;
-      letter-spacing: 0.5px;
       font-weight: 700;
       color: rgba(255,255,255,0.35);
     }
-    /* "6 / 15" lines progress number */
-    .spb-lines-progress {
-      font-size: 13px;
-      font-weight: 900;
-      font-variant-numeric: tabular-nums;
-      color: rgba(255,255,255,0.95);
-      letter-spacing: 0.5px;
-      line-height: 1;
-    }
-    .spb-lines-label {
-      font-size: 7px;
-      letter-spacing: 1px;
-      color: rgba(255,255,255,0.35);
-    }
-
-    /* Progress bar — fills left→right as you approach next level */
     .spb-bar-wrap {
-      display: block;
-      width: 100%;
-      height: 3px;
+      flex: 1 1 auto;
+      height: 4px;
       background: rgba(255,255,255,0.08);
       border-radius: 2px;
       overflow: hidden;
-      margin-top: 2px;
     }
     #score-lvl-bar {
       height: 100%;
@@ -1223,42 +1221,21 @@
       border-radius: 2px;
       transition: width 0.25s ease;
     }
+    .spb-lines-progress {
+      font-size: 11px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255,255,255,0.70);
+      line-height: 1;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
 
-    /* Hide desktop-only info on mobile (spb-lines-row + era chip handle it) */
+    /* Hide desktop-only elements on mobile */
     #lines-display,
     #next-level-display,
     #era-display { display: none !important; }
-
-    /* Level + Lines — chips handle labels */
-    #level-display, #lines-display { font-size: 11px; }
-
-    /* ── Leaderboard rank target ── */
-    .spb-rank-target {
-      display: flex !important;
-      flex-direction: column;
-      align-items: center;
-      gap: 1px;
-      margin-top: 3px;
-      padding-top: 3px;
-      border-top: 1px solid rgba(255,255,255,0.08);
-      width: 100%;
-    }
-    #spb-rank-label {
-      font-size: 7px;
-      letter-spacing: 2px;
-      font-weight: 800;
-      color: rgba(255,200,80,0.70);
-      text-transform: uppercase;
-      line-height: 1;
-    }
-    #spb-rank-score {
-      font-size: 13px;
-      font-weight: 900;
-      font-variant-numeric: tabular-nums;
-      color: rgba(255,220,100,0.95);
-      text-shadow: 0 0 8px rgba(255,180,0,0.45);
-      line-height: 1;
-    }
+    #level-display { font-size: 11px; }
 
     /* ── MODE HUD: same size as HOLD/NEXT when in panel row ── */
     #mode-hud {
@@ -1763,21 +1740,21 @@
         <div class="mini-grid"><canvas id="hold-canvas" width="80" height="60"></canvas></div>
       </div>
       <div class="panel-box" id="score-panel-box">
-        <div class="spb-score-label">SCORE</div>
-        <div id="score-display">0</div>
-        <!-- Lines progress toward next level -->
-        <div class="spb-lines-row">
-          <span class="spb-chip spb-chip-lvl"><span class="spb-chip-lbl">L</span><span id="level-display">1</span></span>
-          <span id="spb-lines-progress" class="spb-lines-progress">0 / 15</span>
-          <span class="spb-chip-lbl spb-lines-label">LN</span>
+        <!-- Row 1: score (left) + rank target (right) -->
+        <div class="spb-row1">
+          <div id="score-display">0</div>
+          <div id="spb-rank-target" class="spb-rank-target">
+            <span id="spb-rank-label">—</span>
+            <span id="spb-rank-score">—</span>
+          </div>
         </div>
-        <div class="spb-bar-wrap"><div id="score-lvl-bar"></div></div>
-        <!-- Leaderboard rank target -->
-        <div id="spb-rank-target" class="spb-rank-target" style="display:none;">
-          <span id="spb-rank-label">—</span>
-          <span id="spb-rank-score">—</span>
+        <!-- Row 2: level chip + bar grows + line count -->
+        <div class="spb-row2">
+          <span class="spb-chip"><span class="spb-chip-lbl">L</span><span id="level-display">1</span></span>
+          <div class="spb-bar-wrap"><div id="score-lvl-bar"></div></div>
+          <span id="spb-lines-progress" class="spb-lines-progress">0/15</span>
         </div>
-        <!-- Visible on desktop; hidden on mobile where spb-lines-row covers it -->
+        <!-- Desktop-only; hidden on mobile -->
         <div id="lines-display">Lines: 0</div>
         <div id="next-level-display">15 to L2</div>
         <div id="era-display">The College Dropout</div>
