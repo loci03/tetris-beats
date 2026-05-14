@@ -1105,18 +1105,19 @@
       margin-bottom: 3px;
     }
 
-    /* ── HOLD: same fixed compact width as NEXT ── */
-    #hold-panel-box {
+    /* ── HOLD + NEXT: same fixed compact size ── */
+    #hold-panel-box,
+    #next-panel-box {
       flex: 0 0 auto;
-      width: 72px;
+      width: 68px;
       padding: 5px 6px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
     }
-    #hold-canvas { width: 56px; height: 40px; }
-    #next-canvas { width: 56px; height: 40px; }
+    #hold-canvas { width: 52px; height: 38px; }
+    #next-canvas { width: 52px; height: 38px; }
 
     /* ── SCORE BOX: grows to fill remaining space ── */
     #score-panel-box {
@@ -1198,35 +1199,45 @@
       transition: width 0.25s ease;
     }
 
-    /* "X to L9" hint — tiny, below bar */
-    #next-level-display {
-      font-size: 7px;
-      letter-spacing: 1px;
-      color: rgba(255,255,255,0.28);
-      text-transform: uppercase;
-      margin-top: 1px;
-    }
+    /* Hide desktop-only info on mobile */
+    #next-level-display,
+    #era-display { display: none; }
 
-    /* Era / track name — accent purple, italic */
-    #era-display {
-      font-size: 8px;
-      font-style: italic;
-      color: rgba(190,140,255,0.65);
-      margin-top: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 100%;
+    /* Level + Lines — chips handle labels */
+    #level-display, #lines-display { font-size: 11px; }
+
+    /* ── Leaderboard rank target ── */
+    .spb-rank-target {
+      display: flex !important;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      margin-top: 3px;
+      padding-top: 3px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      width: 100%;
+    }
+    #spb-rank-label {
+      font-size: 7px;
+      letter-spacing: 2px;
+      font-weight: 800;
+      color: rgba(255,200,80,0.70);
+      text-transform: uppercase;
       line-height: 1;
     }
-
-    /* Level + Lines — desktop labels hidden on mobile (chips handle it) */
-    #level-display, #lines-display { font-size: 11px; }
+    #spb-rank-score {
+      font-size: 13px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255,220,100,0.95);
+      text-shadow: 0 0 8px rgba(255,180,0,0.45);
+      line-height: 1;
+    }
 
     /* ── MODE HUD: same compact width as HOLD/NEXT when in panel row ── */
     #mode-hud {
       flex: 0 0 auto;
-      width: 72px;
+      width: 68px;
       padding: 5px 6px;
     }
     #mode-hud .mh-primary   { font-size: 18px; }
@@ -1731,6 +1742,12 @@
           <div class="spb-chip"><span id="lines-display">0</span><span class="spb-chip-lbl"> LN</span></div>
         </div>
         <div class="spb-bar-wrap"><div id="score-lvl-bar"></div></div>
+        <!-- Leaderboard rank target — hidden on desktop, shown on mobile -->
+        <div id="spb-rank-target" class="spb-rank-target" style="display:none;">
+          <span id="spb-rank-label">—</span>
+          <span id="spb-rank-score">—</span>
+        </div>
+        <!-- Keep these for desktop / JS compatibility -->
         <div id="next-level-display">15 to L2</div>
         <div id="era-display">The College Dropout</div>
       </div>
@@ -1748,7 +1765,7 @@
     </div>
     <canvas id="main-canvas"></canvas>
     <div class="side-panel">
-      <div class="panel-box">
+      <div class="panel-box" id="next-panel-box">
         <h3>Next</h3>
         <div class="mini-grid"><canvas id="next-canvas" width="100" height="320"></canvas></div>
       </div>
@@ -15202,6 +15219,39 @@ function updateUI() {
   if (_lvlBar) {
     const _pct = Math.min(100, ((lines % LINES_PER_LEVEL) / LINES_PER_LEVEL) * 100);
     _lvlBar.style.width = _pct + '%';
+  }
+
+  // Leaderboard rank target — show the next score to beat + its rank
+  if (_isMobileUI && gameStarted) {
+    const _rankLabel = document.getElementById('spb-rank-label');
+    const _rankScore = document.getElementById('spb-rank-score');
+    const _rankTarget = document.getElementById('spb-rank-target');
+    if (_rankLabel && _rankScore && _rankTarget) {
+      const _lb = loadLeaderboard(_currentLbMode);
+      const _cur = Math.floor(score);
+      // Find the lowest-ranked entry the player hasn't beaten yet
+      let _targetIdx = -1;
+      for (let _ri = _lb.length - 1; _ri >= 0; _ri--) {
+        if (_lb[_ri].score > _cur) { _targetIdx = _ri; break; }
+      }
+      if (_cur <= 0 && _lb.length === 0) {
+        _rankLabel.textContent = 'BEAT';
+        _rankScore.textContent = '—';
+      } else if (_targetIdx === -1) {
+        // Player is beating everyone or board is empty
+        _rankLabel.textContent = _lb.length === 0 ? 'FIRST!' : '🏆 #1';
+        _rankScore.textContent = _lb.length > 0 ? '#1 ' + _lb[0].score.toLocaleString() : 'NEW REC';
+        _rankScore.style.color = 'rgba(120,255,160,0.95)';
+        _rankScore.style.textShadow = '0 0 8px rgba(0,255,100,0.45)';
+      } else {
+        const _rank = _targetIdx + 1;
+        _rankLabel.textContent = `BEAT #${_rank}`;
+        _rankScore.textContent = _lb[_targetIdx].score.toLocaleString();
+        _rankScore.style.color = 'rgba(255,220,100,0.95)';
+        _rankScore.style.textShadow = '0 0 8px rgba(255,180,0,0.45)';
+      }
+      _rankTarget.style.display = '';
+    }
   }
   // "X to L<next>" - how many more line clears until the next level. Levels
   // advance every 10 lines, capped at the last theme so L19 just shows "MAX".
