@@ -184,6 +184,11 @@
     font-style: italic;
     margin-top: 4px;
   }
+  /* ── Score panel redesign ── */
+  .spb-score-label { display: none; } /* hidden on desktop, shown on mobile */
+  .spb-chips { display: none; }       /* same */
+  .spb-bar-wrap { display: none; }    /* same */
+
   #zone-bar-container {
     width: 100%;
     height: 6px;
@@ -1113,36 +1118,110 @@
     #hold-canvas { width: 56px; height: 40px; }
     #next-canvas { width: 56px; height: 40px; }
 
-    /* ── SCORE BOX: grows to fill remaining space, redesigned layout ── */
+    /* ── SCORE BOX: grows to fill remaining space ── */
     #score-panel-box {
       flex: 1 1 auto;
-      padding: 6px 8px;
+      padding: 5px 8px 6px;
       display: flex;
       flex-direction: column;
+      align-items: center;
       justify-content: center;
-      gap: 0;
+      gap: 2px;
+      background: linear-gradient(160deg, rgba(20,12,40,0.92), rgba(8,8,22,0.95));
+      border-color: rgba(180,120,255,0.22);
     }
+
+    /* Tiny "SCORE" eyebrow label */
+    .spb-score-label {
+      display: block;
+      font-size: 7px;
+      letter-spacing: 3px;
+      font-weight: 800;
+      color: rgba(255,255,255,0.28);
+      text-transform: uppercase;
+      line-height: 1;
+    }
+
+    /* Score number — dominant, tabular so digits don't jump */
     #score-display {
-      font-size: 22px;
-      line-height: 1.1;
+      font-size: 26px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.5px;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 14px rgba(160,80,255,0.55);
     }
-    /* Level + Lines on one compact row */
-    #level-display, #lines-display {
-      font-size: 10px;
-      display: inline;
+
+    /* Level + Lines chip row */
+    .spb-chips {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      margin-top: 1px;
     }
-    #lines-display::before { content: ' · '; opacity: 0.45; }
-    #next-level-display {
-      font-size: 8px;
-      letter-spacing: 1px;
-      margin-top: 2px;
+    .spb-chip {
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.11);
+      border-radius: 5px;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255,255,255,0.90);
+      display: flex;
+      align-items: baseline;
+      gap: 2px;
+      line-height: 1;
+    }
+    .spb-chip-lbl {
+      font-size: 7px;
+      letter-spacing: 0.5px;
+      font-weight: 700;
       color: rgba(255,255,255,0.35);
     }
+
+    /* Progress bar — fills left→right as you approach next level */
+    .spb-bar-wrap {
+      display: block;
+      width: 100%;
+      height: 3px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 2px;
+    }
+    #score-lvl-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #9900ff, #00ccff);
+      border-radius: 2px;
+      transition: width 0.25s ease;
+    }
+
+    /* "X to L9" hint — tiny, below bar */
+    #next-level-display {
+      font-size: 7px;
+      letter-spacing: 1px;
+      color: rgba(255,255,255,0.28);
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+
+    /* Era / track name — accent purple, italic */
     #era-display {
       font-size: 8px;
-      margin-top: 1px;
-      color: rgba(255,255,255,0.40);
+      font-style: italic;
+      color: rgba(190,140,255,0.65);
+      margin-top: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      line-height: 1;
     }
+
+    /* Level + Lines — desktop labels hidden on mobile (chips handle it) */
+    #level-display, #lines-display { font-size: 11px; }
 
     /* ── MODE HUD: same compact width as HOLD/NEXT when in panel row ── */
     #mode-hud {
@@ -1645,9 +1724,13 @@
         <div class="mini-grid"><canvas id="hold-canvas" width="100" height="80"></canvas></div>
       </div>
       <div class="panel-box" id="score-panel-box">
+        <div class="spb-score-label">SCORE</div>
         <div id="score-display">0</div>
-        <div id="level-display">Level 1</div>
-        <div id="lines-display">Lines: 0</div>
+        <div class="spb-chips">
+          <div class="spb-chip"><span class="spb-chip-lbl">LVL</span><span id="level-display">1</span></div>
+          <div class="spb-chip"><span id="lines-display">0</span><span class="spb-chip-lbl"> LN</span></div>
+        </div>
+        <div class="spb-bar-wrap"><div id="score-lvl-bar"></div></div>
         <div id="next-level-display">15 to L2</div>
         <div id="era-display">The College Dropout</div>
       </div>
@@ -15111,8 +15194,15 @@ function drawParticles() {
 function updateUI() {
   document.getElementById('score-display').textContent = Math.floor(score).toLocaleString();
   const _isMobileUI = window.innerWidth <= 720;
-  document.getElementById('level-display').textContent = _isMobileUI ? `L${level}` : `Level ${level}`;
+  // Mobile: bare numbers — chips (.spb-chip-lbl) supply the LVL/LN labels
+  document.getElementById('level-display').textContent = _isMobileUI ? `${level}` : `Level ${level}`;
   document.getElementById('lines-display').textContent = _isMobileUI ? `${lines}` : `Lines: ${lines}`;
+  // Progress bar — how far through the current level band (0–100%)
+  const _lvlBar = document.getElementById('score-lvl-bar');
+  if (_lvlBar) {
+    const _pct = Math.min(100, ((lines % LINES_PER_LEVEL) / LINES_PER_LEVEL) * 100);
+    _lvlBar.style.width = _pct + '%';
+  }
   // "X to L<next>" - how many more line clears until the next level. Levels
   // advance every 10 lines, capped at the last theme so L19 just shows "MAX".
   const nextLevelEl = document.getElementById('next-level-display');
