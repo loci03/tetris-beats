@@ -2325,22 +2325,34 @@ const LEVEL_THEMES = [
     chords: [[196, 246.94, 293.66], [220, 277.18, 329.63], [261.63, 329.63, 392]],
     synthType: 'gospel',
   },
-  { // Level 16 - Late Registration (final form)
-    name: 'Late Registration',
-    bpm: 92,
-    colors: { bg1: '#1a0000', bg2: '#0a0005', accent: '#ff3344', glow: '#ff0033' },
-    particleHue: 0,
-    particleStyle: 'notes',
-    blockGlow: 10,
-    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0],
+  { // Level 16 - Tacos (massive food fight at a taco restaurant)
+    name: 'Tacos',
+    bpm: 105,
+    track: 'extra-cheese-taco.mp3',
+    colors: { bg1: '#2a1000', bg2: '#180800', accent: '#ffb830', glow: '#ff6010' },
+    particleHue: 30,
+    particleStyle: 'food-fight',
+    blockStyle: 'taco',
+    blockGlow: 14,
+    // Every piece is a different taco filling color
+    piecePalette: {
+      I: '#ffb830',  // golden shell
+      O: '#ff4520',  // hot sauce red
+      T: '#5db832',  // guacamole green
+      S: '#ffe066',  // cheese yellow
+      Z: '#c0392b',  // salsa crimson
+      J: '#e67e22',  // chorizo orange
+      L: '#f1c40f',  // queso gold
+    },
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
-    hh:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
-    hhOpen:[0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0],
-    bass:  [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+    hh:    [1,0,1,1, 1,0,1,1, 1,0,1,1, 1,0,1,1],
+    hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+    bass:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     bassNote: 65.41,
-    scale: [220, 261.63, 293.66, 349.23, 392, 440],
-    chords: [[220, 261.63, 329.63], [196, 246.94, 293.66], [174.61, 220, 261.63]],
-    synthType: 'strings',
+    scale: [220, 246.94, 277.18, 329.63, 369.99, 415.30, 440],
+    chords: [[220, 277.18, 329.63], [196, 246.94, 311.13], [174.61, 220, 293.66]],
+    synthType: 'soulChop',
   },
   { // Level 17 - Cruel Summer (G.O.O.D. Music compilation, sun-drenched and lush)
     name: 'Cruel Summer',
@@ -3380,7 +3392,7 @@ function clearLines() {
       // styled level - matrix + tires count as visually-rich for these FX
       // too, so a Tetris on Back for More / Ferrari Window gets the same
       // shockwave/flash treatment). Volume scales with line count + combo.
-      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star')) {
+      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star' || theme.blockStyle === 'taco')) {
         const pieces = [0, 12, 22, 36, 60][cleared] || 60;
         const totalPieces = pieces + Math.max(0, combo) * 8;
         spawnConfetti(totalPieces, theme);
@@ -5540,7 +5552,7 @@ function drawGhostBlock(context, x, y, color, size) {
   // dashed ghost reads as a different piece type than what's about to
   // lock. For Mac & Cheese the accent is yellow, which means the ghost
   // automatically renders as the yellow guide outline Sir asked for.
-  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star');
+  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star' || theme.blockStyle === 'taco');
   const outlineColor = useThemeColor ? theme.colors.accent : color;
   context.save();
   const [r, g, b] = hexToRgb(outlineColor);
@@ -5569,7 +5581,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   // active piece, ghost). Only skips time-dependent styles (matrix, star).
   if (_bs === 'beefpatty' || _bs === 'trumpet' || _bs === 'brain' ||
       _bs === 'mug' || _bs === 'tetrisEffect' || _bs === 'tires' || _bs === 'macncheese' ||
-      _bs === 'bullet' || _bs === 'leaf') {
+      _bs === 'bullet' || _bs === 'leaf' || _bs === 'taco') {
     const key = `${_bs}-${color}-${size}`;
     let mini = _blockMiniCache.get(key);
     if (!mini) {
@@ -5585,6 +5597,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
       else if (_bs === 'mug')          drawBlockMug(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'bullet')       drawBlockBullet(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'leaf')         drawBlockLeaf(mc, 0, 0, color, size, 1, theme);
+      else if (_bs === 'taco')         drawBlockTaco(mc, 0, 0, color, size, 1, theme);
       _blockMiniCache.set(key, mini);
     }
     if (alpha !== 1) context.globalAlpha = alpha;
@@ -5630,6 +5643,10 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   }
   if (theme && theme.blockStyle === 'leaf') {
     drawBlockLeaf(context, x, y, color, size, alpha, theme);
+    return;
+  }
+  if (theme && theme.blockStyle === 'taco') {
+    drawBlockTaco(context, x, y, color, size, alpha, theme);
     return;
   }
   if (theme && theme.blockStyle === 'star') {
@@ -11178,6 +11195,115 @@ function drawBlockStar(context, x, y, color, size, alpha, theme) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TACO BLOCK (Level 16 - Tacos)
+// Each cell is a folded taco shell: a golden U-shaped hard shell arc with
+// colourful filling (the piece's piecePalette colour) visible inside.
+// A sesame-texture shadow lines the inside of the shell, and a thin cheese
+// drip hangs from the bottom opening for extra crunch.
+// ─────────────────────────────────────────────────────────────────────────────
+function drawBlockTaco(context, x, y, color, size, alpha, theme) {
+  const cx  = x + size / 2;
+  const cy  = y + size / 2 + size * 0.04;
+  const r   = size * 0.40;
+  context.globalAlpha = alpha;
+  context.save();
+
+  // — Shell body (golden arc, open at the bottom) —
+  const shellColor = '#d4941a';
+  const shellHighlight = '#ffe07a';
+  const shellShadow = '#8b5e0a';
+
+  // Outer shell arc — thick stroke acts as the crunchy shell wall
+  context.beginPath();
+  context.arc(cx, cy, r, Math.PI, 0, false); // top semicircle
+  context.strokeStyle = shellColor;
+  context.lineWidth = size * 0.13;
+  context.lineCap = 'round';
+  context.stroke();
+
+  // Highlight on top edge of shell
+  context.beginPath();
+  context.arc(cx, cy, r - size * 0.01, Math.PI + 0.12, -0.12, false);
+  context.strokeStyle = shellHighlight;
+  context.lineWidth = size * 0.04;
+  context.stroke();
+
+  // Inner shadow line (adds depth / bowl feel)
+  context.beginPath();
+  context.arc(cx, cy, r - size * 0.12, Math.PI + 0.18, -0.18, false);
+  context.strokeStyle = shellShadow;
+  context.lineWidth = size * 0.03;
+  context.stroke();
+
+  // — Filling (clipped to the open bowl area) —
+  context.save();
+  context.beginPath();
+  // Clip region: semicircle bowl interior
+  context.arc(cx, cy, r - size * 0.07, Math.PI, 0, false);
+  context.lineTo(cx + r - size * 0.07, cy);
+  context.lineTo(cx - r + size * 0.07, cy);
+  context.closePath();
+  context.clip();
+
+  // Base filling colour (piece colour = the ingredient)
+  const fillGrad = context.createLinearGradient(cx - r, cy - r * 0.5, cx + r, cy);
+  fillGrad.addColorStop(0,   color);
+  fillGrad.addColorStop(0.5, shadeColor(color, 20));
+  fillGrad.addColorStop(1,   shadeColor(color, -20));
+  context.fillStyle = fillGrad;
+  context.fillRect(cx - r, cy - r, r * 2, r);
+
+  // Lettuce shreds (bright green strips near the top of the filling)
+  context.fillStyle = 'rgba(60,180,40,0.75)';
+  for (let i = 0; i < 4; i++) {
+    const lx = cx - r * 0.55 + i * r * 0.33;
+    const ly = cy - r * 0.62 + Math.sin(i * 2.1) * r * 0.10;
+    context.beginPath();
+    context.ellipse(lx, ly, r * 0.12, r * 0.06, -0.3 + i * 0.18, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  // Cheese blob layer (slightly translucent yellow)
+  context.fillStyle = 'rgba(255,215,0,0.55)';
+  context.beginPath();
+  context.ellipse(cx, cy - r * 0.28, r * 0.42, r * 0.16, 0, 0, Math.PI * 2);
+  context.fill();
+
+  context.restore(); // release clip
+
+  // — Cheese drip from the bottom opening —
+  const dripY = cy + r * 0.03;
+  context.beginPath();
+  context.moveTo(cx - r * 0.18, dripY);
+  context.bezierCurveTo(
+    cx - r * 0.12, dripY + size * 0.14,
+    cx + r * 0.12, dripY + size * 0.14,
+    cx + r * 0.18, dripY
+  );
+  context.fillStyle = 'rgba(255,215,0,0.80)';
+  context.fill();
+
+  // — Shell edge lines (texture for crunch) —
+  const edgeAngle = [Math.PI * 1.15, Math.PI * 1.35, Math.PI * 1.55, Math.PI * 1.75, Math.PI * 1.92];
+  context.strokeStyle = shellShadow;
+  context.lineWidth = size * 0.015;
+  context.lineCap = 'butt';
+  for (const a of edgeAngle) {
+    const ex1 = cx + Math.cos(a) * (r - size * 0.13);
+    const ey1 = cy + Math.sin(a) * (r - size * 0.13);
+    const ex2 = cx + Math.cos(a) * (r - size * 0.05);
+    const ey2 = cy + Math.sin(a) * (r - size * 0.05);
+    context.beginPath();
+    context.moveTo(ex1, ey1);
+    context.lineTo(ex2, ey2);
+    context.stroke();
+  }
+
+  context.restore();
+  context.globalAlpha = 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // HAZE SCENE (Level 13 - Higher)
 // Full psychedelic trip: deep color-shifting atmosphere, heavy rolling smoke
 // clouds, blunts on both sides with cherry glow, spinning weed leaves drifting
@@ -13698,6 +13824,753 @@ function drawCathedralScene(theme, now, playRects) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CAFETERIA FOOD FIGHT SCENE  (Level 16 — Tacos)
+//
+// School cafeteria interior drawn in three passes:
+//   1. Static pre-rendered offscreen canvas (_buildCafeteriaBg):
+//      perspective floor tiles, cinder-block walls, receding tables+chairs,
+//      food-service counter with sneeze guard, fluorescent ceiling grids,
+//      bulletin boards, clock, exit sign.
+//   2. Dynamic layer — drawn every frame:
+//      Fluorescent flicker + alarm beacon, BPM-locked light-shaft pulse,
+//      seated student silhouettes (wind-up → release → settle),
+//      lunch lady behind the counter reacting to mayhem.
+//   3. Particle systems:
+//      - thrown food items with arc physics (pizza, milk carton, sandwich,
+//        apple, banana, tray, mashed-potato glob, pudding cup, hot-sauce bottle)
+//      - wall/floor splats that accumulate and grow drip trails
+//      - milk spray burst circles
+//      - flying tray shockwave on hard drop
+//      - lunch-tray slide streak on floor
+//      - alarm ring flash on big line clears
+//
+// Reactivity:
+//   movePulse      → random student winds up + one food item launched
+//   cheerPulse     → full-row VOLLEY from every student + alarm flash +
+//                    milk spray at board edge + red danger-wash
+//   boardDropPulse → giant cafeteria tray slides across the floor, sends a
+//                    shockwave + causes nearby items to scatter
+//
+// Play-area masking: destination-out cutout (same pattern as cathedral).
+// ─────────────────────────────────────────────────────────────────────────────
+let _foodFightScene = null;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TACO RESTAURANT FOOD FIGHT  (Level 16 — Tacos)
+//
+// Fully live-drawn every frame (like Galaxy) — no flat pre-rendered canvas.
+// Rich Mexican restaurant interior with:
+//   • Vivid warm-terracotta architecture drawn fresh each frame
+//   • Talavera tile mosaic accents (animated color pulse)
+//   • Multiple glowing neon signs (TACOS, HOT, OPEN) with tube glow
+//   • String-light garland casting colored pools on the ceiling + floor
+//   • Kitchen pass-through window with animated fire/steam
+//   • Papel picado flags waving on the beat
+//   • Rising steam + floating chili/taco emoji particles
+//   • Color-shifting ambient light that tracks audio energy
+//
+// Particle systems:
+//   • Thrown food (taco, burrito, chip, hotsauce, guac, rice)
+//   • Wall splats with drip trails
+//   • Shockwave rings on line clears (same as Galaxy)
+//   • Burst of flying chips + hot-flash on hard drop
+//   • Colored confetti (taco palette) on Tetris
+//
+// All characters repositioned below the board on mobile (w < 600).
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _initFoodFightScene(w, h) {
+  const rng = (a, b) => a + Math.random() * (b - a);
+  const ri  = (a, b) => Math.floor(rng(a, b + 1));
+
+  // Steam particles rising from kitchen
+  const steam = [];
+  for (let i = 0; i < 18; i++) {
+    steam.push({ x: rng(w*0.38, w*0.62), y: rng(h*0.22, h*0.32), vy: rng(-0.4,-0.9), vx: rng(-0.2,0.2), r: rng(6,20), alpha: rng(0.08,0.22), life: Math.random() });
+  }
+
+  // Floating emoji particles (chili + taco) that drift upward
+  const emojis = [];
+  for (let i = 0; i < 10; i++) {
+    emojis.push({ x: rng(0,w), y: rng(0,h), vy: rng(-0.3,-0.7), vx: rng(-0.2,0.2), alpha: rng(0.15,0.40), size: rng(14,28), glyph: Math.random()<0.5?'🌮':'🌶️', phase: rng(0,Math.PI*2) });
+  }
+
+  // Customers
+  const shirts = ['#cc2200','#e07020','#d0a020','#204080','#206030','#802060'];
+  const skins  = ['#2a1408','#3d1e0c','#6b3010','#8b4820','#c07840'];
+  const customers = [];
+  for (let side = 0; side < 2; side++) {
+    for (let i = 0; i < 3; i++) {
+      customers.push({
+        side: side===0?'left':'right',
+        xFrac: side===0 ? rng(0.04,0.20) : rng(0.80,0.96),
+        yFrac: 0.58 + i*0.06,
+        scale: 1.05 - i*0.09,
+        headShape: ri(0,3),
+        skin: skins[ri(0,skins.length-1)],
+        shirt: shirts[ri(0,shirts.length-1)],
+        armPhase: rng(0,Math.PI*2),
+        state: 'idle', stateTimer: ri(60,200),
+        windupAngle:0, releaseAngle:0, settleTimer:0,
+      });
+    }
+  }
+
+  // Pre-scattered splats
+  const splatColors = ['#cc2200','#e0a000','#40a010','#e06010','#f0e0b0','#a04010'];
+  const splats = [];
+  for (let i=0;i<24;i++) splats.push({ x:rng(0,w), y:rng(0,h*0.82), r:rng(7,24), color:splatColors[ri(0,splatColors.length-1)], alpha:rng(0.28,0.65), drip:Math.random()>0.5?rng(6,36):0, dripW:rng(2,5) });
+
+  // Papel picado flags state
+  const flagCount = Math.max(5, Math.floor(w / 60));
+  const flags = [];
+  for (let fi=0;fi<flagCount;fi++) flags.push({ phase: Math.random()*Math.PI*2, speed: rng(0.6,1.4) });
+
+  _foodFightScene = {
+    w, h,
+    customers, splats, steam, emojis, flags,
+    thrownItems: [],
+    shocks: [],           // expanding shockwave rings (line-clear)
+    chipBurst: [],        // chip confetti on hard-drop
+    hotFlash: 0,          // full-screen hot-sauce flash on cheerPulse
+    dropFlash: 0,         // white flash on hard drop
+    cookMouth: 0,         // cook open-mouth reaction
+    lastCheer: 0, lastDrop: 0, lastMove: 0,
+    spiralAngle: 0,
+  };
+}
+
+// ── Architecture helpers ──────────────────────────────────────────────────
+function _drawTacoArch(ctx, w, h, now, energy, cheer, beatT) {
+  // ── Ceiling ──
+  const cg = ctx.createLinearGradient(0,0,0,h*0.28);
+  cg.addColorStop(0,'#120a04'); cg.addColorStop(1,'#1e1008');
+  ctx.fillStyle=cg; ctx.fillRect(0,0,w,h*0.28);
+
+  // ── Walls — vivid terracotta ──
+  const wg = ctx.createLinearGradient(0,h*0.14,0,h*0.78);
+  wg.addColorStop(0,'#7a3010'); wg.addColorStop(0.5,'#5c2008'); wg.addColorStop(1,'#3c1208');
+  ctx.fillStyle=wg; ctx.fillRect(0,h*0.14,w,h*0.64);
+
+  // Warm center light wash on walls (audio reactive)
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  const wlg=ctx.createRadialGradient(w*0.5,h*0.45,0,w*0.5,h*0.45,w*0.55);
+  wlg.addColorStop(0,`rgba(255,140,30,${0.08+energy*0.10})`);
+  wlg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=wlg; ctx.fillRect(0,0,w,h);
+  ctx.restore();
+
+  // ── Talavera tile accent border (top of walls) ──
+  const tileY=h*0.14, tileH=h*0.055;
+  const tileColors=['#1e6acc','#cc1e28','#d4a010','#1ea030','#a028a0'];
+  const tileCount=Math.ceil(w/tileH);
+  for (let ti=0;ti<tileCount;ti++){
+    const tc=tileColors[ti%tileColors.length];
+    ctx.fillStyle=tc;
+    ctx.fillRect(ti*(tileH+1),tileY,tileH,tileH);
+    // Inner diamond
+    ctx.fillStyle='rgba(255,255,255,0.22)';
+    ctx.save(); ctx.translate(ti*(tileH+1)+tileH/2,tileY+tileH/2); ctx.rotate(Math.PI/4);
+    ctx.fillRect(-tileH*0.22,-tileH*0.22,tileH*0.44,tileH*0.44); ctx.restore();
+  }
+  // Bottom tile accent strip (wainscoting)
+  const dadoY=h*0.60, dadoH=h*0.06;
+  for (let ti=0;ti<tileCount;ti++){
+    ctx.fillStyle=tileColors[(ti+2)%tileColors.length];
+    ctx.fillRect(ti*(dadoH+1),dadoY,dadoH,dadoH);
+    ctx.fillStyle='rgba(255,255,255,0.18)';
+    ctx.save(); ctx.translate(ti*(dadoH+1)+dadoH/2,dadoY+dadoH/2); ctx.rotate(Math.PI/4);
+    ctx.fillRect(-dadoH*0.22,-dadoH*0.22,dadoH*0.44,dadoH*0.44); ctx.restore();
+  }
+
+  // ── Saltillo tile floor ──
+  const floorY=h*0.66;
+  const fg=ctx.createLinearGradient(0,floorY,0,h);
+  fg.addColorStop(0,'#8c4418'); fg.addColorStop(0.5,'#642e10'); fg.addColorStop(1,'#3a1808');
+  ctx.fillStyle=fg; ctx.fillRect(0,floorY,w,h-floorY);
+  // Perspective grid
+  const vpX=w*0.5, vpY=h*0.52;
+  ctx.strokeStyle='rgba(0,0,0,0.30)'; ctx.lineWidth=1;
+  for (let i=0;i<=14;i++){const tx=w*(i/14);ctx.beginPath();ctx.moveTo(vpX+(tx-vpX)*0.06,vpY);ctx.lineTo(tx,h);ctx.stroke();}
+  for (let j=0;j<=9;j++){const ry=floorY+(h-floorY)*Math.pow(j/9,1.6);ctx.beginPath();ctx.moveTo(0,ry);ctx.lineTo(w,ry);ctx.stroke();}
+  // Tile highlights (checker)
+  ctx.fillStyle='rgba(255,120,40,0.08)';
+  const tw=w/14,th=(h-floorY)/9;
+  for(let r=0;r<9;r++)for(let c=0;c<14;c++)if((r+c)%2===0)ctx.fillRect(c*tw,floorY+r*th,tw,th);
+
+  // Floor light pools from string lights (colored) — 'lighter' composite
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  const bulbCols=['#ff6600','#ff2200','#ffcc00','#00aa33','#ff2288'];
+  for(let li=0;li<5;li++){
+    const lx=w*(li+0.5)/5;
+    const bc=bulbCols[li%bulbCols.length];
+    const [br,bg2,bb]=hexToRgb(bc);
+    const flicker=0.85+Math.sin(now*0.038+li*1.7)*0.10+Math.sin(now*0.019+li)*0.05;
+    const pg=ctx.createRadialGradient(lx,floorY,0,lx,floorY,w*0.22);
+    pg.addColorStop(0,`rgba(${br},${bg2},${bb},${0.18*flicker})`);
+    pg.addColorStop(0.5,`rgba(${br},${bg2},${bb},${0.07*flicker})`);
+    pg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=pg; ctx.fillRect(0,floorY-h*0.05,w,h-floorY+h*0.05);
+  }
+  ctx.restore();
+
+  // ── Booths left + right ──
+  const boothDefs=[[0,h*0.52,w*0.18,h*0.18],[w*0.82,h*0.52,w*0.18,h*0.18]];
+  for(const[bx,by,bw,bh2]of boothDefs){
+    const bg3=ctx.createLinearGradient(bx,by,bx,by+bh2);
+    bg3.addColorStop(0,'#8a1a08'); bg3.addColorStop(1,'#4a0c04');
+    ctx.fillStyle=bg3; ctx.fillRect(bx,by,bw,bh2);
+    ctx.fillStyle='rgba(220,80,40,0.25)'; ctx.fillRect(bx,by,bw,2);
+    ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+    ctx.strokeRect(bx+4,by+4,bw-8,bh2-8); ctx.setLineDash([]);
+    // Table
+    const tg2=ctx.createLinearGradient(bx,by+bh2,bx,by+bh2+h*0.06);
+    tg2.addColorStop(0,'#6a3818'); tg2.addColorStop(1,'#3a1e0c');
+    ctx.fillStyle=tg2; ctx.fillRect(bx+bw*0.05,by+bh2,bw*0.90,h*0.055);
+    ctx.fillStyle='rgba(200,120,50,0.30)'; ctx.fillRect(bx+bw*0.05,by+bh2,bw*0.90,2);
+  }
+
+  // ── Kitchen window ──
+  const kitW=w*0.32, kitH=h*0.155;
+  const kitX=(w-kitW)/2, kitY2=h*0.25;
+  ctx.fillStyle='#5a2808'; ctx.fillRect(kitX-7,kitY2-7,kitW+14,kitH+14);
+  const kig=ctx.createLinearGradient(kitX,kitY2,kitX,kitY2+kitH);
+  kig.addColorStop(0,'#2a1408'); kig.addColorStop(1,'#1a0c04');
+  ctx.fillStyle=kig; ctx.fillRect(kitX,kitY2,kitW,kitH);
+  // Kitchen glow — orange fire light, animated
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  const fireFlicker=0.7+Math.sin(now*0.041)*0.20+Math.sin(now*0.028)*0.10+energy*0.15;
+  const klg=ctx.createRadialGradient(w*0.5,kitY2+kitH*0.55,0,w*0.5,kitY2+kitH*0.55,kitW*0.65);
+  klg.addColorStop(0,`rgba(255,160,30,${0.55*fireFlicker})`);
+  klg.addColorStop(0.4,`rgba(255,80,10,${0.28*fireFlicker})`);
+  klg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=klg; ctx.fillRect(kitX,kitY2,kitW,kitH);
+  ctx.restore();
+  // Counter shelf
+  ctx.fillStyle='#6a3010'; ctx.fillRect(kitX-8,kitY2+kitH,kitW+16,h*0.022);
+
+  // ── Menu board above kitchen ──
+  const mbW=w*0.36,mbH=h*0.13,mbX=(w-mbW)/2,mbY=h*0.08;
+  ctx.fillStyle='#0e0804'; ctx.fillRect(mbX,mbY,mbW,mbH);
+  ctx.strokeStyle=`rgba(255,${140+Math.floor(energy*60)},20,0.65)`; ctx.lineWidth=2; ctx.strokeRect(mbX,mbY,mbW,mbH);
+  ctx.fillStyle='rgba(255,200,60,0.88)';
+  const mfsz=Math.max(9,Math.floor(h*0.020));
+  ctx.font=`bold ${mfsz}px monospace`; ctx.textAlign='left';
+  ['🌮 TACO  $3','🌯 BURRITO  $5','🥑 GUAC  +$1','🔥 COMBO  $8'].forEach((mi,i)=>{
+    ctx.fillText(mi,mbX+mbW*0.06,mbY+mbH*(0.22+i*0.22));
+  });
+}
+
+// ── Neon signs ─────────────────────────────────────────────────────────────
+function _drawNeonSigns(ctx, w, h, now, energy, cheer, beatT) {
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
+
+  // Main TACOS neon (left side) — big, multi-layer glow
+  const nfsz=Math.max(22,Math.floor(h*0.068));
+  ctx.font=`bold ${nfsz}px monospace`;
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  const np=0.82+Math.sin(now/350)*0.18+cheer*0.25+energy*0.12;
+  const nx=w*0.12, ny=h*0.17;
+  // Outer glow layer
+  ctx.shadowColor=`rgba(255,60,0,${np*0.90})`; ctx.shadowBlur=40+np*20;
+  ctx.fillStyle=`rgba(255,80,0,${np*0.30})`; ctx.fillText('TACOS',nx,ny);
+  // Mid glow
+  ctx.shadowBlur=18; ctx.fillStyle=`rgba(255,160,40,${np*0.70})`; ctx.fillText('TACOS',nx,ny);
+  // Bright core
+  ctx.shadowBlur=6; ctx.fillStyle=`rgba(255,230,120,${np*0.95})`; ctx.fillText('TACOS',nx,ny);
+
+  // HOT neon (right side, red)
+  const hfsz=Math.max(16,Math.floor(h*0.046));
+  ctx.font=`bold ${hfsz}px monospace`;
+  const hp=0.75+Math.sin(now/280+1.3)*0.25+cheer*0.20;
+  const hx=w*0.88, hy=h*0.16;
+  ctx.shadowColor=`rgba(255,20,20,${hp*0.90})`; ctx.shadowBlur=30+hp*15;
+  ctx.fillStyle=`rgba(255,0,0,${hp*0.30})`; ctx.fillText('🌶️HOT',hx,hy);
+  ctx.shadowBlur=10; ctx.fillStyle=`rgba(255,100,80,${hp*0.85})`; ctx.fillText('🌶️HOT',hx,hy);
+
+  // OPEN neon (small, green, right wall near top)
+  const opfsz=Math.max(10,Math.floor(h*0.028));
+  ctx.font=`bold ${opfsz}px monospace`;
+  const op=0.60+Math.sin(now/700)*0.40; // slow blink
+  const ox=w*0.92, oy=h*0.24;
+  ctx.shadowColor=`rgba(0,255,100,${op*0.80})`; ctx.shadowBlur=18;
+  ctx.fillStyle=`rgba(80,255,140,${op*0.85})`; ctx.fillText('OPEN',ox,oy);
+
+  ctx.restore();
+
+  // ── Neon ceiling glow pools (from signs onto ceiling/floor) ──
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  // TACOS sign glow pool on ceiling
+  const cg2=ctx.createRadialGradient(nx,0,0,nx,0,h*0.28);
+  cg2.addColorStop(0,`rgba(255,80,0,${np*0.22})`);
+  cg2.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=cg2; ctx.fillRect(0,0,w*0.35,h*0.30);
+  // HOT sign glow pool
+  const hg2=ctx.createRadialGradient(hx,0,0,hx,0,h*0.22);
+  hg2.addColorStop(0,`rgba(255,0,0,${hp*0.18})`);
+  hg2.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=hg2; ctx.fillRect(w*0.65,0,w*0.35,h*0.25);
+  ctx.restore();
+}
+
+// ── String lights ──────────────────────────────────────────────────────────
+function _drawStringLights(ctx, w, h, now, energy, beatT) {
+  const anchorY=h*0.055;
+  const anchors=[0,w*0.25,w*0.50,w*0.75,w];
+  const bulbCols=['#ff6600','#ff2200','#ffcc00','#00aa33','#ff2288'];
+
+  // Draw wire catenary curves
+  ctx.strokeStyle='rgba(30,15,5,0.65)'; ctx.lineWidth=1;
+  for(let ai=0;ai<anchors.length-1;ai++){
+    const ax0=anchors[ai],ax1=anchors[ai+1],mid=(ax0+ax1)/2;
+    ctx.beginPath(); ctx.moveTo(ax0,anchorY);
+    ctx.quadraticCurveTo(mid,anchorY+h*0.048,ax1,anchorY); ctx.stroke();
+  }
+
+  // Bulbs + live colored glow pools on the ceiling
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  for(let ai=0;ai<anchors.length-1;ai++){
+    const ax0=anchors[ai],ax1=anchors[ai+1];
+    const bc=bulbCols[ai%bulbCols.length];
+    const [br,bg2,bb]=hexToRgb(bc);
+    const bCount=Math.max(3,Math.floor((ax1-ax0)/(w*0.07)));
+    for(let bi=0;bi<=bCount;bi++){
+      const t=bi/bCount, bx=ax0+(ax1-ax0)*t;
+      const sag=Math.sin(t*Math.PI);
+      const by=anchorY+sag*h*0.048;
+      const flicker=0.80+Math.sin(now*0.035+ai*1.9+bi*0.7)*0.12+Math.sin(now*0.018+bi)*0.08;
+      // Glow halo around bulb
+      const hg=ctx.createRadialGradient(bx,by,0,bx,by,w*0.09);
+      hg.addColorStop(0,`rgba(${br},${bg2},${bb},${0.35*flicker})`);
+      hg.addColorStop(0.4,`rgba(${br},${bg2},${bb},${0.12*flicker})`);
+      hg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=hg; ctx.fillRect(bx-w*0.09,by-h*0.08,w*0.18,h*0.12);
+    }
+  }
+  ctx.restore();
+
+  // Bulb physical shapes (drawn on top, not 'lighter')
+  for(let ai=0;ai<anchors.length-1;ai++){
+    const ax0=anchors[ai],ax1=anchors[ai+1];
+    const bc=bulbCols[ai%bulbCols.length];
+    const bCount=Math.max(3,Math.floor((ax1-ax0)/(w*0.07)));
+    for(let bi=0;bi<=bCount;bi++){
+      const t=bi/bCount, bx=ax0+(ax1-ax0)*t;
+      const by=anchorY+Math.sin(t*Math.PI)*h*0.048;
+      const flicker=0.80+Math.sin(now*0.035+ai*1.9+bi*0.7)*0.12;
+      ctx.fillStyle='rgba(20,10,4,0.80)'; ctx.fillRect(bx-1.5,by-3,3,3);
+      ctx.fillStyle=bc;
+      ctx.globalAlpha=0.70+0.30*flicker;
+      ctx.beginPath(); ctx.ellipse(bx,by+5,4,5.5,0,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+    }
+  }
+}
+
+// ── Papel picado flags ─────────────────────────────────────────────────────
+function _drawPapelPicado(ctx, w, h, now, beatT, flags) {
+  const ppY=h*0.140;
+  const flagW=Math.max(20,w/flags.length), flagH=Math.max(16,h*0.042);
+  const colors=['#e82020','#f0c010','#2070e0','#20b030','#e020a0','#ff8010'];
+  ctx.strokeStyle='rgba(30,12,4,0.50)'; ctx.lineWidth=0.8;
+  ctx.beginPath(); ctx.moveTo(0,ppY); ctx.lineTo(w,ppY); ctx.stroke();
+  for(let fi=0;fi<flags.length;fi++){
+    const fg=flags[fi];
+    fg.phase += fg.speed * 0.012;
+    const fx=(fi+0.5)*(w/flags.length);
+    const wave=Math.sin(fg.phase+beatT*0.8)*flagH*0.18;
+    const wave2=Math.sin(fg.phase*1.3)*flagH*0.10;
+    const fc=colors[fi%colors.length];
+    ctx.fillStyle=fc;
+    ctx.beginPath();
+    ctx.moveTo(fx-flagW*0.46,ppY);
+    ctx.quadraticCurveTo(fx,ppY+flagH*0.5+wave,fx+flagW*0.46,ppY+wave2);
+    ctx.lineTo(fx+flagW*0.46,ppY);
+    ctx.closePath(); ctx.fill();
+    // Cutout diamond
+    ctx.fillStyle='rgba(0,0,0,0.22)';
+    ctx.beginPath(); ctx.arc(fx+wave*0.15,ppY+flagH*0.42+wave*0.5,flagW*0.09,0,Math.PI*2); ctx.fill();
+  }
+}
+
+// ── Steam from kitchen ─────────────────────────────────────────────────────
+function _drawSteam(ctx, w, h, now, energy, steam) {
+  const kitW=w*0.32, kitX=(w-kitW)/2, kitY2=h*0.25;
+  for(const s of steam){
+    s.y+=s.vy*(1+energy*0.5); s.x+=s.vx+Math.sin(now*0.002+s.life*5)*0.15;
+    s.life+=0.008; s.alpha*=0.994;
+    if(s.y<kitY2-h*0.18||s.alpha<0.015){
+      s.y=kitY2; s.x=kitX+Math.random()*kitW;
+      s.vy=-(0.4+Math.random()*0.6); s.vx=(Math.random()-0.5)*0.2;
+      s.r=6+Math.random()*16; s.alpha=0.12+Math.random()*0.14; s.life=0;
+    }
+    ctx.save(); ctx.globalAlpha=s.alpha*(1-s.life);
+    ctx.fillStyle=`rgba(200,180,150,1)`;
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r*(1+s.life*0.5),0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ── Cook in window ──────────────────────────────────────────────────────────
+function _drawCook(ctx, w, h, now, energy, cheer, cookMouth) {
+  const kitW=w*0.32,kitH=h*0.155,kitX=(w-kitW)/2,kitY2=h*0.25;
+  const cx=w*0.5, cy=kitY2+kitH*0.62;
+  const s=Math.min(kitW,kitH)*0.42;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(kitX,kitY2,kitW,kitH); ctx.clip();
+  ctx.translate(cx,cy);
+  // Hat
+  ctx.fillStyle='rgba(210,205,195,0.92)';
+  ctx.shadowColor='rgba(0,0,0,0.35)'; ctx.shadowBlur=4;
+  ctx.beginPath(); ctx.ellipse(0,-s*0.78,s*0.28,s*0.10,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0,-s*1.08,s*0.20,s*0.30,0,0,Math.PI*2); ctx.fill();
+  // Head
+  ctx.fillStyle='#8a5028';
+  ctx.beginPath(); ctx.arc(0,-s*0.58,s*0.24,0,Math.PI*2); ctx.fill();
+  // Angry expression
+  const mo=Math.min(1,cheer*2.5+energy*0.8+cookMouth);
+  ctx.fillStyle='rgba(15,6,2,0.90)';
+  ctx.beginPath(); ctx.ellipse(0,-s*0.53,s*0.08+mo*s*0.06,s*0.04+mo*s*0.07,0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(15,6,2,0.88)'; ctx.lineWidth=s*0.04; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-s*0.14,-s*0.69); ctx.lineTo(-s*0.06,-s*0.66-energy*s*0.04); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(s*0.06,-s*0.66-energy*s*0.04); ctx.lineTo(s*0.14,-s*0.69); ctx.stroke();
+  // Apron
+  ctx.fillStyle='rgba(205,200,188,0.88)';
+  ctx.beginPath(); ctx.roundRect(-s*0.28,-s*0.42,s*0.56,s*0.50,s*0.05); ctx.fill();
+  // Ladle arm
+  const wave=Math.min(1.2,cheer*2)*0.7;
+  ctx.fillStyle='rgba(205,200,188,0.88)';
+  ctx.save(); ctx.translate(-s*0.30,-s*0.30); ctx.rotate(-0.22-wave*0.85);
+  ctx.beginPath(); ctx.roundRect(-s*0.07,0,s*0.12,s*0.36,s*0.05); ctx.fill();
+  ctx.strokeStyle='rgba(150,120,50,0.90)'; ctx.lineWidth=s*0.06; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(0,s*0.36); ctx.lineTo(0,s*0.58); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,s*0.66,s*0.12,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+}
+
+// ── Customer silhouette ────────────────────────────────────────────────────
+function _drawCafStudent(ctx, cust, w, h, beatT, energy) {
+  const px=cust.xFrac*w, py=cust.yFrac*h;
+  const s=cust.scale*h*0.10;
+  ctx.save(); ctx.translate(px,py);
+  if(cust.side==='right') ctx.scale(-1,1);
+  const bob=Math.sin(beatT*Math.PI*2+cust.armPhase)*(1.2+energy*2.0);
+  ctx.shadowColor='rgba(0,0,0,0.55)'; ctx.shadowBlur=6;
+  // Shirt / torso
+  ctx.fillStyle=cust.shirt;
+  ctx.beginPath(); ctx.roundRect(-s*0.22,-s*0.56+bob,s*0.44,s*0.58,s*0.07); ctx.fill();
+  // Lap
+  ctx.fillStyle='rgba(0,0,0,0.22)';
+  ctx.beginPath(); ctx.ellipse(0,bob,s*0.28,s*0.15,0,0,Math.PI*2); ctx.fill();
+  // Head
+  ctx.fillStyle=cust.skin; ctx.shadowBlur=4;
+  const hy=-s*0.74+bob;
+  if(cust.headShape===0){ctx.beginPath();ctx.arc(0,hy,s*0.21,0,Math.PI*2);ctx.fill();}
+  else if(cust.headShape===1){ctx.beginPath();ctx.ellipse(0,hy,s*0.17,s*0.24,0,0,Math.PI*2);ctx.fill();}
+  else if(cust.headShape===2){ctx.fillRect(-s*0.19,hy-s*0.21,s*0.38,s*0.42);}
+  else{ctx.beginPath();ctx.arc(0,hy,s*0.26,0,Math.PI*2);ctx.fill();ctx.fillStyle=shadeColor(cust.skin,-20);for(let ai=0;ai<7;ai++){const aa=(ai/7)*Math.PI*2;ctx.beginPath();ctx.arc(Math.cos(aa)*s*0.22,hy+Math.sin(aa)*s*0.22,s*0.09,0,Math.PI*2);ctx.fill();}ctx.fillStyle=cust.skin;}
+  // Arm
+  let armRot=0;
+  if(cust.state==='windup') armRot=-0.80-cust.windupAngle*0.55;
+  else if(cust.state==='release') armRot=0.45+cust.releaseAngle*1.65;
+  else if(cust.state==='settle') armRot=0.45*(1-cust.settleTimer);
+  else armRot=Math.sin(beatT*Math.PI+cust.armPhase)*0.18;
+  const shlX=s*0.20,shlY=-s*0.44+bob;
+  ctx.save(); ctx.translate(shlX,shlY); ctx.rotate(armRot-Math.PI*0.22);
+  const armLen=s*0.35;
+  ctx.fillStyle=cust.shirt; ctx.shadowBlur=2;
+  ctx.beginPath(); ctx.roundRect(-s*0.07,0,s*0.13,armLen,s*0.05); ctx.fill();
+  ctx.translate(0,armLen); ctx.rotate(armRot*0.55);
+  ctx.fillStyle=cust.skin;
+  ctx.beginPath(); ctx.roundRect(-s*0.06,0,s*0.11,armLen*0.82,s*0.04); ctx.fill();
+  ctx.beginPath(); ctx.arc(0,armLen*0.82,s*0.09,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  // Idle arm
+  ctx.save(); ctx.translate(-s*0.22,-s*0.28+bob); ctx.rotate(Math.PI*0.28);
+  ctx.fillStyle=cust.shirt; ctx.beginPath(); ctx.roundRect(-s*0.06,0,s*0.11,s*0.26,s*0.04); ctx.fill();
+  ctx.restore();
+  ctx.restore();
+}
+
+// ── Splats ─────────────────────────────────────────────────────────────────
+function _drawCafSplat(ctx, sp) {
+  ctx.save(); ctx.globalAlpha=sp.alpha;
+  ctx.fillStyle=sp.color;
+  ctx.beginPath(); ctx.arc(sp.x,sp.y,sp.r,0,Math.PI*2); ctx.fill();
+  const seed=(sp.x*7.3+sp.y*11.1)|0;
+  for(let i=0;i<7;i++){
+    const a=((seed*(i+1)*2654435761)>>>0)%628/100;
+    const dr=sp.r*(0.9+((seed*i*1234567)>>>0&255)/255*0.7);
+    const ds=sp.r*(0.08+((seed*i*987654)>>>0&255)/255*0.14);
+    ctx.beginPath(); ctx.arc(sp.x+Math.cos(a)*dr,sp.y+Math.sin(a)*dr,ds,0,Math.PI*2); ctx.fill();
+  }
+  if(sp.drip>2){
+    const dg=ctx.createLinearGradient(sp.x,sp.y+sp.r,sp.x,sp.y+sp.r+sp.drip);
+    dg.addColorStop(0,sp.color); dg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=dg;
+    ctx.beginPath(); ctx.ellipse(sp.x,sp.y+sp.r+sp.drip*0.5,sp.dripW,sp.drip*0.55,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=sp.color;
+    ctx.beginPath(); ctx.arc(sp.x,sp.y+sp.r+sp.drip,sp.dripW*1.3,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ── Food items ─────────────────────────────────────────────────────────────
+function _drawCafFoodItem(ctx, item) {
+  const s=item.size;
+  ctx.save();
+  for(let t=0;t<item.trail.length;t++){
+    const tp=item.trail[t];
+    ctx.globalAlpha=(t/item.trail.length)*0.20*item.alpha;
+    ctx.fillStyle='#e08020';
+    ctx.beginPath(); ctx.arc(tp.x,tp.y,s*0.18,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=item.alpha;
+  ctx.translate(item.x,item.y); ctx.rotate(item.rot);
+  ctx.shadowColor='rgba(0,0,0,0.55)'; ctx.shadowBlur=6; ctx.shadowOffsetX=2; ctx.shadowOffsetY=3;
+  switch(item.type){
+    case 'taco':{
+      ctx.strokeStyle='#d49020'; ctx.lineWidth=s*0.22; ctx.lineCap='round';
+      ctx.beginPath(); ctx.arc(0,0,s*0.40,Math.PI,0,false); ctx.stroke();
+      ctx.strokeStyle='#ffe070'; ctx.lineWidth=s*0.055;
+      ctx.beginPath(); ctx.arc(0,0,s*0.39,Math.PI+0.12,-0.12,false); ctx.stroke();
+      ctx.save(); ctx.beginPath(); ctx.arc(0,0,s*0.33,Math.PI,0,false); ctx.lineTo(s*0.33,0); ctx.lineTo(-s*0.33,0); ctx.clip();
+      ctx.fillStyle='#50b030'; for(let l=0;l<4;l++){ctx.beginPath();ctx.ellipse(-s*0.20+l*s*0.13,-s*0.12,s*0.13,s*0.06,l*0.3-0.3,0,Math.PI*2);ctx.fill();}
+      ctx.fillStyle='#884020'; ctx.fillRect(-s*0.28,-s*0.20,s*0.56,s*0.22); ctx.restore();
+      ctx.fillStyle='rgba(255,210,0,0.85)';
+      ctx.beginPath(); ctx.moveTo(-s*0.14,s*0.04); ctx.bezierCurveTo(-s*0.09,s*0.17,s*0.09,s*0.17,s*0.14,s*0.04); ctx.fill();
+      break;
+    }
+    case 'burrito':{
+      ctx.fillStyle='#c8b080'; ctx.beginPath(); ctx.ellipse(0,0,s*0.50,s*0.22,0,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(100,70,30,0.55)'; ctx.lineWidth=s*0.04;
+      for(let wi=-1;wi<=1;wi++){ctx.beginPath();ctx.moveTo(wi*s*0.22,-s*0.22);ctx.lineTo(wi*s*0.22,s*0.22);ctx.stroke();}
+      ctx.fillStyle='#cc4010'; ctx.beginPath(); ctx.ellipse(s*0.46,0,s*0.12,s*0.19,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#50b030'; ctx.beginPath(); ctx.ellipse(s*0.48,-s*0.06,s*0.08,s*0.10,0,0,Math.PI*2); ctx.fill();
+      break;
+    }
+    case 'chip':{
+      ctx.fillStyle='#e8b820';
+      ctx.beginPath(); ctx.moveTo(0,-s*0.46); ctx.lineTo(s*0.40,s*0.32); ctx.lineTo(-s*0.40,s*0.32); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(160,90,10,0.55)'; ctx.lineWidth=s*0.04; ctx.stroke();
+      ctx.fillStyle='rgba(210,120,10,0.30)'; ctx.beginPath(); ctx.ellipse(0,s*0.10,s*0.14,s*0.07,-0.2,0,Math.PI*2); ctx.fill();
+      break;
+    }
+    case 'hotsauce':{
+      ctx.fillStyle='#cc1008'; ctx.beginPath(); ctx.roundRect(-s*0.17,-s*0.50,s*0.34,s*0.80,s*0.07); ctx.fill();
+      ctx.fillStyle='#ff5500'; ctx.fillRect(-s*0.17,-s*0.18,s*0.34,s*0.28);
+      ctx.fillStyle='rgba(255,255,255,0.88)'; ctx.font=`bold ${Math.floor(s*0.16)}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('HOT',0,-s*0.04);
+      ctx.fillStyle='#880000'; ctx.beginPath(); ctx.roundRect(-s*0.10,-s*0.58,s*0.20,s*0.12,s*0.04); ctx.fill();
+      ctx.fillStyle='rgba(200,30,0,0.65)'; ctx.beginPath(); ctx.ellipse(s*0.30,-s*0.42,s*0.22,s*0.06,-0.5,0,Math.PI*2); ctx.fill();
+      break;
+    }
+    case 'guac':{
+      ctx.fillStyle='#5a9818';
+      ctx.beginPath(); ctx.moveTo(s*0.35,0); ctx.bezierCurveTo(s*0.45,s*0.28,s*0.08,s*0.48,-s*0.18,s*0.36); ctx.bezierCurveTo(-s*0.50,s*0.22,-s*0.45,-s*0.18,-s*0.20,-s*0.36); ctx.bezierCurveTo(-s*0.02,-s*0.50,s*0.28,-s*0.30,s*0.35,0); ctx.fill();
+      ctx.fillStyle='#8acc30'; ctx.beginPath(); ctx.ellipse(-s*0.05,-s*0.06,s*0.18,s*0.12,0.3,0,Math.PI*2); ctx.fill();
+      break;
+    }
+    case 'nacho':{
+      const chipA=[0,0.7,-0.5,1.2,-1.0];
+      for(let ni=0;ni<5;ni++){ctx.save();ctx.rotate(chipA[ni]);ctx.fillStyle=ni%2===0?'#e8b830':'#d4a020';ctx.beginPath();ctx.moveTo(0,-s*0.36);ctx.lineTo(s*0.32,s*0.20);ctx.lineTo(-s*0.32,s*0.20);ctx.closePath();ctx.fill();ctx.restore();}
+      ctx.fillStyle='rgba(255,200,0,0.88)'; ctx.beginPath(); ctx.ellipse(0,0,s*0.24,s*0.13,0,0,Math.PI*2); ctx.fill();
+      break;
+    }
+    case 'rice':{
+      ctx.fillStyle='#f0ecd8';
+      for(let ri=0;ri<9;ri++){const ra=(ri/9)*Math.PI*2,rr=s*(0.10+Math.sin(ri*1.7)*0.20);ctx.save();ctx.translate(Math.cos(ra)*rr,Math.sin(ra)*rr);ctx.rotate(ra+0.5);ctx.beginPath();ctx.ellipse(0,0,s*0.07,s*0.03,0,0,Math.PI*2);ctx.fill();ctx.restore();}
+      break;
+    }
+    case 'salsa':{
+      ctx.fillStyle='#cc2200'; ctx.beginPath(); ctx.arc(0,0,s*0.40,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ff4420'; ctx.beginPath(); ctx.ellipse(-s*0.10,-s*0.10,s*0.18,s*0.10,-0.4,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#50b030'; ctx.beginPath(); ctx.ellipse(s*0.12,s*0.08,s*0.08,s*0.05,0.6,0,Math.PI*2); ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+// ── Spawn helper ───────────────────────────────────────────────────────────
+const _TACO_FOODS=['taco','burrito','chip','hotsauce','guac','nacho','rice','salsa'];
+function _spawnFoodItem(sc,w,h,fromSide,opts){
+  opts=opts||{};
+  const rng=(a,b)=>a+Math.random()*(b-a);
+  const type=opts.type||_TACO_FOODS[Math.floor(Math.random()*_TACO_FOODS.length)];
+  const urgency=opts.urgency||1;
+  const fromX=fromSide==='left'?w*rng(0.04,0.24):w*rng(0.76,0.96);
+  const fromY=h*rng(0.52,0.66);
+  const toX=fromSide==='left'?w*rng(0.55,0.92):w*rng(0.08,0.45);
+  const toY=h*rng(0.38,0.68);
+  const dx=toX-fromX,dy=toY-fromY,dist=Math.hypot(dx,dy)||1;
+  const spd=(4.5+Math.random()*5)*urgency;
+  sc.thrownItems.push({x:fromX,y:fromY,vx:(dx/dist)*spd,vy:(dy/dist)*spd-(2.2+Math.random()*2)*urgency,gravity:0.20+Math.random()*0.06,rot:Math.random()*Math.PI*2,rotV:(Math.random()-0.5)*(0.18+urgency*0.08),type,size:opts.size||(11+Math.random()*13),alpha:1,landed:false,trail:[]});
+}
+
+// ── MAIN DRAW ──────────────────────────────────────────────────────────────
+function drawFoodFightScene(theme,now,playRects){
+  const ctx=bgCtx, w=bgCanvas.width, h=bgCanvas.height;
+  if(!_foodFightScene||_foodFightScene.w!==w||_foodFightScene.h!==h) _initFoodFightScene(w,h);
+  const sc=_foodFightScene;
+
+  const move  =(typeof movePulse==='number')?movePulse:0;
+  const cheer =(typeof cheerPulse==='number')?cheerPulse:0;
+  const drop  =(typeof boardDropPulse==='number')?boardDropPulse:0;
+  const energy=(audioEngine&&audioEngine.getAudioEnergy)?audioEngine.getAudioEnergy():0;
+  const bpm   =theme.bpm||105;
+  const beatT =(now/1000)*(bpm/60);
+  const isMobile=w<600;
+  const _pr=playRects[0];
+  const botGutterY=_pr?Math.min(h,_pr.y+_pr.h):h*0.80;
+
+  // ── 1. Full background clear + architecture ──────────────────────────
+  ctx.fillStyle='#120800'; ctx.fillRect(0,0,w,h);
+  _drawTacoArch(ctx,w,h,now,energy,cheer,beatT);
+
+  // ── 2. String lights ─────────────────────────────────────────────────
+  _drawStringLights(ctx,w,h,now,energy,beatT);
+
+  // ── 3. Papel picado ──────────────────────────────────────────────────
+  _drawPapelPicado(ctx,w,h,now,beatT,sc.flags);
+
+  // ── 4. Neon signs ────────────────────────────────────────────────────
+  _drawNeonSigns(ctx,w,h,now,energy,cheer,beatT);
+
+  // ── 5. Steam from kitchen ────────────────────────────────────────────
+  _drawSteam(ctx,w,h,now,energy,sc.steam);
+
+  // ── 6. Cook in kitchen window ────────────────────────────────────────
+  sc.cookMouth=(sc.cookMouth||0)*0.88;
+  _drawCook(ctx,w,h,now,energy,cheer,sc.cookMouth);
+
+  // ── 7. Splats ────────────────────────────────────────────────────────
+  for(const sp of sc.splats) _drawCafSplat(ctx,sp);
+
+  // ── 8. Shockwave rings (line-clear, like Galaxy shocks) ──────────────
+  if(cheer>sc.lastCheer+0.18){
+    const cx2=_pr?(_pr.x+_pr.w/2):w*0.5;
+    const cy2=_pr?(_pr.y+_pr.h/2):h*0.5;
+    sc.shocks.push({x:cx2,y:cy2,r:10,maxR:Math.min(w,h)*0.75,alpha:0.80});
+    sc.hotFlash=Math.min(1.2,sc.hotFlash+(cheer*0.80));
+    sc.cookMouth=1;
+    // Full salvo from everyone
+    for(const c of sc.customers){if(c.state==='idle'){c.state='windup';c.windupAngle=0;c.stateTimer=8;}}
+  }
+  for(let i=sc.shocks.length-1;i>=0;i--){
+    const sh=sc.shocks[i]; sh.r+=10; sh.alpha-=0.020;
+    if(sh.alpha<=0||sh.r>=sh.maxR){sc.shocks.splice(i,1);continue;}
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    ctx.strokeStyle=`rgba(255,120,0,${sh.alpha})`; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(sh.x,sh.y,sh.r,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle=`rgba(255,220,60,${sh.alpha*0.55})`; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(sh.x,sh.y,sh.r*0.55,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── 9. Hot-sauce flash on line clear ─────────────────────────────────
+  sc.hotFlash=(sc.hotFlash||0)*0.86;
+  if(sc.hotFlash>0.04){
+    ctx.fillStyle=`rgba(220,60,0,${sc.hotFlash*0.12*(0.65+Math.sin(now*0.030)*0.35)})`;
+    ctx.fillRect(0,0,w,h);
+  }
+
+  // ── 10. Chip confetti burst on hard drop ─────────────────────────────
+  if(drop>(sc.lastDrop+0.22)&&drop>0.6){
+    const ox=w*(0.3+Math.random()*0.4),oy=h*0.68;
+    for(let di=0;di<22;di++){
+      const ang=(Math.random()-0.5)*Math.PI*1.4,spd=3+Math.random()*8;
+      const isChip=Math.random()>0.45;
+      sc.chipBurst.push({x:ox+(Math.random()-0.5)*50,y:oy,vx:Math.cos(ang)*spd,vy:-Math.random()*4-1.5,vy0:0,rv:(Math.random()-0.5)*0.24,rot:Math.random()*Math.PI,life:0.8+Math.random()*0.4,s:isChip?9+Math.random()*10:3+Math.random()*5,type:isChip?'chip':'dot',color:['#cc2200','#e0a000','#50a010','#d49020'][Math.floor(Math.random()*4)]});
+    }
+    // Extra food volley
+    for(let vi=0;vi<5;vi++) _spawnFoodItem(sc,w,h,vi<2?'left':'right',{urgency:1.9});
+    ctx.fillStyle=`rgba(255,180,30,${drop*0.14})`; ctx.fillRect(0,0,w,h);
+  }
+  // Draw + age chip burst
+  sc.chipBurst=sc.chipBurst.filter(sh=>sh.life>0);
+  for(const sh of sc.chipBurst){
+    sh.x+=sh.vx; sh.vy+=0.18; sh.y+=sh.vy; sh.life-=0.022; sh.rot+=sh.rv;
+    ctx.save(); ctx.globalAlpha=sh.life; ctx.translate(sh.x,sh.y); ctx.rotate(sh.rot);
+    if(sh.type==='chip'){
+      ctx.fillStyle='#e8b820'; ctx.beginPath(); ctx.moveTo(0,-sh.s); ctx.lineTo(sh.s*0.88,sh.s*0.62); ctx.lineTo(-sh.s*0.88,sh.s*0.62); ctx.closePath(); ctx.fill();
+    } else { ctx.fillStyle=sh.color; ctx.beginPath(); ctx.arc(0,0,sh.s,0,Math.PI*2); ctx.fill(); }
+    ctx.restore();
+  }
+
+  // ── 11. Drop flash ───────────────────────────────────────────────────
+  sc.dropFlash=(sc.dropFlash||0)*0.88;
+  if(drop>sc.lastDrop+0.15) sc.dropFlash=Math.min(0.9,sc.dropFlash+drop*0.4);
+  if(sc.dropFlash>0.03){ ctx.fillStyle=`rgba(255,200,80,${sc.dropFlash*0.10})`; ctx.fillRect(0,0,w,h); }
+
+  // ── 12. Floating emoji ───────────────────────────────────────────────
+  for(const em of sc.emojis){
+    em.y+=em.vy*(1+energy*0.4); em.x+=em.vx+Math.sin(now*0.001+em.phase)*0.22; em.phase+=0.008;
+    if(em.y<-40){em.y=h+20;em.x=Math.random()*w;em.alpha=0.18+Math.random()*0.25;}
+    ctx.save(); ctx.globalAlpha=em.alpha*(0.7+energy*0.3);
+    ctx.font=`${em.size}px serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(em.glyph,em.x,em.y); ctx.restore();
+  }
+
+  // ── 13. Customer state machine + draw ────────────────────────────────
+  for(const cust of sc.customers){
+    if(cust.state==='idle'){cust.stateTimer--;if(cust.stateTimer<=0){cust.state='windup';cust.windupAngle=0;cust.stateTimer=18+Math.random()*12;}}
+    else if(cust.state==='windup'){cust.windupAngle+=1/cust.stateTimer;cust.stateTimer--;if(cust.stateTimer<=0){cust.state='release';cust.releaseAngle=0;cust.stateTimer=8;_spawnFoodItem(sc,w,h,cust.side,{urgency:1+energy*0.5});}}
+    else if(cust.state==='release'){cust.releaseAngle+=1/cust.stateTimer;cust.stateTimer--;if(cust.stateTimer<=0){cust.state='settle';cust.settleTimer=1;cust.stateTimer=50+Math.random()*160;}}
+    else if(cust.state==='settle'){cust.settleTimer=Math.max(0,cust.settleTimer-0.04);if(cust.settleTimer<=0)cust.state='idle';}
+    if(move>0.35&&cust.state==='idle'&&Math.random()<move*0.08){cust.state='windup';cust.windupAngle=0;cust.stateTimer=18;}
+
+    const savedX=cust.xFrac,savedY=cust.yFrac;
+    if(isMobile){
+      const idx=sc.customers.indexOf(cust);
+      cust.xFrac=(idx+0.5)/sc.customers.length;
+      cust.yFrac=(botGutterY+(h-botGutterY)*0.38)/h;
+    }
+    _drawCafStudent(ctx,cust,w,h,beatT,energy);
+    cust.xFrac=savedX; cust.yFrac=savedY;
+  }
+
+  // ── 14. Thrown food items ────────────────────────────────────────────
+  sc.thrownItems=sc.thrownItems.filter(item=>!item.landed&&item.alpha>0.04);
+  for(const item of sc.thrownItems){
+    item.trail.push({x:item.x,y:item.y}); if(item.trail.length>5)item.trail.shift();
+    item.vy+=item.gravity; item.x+=item.vx*(1+energy*0.28); item.y+=item.vy; item.rot+=item.rotV;
+    let inBoard=false;
+    for(const pr of playRects)if(item.x>pr.x&&item.x<pr.x+pr.w&&item.y>pr.y&&item.y<pr.y+pr.h){inBoard=true;break;}
+    if(inBoard||item.y>h*0.90||item.x<-80||item.x>w+80){
+      if(!inBoard&&sc.splats.length<90){
+        const sColor=item.type==='taco'?'#d49020':item.type==='hotsauce'?'#cc1008':item.type==='guac'?'#5a9818':item.type==='salsa'?'#cc2200':'#c8a040';
+        sc.splats.push({x:Math.max(4,Math.min(w-4,item.x)),y:Math.max(4,Math.min(h*0.87,item.y)),r:item.size*0.52+Math.random()*5,color:sColor,alpha:0.50+Math.random()*0.28,drip:Math.random()>0.45?7+Math.random()*32:0,dripW:2+Math.random()*4});
+      }
+      item.landed=true;
+    } else { _drawCafFoodItem(ctx,item); }
+  }
+
+  // ── 15. Board-edge heat glow on line clears ──────────────────────────
+  if(cheer>0.60&&_pr){
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const eg=ctx.createRadialGradient(_pr.x+_pr.w/2,_pr.y+_pr.h/2,_pr.w*0.28,_pr.x+_pr.w/2,_pr.y+_pr.h/2,Math.max(_pr.w,_pr.h)*0.92);
+    const ca=(cheer-0.60)*0.65;
+    eg.addColorStop(0,'rgba(0,0,0,0)'); eg.addColorStop(0.50,`rgba(255,120,10,${ca*0.28})`); eg.addColorStop(0.80,`rgba(255,40,0,${ca*0.52})`); eg.addColorStop(1,'rgba(160,10,0,0)');
+    ctx.fillStyle=eg; ctx.fillRect(_pr.x-_pr.w*0.6,_pr.y-_pr.h*0.25,_pr.w*2.2,_pr.h*1.5);
+    ctx.restore();
+  }
+
+  // ── 16. Caps + bookkeeping ───────────────────────────────────────────
+  if(sc.splats.length>90) sc.splats.splice(0,sc.splats.length-90);
+  if(sc.thrownItems.length>45) sc.thrownItems.splice(0,sc.thrownItems.length-45);
+  sc.lastCheer=cheer; sc.lastDrop=drop; sc.lastMove=move;
+
+  // ── 17. Play-area destination-out cutout ─────────────────────────────
+  if(playRects.length){
+    ctx.save(); ctx.globalCompositeOperation='destination-out';
+    for(const pr of playRects){ctx.fillStyle='#000';ctx.fillRect(pr.x,pr.y,pr.w,pr.h);}
+    ctx.restore();
+  }
+}
+
 function drawBackground() {
   const theme = getTheme(level);
   const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
@@ -13716,7 +14589,7 @@ function drawBackground() {
   // future "physical" background object) from rendering on top of the
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone' || style === 'haze' || style === 'robot-city' || style === 'cathedral');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone' || style === 'haze' || style === 'robot-city' || style === 'cathedral' || style === 'food-fight');
   // Cache getBoundingClientRect — forced layout reflow every frame is very
   // expensive. Invalidate only when canvas size or vs-mode changes.
   const _vsMode = document.body.classList.contains('vs-mode');
@@ -13839,6 +14712,13 @@ function drawBackground() {
   // and halos around the play area on combos.
   if (style === 'cathedral') {
     drawCathedralScene(theme, now, playRects);
+    return;
+  }
+  // Tacos (Level 16): chaotic taco restaurant with a massive food fight.
+  // Flying ingredients, hot sauce splats, silhouette patrons pelting each
+  // other — everything reacts to moves, drops, and line clears.
+  if (style === 'food-fight') {
+    drawFoodFightScene(theme, now, playRects);
     return;
   }
 
