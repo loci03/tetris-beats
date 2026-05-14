@@ -158,11 +158,30 @@
     will-change: transform;
   }
   #score-display {
-    font-size: 28px;
-    font-weight: 700;
+    font-size: 34px;
+    font-weight: 900;
     text-align: center;
-    color: #fff;
-    text-shadow: 0 0 20px rgba(128,0,255,0.5);
+    letter-spacing: -0.5px;
+    font-variant-numeric: tabular-nums;
+    /* Gradient text — purple → cyan */
+    background: linear-gradient(135deg, #dd66ff 0%, #66ccff 60%, #ffffff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    /* Glow via filter since text-shadow doesn't work on gradient text */
+    filter: drop-shadow(0 0 10px rgba(160,60,255,0.65))
+            drop-shadow(0 0 22px rgba(60,140,255,0.40));
+    line-height: 1.1;
+    transition: filter 0.12s;
+  }
+  /* Score pop — brief scale-up when the number changes */
+  @keyframes scorePop {
+    0%   { transform: scale(1);    }
+    35%  { transform: scale(1.10); }
+    100% { transform: scale(1);    }
+  }
+  #score-display.score-popping {
+    animation: scorePop 0.28s cubic-bezier(0.22, 0.68, 0, 1.4);
   }
   #level-display, #lines-display {
     font-size: 16px;
@@ -1147,12 +1166,8 @@
       flex: 0 0 auto;
     }
     #score-display {
-      font-size: 28px;
-      font-weight: 900;
+      font-size: 32px;
       line-height: 1;
-      letter-spacing: -0.5px;
-      font-variant-numeric: tabular-nums;
-      text-shadow: 0 0 14px rgba(160,80,255,0.55);
     }
     /* Rank target — stacked right-aligned next to score */
     .spb-rank-target {
@@ -15230,7 +15245,15 @@ function drawParticles() {
 }
 
 function updateUI() {
-  document.getElementById('score-display').textContent = Math.floor(score).toLocaleString();
+  const _scoreEl = document.getElementById('score-display');
+  const _newScoreText = Math.floor(score).toLocaleString();
+  if (_scoreEl.textContent !== _newScoreText) {
+    _scoreEl.textContent = _newScoreText;
+    // Trigger pop animation on every score change
+    _scoreEl.classList.remove('score-popping');
+    void _scoreEl.offsetWidth; // force reflow to restart animation
+    _scoreEl.classList.add('score-popping');
+  }
   const _isMobileUI = window.innerWidth <= 720;
   document.getElementById('level-display').textContent = _isMobileUI ? `${level}` : `Level ${level}`;
   document.getElementById('lines-display').textContent = _isMobileUI ? `${lines}` : `Lines: ${lines}`;
