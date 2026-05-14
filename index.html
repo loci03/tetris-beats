@@ -15252,10 +15252,13 @@ function updateUI() {
     _scoreEl.classList.add('score-popping');
   }
   const _isMobileUI = window.innerWidth <= 720;
-  document.getElementById('level-display').textContent = _isMobileUI ? `${level}` : `Level ${level}`;
-  document.getElementById('lines-display').textContent = _isMobileUI ? `${lines}` : `Lines: ${lines}`;
-  // Lines progress toward next level
   const _linesInLevel = lines % LINES_PER_LEVEL;
+  document.getElementById('level-display').textContent = _isMobileUI ? `${level}` : `Level ${level}`;
+  // Desktop: show "6 / 15 Lines" so progress toward next level is clear
+  document.getElementById('lines-display').textContent = _isMobileUI
+    ? `${lines}`
+    : `${_linesInLevel} / ${LINES_PER_LEVEL} Lines`;
+  // Progress bar (mobile)
   const _lvlBar = document.getElementById('score-lvl-bar');
   if (_lvlBar) {
     const _pct = Math.min(100, (_linesInLevel / LINES_PER_LEVEL) * 100);
