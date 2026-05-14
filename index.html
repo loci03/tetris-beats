@@ -762,19 +762,33 @@
     50%      { transform: translateX(-50%) scale(1.06); }
   }
   @media (max-width: 720px) {
-    /* On mobile the HUD moves to the bottom, sitting just above the fixed
-       touch-control strip (~90px tall + safe-area). This keeps it clear of
-       the score/hold/next panels that occupy the top of the screen. */
-    #mode-hud {
-      top: auto;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 94px);
-      padding: 5px 14px;
-      min-width: 140px;
-      border-radius: 16px;
+    @keyframes modeHudPulse {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.04); }
     }
-    #mode-hud .mh-primary   { font-size: 20px; }
-    #mode-hud .mh-secondary { font-size: 9px; letter-spacing: 1.5px; }
-    #mode-hud .mh-label     { font-size: 8px; letter-spacing: 3px; }
+  }
+  @media (max-width: 720px) {
+    /* Zone bar panel hidden on mobile — the ZONE touch button covers it. */
+    #zone-panel-box { display: none !important; }
+
+    /* Mode HUD becomes an in-flow panel-box on mobile, sitting in the top
+       panel row exactly where the Zone box was. Reset all the fixed-overlay
+       positioning so it participates in the flex layout naturally. */
+    #mode-hud {
+      position: static;
+      transform: none;
+      left: auto; top: auto; bottom: auto;
+      min-width: 0;
+      width: auto;
+      padding: 6px 8px;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(255,209,102,0.25), inset 0 1px 0 rgba(255,255,255,0.12);
+      /* Shrink text to fit the panel slot */
+      flex: 1 1 auto;
+    }
+    #mode-hud .mh-primary   { font-size: 18px; }
+    #mode-hud .mh-secondary { font-size: 8px; letter-spacing: 1px; }
+    #mode-hud .mh-label     { font-size: 7px; letter-spacing: 2.5px; }
   }
   #zone-active-badge {
     position: fixed;
@@ -1591,9 +1605,16 @@
         <div id="next-level-display">15 to L2</div>
         <div id="era-display">The College Dropout</div>
       </div>
-      <div class="panel-box">
+      <div class="panel-box" id="zone-panel-box">
         <div id="zone-label">Zone</div>
         <div id="zone-bar-container"><div id="zone-bar"></div></div>
+      </div>
+      <!-- Mode HUD lives here on mobile so it slots into the panel row
+           where the Zone box was. On desktop it stays position:fixed. -->
+      <div id="mode-hud" style="display:none;">
+        <span class="mh-label" id="mh-label">SPRINT</span>
+        <span class="mh-primary" id="mh-primary">0:00.00</span>
+        <span class="mh-secondary" id="mh-secondary">40 lines · 0.00 PPS</span>
       </div>
     </div>
     <canvas id="main-canvas"></canvas>
@@ -1617,13 +1638,6 @@
 </div>
 <div id="combo-display"></div>
 <div id="level-announce"></div>
-<!-- Sprint lines-left / Ultra time-left HUD. Big panel above the play
-     area; visible only during those modes. Driven by updateUI(). -->
-<div id="mode-hud" style="display:none;">
-  <span class="mh-label" id="mh-label">SPRINT</span>
-  <span class="mh-primary" id="mh-primary">0:00.00</span>
-  <span class="mh-secondary" id="mh-secondary">40 lines · 0.00 PPS</span>
-</div>
 <div id="zone-active-badge">ZONE × 2.5</div>
 
 <!-- Touch HUD: minimal - swipe handles left/right/down + hard-drop, tap rotates.
