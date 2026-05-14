@@ -1224,9 +1224,10 @@
       transition: width 0.25s ease;
     }
 
-    /* Hide desktop-only info on mobile */
+    /* Hide desktop-only info on mobile (spb-lines-row + era chip handle it) */
+    #lines-display,
     #next-level-display,
-    #era-display { display: none; }
+    #era-display { display: none !important; }
 
     /* Level + Lines — chips handle labels */
     #level-display, #lines-display { font-size: 11px; }
@@ -1776,10 +1777,10 @@
           <span id="spb-rank-label">—</span>
           <span id="spb-rank-score">—</span>
         </div>
-        <!-- Desktop-only elements kept for JS compatibility -->
-        <div id="lines-display" style="display:none;">0</div>
-        <div id="next-level-display" style="display:none;">15 to L2</div>
-        <div id="era-display" style="display:none;">The College Dropout</div>
+        <!-- Visible on desktop; hidden on mobile where spb-lines-row covers it -->
+        <div id="lines-display">Lines: 0</div>
+        <div id="next-level-display">15 to L2</div>
+        <div id="era-display">The College Dropout</div>
       </div>
       <div class="panel-box" id="zone-panel-box">
         <div id="zone-label">Zone</div>
