@@ -2546,22 +2546,33 @@ const LEVEL_THEMES = [
     chords: [[220, 277.18, 329.63], [196, 246.94, 311.13], [174.61, 220, 293.66]],
     synthType: 'soulChop',
   },
-  { // Level 17 - Cruel Summer (G.O.O.D. Music compilation, sun-drenched and lush)
-    name: 'Cruel Summer',
-    bpm: 108,
-    colors: { bg1: '#2a1a00', bg2: '#1a0d00', accent: '#ffcc44', glow: '#ffaa22' },
-    particleHue: 50,
-    particleStyle: 'rays',
-    blockGlow: 12,
-    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,1, 0,0,1,0],
+  { // Level 17 - Living My Life (robots cruising to the beach in convertibles)
+    name: 'Living My Life',
+    bpm: 100,
+    track: 'living-my-life.mp3',
+    colors: { bg1: '#001a33', bg2: '#000d1a', accent: '#40ddff', glow: '#ffdd44' },
+    particleHue: 195,
+    particleStyle: 'beach-cruise',
+    blockStyle: 'seashell',
+    blockGlow: 10,
+    piecePalette: {
+      I: '#f4c97a',  // sandy gold
+      O: '#f08050',  // coral orange
+      T: '#e8a8d0',  // pale pink
+      S: '#60cccc',  // seafoam teal
+      Z: '#f06060',  // sunset red
+      J: '#a0d8ef',  // sky blue
+      L: '#ffe4a0',  // cream shell
+    },
+    kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
     snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
     hh:    [1,0,1,1, 1,0,1,1, 1,0,1,1, 1,0,1,1],
     hhOpen:[0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
     bass:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
-    bassNote: 49.0, // G1
-    scale: [196, 246.94, 293.66, 349.23, 392, 440, 493.88, 587.33],
+    bassNote: 49.0,
+    scale: [196, 246.94, 293.66, 349.23, 392, 440, 493.88],
     chords: [[196, 246.94, 293.66], [220, 277.18, 329.63], [261.63, 329.63, 392]],
-    synthType: 'gospel',
+    synthType: 'soulChop',
   },
   { // Level 18 - Watch the Throne (Jay-Z + Kanye, regal and grand)
     name: 'Watch the Throne',
@@ -3581,7 +3592,7 @@ function clearLines() {
       // styled level - matrix + tires count as visually-rich for these FX
       // too, so a Tetris on Back for More / Ferrari Window gets the same
       // shockwave/flash treatment). Volume scales with line count + combo.
-      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star' || theme.blockStyle === 'taco')) {
+      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star' || theme.blockStyle === 'taco' || theme.blockStyle === 'seashell')) {
         const pieces = [0, 12, 22, 36, 60][cleared] || 60;
         const totalPieces = pieces + Math.max(0, combo) * 8;
         spawnConfetti(totalPieces, theme);
@@ -5770,7 +5781,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   // active piece, ghost). Only skips time-dependent styles (matrix, star).
   if (_bs === 'beefpatty' || _bs === 'trumpet' || _bs === 'brain' ||
       _bs === 'mug' || _bs === 'tetrisEffect' || _bs === 'tires' || _bs === 'macncheese' ||
-      _bs === 'bullet' || _bs === 'leaf' || _bs === 'taco') {
+      _bs === 'bullet' || _bs === 'leaf' || _bs === 'taco' || _bs === 'seashell') {
     const key = `${_bs}-${color}-${size}`;
     let mini = _blockMiniCache.get(key);
     if (!mini) {
@@ -5787,6 +5798,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
       else if (_bs === 'bullet')       drawBlockBullet(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'leaf')         drawBlockLeaf(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'taco')         drawBlockTaco(mc, 0, 0, color, size, 1, theme);
+      else if (_bs === 'seashell')     drawBlockSeashell(mc, 0, 0, color, size, 1, theme);
       _blockMiniCache.set(key, mini);
     }
     if (alpha !== 1) context.globalAlpha = alpha;
@@ -5836,6 +5848,10 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   }
   if (theme && theme.blockStyle === 'taco') {
     drawBlockTaco(context, x, y, color, size, alpha, theme);
+    return;
+  }
+  if (theme && theme.blockStyle === 'seashell') {
+    drawBlockSeashell(context, x, y, color, size, alpha, theme);
     return;
   }
   if (theme && theme.blockStyle === 'star') {
@@ -14773,6 +14789,671 @@ function drawFoodFightScene(theme,now,playRects){
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SEASHELL BLOCK  (Level 17 — Living My Life)
+// A nautilus-style spiral shell with ridges, warm sandy tones,
+// and a pearlescent highlight that shifts with the piece colour.
+// ─────────────────────────────────────────────────────────────────────────────
+function drawBlockSeashell(context, x, y, color, size, alpha, theme) {
+  const cx = x + size / 2, cy = y + size / 2;
+  context.globalAlpha = alpha;
+  context.save();
+
+  // Outer soft glow
+  const haloG = context.createRadialGradient(cx, cy, size*0.18, cx, cy, size*0.62);
+  haloG.addColorStop(0, color.replace(')', ',0.55)').replace('rgb','rgba'));
+  haloG.addColorStop(1, 'rgba(0,0,0,0)');
+  context.fillStyle = haloG;
+  context.beginPath(); context.arc(cx, cy, size*0.62, 0, Math.PI*2); context.fill();
+
+  // Shell body — filled spiral via arcs of shrinking radius
+  const outerR = size * 0.44;
+  context.save();
+  context.translate(cx, cy);
+
+  // Shell silhouette
+  context.beginPath();
+  context.arc(0, 0, outerR, 0, Math.PI*2);
+  const shellGrad = context.createRadialGradient(-outerR*0.25, -outerR*0.25, outerR*0.05, 0, 0, outerR);
+  shellGrad.addColorStop(0,   '#fff8f0');
+  shellGrad.addColorStop(0.3, color);
+  shellGrad.addColorStop(0.7, shadeColor(color, -20));
+  shellGrad.addColorStop(1,   shadeColor(color, -40));
+  context.fillStyle = shellGrad;
+  context.fill();
+
+  // Spiral ridges (logarithmic-ish inward arcs)
+  context.strokeStyle = 'rgba(255,255,255,0.30)';
+  for (let i = 0; i < 5; i++) {
+    const r = outerR * (1 - i * 0.17);
+    context.lineWidth = Math.max(0.4, size * 0.018 * (1 - i*0.12));
+    context.beginPath();
+    context.arc(outerR*0.12*(i*0.3), outerR*0.08*(i*0.2), r, Math.PI*0.55, Math.PI*2.0, false);
+    context.stroke();
+  }
+
+  // Dark spiral arm line
+  context.strokeStyle = `rgba(0,0,0,0.18)`;
+  context.lineWidth = size * 0.040;
+  context.lineCap = 'round';
+  context.beginPath();
+  let r0 = outerR * 0.88;
+  for (let a = 0; a < Math.PI*3.8; a += 0.12) {
+    const r = r0 * Math.exp(-a * 0.13);
+    const px = Math.cos(a - Math.PI*0.4) * r;
+    const py = Math.sin(a - Math.PI*0.4) * r;
+    if (a === 0) context.moveTo(px, py); else context.lineTo(px, py);
+  }
+  context.stroke();
+
+  // Pearlescent highlight
+  context.fillStyle = 'rgba(255,255,255,0.42)';
+  context.beginPath();
+  context.ellipse(-outerR*0.22, -outerR*0.26, outerR*0.22, outerR*0.13, -0.55, 0, Math.PI*2);
+  context.fill();
+
+  // Centre whorl
+  context.fillStyle = shadeColor(color, -30);
+  context.beginPath(); context.arc(outerR*0.18, outerR*0.10, outerR*0.12, 0, Math.PI*2); context.fill();
+  context.fillStyle = 'rgba(255,255,255,0.50)';
+  context.beginPath(); context.arc(outerR*0.14, outerR*0.06, outerR*0.05, 0, Math.PI*2); context.fill();
+
+  context.restore();
+  context.globalAlpha = 1;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BEACH CRUISE SCENE  (Level 17 — Living My Life)
+//
+// Same-style robots from Level 14 (reuses _drawRobot) but now they're
+// seated in open-top convertible cars cruising along a coastal highway
+// toward the beach. Sunny day, ocean on the horizon, palm trees swaying,
+// seagulls flying, road markings scrolling under the cars.
+//
+// Static BG (_buildBeachBg): baked-once offscreen canvas:
+//   Bright sky gradient, sun disc with corona, scattered clouds,
+//   distant ocean band, sandy beach strip, coastal road with dashed centre.
+//
+// Dynamic layers every frame:
+//   Moving road dashes / waves on the ocean / cloud drift.
+//   Convertible cars with seated robot drivers + passengers.
+//   Palm trees at road edges swaying with beat.
+//   Seagulls arcing overhead.
+//
+// Reactivity:
+//   movePulse      → cars lurch forward, music-note burst from car
+//   cheerPulse     → cars speed up, splash of confetti, palm trees thrash,
+//                    sun corona flares, board-edge ocean shimmer
+//   boardDropPulse → giant wave crashes, seagulls scatter, road bump
+// ─────────────────────────────────────────────────────────────────────────────
+let _beachScene = null;
+
+function _buildBeachBg(w, h) {
+  const oc = document.createElement('canvas');
+  oc.width = w; oc.height = h;
+  const c = oc.getContext('2d');
+
+  // Sky — bright azure
+  const sky = c.createLinearGradient(0, 0, 0, h * 0.60);
+  sky.addColorStop(0,    '#006ab5');
+  sky.addColorStop(0.55, '#42aee8');
+  sky.addColorStop(1,    '#a8d8f0');
+  c.fillStyle = sky; c.fillRect(0, 0, w, h * 0.62);
+
+  // Sun disc
+  const sunX = w * 0.82, sunY = h * 0.14, sunR = Math.min(w, h) * 0.09;
+  // Outer corona
+  const sunG = c.createRadialGradient(sunX, sunY, sunR * 0.5, sunX, sunY, sunR * 2.4);
+  sunG.addColorStop(0,   'rgba(255,245,180,0.55)');
+  sunG.addColorStop(0.6, 'rgba(255,220,80,0.18)');
+  sunG.addColorStop(1,   'rgba(255,200,60,0)');
+  c.fillStyle = sunG; c.fillRect(0, 0, w, h * 0.55);
+  // Core
+  const sunCore = c.createRadialGradient(sunX - sunR*0.2, sunY - sunR*0.2, 0, sunX, sunY, sunR);
+  sunCore.addColorStop(0,   '#fffff0');
+  sunCore.addColorStop(0.4, '#fff060');
+  sunCore.addColorStop(1,   '#ffa020');
+  c.fillStyle = sunCore;
+  c.beginPath(); c.arc(sunX, sunY, sunR, 0, Math.PI*2); c.fill();
+
+  // Clouds (fixed fluffy shapes)
+  c.fillStyle = 'rgba(255,255,255,0.88)';
+  const clouds = [[0.12,0.10,0.14], [0.35,0.07,0.11], [0.55,0.13,0.09], [0.70,0.08,0.13]];
+  for (const [cx2, cy2, cr] of clouds) {
+    const bx = w*cx2, by = h*cy2, br = w*cr;
+    c.beginPath();
+    c.arc(bx, by, br, 0, Math.PI*2);
+    c.arc(bx + br*0.7, by - br*0.2, br*0.75, 0, Math.PI*2);
+    c.arc(bx - br*0.6, by - br*0.1, br*0.65, 0, Math.PI*2);
+    c.arc(bx + br*0.35, by + br*0.18, br*0.55, 0, Math.PI*2);
+    c.fill();
+  }
+
+  // Ocean band
+  const oceanY = h * 0.55;
+  const oceanG = c.createLinearGradient(0, oceanY, 0, oceanY + h * 0.12);
+  oceanG.addColorStop(0,   '#0077b6');
+  oceanG.addColorStop(0.5, '#0096c7');
+  oceanG.addColorStop(1,   '#48cae4');
+  c.fillStyle = oceanG; c.fillRect(0, oceanY, w, h * 0.12);
+  // Horizon glimmer
+  c.fillStyle = 'rgba(255,255,255,0.35)';
+  c.fillRect(0, oceanY, w, 2);
+
+  // Sandy beach
+  const beachY = h * 0.67;
+  const beachG = c.createLinearGradient(0, beachY, 0, h * 0.76);
+  beachG.addColorStop(0,   '#f5dfa0');
+  beachG.addColorStop(1,   '#e8c878');
+  c.fillStyle = beachG; c.fillRect(0, beachY, w, h * 0.09);
+
+  // Coastal road (two lanes)
+  const roadY = h * 0.74;
+  const roadH = h * 0.20;
+  const roadG = c.createLinearGradient(0, roadY, 0, roadY + roadH);
+  roadG.addColorStop(0,   '#4a4848');
+  roadG.addColorStop(1,   '#2c2a2a');
+  c.fillStyle = roadG; c.fillRect(0, roadY, w, roadH);
+  // Road edge markings
+  c.fillStyle = '#f5e878';
+  c.fillRect(0, roadY + 2, w, 4);
+  c.fillRect(0, roadY + roadH - 6, w, 4);
+  // Kerb/shoulder
+  c.fillStyle = '#d4c890';
+  c.fillRect(0, beachY, w, 4);
+
+  return oc;
+}
+
+function _initBeachScene(w, h) {
+  const rng = (a, b) => a + Math.random() * (b - a);
+  const ri  = (a, b) => Math.floor(rng(a, b + 1));
+
+  // Convertible cars: start at different x positions, all moving rightward
+  const cars = [];
+  const carColors = ['#e83030','#f0c020','#2080e0','#30c060','#e060a0','#ff7820'];
+  for (let i = 0; i < 3; i++) {
+    cars.push({
+      xFrac: rng(-0.3, 1.1),
+      lane: i % 2,               // 0 = near lane, 1 = far lane
+      color: carColors[ri(0, carColors.length-1)],
+      speed: rng(0.0008, 0.0016),
+      bobPhase: rng(0, Math.PI*2),
+      noteTimer: 0,
+      honkFlash: 0,
+      robotTypes: [ri(0,1), ri(0,1)],  // driver + passenger
+    });
+  }
+
+  // Palm trees along the road edges
+  const palms = [];
+  for (let i = 0; i < 7; i++) {
+    palms.push({
+      xFrac: i / 6,
+      side: i % 2 === 0 ? 'top' : 'bottom',
+      swayPhase: rng(0, Math.PI*2),
+      swaySpeed: rng(0.7, 1.3),
+      scale: rng(0.85, 1.15),
+    });
+  }
+
+  // Seagulls drifting across the sky
+  const gulls = [];
+  for (let i = 0; i < 8; i++) {
+    gulls.push({
+      x: rng(0, w), y: rng(h*0.08, h*0.42),
+      vx: rng(0.4, 1.2) * (Math.random()<0.5?1:-1),
+      vy: Math.sin(i) * 0.3,
+      flapPhase: rng(0, Math.PI*2),
+      scale: rng(0.7, 1.2),
+      scared: 0,
+    });
+  }
+
+  // Road dashes (animated scrolling)
+  const dashes = [];
+  for (let i = 0; i < 12; i++) {
+    dashes.push({ xFrac: i / 12 });
+  }
+
+  // Music notes from car
+  const notes = [];
+
+  // Wave particles on cheerPulse
+  const waves = [];
+
+  _beachScene = {
+    w, h,
+    bgCanvas: null,
+    cars, palms, gulls, dashes, notes, waves,
+    roadScroll: 0,
+    sunCorona: 0,     // extra corona on cheer
+    waveCrash: 0,     // wave crash intensity on boardDropPulse
+    lastDrop: 0, lastCheer: 0, lastMove: 0,
+  };
+}
+
+// Draw a convertible car with a seated robot driver (and optional passenger)
+function _drawConvertible(ctx, cx, baseY, w, h, car, beatT, energy, cheer, drop, accentRgb, glowRgb, now) {
+  const carW = w * 0.18, carH = h * 0.055;
+  const bodyY = baseY - carH;
+
+  ctx.save();
+  // Body sway with beat
+  const bob = Math.sin(beatT * Math.PI * 2 + car.bobPhase) * (1.5 + energy * 3);
+  ctx.translate(0, bob);
+
+  // Drop shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath();
+  ctx.ellipse(cx, baseY + 4, carW * 0.48, carH * 0.22, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Car body
+  const bodyG = ctx.createLinearGradient(cx - carW*0.5, bodyY - carH*0.3, cx - carW*0.5, bodyY + carH);
+  bodyG.addColorStop(0,   shadeColor(car.color, 30));
+  bodyG.addColorStop(0.5, car.color);
+  bodyG.addColorStop(1,   shadeColor(car.color, -30));
+  ctx.fillStyle = bodyG;
+  ctx.beginPath();
+  ctx.roundRect(cx - carW*0.5, bodyY, carW, carH, carH*0.28);
+  ctx.fill();
+
+  // Chrome trim strip
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillRect(cx - carW*0.44, bodyY + carH*0.40, carW*0.88, 2.5);
+
+  // Open windshield frame
+  ctx.strokeStyle = 'rgba(60,50,40,0.80)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - carW*0.25, bodyY);
+  ctx.lineTo(cx - carW*0.30, bodyY - carH*0.28);
+  ctx.lineTo(cx + carW*0.30, bodyY - carH*0.28);
+  ctx.lineTo(cx + carW*0.25, bodyY);
+  ctx.stroke();
+
+  // Windshield glass (tinted)
+  ctx.fillStyle = 'rgba(160,220,255,0.28)';
+  ctx.beginPath();
+  ctx.moveTo(cx - carW*0.24, bodyY - 1);
+  ctx.lineTo(cx - carW*0.28, bodyY - carH*0.26);
+  ctx.lineTo(cx + carW*0.28, bodyY - carH*0.26);
+  ctx.lineTo(cx + carW*0.24, bodyY - 1);
+  ctx.closePath(); ctx.fill();
+
+  // Headlights
+  ctx.fillStyle = '#ffe060';
+  ctx.shadowColor = '#ffe060'; ctx.shadowBlur = 8;
+  ctx.beginPath(); ctx.ellipse(cx + carW*0.46, bodyY + carH*0.35, carW*0.045, carH*0.22, 0, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+  // Tail lights
+  ctx.fillStyle = '#ff2020';
+  ctx.shadowColor = '#ff2020'; ctx.shadowBlur = 5;
+  ctx.beginPath(); ctx.ellipse(cx - carW*0.46, bodyY + carH*0.35, carW*0.040, carH*0.18, 0, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Wheels (two showing on this side)
+  const wheelR = carH * 0.40;
+  const wheelY = baseY + wheelR * 0.18;
+  const wheelPositions = [cx - carW*0.30, cx + carW*0.30];
+  for (const wx of wheelPositions) {
+    // Tyre
+    ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.arc(wx, wheelY, wheelR, 0, Math.PI*2); ctx.fill();
+    // Rim
+    ctx.fillStyle = '#c8c8c8';
+    ctx.beginPath(); ctx.arc(wx, wheelY, wheelR * 0.58, 0, Math.PI*2); ctx.fill();
+    // Spinning spokes
+    const spinAng = (now * 0.006 + wx) % (Math.PI*2);
+    ctx.strokeStyle = '#888'; ctx.lineWidth = 1.5;
+    for (let sp = 0; sp < 5; sp++) {
+      const a = spinAng + sp * (Math.PI*2/5);
+      ctx.beginPath();
+      ctx.moveTo(wx, wheelY);
+      ctx.lineTo(wx + Math.cos(a)*wheelR*0.52, wheelY + Math.sin(a)*wheelR*0.52);
+      ctx.stroke();
+    }
+    // Hub
+    ctx.fillStyle = '#ddd';
+    ctx.beginPath(); ctx.arc(wx, wheelY, wheelR * 0.18, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ── Seated robot driver ──
+  const robotH = carH * 1.05;
+  const driverX = cx + carW * 0.12;
+  const driverFootY = bodyY + 2;
+  // We reuse _drawRobot but scaled for the seated-in-car pose:
+  // just the torso+head+arms visible above the car door
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(cx - carW*0.48, bodyY - robotH*1.4, carW*0.96, robotH*1.4);
+  ctx.clip();
+  _drawRobot(ctx, driverX, driverFootY + robotH * 0.55,
+             robotH * 0.95,
+             beatT * Math.PI * 2 + car.bobPhase,
+             energy, cheer, 0, accentRgb, glowRgb, beatT);
+  ctx.restore();
+
+  // ── Passenger robot (slightly smaller, sunglasses) ──
+  if (car.robotTypes[1] === 1) {
+    const passX = cx - carW * 0.10;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cx - carW*0.48, bodyY - robotH*1.4, carW*0.40, robotH*1.4);
+    ctx.clip();
+    _drawRobot(ctx, passX, driverFootY + robotH * 0.55,
+               robotH * 0.80,
+               beatT * Math.PI * 2 + car.bobPhase + 0.8,
+               energy, cheer * 0.8, 0, accentRgb, glowRgb, beatT);
+    ctx.restore();
+    // Sunglasses on passenger
+    ctx.save();
+    const psHeadY = driverFootY + robotH * 0.55 - robotH * 0.80 * 0.88;
+    ctx.fillStyle = 'rgba(20,10,5,0.88)';
+    ctx.beginPath();
+    ctx.roundRect(passX - robotH*0.07, psHeadY - robotH*0.072, robotH*0.16, robotH*0.040, 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Honk flash ──
+  if (car.honkFlash > 0) {
+    car.honkFlash -= 0.08;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = `rgba(255,220,60,${car.honkFlash * 0.25})`;
+    ctx.beginPath();
+    ctx.ellipse(cx + carW*0.46, bodyY + carH*0.35, w*0.10, h*0.06, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// Palm tree along the road
+function _drawPalmTree(ctx, px, py, scale, swayAng, energy) {
+  ctx.save();
+  ctx.translate(px, py);
+
+  // Trunk
+  const trunkH = 80 * scale;
+  ctx.strokeStyle = '#8b6020';
+  ctx.lineWidth = 10 * scale;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(swayAng * 15, -trunkH * 0.5, swayAng * 25, -trunkH);
+  ctx.stroke();
+
+  // Trunk texture rings
+  ctx.strokeStyle = '#7a5518';
+  ctx.lineWidth = 1.5 * scale;
+  for (let ti = 1; ti <= 5; ti++) {
+    const ty = -trunkH * (ti / 6);
+    const tx = swayAng * 25 * (ti / 6);
+    ctx.beginPath();
+    ctx.moveTo(tx - 5*scale, ty);
+    ctx.lineTo(tx + 5*scale, ty);
+    ctx.stroke();
+  }
+
+  // Fronds from the top
+  const tipX = swayAng * 25, tipY = -trunkH;
+  const frondAngles = [-1.2, -0.6, 0, 0.5, 1.1, -1.7, 1.6];
+  for (const fa of frondAngles) {
+    const fLen = (50 + Math.random() * 20) * scale;
+    const bendX = tipX + Math.cos(fa + swayAng * 0.4) * fLen;
+    const bendY = tipY + Math.sin(fa + swayAng * 0.4) * fLen;
+    ctx.strokeStyle = '#228b22';
+    ctx.lineWidth = 4 * scale;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.quadraticCurveTo(
+      tipX + Math.cos(fa) * fLen * 0.5,
+      tipY + Math.sin(fa) * fLen * 0.5 - 10 * scale,
+      bendX, bendY
+    );
+    ctx.stroke();
+    // Frond leaves (alternate lighter green)
+    ctx.strokeStyle = '#2da52d';
+    ctx.lineWidth = 1.5 * scale;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.quadraticCurveTo(
+      tipX + Math.cos(fa) * fLen * 0.5 + 4,
+      tipY + Math.sin(fa) * fLen * 0.5 - 10 * scale,
+      bendX + 3, bendY - 2
+    );
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// Seagull in flight
+function _drawSeagull(ctx, gx, gy, flapPhase, scale, energy) {
+  const ws = 22 * scale;
+  const flap = Math.sin(flapPhase) * 0.6;
+  ctx.save();
+  ctx.translate(gx, gy);
+  ctx.strokeStyle = 'rgba(240,240,240,0.90)';
+  ctx.lineWidth = 2 * scale;
+  ctx.lineCap = 'round';
+  // Left wing
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-ws*0.4, -flap * ws * 0.55, -ws, flap * ws * 0.25);
+  ctx.stroke();
+  // Right wing
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(ws*0.4, -flap * ws * 0.55, ws, flap * ws * 0.25);
+  ctx.stroke();
+  // Body
+  ctx.fillStyle = 'rgba(240,240,240,0.85)';
+  ctx.beginPath(); ctx.ellipse(0, 2*scale, 5*scale, 2.5*scale, 0, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawBeachCruiseScene(theme, now, playRects) {
+  const ctx = bgCtx;
+  const w = bgCanvas.width, h = bgCanvas.height;
+  if (!_beachScene || _beachScene.w !== w || _beachScene.h !== h) _initBeachScene(w, h);
+  const sc = _beachScene;
+
+  if (!sc.bgCanvas || sc.bgCanvas.width !== w || sc.bgCanvas.height !== h) {
+    sc.bgCanvas = _buildBeachBg(w, h);
+  }
+
+  const move  = (typeof movePulse      === 'number') ? movePulse      : 0;
+  const cheer = (typeof cheerPulse     === 'number') ? cheerPulse     : 0;
+  const drop  = (typeof boardDropPulse === 'number') ? boardDropPulse : 0;
+  const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
+  const bpm   = theme.bpm || 100;
+  const beatT = (now / 1000) * (bpm / 60);
+  const [ar, ag, ab] = hexToRgb(theme.colors.accent);
+  const [gr, gg, gb] = hexToRgb(theme.colors.glow);
+
+  const isMobile = w < 600;
+  const _pr = playRects[0];
+
+  // ── 1. Static beach background ──────────────────────────────────────
+  ctx.drawImage(sc.bgCanvas, 0, 0);
+
+  // ── 2. Animated sun corona (pulses with energy + cheer) ─────────────
+  sc.sunCorona = sc.sunCorona * 0.88 + (energy * 0.5 + cheer * 0.4) * 0.12;
+  if (sc.sunCorona > 0.04) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const sunX = w * 0.82, sunY = h * 0.14, sunR = Math.min(w,h)*0.09;
+    const cg = ctx.createRadialGradient(sunX, sunY, sunR, sunX, sunY, sunR * (2.5 + sc.sunCorona * 1.5));
+    cg.addColorStop(0,   `rgba(255,240,100,${sc.sunCorona * 0.55})`);
+    cg.addColorStop(1,   'rgba(255,200,60,0)');
+    ctx.fillStyle = cg;
+    ctx.beginPath(); ctx.arc(sunX, sunY, sunR * 3.5, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // ── 3. Ocean waves (BPM-synced shimmer) ──────────────────────────────
+  const oceanY = h * 0.55;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let wi = 0; wi < 5; wi++) {
+    const wt = (now * 0.0012 + wi * 0.7) % (Math.PI * 2);
+    const wa = 0.06 + Math.sin(wt + beatT * Math.PI) * 0.04 + energy * 0.04;
+    ctx.fillStyle = `rgba(255,255,255,${wa})`;
+    ctx.fillRect(0, oceanY + wi * (h * 0.018), w, 2);
+  }
+  ctx.restore();
+
+  // ── 4. Wave crash on hard drop ────────────────────────────────────────
+  sc.waveCrash = sc.waveCrash * 0.86;
+  if (drop > (sc.lastDrop + 0.22) && drop > 0.6) {
+    sc.waveCrash = Math.min(1.2, sc.waveCrash + drop * 0.9);
+    // Scatter seagulls
+    for (const g of sc.gulls) { g.scared = 1; g.vy = -2 - Math.random() * 2; }
+  }
+  if (sc.waveCrash > 0.04) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const crashG = ctx.createLinearGradient(0, oceanY - h*0.03, 0, oceanY + h*0.06);
+    crashG.addColorStop(0,   `rgba(255,255,255,${sc.waveCrash * 0.45})`);
+    crashG.addColorStop(0.5, `rgba(160,220,255,${sc.waveCrash * 0.25})`);
+    crashG.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = crashG;
+    ctx.fillRect(0, oceanY - h*0.03, w, h * 0.09);
+    ctx.restore();
+  }
+
+  // ── 5. Scrolling road dashes ──────────────────────────────────────────
+  const roadY = h * 0.74;
+  const roadH = h * 0.20;
+  const baseCarSpeed = 0.0012 * w;
+  const scrollSpeed = baseCarSpeed * (1 + energy * 0.6 + cheer * 0.8);
+  sc.roadScroll = (sc.roadScroll + scrollSpeed * 0.016) % (w / 12);
+  ctx.fillStyle = '#f5e878';
+  const dashW = w * 0.055, dashH = 4, dashGap = w / 12;
+  for (let di = -1; di < 13; di++) {
+    const dx = di * dashGap + sc.roadScroll - dashGap;
+    ctx.fillRect(dx, roadY + roadH * 0.48, dashW, dashH);
+  }
+
+  // ── 6. Palm trees ─────────────────────────────────────────────────────
+  for (const palm of sc.palms) {
+    const swayT = Math.sin(now * 0.001 * palm.swaySpeed + palm.swayPhase) * (0.12 + energy * 0.18 + cheer * 0.35);
+    const py = palm.side === 'top'
+      ? roadY - 10
+      : roadY + roadH + 5;
+    const px = palm.xFrac * w;
+    const flipY = palm.side === 'bottom' ? -1 : 1;
+    ctx.save();
+    ctx.scale(1, flipY);
+    _drawPalmTree(ctx, px, -py * flipY, palm.scale * (h / 600), swayT, energy);
+    ctx.restore();
+  }
+
+  // ── 7. Seagulls ───────────────────────────────────────────────────────
+  for (const g of sc.gulls) {
+    g.flapPhase += 0.10 + energy * 0.06;
+    g.x += g.vx * (1 + energy * 0.3);
+    g.y += g.vy;
+    // Scared: rapid flutter + flee upward
+    if (g.scared > 0) {
+      g.scared *= 0.92; g.vy = g.vy * 0.85 - 0.2;
+    } else {
+      g.vy *= 0.92;
+      g.y += Math.sin(now * 0.001 + g.flapPhase * 0.5) * 0.3;
+    }
+    if (g.x > w + 50)  { g.x = -40; g.y = h*(0.08 + Math.random()*0.30); }
+    if (g.x < -50)     { g.x = w + 40; g.y = h*(0.08 + Math.random()*0.30); }
+    if (g.y < h*0.03)  { g.vy = Math.abs(g.vy) + 0.3; }
+    if (g.y > h*0.48)  { g.vy = -0.5 - Math.random()*0.5; }
+    _drawSeagull(ctx, g.x, g.y, g.flapPhase, g.scale, energy);
+  }
+
+  // ── 8. Cars (with seated robots) ─────────────────────────────────────
+  // Sort by lane so far lane draws first (depth order)
+  const sortedCars = [...sc.cars].sort((a,b) => b.lane - a.lane);
+
+  // Event reactions
+  if (cheer > (sc.lastCheer + 0.18)) {
+    // Speed burst + honk all cars
+    for (const c of sc.cars) { c.honkFlash = 1; c.speed = Math.min(0.003, c.speed * 1.8); }
+  }
+  if (move > 0.35 && Math.random() < move * 0.25) {
+    const rc = sc.cars[Math.floor(Math.random() * sc.cars.length)];
+    rc.honkFlash = 0.7;
+    sc.notes.push({ x: rc.xFrac * w + w*0.08, y: h * (0.72 + rc.lane * 0.04), vy: -1.2, vx: 0.5, life: 1, glyph: ['♪','♫','🎵'][Math.floor(Math.random()*3)] });
+  }
+
+  for (const car of sortedCars) {
+    car.xFrac += car.speed * (1 + energy * 0.5);
+    if (car.xFrac > 1.25) car.xFrac = -0.25;
+    const carX = car.xFrac * w;
+    const laneOffset = car.lane === 0 ? h * 0.795 : h * 0.755;
+    // Scale: near lane bigger, far lane smaller
+    const laneScale = car.lane === 0 ? 1.0 : 0.72;
+    ctx.save();
+    ctx.scale(laneScale, laneScale);
+    const scaledX = carX / laneScale;
+    const scaledY = laneOffset / laneScale;
+    _drawConvertible(ctx, scaledX, scaledY, w, h, car, beatT, energy, cheer, drop,
+                     [ar, ag, ab], [gr, gg, gb], now);
+    ctx.restore();
+  }
+
+  // ── 9. Floating music notes ───────────────────────────────────────────
+  sc.notes = sc.notes.filter(n => n.life > 0.05);
+  for (const n of sc.notes) {
+    n.x += n.vx; n.y += n.vy; n.vy *= 0.97; n.life -= 0.018;
+    ctx.save();
+    ctx.globalAlpha = n.life;
+    ctx.font = `${Math.floor(16 + n.life * 8)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(${ar},${ag},${ab},${n.life})`;
+    ctx.shadowColor = `rgba(${ar},${ag},${ab},0.6)`;
+    ctx.shadowBlur = 8;
+    ctx.fillText(n.glyph, n.x, n.y);
+    ctx.restore();
+  }
+
+  // ── 10. Board edge shimmer on line clears ─────────────────────────────
+  if (cheer > 0.55 && _pr) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const eg = ctx.createRadialGradient(_pr.x+_pr.w/2, _pr.y+_pr.h/2, _pr.w*0.3,
+                                         _pr.x+_pr.w/2, _pr.y+_pr.h/2, Math.max(_pr.w,_pr.h)*0.88);
+    const ca = (cheer-0.55)*0.70;
+    eg.addColorStop(0,'rgba(0,0,0,0)');
+    eg.addColorStop(0.55,`rgba(${ar},${ag},${ab},${ca*0.25})`);
+    eg.addColorStop(0.82,`rgba(255,230,80,${ca*0.45})`);
+    eg.addColorStop(1,'rgba(255,200,40,0)');
+    ctx.fillStyle = eg;
+    ctx.fillRect(_pr.x-_pr.w*0.5,_pr.y-_pr.h*0.25,_pr.w*2,_pr.h*1.5);
+    ctx.restore();
+  }
+
+  // ── 11. Slow cars back down after cheer ───────────────────────────────
+  for (const car of sc.cars) {
+    if (car.speed > 0.0018) car.speed = Math.max(0.0008, car.speed * 0.985);
+  }
+
+  sc.lastCheer = cheer;
+  sc.lastDrop  = drop;
+  sc.lastMove  = move;
+
+  // ── 12. Play-area destination-out cutout ──────────────────────────────
+  if (playRects.length) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    for (const pr of playRects) { ctx.fillStyle = '#000'; ctx.fillRect(pr.x,pr.y,pr.w,pr.h); }
+    ctx.restore();
+  }
+}
+
+
 function drawBackground() {
   const theme = getTheme(level);
   const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
@@ -14791,7 +15472,7 @@ function drawBackground() {
   // future "physical" background object) from rendering on top of the
   // player's board. Margin = 12px to give the silhouette glow a little
   // breathing room around the canvas edge so it doesn't visibly clip.
-  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone' || style === 'haze' || style === 'robot-city' || style === 'cathedral' || style === 'food-fight');
+  const usesPlayAreaMask = (style === 'violins' || style === 'matrix-rain' || style === 'ferrari-highway' || style === 'cheese-whips' || style === 'dancehall' || style === 'zen-drift' || style === 'jazz-club' || style === 'office-rage' || style === 'galaxy' || style === 'warzone' || style === 'haze' || style === 'robot-city' || style === 'cathedral' || style === 'food-fight' || style === 'beach-cruise');
   // Cache getBoundingClientRect — forced layout reflow every frame is very
   // expensive. Invalidate only when canvas size or vs-mode changes.
   const _vsMode = document.body.classList.contains('vs-mode');
@@ -14917,10 +15598,13 @@ function drawBackground() {
     return;
   }
   // Tacos (Level 16): chaotic taco restaurant with a massive food fight.
-  // Flying ingredients, hot sauce splats, silhouette patrons pelting each
-  // other — everything reacts to moves, drops, and line clears.
   if (style === 'food-fight') {
     drawFoodFightScene(theme, now, playRects);
+    return;
+  }
+  // Living My Life (Level 17): robots in convertibles cruising to the beach.
+  if (style === 'beach-cruise') {
+    drawBeachCruiseScene(theme, now, playRects);
     return;
   }
 
