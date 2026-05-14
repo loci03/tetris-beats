@@ -1486,7 +1486,7 @@
     <span>Announcer voice <span class="opt-hint">(V)</span><span id="voice-muted-badge">MUTED</span></span>
   </label>
   <div id="start-leaderboard" class="leaderboard" aria-live="polite">
-    <h3>Arcade <span class="lb-mode" id="lb-mode-label">STORY</span></h3>
+    <h3>High Scores <span class="lb-mode" id="lb-mode-label">ARCADE</span></h3>
     <div class="lb-body"></div>
   </div>
   </div><!-- /#mode-options -->
@@ -16497,9 +16497,13 @@ window.addEventListener('resize', () => positionP2Monitor());
     if (m === 'daily')    return 'daily';
     return 'story';
   };
+  const lbModeLabel = (m) => {
+    if (m === 'story') return 'ARCADE';
+    return m.toUpperCase();
+  };
   const refreshLb = () => {
     _currentLbMode = lbModeFor(gameMode);
-    if (lbLabel) lbLabel.textContent = _currentLbMode.toUpperCase() + (isLowerBetterMode(_currentLbMode) ? ' · TIME' : '');
+    if (lbLabel) lbLabel.textContent = lbModeLabel(_currentLbMode) + (isLowerBetterMode(_currentLbMode) ? ' · TIME' : '');
     if (typeof renderStartLeaderboard === 'function') renderStartLeaderboard();
   };
   // ── Tier-1 tab switch ──
