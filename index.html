@@ -762,8 +762,17 @@
     50%      { transform: translateX(-50%) scale(1.06); }
   }
   @media (max-width: 720px) {
-    #mode-hud { padding: 6px 14px; min-width: 160px; top: 4px; }
-    #mode-hud .mh-primary   { font-size: 22px; }
+    /* On mobile the HUD moves to the bottom, sitting just above the fixed
+       touch-control strip (~90px tall + safe-area). This keeps it clear of
+       the score/hold/next panels that occupy the top of the screen. */
+    #mode-hud {
+      top: auto;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 94px);
+      padding: 5px 14px;
+      min-width: 140px;
+      border-radius: 16px;
+    }
+    #mode-hud .mh-primary   { font-size: 20px; }
     #mode-hud .mh-secondary { font-size: 9px; letter-spacing: 1.5px; }
     #mode-hud .mh-label     { font-size: 8px; letter-spacing: 3px; }
   }
