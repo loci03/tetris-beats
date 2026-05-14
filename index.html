@@ -1106,24 +1106,28 @@
       margin-bottom: 3px;
     }
 
-    /* ── HOLD + NEXT: same fixed compact size ── */
+    /* ── HOLD + NEXT: same fixed compact size, don't stretch ── */
     #hold-panel-box,
     #next-panel-box {
       flex: 0 0 auto;
-      width: 68px;
-      padding: 5px 6px;
+      width: 72px;
+      height: 80px;          /* fixed height — don't stretch to score box */
+      align-self: flex-start;
+      padding: 4px 6px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
     }
-    #hold-canvas { width: 54px; height: 40px; }
-    #next-canvas { width: 54px; height: 40px; }
+    #hold-canvas { width: 56px; height: 46px; }
+    #next-canvas { width: 56px; height: 46px; }
 
-    /* ── SCORE BOX: grows to fill remaining space ── */
+    /* ── SCORE BOX: grows to fill remaining space, fixed row height ── */
     #score-panel-box {
       flex: 1 1 auto;
-      padding: 5px 8px 6px;
+      height: 80px;          /* same as hold/next so the row is uniform */
+      align-self: flex-start;
+      padding: 5px 8px 5px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -1255,10 +1259,12 @@
       line-height: 1;
     }
 
-    /* ── MODE HUD: same compact width as HOLD/NEXT when in panel row ── */
+    /* ── MODE HUD: same size as HOLD/NEXT when in panel row ── */
     #mode-hud {
       flex: 0 0 auto;
-      width: 68px;
+      width: 72px;
+      height: 80px;
+      align-self: flex-start;
       padding: 5px 6px;
     }
     #mode-hud .mh-primary   { font-size: 18px; }
@@ -6435,12 +6441,14 @@ function drawHold() {
 function drawNext() {
   nextCtx.fillStyle = 'rgba(8,8,16,1)';
   nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
-  // Show as many next pieces as fit. Layout adapts: horizontal if canvas is wide & short, vertical otherwise.
+  // Use bitmap dimensions for drawing, but CSS display height for mode decision
+  // so a 320px bitmap displayed at 46px CSS still picks the compact single-piece mode.
   const nw = nextCanvas.width, nh = nextCanvas.height;
-  const horizontal = nh < 80;
+  const displayH = nextCanvas.offsetHeight || nh;
+  const horizontal = displayH < 80 || nh < 80;
   if (horizontal) {
-    // Just show the immediate next piece, centered — measure actual bounding box
-    const cs = Math.max(6, Math.min(14, Math.floor(nh / 3.0)));
+    // Single piece centered, sized to fill the canvas compactly.
+    const cs = Math.max(6, Math.min(14, Math.floor(Math.min(nw, nh) / 3.2)));
     if (nextQueue.length) {
       const shape = PIECES[nextQueue[0]] ? PIECES[nextQueue[0]].shape : [[0,0],[1,0],[2,0],[3,0]];
       const cols = shape.map(([c]) => c), rows = shape.map(([,r]) => r);
@@ -16014,6 +16022,9 @@ function startGame() {
   startReplayRecording(_netSeed, gameMode);
   document.getElementById('start-screen').style.display = 'none';
   document.getElementById('game-over-screen').style.display = 'none';
+  // Re-run canvas sizing now that the game UI is fully visible —
+  // getBoundingClientRect on hold/next returns 0 before the overlay is gone.
+  resizeCanvases();
   const vsRes = document.getElementById('vs-result-screen');
   if (vsRes) vsRes.style.display = 'none';
   _vsResultShown = false;
