@@ -1092,24 +1092,69 @@
       padding: 6px 8px;
       min-width: 0;
     }
+    /* All panel-boxes in the left panel row grow equally by default,
+       then we override HOLD and mode-hud to fixed compact size below. */
     .side-panel:first-child .panel-box { flex: 1; }
     .panel-box h3 {
       font-size: 9px;
       margin-bottom: 3px;
     }
-    #score-display {
-      font-size: 20px;
+
+    /* ── HOLD: same fixed compact width as NEXT ── */
+    #hold-panel-box {
+      flex: 0 0 auto;
+      width: 72px;
+      padding: 5px 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
-    #level-display, #lines-display {
-      font-size: 11px;
-    }
-    #era-display {
-      font-size: 9px;
-      margin-top: 2px;
-    }
-    #zone-label { font-size: 9px; }
     #hold-canvas { width: 56px; height: 40px; }
     #next-canvas { width: 56px; height: 40px; }
+
+    /* ── SCORE BOX: grows to fill remaining space, redesigned layout ── */
+    #score-panel-box {
+      flex: 1 1 auto;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0;
+    }
+    #score-display {
+      font-size: 22px;
+      line-height: 1.1;
+    }
+    /* Level + Lines on one compact row */
+    #level-display, #lines-display {
+      font-size: 10px;
+      display: inline;
+    }
+    #lines-display::before { content: ' · '; opacity: 0.45; }
+    #next-level-display {
+      font-size: 8px;
+      letter-spacing: 1px;
+      margin-top: 2px;
+      color: rgba(255,255,255,0.35);
+    }
+    #era-display {
+      font-size: 8px;
+      margin-top: 1px;
+      color: rgba(255,255,255,0.40);
+    }
+
+    /* ── MODE HUD: same compact width as HOLD/NEXT when in panel row ── */
+    #mode-hud {
+      flex: 0 0 auto;
+      width: 72px;
+      padding: 5px 6px;
+    }
+    #mode-hud .mh-primary   { font-size: 18px; }
+    #mode-hud .mh-secondary { font-size: 8px; letter-spacing: 1px; }
+    #mode-hud .mh-label     { font-size: 7px; letter-spacing: 2.5px; }
+
+    #zone-label { font-size: 9px; }
     #touch-controls { display: block; }
     #start-screen h1 { font-size: 38px; letter-spacing: 2px; margin-top: 0; margin-bottom: 6px; }
     #start-screen .sub { font-size: 12px; letter-spacing: 3px; margin-bottom: 18px; }
@@ -1595,11 +1640,11 @@
 <div id="game-container">
   <div class="player-wrap" id="p1-wrap">
     <div class="side-panel">
-      <div class="panel-box">
+      <div class="panel-box" id="hold-panel-box">
         <h3>Hold</h3>
         <div class="mini-grid"><canvas id="hold-canvas" width="100" height="80"></canvas></div>
       </div>
-      <div class="panel-box">
+      <div class="panel-box" id="score-panel-box">
         <div id="score-display">0</div>
         <div id="level-display">Level 1</div>
         <div id="lines-display">Lines: 0</div>
@@ -15065,8 +15110,9 @@ function drawParticles() {
 
 function updateUI() {
   document.getElementById('score-display').textContent = Math.floor(score).toLocaleString();
-  document.getElementById('level-display').textContent = `Level ${level}`;
-  document.getElementById('lines-display').textContent = `Lines: ${lines}`;
+  const _isMobileUI = window.innerWidth <= 720;
+  document.getElementById('level-display').textContent = _isMobileUI ? `L${level}` : `Level ${level}`;
+  document.getElementById('lines-display').textContent = _isMobileUI ? `${lines}` : `Lines: ${lines}`;
   // "X to L<next>" - how many more line clears until the next level. Levels
   // advance every 10 lines, capped at the last theme so L19 just shows "MAX".
   const nextLevelEl = document.getElementById('next-level-display');
