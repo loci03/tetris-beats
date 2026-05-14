@@ -11,14 +11,14 @@
 //                           by ?code=ABCD. CREATE flows generate a fresh code.
 //
 // Storage:
-//   KV namespace `SCORES` holds the JSON top-10 under key "leaderboard".
+//   KV namespace `SCORES` holds the JSON top-50 under key "leaderboard".
 //   Durable Object class `Room` holds per-match state (host/guest WS pairs).
 //
 // CORS is wide-open by design — the client is a static page on github.io and
 // the Worker has no auth surface that could be abused beyond the rate limits
 // and score-cap already enforced in the POST handler.
 
-const MAX_SCORES = 10;
+const MAX_SCORES = 50;
 const MAX_SCORE_VALUE = 10_000_000;
 const VALID_MODES = new Set(['story', 'marathon', 'sprint', 'ultra', 'daily']);
 
