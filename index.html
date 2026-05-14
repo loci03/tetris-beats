@@ -1051,7 +1051,7 @@
       flex-wrap: wrap;
       justify-content: center;
       gap: 6px;
-      padding: 0 6px 140px;
+      padding: 0 6px 108px;
       width: 100%;
     }
     /* The old mobile layout expected side-panels + main-canvas to live
@@ -2772,21 +2772,18 @@ function computeCellSize() {
   }
   // Mobile: reserve the minimum space actually consumed by non-board UI so
   // the board can zoom in as far as possible. Measured values:
-  //   panels strip ~82px, touch controls ~130px (after tightening),
-  //   safe-area home indicator ~30px, 4px buffer.
+  //   top panel strip: 80px fixed height + 6px body top-padding = 86px
+  //   touch controls: 60px buttons + hint + padding ≈ 70px
+  //   iOS safe-area home indicator ≈ 20px
+  //   4px buffer
   const maxW = Math.max(220, vw - 20);
-  // Alfred's monitor is absolute-positioned to the right of the player's
-  // board, so vs-mode reserves no extra vertical space.
-  // Touch controls dropped 130px → ~80px after we removed the directional
-  // button row (now just HOLD/ZONE/DROP/pause + hint). Reclaim those ~50px
-  // for the play field - board reads bigger.
-  const reservedH = 82 + 80 + 30 + 4;
+  const reservedH = 86 + 70 + 20 + 4; // = 180px
   const maxH = Math.max(240, vh - reservedH);
   const byW = Math.floor(maxW / COLS);
   const byH = Math.floor(maxH / ROWS);
-  // Cap raised from 30 → 36 so tall phones (iPhone 15 Pro etc.) can actually
-  // use the vertical space instead of leaving huge empty margins.
-  return Math.max(12, Math.min(36, Math.min(byW, byH)));
+  // Cap at 40 — lets tall phones (iPhone 15 Pro etc.) use the extra vertical
+  // space that was previously left as empty margin below the board.
+  return Math.max(12, Math.min(40, Math.min(byW, byH)));
 }
 
 // Throttle resizeCanvases triggers - iOS fires visualViewport `scroll` rapidly
