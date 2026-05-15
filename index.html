@@ -809,9 +809,9 @@
       /* Shrink text to fit the panel slot */
       flex: 1 1 auto;
     }
-    #mode-hud .mh-primary   { font-size: 18px; }
-    #mode-hud .mh-secondary { font-size: 8px; letter-spacing: 1px; }
-    #mode-hud .mh-label     { font-size: 7px; letter-spacing: 2.5px; }
+    #mode-hud .mh-primary   { font-size: 16px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-secondary { font-size: 7px; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-label     { font-size: 6px; letter-spacing: 2px; white-space: nowrap; }
   }
   #zone-active-badge {
     position: fixed;
@@ -1061,12 +1061,16 @@
       flex-direction: row;
       flex-wrap: wrap;
       justify-content: center;
+      /* flex-start: pack rows to the top so the panel row never shifts
+         below the canvas row regardless of available height. */
+      align-content: flex-start;
       gap: 6px;
       width: 100%;
     }
     .side-panel {
       flex-direction: row;
       min-width: 0;
+      overflow: hidden;   /* contain any overflowing panel content */
       gap: 6px;
     }
     .side-panel:first-child {
@@ -1254,15 +1258,18 @@
 
     /* ── MODE HUD: same size as HOLD/NEXT when in panel row ── */
     #mode-hud {
-      flex: 0 0 auto;
+      flex: 0 0 72px;   /* shorthand locks basis to 72px, no grow/shrink */
+      min-width: 0;     /* override base CSS min-width:220px so it stays 72px */
+      max-width: 72px;
       width: 72px;
       height: 80px;
       align-self: flex-start;
       padding: 5px 6px;
+      overflow: hidden;
     }
-    #mode-hud .mh-primary   { font-size: 18px; }
-    #mode-hud .mh-secondary { font-size: 8px; letter-spacing: 1px; }
-    #mode-hud .mh-label     { font-size: 7px; letter-spacing: 2.5px; }
+    #mode-hud .mh-primary   { font-size: 16px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-secondary { font-size: 7px; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-label     { font-size: 6px; letter-spacing: 2px; white-space: nowrap; }
 
     #zone-label { font-size: 9px; }
     #touch-controls { display: block; }
