@@ -1076,6 +1076,12 @@
     .side-panel:first-child {
       order: 1;
       flex: 1 1 auto;
+      /* Cap width so the right panel (NEXT, ~80px) always fits in the
+         same flex row. Without this, flex-basis:auto on the left panel
+         resolves to its max-content-width in marathon mode (hold+score+
+         marathon-hud), which can fill the whole row and push NEXT to
+         line 2 alongside the canvas — causing the "shifted right" bug. */
+      max-width: calc(100% - 80px - 6px);
     }
     .side-panel:last-child {
       order: 2;
