@@ -15034,6 +15034,131 @@ function _initBeachScene(w, h) {
 }
 
 // Draw a convertible car with a seated robot driver (and optional passenger)
+// Draw a brass saxophone held by the robot driver.
+// (sx, sy) = top of the saxophone (mouthpiece end).
+// len = total instrument length, ang = tilt from vertical.
+// beatT drives a gentle playing-breath pulse on the bell glow.
+function _drawSaxophone(ctx, sx, sy, len, ang, energy, beatT, accentRgb) {
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(ang);
+
+  const bw  = len * 0.13;  // body tube width at top
+  const sax = '#c8860a';   // brass body
+  const hi  = '#f5d070';   // highlight
+  const dk  = '#8a5010';   // dark shadow / keys
+
+  // Radial brass gradient applied across the tube width
+  const bg = ctx.createLinearGradient(-bw, 0, bw, 0);
+  bg.addColorStop(0, hi); bg.addColorStop(0.35, sax);
+  bg.addColorStop(0.70, dk); bg.addColorStop(1, hi);
+
+  // ── Mouthpiece ──
+  // Dark rubber/ebonite bec
+  ctx.fillStyle = '#1e1208';
+  ctx.beginPath();
+  ctx.roundRect(-bw*0.22, -len*0.09, bw*0.44, len*0.09, bw*0.08);
+  ctx.fill();
+  // Reed (cream coloured sliver on one side)
+  ctx.fillStyle = '#d4b060';
+  ctx.fillRect(-bw*0.10, -len*0.085, bw*0.20, len*0.08);
+
+  // ── S-neck ──
+  ctx.strokeStyle = sax; ctx.lineWidth = bw * 0.60;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(bw*0.9, len*0.04, -bw*0.7, len*0.11, 0, len*0.17);
+  ctx.stroke();
+  // Neck octave key bump
+  ctx.fillStyle = dk;
+  ctx.beginPath(); ctx.arc(-bw*0.10, len*0.08, bw*0.18, 0, Math.PI*2); ctx.fill();
+
+  // ── Main body (tapered trapezoid) ──
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.moveTo(-bw*0.55, len*0.17);
+  ctx.lineTo(-bw*0.78, len*0.73);
+  ctx.lineTo( bw*0.78, len*0.73);
+  ctx.lineTo( bw*0.55, len*0.17);
+  ctx.closePath(); ctx.fill();
+  // Body highlight stripe
+  ctx.fillStyle = 'rgba(255,255,200,0.22)';
+  ctx.fillRect(-bw*0.10, len*0.19, bw*0.16, len*0.50);
+  // Left side shadow stripe
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fillRect(-bw*0.68, len*0.19, bw*0.16, len*0.50);
+
+  // ── Key pads (6 pads, alternating left/right) ──
+  const pads = [0.23, 0.31, 0.39, 0.47, 0.55, 0.63];
+  const sides = [ 1,   -1,    1,   -1,    1,   -1];
+  for (let ki = 0; ki < pads.length; ki++) {
+    const py = len * pads[ki];
+    const px = bw * sides[ki] * 0.52;
+    const pr = bw * 0.24;
+    // Key lever arm
+    ctx.strokeStyle = dk; ctx.lineWidth = bw * 0.10;
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(px, py); ctx.stroke();
+    // Pad cup
+    ctx.fillStyle = '#b89828'; ctx.strokeStyle = dk; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    // Pad centre hole
+    ctx.fillStyle = dk;
+    ctx.beginPath(); ctx.arc(px, py, pr*0.42, 0, Math.PI*2); ctx.fill();
+    // Tiny specular dot
+    ctx.fillStyle = 'rgba(255,255,200,0.55)';
+    ctx.beginPath(); ctx.arc(px - pr*0.25, py - pr*0.25, pr*0.18, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ── Bell (curved flare) ──
+  ctx.fillStyle = bg;
+  ctx.beginPath();
+  ctx.moveTo(-bw*0.78, len*0.73);
+  ctx.bezierCurveTo(-bw*1.05, len*0.80, -bw*1.70, len*0.88, -bw*1.90, len*0.97);
+  ctx.bezierCurveTo(-bw*1.65, len*1.04, bw*0.50, len*1.01, bw*0.78, len*0.73);
+  ctx.closePath(); ctx.fill();
+  // Bell rim highlight
+  ctx.strokeStyle = hi; ctx.lineWidth = bw*0.20; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-bw*1.90, len*0.97);
+  ctx.bezierCurveTo(-bw*1.55, len*1.06, bw*0.25, len*1.03, bw*0.78, len*0.73);
+  ctx.stroke();
+
+  // ── Bell glow — warm brass light from the bell opening ──
+  // Pulses with the beat to suggest the robot is actually playing.
+  const breathe = 0.35 + Math.sin(beatT * Math.PI * 2) * 0.18 + energy * 0.22;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const bellG = ctx.createRadialGradient(
+    -bw*1.55, len*0.97, 0,
+    -bw*1.55, len*0.97, bw * 2.2
+  );
+  bellG.addColorStop(0,   `rgba(255,200,60,${breathe * 0.65})`);
+  bellG.addColorStop(0.5, `rgba(255,160,20,${breathe * 0.28})`);
+  bellG.addColorStop(1,   'rgba(255,120,0,0)');
+  ctx.fillStyle = bellG;
+  ctx.beginPath(); ctx.arc(-bw*1.55, len*0.97, bw*2.2, 0, Math.PI*2); ctx.fill();
+  // Accent-coloured secondary shimmer
+  if (accentRgb) {
+    const [ar,ag,ab] = accentRgb;
+    const ag2 = ctx.createRadialGradient(-bw*1.55, len*0.97, 0, -bw*1.55, len*0.97, bw*3.5);
+    ag2.addColorStop(0,   `rgba(${ar},${ag},${ab},${breathe * 0.18})`);
+    ag2.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = ag2;
+    ctx.beginPath(); ctx.arc(-bw*1.55, len*0.97, bw*3.5, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+
+  // ── Strap ring (where shoulder strap attaches) ──
+  ctx.fillStyle = dk;
+  ctx.beginPath(); ctx.arc(-bw*0.10, len*0.45, bw*0.16, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#6a3808'; ctx.lineWidth = bw*0.08;
+  ctx.beginPath(); ctx.arc(-bw*0.10, len*0.45, bw*0.22, 0, Math.PI*2); ctx.stroke();
+
+  ctx.restore();
+}
+
+
 function _drawConvertible(ctx, cx, baseY, w, h, car, beatT, energy, cheer, drop, accentRgb, glowRgb, now) {
   const carW = w * 0.18, carH = h * 0.055;
   const bodyY = baseY - carH;
@@ -15119,40 +15244,61 @@ function _drawConvertible(ctx, cx, baseY, w, h, car, beatT, energy, cheer, drop,
     ctx.beginPath(); ctx.arc(wx, wheelY, wheelR * 0.18, 0, Math.PI*2); ctx.fill();
   }
 
-  // ── Seated robot driver ──
-  const robotH = carH * 1.05;
-  const driverX = cx + carW * 0.12;
-  const driverFootY = bodyY + 2;
-  // We reuse _drawRobot but scaled for the seated-in-car pose:
-  // just the torso+head+arms visible above the car door
+  // ── Seated robot driver — big, playing saxophone ──
+  // robotH controls how tall the robot is relative to the car.
+  // Setting it to 2.8× carH makes the robot tower prominently above
+  // the car door so the sax and head are clearly readable.
+  const robotH = carH * 2.8;
+  const robotEffH = robotH * 0.95;
+  const driverX = cx + carW * 0.18;
+  // footY placed so the car door falls at approximately hip height —
+  // gives the "seated driver" silhouette with torso + head above the roof.
+  const robotFootY = bodyY + robotEffH * 0.42;
+
   ctx.save();
   ctx.beginPath();
-  ctx.rect(cx - carW*0.48, bodyY - robotH*1.4, carW*0.96, robotH*1.4);
+  ctx.rect(cx - carW*0.48, bodyY - robotH * 2.0, carW * 0.96, robotH * 2.0);
   ctx.clip();
-  _drawRobot(ctx, driverX, driverFootY + robotH * 0.55,
-             robotH * 0.95,
+
+  _drawRobot(ctx, driverX, robotFootY, robotEffH,
              beatT * Math.PI * 2 + car.bobPhase,
              energy, cheer, 0, accentRgb, glowRgb, beatT);
+
+  // Saxophone held at the robot's torso/arm level
+  // shoulderY ≈ footY - height*(legL_frac + bodyH_frac - bodyH_frac*0.10)
+  //           ≈ footY - robotEffH * 0.68
+  const saxShoulderY = robotFootY - robotEffH * 0.68;
+  const saxSize = robotEffH * 0.58;
+  // Playing sway — small rocking of the sax with the beat
+  const saxAng = 0.28 + Math.sin(beatT * Math.PI * 2 + car.bobPhase) * 0.07;
+  _drawSaxophone(ctx,
+    driverX + robotEffH * 0.06,   // slightly right of robot centre
+    saxShoulderY - saxSize * 0.08, // start just above shoulder
+    saxSize, saxAng, energy, beatT, accentRgb);
+
   ctx.restore();
 
   // ── Passenger robot (slightly smaller, sunglasses) ──
   if (car.robotTypes[1] === 1) {
-    const passX = cx - carW * 0.10;
+    const passH2   = robotH * 0.82;
+    const passEffH = passH2 * 0.95;
+    const passX    = cx - carW * 0.08;
+    const passFootY = bodyY + passEffH * 0.42;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(cx - carW*0.48, bodyY - robotH*1.4, carW*0.40, robotH*1.4);
+    ctx.rect(cx - carW*0.48, bodyY - passH2 * 2.0, carW * 0.45, passH2 * 2.0);
     ctx.clip();
-    _drawRobot(ctx, passX, driverFootY + robotH * 0.55,
-               robotH * 0.80,
+    _drawRobot(ctx, passX, passFootY, passEffH,
                beatT * Math.PI * 2 + car.bobPhase + 0.8,
                energy, cheer * 0.8, 0, accentRgb, glowRgb, beatT);
     ctx.restore();
     // Sunglasses on passenger
     ctx.save();
-    const psHeadY = driverFootY + robotH * 0.55 - robotH * 0.80 * 0.88;
-    ctx.fillStyle = 'rgba(20,10,5,0.88)';
+    const psHeadY = passFootY - passEffH * 0.88;
+    ctx.fillStyle = 'rgba(20,10,5,0.90)';
     ctx.beginPath();
-    ctx.roundRect(passX - robotH*0.07, psHeadY - robotH*0.072, robotH*0.16, robotH*0.040, 2);
+    ctx.roundRect(passX - passEffH*0.085, psHeadY - passEffH*0.075,
+                  passEffH*0.18, passEffH*0.042, 3);
     ctx.fill();
     ctx.restore();
   }
