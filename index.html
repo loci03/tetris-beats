@@ -15086,8 +15086,16 @@ function _drawSaxophone(ctx, sx, sy, len, ang, energy, beatT, accentRgb) {
   ctx.save();
   ctx.translate(sx, sy);
   ctx.rotate(ang);
-  const bw = len * 0.13;
-  const sax = '#c8860a', hi = '#f5d070', dk = '#8a5010';
+  // Outer glow so sax stands out against any background
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
+  const glowG=ctx.createRadialGradient(0,len*0.5,0,0,len*0.5,len*0.55);
+  glowG.addColorStop(0,`rgba(255,210,60,0.28)`);
+  glowG.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=glowG; ctx.fillRect(-len*0.6,-len*0.1,len*1.2,len*1.2);
+  ctx.restore();
+  const bw = len * 0.16;   // thicker body — more visible at small sizes
+  const sax = '#d4920e', hi = '#ffe070', dk = '#7a4008';
   const bg = ctx.createLinearGradient(-bw,0,bw,0);
   bg.addColorStop(0,hi); bg.addColorStop(0.35,sax); bg.addColorStop(0.70,dk); bg.addColorStop(1,hi);
   // Mouthpiece
@@ -15394,33 +15402,67 @@ function _drawConvertible(ctx,cx,baseY,w,h,car,beatT,energy,cheer,drop,accentRgb
   }
 
   // ── Robot + Saxophone ────────────────────────────────────────────────
-  // Draw order: robot first (clipped to car), then saxophone on top of
-  // everything — this way the sax is always visible in front of the robot
-  // body, mouthpiece at face level, body crossing where the hands are.
-  const robotH = carH * 2.8;
+  const robotH   = carH * 2.8;
   const robotEffH = robotH * 0.95;
-  const driverX = cx + carW * 0.14;
+  const driverX  = cx + carW * 0.14;
   const robotFootY = bodyY + robotEffH * 0.42;
 
-  // 1. Robot (clipped to above car door)
+  // Sax geometry — calculated before robot so grips align
+  const saxX     = driverX + robotEffH * 0.10;
+  const saxTopY  = robotFootY - robotEffH * 0.84;  // mouthpiece at mouth
+  const saxLen   = robotEffH * 0.72;               // mouth down to bell
+  const saxAng   = 0.40 + Math.sin(beatT*Math.PI*2+car.bobPhase)*0.05;
+  // Where the two hands grip the sax (in the sax's local tilted frame)
+  const saxSin   = Math.sin(saxAng), saxCos = Math.cos(saxAng);
+  const grip1Frac = 0.28;  // upper hand (left) on the neck / upper keys
+  const grip2Frac = 0.60;  // lower hand (right) on the lower body
+  const grip1X = saxX + saxSin * saxLen * grip1Frac;
+  const grip1Y = saxTopY + saxCos * saxLen * grip1Frac;
+  const grip2X = saxX + saxSin * saxLen * grip2Frac;
+  const grip2Y = saxTopY + saxCos * saxLen * grip2Frac;
+
+  // 1. Robot — force cheer=0.75 so arms raise toward saxophone position
   ctx.save();
   ctx.beginPath();
   ctx.rect(cx-carW*0.48, bodyY-robotH*2.0, carW*0.96, robotH*2.0);
   ctx.clip();
   _drawRobot(ctx, driverX, robotFootY, robotEffH,
              beatT*Math.PI*2+car.bobPhase,
-             energy, cheer, 0, accentRgb, glowRgb, beatT);
+             Math.max(energy, 0.35), 0.75,   // 0.75 cheer → punchUp=1 → arms raised
+             0, accentRgb, glowRgb, beatT);
   ctx.restore();
 
-  // 2. Saxophone drawn IN FRONT of robot so it's always visible.
-  //    Mouthpiece at mouth level (~85% up from foot), body angles forward.
-  //    Length is kept short so bell doesn't go into car body.
-  const saxTopY = robotFootY - robotEffH * 0.84; // at mouth
-  const saxLen  = robotEffH * 0.52;              // mouth → below shoulder
-  const saxAng  = 0.32 + Math.sin(beatT*Math.PI*2+car.bobPhase)*0.06;
-  _drawSaxophone(ctx,
-    driverX + robotEffH * 0.06,  // slightly right of robot centre
-    saxTopY, saxLen, saxAng, energy, beatT, accentRgb);
+  // 2. Saxophone drawn IN FRONT of robot — always visible
+  _drawSaxophone(ctx, saxX, saxTopY, saxLen, saxAng, energy, beatT, accentRgb);
+
+  // 3. Robot hand grips drawn OVER the sax — makes it clear the robot is
+  //    holding it. Dark rounded rectangles at the grip positions, tilted
+  //    perpendicular to the saxophone body.
+  const gripW = robotEffH * 0.10, gripH = robotEffH * 0.07;
+  const perpAng = saxAng - Math.PI * 0.5;  // perpendicular to sax axis
+  const bodyColor = 'rgba(55,52,75,0.95)';
+  const accentStr = accentRgb ? `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.80)` : 'rgba(120,200,255,0.80)';
+
+  // Upper grip (left hand on neck/upper keys)
+  ctx.save();
+  ctx.translate(grip1X, grip1Y);
+  ctx.rotate(perpAng + 0.15);
+  ctx.fillStyle = bodyColor;
+  ctx.fillRect(-gripW*0.55, -gripH*0.5, gripW, gripH);
+  // Knuckle accent
+  ctx.fillStyle = accentStr;
+  ctx.fillRect(-gripW*0.52, -gripH*0.52, gripW*0.96, gripH*0.22);
+  ctx.restore();
+
+  // Lower grip (right hand supporting lower body)
+  ctx.save();
+  ctx.translate(grip2X, grip2Y);
+  ctx.rotate(perpAng - 0.20);
+  ctx.fillStyle = bodyColor;
+  ctx.fillRect(-gripW*0.50, -gripH*0.5, gripW*0.95, gripH);
+  ctx.fillStyle = accentStr;
+  ctx.fillRect(-gripW*0.47, -gripH*0.52, gripW*0.88, gripH*0.22);
+  ctx.restore();
 
   // ── Passenger robot ──────────────────────────────────────────────────
   if(car.robotTypes[1]===1){
