@@ -809,9 +809,9 @@
       /* Shrink text to fit the panel slot */
       flex: 1 1 auto;
     }
-    #mode-hud .mh-primary   { font-size: 16px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-secondary { font-size: 7px; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-label     { font-size: 6px; letter-spacing: 2px; white-space: nowrap; }
+    #mode-hud .mh-primary   { font-size: 14px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-secondary { font-size: 7px; letter-spacing: 0px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-label     { font-size: 6px; letter-spacing: 1px; white-space: nowrap; }
   }
   #zone-active-badge {
     position: fixed;
@@ -1273,9 +1273,9 @@
       padding: 5px 6px;
       overflow: hidden;
     }
-    #mode-hud .mh-primary   { font-size: 16px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-secondary { font-size: 7px; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-label     { font-size: 6px; letter-spacing: 2px; white-space: nowrap; }
+    #mode-hud .mh-primary   { font-size: 14px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-secondary { font-size: 7px; letter-spacing: 0px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-label     { font-size: 6px; letter-spacing: 1px; white-space: nowrap; }
 
     #zone-label { font-size: 9px; }
     #touch-controls { display: block; }
@@ -16497,8 +16497,8 @@ function updateUI() {
     } else if (gameMode === 'marathon') {
       const goal = _marathonGoal;
       elLab.textContent = 'MARATHON';
-      elPri.textContent = `${lines} / ${goal}`;
-      elSec.textContent = `${Math.floor(score).toLocaleString()} · L${level}`;
+      elPri.textContent = `${lines}/${goal}`;   // compact — no spaces, fits in 72px slot
+      elSec.textContent = `L${level} · ${lines}`;
       modeHud.classList.remove('is-urgent');
       modeHud.style.display = '';
     } else {
