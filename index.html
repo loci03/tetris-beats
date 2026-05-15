@@ -16187,7 +16187,7 @@ function drawBeachCruiseScene(theme,now,playRects){
 
   // ── 20. Beach volleyball — drawn after cutout so it's always visible ────────
   _drawBeachVolleyball(ctx, w, h, sc.vb, now, beatT, energy, cheer, drop, move,
-                       accentRgb ? [ar, ag, ab] : null);
+                       [ar, ag, ab]);
 
   // ── 21. BIG sax notes drawn AFTER cutout so board mask doesn't erase them ──
   sc.saxNotes=sc.saxNotes.filter(n=>n.life>0.04);
