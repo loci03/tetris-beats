@@ -14931,7 +14931,8 @@ function drawBlockBeachball(context, x, y, color, size, alpha, theme) {
   context.save();
   context.globalCompositeOperation = 'lighter';
   const halo = context.createRadialGradient(cx, cy, r*0.4, cx, cy, r*1.1);
-  halo.addColorStop(0, color.replace('rgb','rgba').replace(')', ',0.35)'));
+  const [_hr,_hg,_hb] = hexToRgb(color) || [255,200,100];
+  halo.addColorStop(0, `rgba(${_hr},${_hg},${_hb},0.35)`);
   halo.addColorStop(1, 'rgba(0,0,0,0)');
   context.fillStyle = halo;
   context.beginPath(); context.arc(cx, cy, r*1.1, 0, Math.PI*2); context.fill();
@@ -15271,6 +15272,13 @@ function _drawSkeleton(ctx, sx, sy, scale, phase, rattle, energy) {
 
 // ── Main nuclear waste scene draw ──────────────────────────────────────────
 function drawNuclearWasteScene(theme, now, playRects) {
+  // Safari <15.4 polyfill
+  if (!bgCtx.roundRect) bgCtx.roundRect = function(x,y,w2,h2,r){
+    r=Math.min(r,w2/2,h2/2);
+    this.moveTo(x+r,y);this.lineTo(x+w2-r,y);this.quadraticCurveTo(x+w2,y,x+w2,y+r);
+    this.lineTo(x+w2,y+h2-r);this.quadraticCurveTo(x+w2,y+h2,x+w2-r,y+h2);
+    this.lineTo(x+r,y+h2);this.quadraticCurveTo(x,y+h2,x,y+h2-r);
+    this.lineTo(x,y+r);this.quadraticCurveTo(x,y,x+r,y);};
   const ctx = bgCtx;
   const w = bgCanvas.width, h = bgCanvas.height;
   if (!_nukeScene || _nukeScene.w !== w || _nukeScene.h !== h) _initNukeScene(w, h);
