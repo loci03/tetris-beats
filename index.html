@@ -2829,6 +2829,12 @@ function scheduleResize() {
 
 function resizeCanvases() {
   const p1Cell = computeCellSize();
+  // Guard: during active gameplay on mobile, skip if CELL hasn't changed.
+  // Hard-drop swipes can briefly trigger visualViewport resize events (iOS
+  // URL-bar flicker) that oscillate CELL by ±1px every frame, causing the
+  // canvas to resize and the flex layout to reflow — visually the board
+  // "shifts". Only commit the resize when the cell size actually changes.
+  if (gameStarted && !gameOver && window.innerWidth <= 720 && p1Cell === CELL) return;
   CELL = p1Cell;
   // Size every player's main canvas to the current CELL. In vs mode, P2's
   // Alfred-mini canvas uses a smaller CELL so it doesn't dominate the screen.
@@ -15387,20 +15393,16 @@ function _drawConvertible(ctx,cx,baseY,w,h,car,beatT,energy,cheer,drop,accentRgb
     ctx.beginPath(); ctx.arc(wx,wheelY,wheelR*0.22,0,Math.PI*2); ctx.fill();
   }
 
-  // ── Saxophone (drawn first so robot arms appear to overlap / hold it) ─
+  // ── Robot + Saxophone ────────────────────────────────────────────────
+  // Draw order: robot first (clipped to car), then saxophone on top of
+  // everything — this way the sax is always visible in front of the robot
+  // body, mouthpiece at face level, body crossing where the hands are.
   const robotH = carH * 2.8;
   const robotEffH = robotH * 0.95;
   const driverX = cx + carW * 0.14;
   const robotFootY = bodyY + robotEffH * 0.42;
-  // Shoulder approx: footY - effH*(legL_frac+bodyH_frac-bodyH*0.10) ≈ effH*0.62
-  const shoulderApproxY = robotFootY - robotEffH * 0.62;
-  // Mouthpiece at robot mouth (top of head): footY - effH*0.88 + a little
-  const saxTopY = robotFootY - robotEffH * 0.82;
-  const saxLen  = robotEffH * 0.65;
-  const saxAng  = 0.26 + Math.sin(beatT*Math.PI*2+car.bobPhase)*0.07;
-  _drawSaxophone(ctx, driverX+robotEffH*0.08, saxTopY, saxLen, saxAng, energy, beatT, accentRgb);
 
-  // ── Robot (drawn on top of sax — arms appear to grip it) ────────────
+  // 1. Robot (clipped to above car door)
   ctx.save();
   ctx.beginPath();
   ctx.rect(cx-carW*0.48, bodyY-robotH*2.0, carW*0.96, robotH*2.0);
@@ -15409,6 +15411,16 @@ function _drawConvertible(ctx,cx,baseY,w,h,car,beatT,energy,cheer,drop,accentRgb
              beatT*Math.PI*2+car.bobPhase,
              energy, cheer, 0, accentRgb, glowRgb, beatT);
   ctx.restore();
+
+  // 2. Saxophone drawn IN FRONT of robot so it's always visible.
+  //    Mouthpiece at mouth level (~85% up from foot), body angles forward.
+  //    Length is kept short so bell doesn't go into car body.
+  const saxTopY = robotFootY - robotEffH * 0.84; // at mouth
+  const saxLen  = robotEffH * 0.52;              // mouth → below shoulder
+  const saxAng  = 0.32 + Math.sin(beatT*Math.PI*2+car.bobPhase)*0.06;
+  _drawSaxophone(ctx,
+    driverX + robotEffH * 0.06,  // slightly right of robot centre
+    saxTopY, saxLen, saxAng, energy, beatT, accentRgb);
 
   // ── Passenger robot ──────────────────────────────────────────────────
   if(car.robotTypes[1]===1){
