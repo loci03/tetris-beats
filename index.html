@@ -15069,6 +15069,14 @@ function _initBeachScene(w, h) {
 // ── Better convertible car with sports proportions ────────────────────────
 // ── Saxophone ────────────────────────────────────────────────────────────────
 function _drawSaxophone(ctx, sx, sy, len, ang, energy, beatT, accentRgb) {
+  // Safari <15.4 polyfill for roundRect
+  if (!ctx.roundRect) ctx.roundRect = function(x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);
+    this.moveTo(x+r,y); this.lineTo(x+w-r,y);
+    this.quadraticCurveTo(x+w,y,x+w,y+r);
+    this.lineTo(x+w,y+h-r); this.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    this.lineTo(x+r,y+h); this.quadraticCurveTo(x,y+h,x,y+h-r);
+    this.lineTo(x,y+r); this.quadraticCurveTo(x,y,x+r,y); };
   ctx.save();
   ctx.translate(sx, sy);
   ctx.rotate(ang);
@@ -15162,6 +15170,12 @@ function _drawBeachPalmTree(ctx, px, py, scale, swayAng, energy) {
 
 
 function _drawConvertible(ctx,cx,baseY,w,h,car,beatT,energy,cheer,drop,accentRgb,glowRgb,now){
+  if(!ctx.roundRect) ctx.roundRect=function(x,y,w2,h2,r){
+    r=Math.min(r,w2/2,h2/2);
+    this.moveTo(x+r,y);this.lineTo(x+w2-r,y);this.quadraticCurveTo(x+w2,y,x+w2,y+r);
+    this.lineTo(x+w2,y+h2-r);this.quadraticCurveTo(x+w2,y+h2,x+w2-r,y+h2);
+    this.lineTo(x+r,y+h2);this.quadraticCurveTo(x,y+h2,x,y+h2-r);
+    this.lineTo(x,y+r);this.quadraticCurveTo(x,y,x+r,y);};
   const carW=w*0.22, carH=h*0.058;
   const bodyY=baseY-carH;
   const spd=car.speed/(0.0017)*energy;
@@ -15729,24 +15743,30 @@ function drawBeachCruiseScene(theme,now,playRects){
       c.honkFlash=1;
       c.speed=Math.min(0.0030,c.speed*1.9);
     }
-    // Big musical note burst from board-area + from sax bells
-    const bx2=_pr?_pr.x+_pr.w*0.5:w*0.5;
-    const by2=_pr?_pr.y+_pr.h*0.3:h*0.3;
+    // Big musical note burst — spawn from car positions in the side
+    // gutters so they appear OUTSIDE the play-board destination-out mask.
     const glyphs=['♪','♫','♬','♩','🎵','🎶','🎷'];
-    for(let ni=0;ni<12;ni++){
-      const ang=((ni/12)*Math.PI*2)-(Math.PI*0.5);
-      const spd=2.5+Math.random()*3.5;
+    const _laneYs=[h*0.795,h*0.755];
+    for(let ni=0;ni<14;ni++){
+      // Pick a random car as the source (cars are in side areas)
+      const srcCar=sc.cars[Math.floor(Math.random()*sc.cars.length)];
+      const lS=srcCar.lane===0?1.0:0.72;
+      // Sax bell approx position: left of the car, at car roof height
+      const noteX=srcCar.xFrac*w - w*0.06;
+      const noteY=_laneYs[srcCar.lane]-h*0.16*lS;
+      // Fire upward and slightly outward from center
+      const outward=noteX<w*0.5?-1:1;
       sc.saxNotes.push({
-        x:bx2+(Math.random()-0.5)*60,
-        y:by2+(Math.random()-0.5)*40,
-        vx:Math.cos(ang)*spd*(0.6+Math.random()*0.8),
-        vy:Math.sin(ang)*spd-1.5,
-        size:20+Math.random()*14,
+        x:noteX+(Math.random()-0.5)*40,
+        y:noteY+(Math.random()-0.5)*20,
+        vx:outward*(1.5+Math.random()*2.5),
+        vy:-(2.5+Math.random()*3.5),
+        size:22+Math.random()*16,
         life:1,
         rot:(Math.random()-0.5)*0.5,
-        rotV:(Math.random()-0.5)*0.08,
+        rotV:(Math.random()-0.5)*0.07,
         glyph:glyphs[Math.floor(Math.random()*glyphs.length)],
-        hue:30+Math.random()*40,
+        hue:30+Math.random()*50,
       });
     }
   }
@@ -15792,22 +15812,7 @@ function drawBeachCruiseScene(theme,now,playRects){
     ctx.restore();
   }
 
-  // ── 16. BIG sax notes on line clears (cheerPulse burst) ─────────────
-  sc.saxNotes=sc.saxNotes.filter(n=>n.life>0.04);
-  for(const n of sc.saxNotes){
-    n.x+=n.vx; n.y+=n.vy; n.vy+=0.04; n.vx*=0.98;
-    n.rot+=n.rotV; n.life-=0.014;
-    ctx.save();
-    ctx.globalAlpha=Math.min(1,n.life*1.4);
-    ctx.translate(n.x,n.y); ctx.rotate(n.rot);
-    ctx.font=`900 ${Math.floor(n.size*(0.6+n.life*0.4))}px serif`;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillStyle=`hsla(${n.hue},95%,68%,1)`;
-    ctx.shadowColor=`hsla(${n.hue},90%,75%,0.85)`;
-    ctx.shadowBlur=16+n.life*8;
-    ctx.fillText(n.glyph,0,0);
-    ctx.restore();
-  }
+  // ── 16. (sax notes drawn after cutout — see step 20) ─────────────────
 
   // ── 17. Board-edge shimmer on line clears ─────────────────────────────
   if(cheer>0.50&&_pr){
@@ -15834,6 +15839,23 @@ function drawBeachCruiseScene(theme,now,playRects){
   if(playRects.length){
     ctx.save(); ctx.globalCompositeOperation='destination-out';
     for(const pr of playRects){ctx.fillStyle='#000';ctx.fillRect(pr.x,pr.y,pr.w,pr.h);}
+    ctx.restore();
+  }
+
+  // ── 20. BIG sax notes drawn AFTER cutout so board mask doesn't erase them ──
+  sc.saxNotes=sc.saxNotes.filter(n=>n.life>0.04);
+  for(const n of sc.saxNotes){
+    n.x+=n.vx; n.y+=n.vy; n.vy+=0.03; n.vx*=0.98;
+    n.rot+=n.rotV; n.life-=0.013;
+    ctx.save();
+    ctx.globalAlpha=Math.min(1,n.life*1.5);
+    ctx.translate(n.x,n.y); ctx.rotate(n.rot);
+    ctx.font=`900 ${Math.floor(n.size*(0.55+n.life*0.45))}px serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle=`hsla(${n.hue},95%,68%,1)`;
+    ctx.shadowColor=`hsla(${n.hue},90%,80%,0.90)`;
+    ctx.shadowBlur=18+n.life*10;
+    ctx.fillText(n.glyph,0,0);
     ctx.restore();
   }
 }
