@@ -15075,8 +15075,291 @@ function _initBeachScene(w, h) {
     pelican:{x:rng(0,w),y:h*0.18,vx:0.8,wingPhase:0,scale:1.2},
     surferX:rng(0.2,0.7),
     lastDrop:0,lastCheer:0,lastMove:0,
+    // ── Beach volleyball ──────────────────────────────────────
+    vb:{
+      // Ball starts on left side, arcing toward right
+      ball:{ x:w*0.12, y:0, vx:1.8, vy:-2.5, trail:[] },
+      sandPuffs:[],
+      score:[0,0],
+      // 2 robot players per side in the beach gutters
+      players:[
+        { side:'L', xFrac:0.08, jumpAmt:0, armRaise:0, lean:0 },
+        { side:'L', xFrac:0.18, jumpAmt:0, armRaise:0, lean:0 },
+        { side:'R', xFrac:0.82, jumpAmt:0, armRaise:0, lean:0 },
+        { side:'R', xFrac:0.92, jumpAmt:0, armRaise:0, lean:0 },
+      ],
+      netX: w*0.50,
+      rally: 0,       // frames since last hit
+      lastHitter: -1, // player index
+      spikeFlash: 0,  // brightens on cheerPulse
+      lastCheer: 0,
+    },
   };
 }
+
+// ── Beach Volleyball ─────────────────────────────────────────────────────────
+// Robots play volleyball in the beach gutters. Ball arcs from side to side,
+// players jump to hit it. Fully reactive: movePulse → player dives,
+// cheerPulse → spike + sand explosion, boardDropPulse → dramatic slam.
+// Drawn AFTER destination-out so it renders on top of the play-board edge.
+function _drawBeachVolleyball(ctx, w, h, vb, now, beatT, energy, cheer, drop, move, accentRgb) {
+  const beachFloorY = h * 0.735;   // ground level for volleyball players
+  const netX = vb.netX;
+  const netTopY = beachFloorY - h * 0.055;
+  const netBotY = beachFloorY;
+
+  // ── Net ──────────────────────────────────────────────────────────────
+  // Left pole (visible in left gutter)
+  const poleX_L = netX - w * 0.04;
+  ctx.fillStyle = 'rgba(200,180,140,0.90)';
+  ctx.fillRect(poleX_L - 2, netTopY - h*0.01, 4, beachFloorY - netTopY + h*0.01);
+  // Right pole (visible in right gutter)
+  const poleX_R = netX + w * 0.04;
+  ctx.fillRect(poleX_R - 2, netTopY - h*0.01, 4, beachFloorY - netTopY + h*0.01);
+  // Net rope across full width (players are on sides, board clips center)
+  ctx.strokeStyle = 'rgba(230,210,160,0.75)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath(); ctx.moveTo(poleX_L, netTopY); ctx.lineTo(poleX_R, netTopY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(poleX_L, netBotY - 4); ctx.lineTo(poleX_R, netBotY - 4); ctx.stroke();
+  // Vertical net lines
+  const netSegs = 6;
+  for (let ni = 0; ni <= netSegs; ni++) {
+    const nx = poleX_L + (poleX_R - poleX_L) * ni / netSegs;
+    ctx.beginPath(); ctx.moveTo(nx, netTopY); ctx.lineTo(nx, netBotY - 4); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // Net top white tape
+  ctx.strokeStyle = 'rgba(255,255,255,0.90)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(poleX_L, netTopY); ctx.lineTo(poleX_R, netTopY); ctx.stroke();
+
+  // Score chips above net
+  ctx.save();
+  ctx.font = `bold ${Math.floor(h*0.020)}px monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const scoreY = netTopY - h*0.025;
+  // Left score
+  ctx.fillStyle = accentRgb ? `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.90)` : 'rgba(64,200,255,0.90)';
+  ctx.fillText(String(vb.score[0]), netX - w*0.055, scoreY);
+  // Divider
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillText(':', netX, scoreY);
+  // Right score
+  ctx.fillStyle = 'rgba(255,160,80,0.90)';
+  ctx.fillText(String(vb.score[1]), netX + w*0.055, scoreY);
+  ctx.restore();
+
+  // ── Ball physics ─────────────────────────────────────────────────────
+  const ball = vb.ball;
+  ball.vy += 0.22 + energy * 0.06;  // gravity
+  ball.x  += ball.vx * (1 + energy * 0.3);
+  ball.y  += ball.vy;
+
+  // Record trail
+  ball.trail.push({ x: ball.x, y: ball.y });
+  if (ball.trail.length > 6) ball.trail.shift();
+
+  // Ball hits ground → bounce + sand + point
+  if (ball.y >= beachFloorY) {
+    ball.y = beachFloorY;
+    if (Math.abs(ball.vy) > 1) {
+      vb.sandPuffs.push({ x: ball.x, y: beachFloorY, r: 8, life: 1 });
+    }
+    // Award point to side that didn't let it land
+    const scorer = ball.x < netX ? 1 : 0;
+    vb.score[scorer]++;
+    // Reset ball to serving side
+    ball.x = scorer === 0 ? w * 0.10 : w * 0.90;
+    ball.y = beachFloorY - h * 0.04;
+    ball.vx = scorer === 0 ? 1.6 + Math.random()*0.8 : -(1.6 + Math.random()*0.8);
+    ball.vy = -(2.5 + Math.random() * 1.5);
+    ball.trail = [];
+  }
+
+  // Ball hits sides
+  if (ball.x < w * 0.01) { ball.x = w*0.01; ball.vx = Math.abs(ball.vx); }
+  if (ball.x > w * 0.99) { ball.x = w*0.99; ball.vx = -Math.abs(ball.vx); }
+
+  // ── Player AI ────────────────────────────────────────────────────────
+  // Each player tries to position under the ball if it's on their side.
+  // When ball is close, they jump and hit (toggle vx direction).
+  vb.rally++;
+  for (let pi = 0; pi < vb.players.length; pi++) {
+    const p = vb.players[pi];
+    const px = p.xFrac * w;
+    const onLeftSide  = p.side === 'L';
+    const ballOnSide  = onLeftSide ? (ball.x < netX) : (ball.x > netX);
+    const distToBall  = Math.hypot(ball.x - px, ball.y - (beachFloorY - h*0.06));
+
+    // Decay jump / arm raise
+    p.jumpAmt  = Math.max(0, p.jumpAmt  - 2.5);
+    p.armRaise = Math.max(0, p.armRaise - 0.04);
+    p.lean     *= 0.88;
+
+    if (ballOnSide && distToBall < w * 0.14 && vb.rally > 30) {
+      // Jump to hit!
+      p.jumpAmt  = h * 0.040;
+      p.armRaise = 1;
+      p.lean     = onLeftSide ? 0.3 : -0.3;
+      // Redirect the ball over the net
+      const speed  = 2.0 + energy * 0.8 + (vb.spikeFlash > 0 ? 1.5 : 0);
+      ball.vx  = onLeftSide ? speed : -speed;
+      ball.vy  = -(2.8 + Math.random() * 1.2);
+      ball.x   = px + (onLeftSide ? w*0.04 : -w*0.04);
+      ball.trail = [];
+      vb.rally = 0;
+      vb.lastHitter = pi;
+      // Arm swing on nearby partners too
+      vb.players.forEach((q, qi) => { if (q.side === p.side && qi !== pi) q.lean = p.lean * 0.4; });
+    }
+  }
+
+  // Pulse reactions
+  vb.spikeFlash = Math.max(0, vb.spikeFlash - 0.06);
+  if (cheer > vb.lastCheer + 0.18) {
+    vb.spikeFlash = 1.0;
+    // Force a spike — find the player whose side has the ball
+    for (const p of vb.players) {
+      if ((p.side==='L') === (ball.x < netX)) {
+        p.jumpAmt = h * 0.065;
+        p.armRaise = 1;
+      }
+    }
+    vb.sandPuffs.push({ x: ball.x, y: beachFloorY, r: 20, life: 1 });
+  }
+  vb.lastCheer = cheer;
+  if (drop > 0.6 && Math.random() < 0.5) {
+    // Drop → slam the ball straight down
+    ball.vy = Math.abs(ball.vy) * 1.5 + 2;
+    vb.sandPuffs.push({ x: ball.x, y: beachFloorY, r: 16, life: 1 });
+  }
+  if (move > 0.4 && Math.random() < move * 0.18) {
+    const rp = vb.players[Math.floor(Math.random() * vb.players.length)];
+    rp.jumpAmt  = Math.max(rp.jumpAmt,  h * 0.025);
+    rp.armRaise = Math.max(rp.armRaise, 0.5);
+  }
+
+  // ── Draw sand puffs ───────────────────────────────────────────────────
+  vb.sandPuffs = vb.sandPuffs.filter(s => s.life > 0.02);
+  for (const s of vb.sandPuffs) {
+    s.r  *= 1.06;
+    s.life *= 0.88;
+    ctx.save();
+    ctx.globalAlpha = s.life * 0.55;
+    ctx.fillStyle = '#e8c878';
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Draw players ──────────────────────────────────────────────────────
+  for (const p of vb.players) {
+    const px = p.xFrac * w;
+    const groundY = beachFloorY;
+    const baseY   = groundY - p.jumpAmt;
+    const scale   = h * 0.048;
+    const faceRight = p.side === 'L';
+
+    ctx.save();
+    ctx.translate(px, baseY);
+    if (!faceRight) ctx.scale(-1, 1);
+    ctx.save(); ctx.rotate(p.lean);
+
+    // Shadow on sand
+    ctx.fillStyle = 'rgba(0,0,0,0.20)';
+    ctx.beginPath();
+    ctx.ellipse(0, groundY - baseY + scale*0.1, scale*0.38, scale*0.09, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    // Legs
+    ctx.fillStyle = 'rgba(30,60,120,0.88)';  // dark blue shorts
+    ctx.fillRect(-scale*0.18, 0, scale*0.16, scale*0.35);
+    ctx.fillRect(scale*0.02,  0, scale*0.16, scale*0.35);
+
+    // Torso (beach jersey: bright color per team)
+    const jerseyColor = p.side==='L' ? 'rgba(255,80,30,0.92)' : 'rgba(30,120,255,0.92)';
+    ctx.fillStyle = jerseyColor;
+    ctx.fillRect(-scale*0.22, -scale*0.55, scale*0.44, scale*0.58);
+
+    // Arms
+    const armAng = p.side==='L'
+      ? -(0.3 + p.armRaise * 1.1 + Math.sin(beatT*Math.PI*2+p.xFrac*6)*0.12)
+      : -(0.3 + p.armRaise * 1.1 + Math.sin(beatT*Math.PI*2+p.xFrac*6)*0.12);
+    ctx.save();
+    ctx.translate(scale*0.22, -scale*0.42);
+    ctx.rotate(armAng);
+    ctx.fillStyle = 'rgba(140,90,40,0.90)';
+    ctx.fillRect(0, -scale*0.06, scale*0.32, scale*0.11);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(-scale*0.22, -scale*0.42);
+    ctx.rotate(-armAng * 0.7 - 0.2);
+    ctx.fillRect(-scale*0.32, -scale*0.06, scale*0.32, scale*0.11);
+    ctx.restore();
+
+    // Head — robot box with glowing eyes
+    ctx.fillStyle = 'rgba(55,52,78,0.96)';
+    ctx.fillRect(-scale*0.20, -scale*1.02, scale*0.40, scale*0.44);
+    // Visor
+    ctx.fillStyle = 'rgba(15,12,28,0.95)';
+    ctx.fillRect(-scale*0.18, -scale*0.94, scale*0.36, scale*0.18);
+    // Eyes
+    const eyeGlow = vb.spikeFlash > 0 ? 'rgba(255,255,255,1)' : (accentRgb ? `rgba(${accentRgb[0]},${accentRgb[1]},${accentRgb[2]},0.90)` : 'rgba(64,200,255,0.90)');
+    ctx.fillStyle = eyeGlow;
+    ctx.shadowColor = eyeGlow; ctx.shadowBlur = 4;
+    ctx.fillRect(-scale*0.12, -scale*0.90, scale*0.08, scale*0.08);
+    ctx.fillRect( scale*0.04, -scale*0.90, scale*0.08, scale*0.08);
+    ctx.shadowBlur = 0;
+    // Antenna
+    ctx.strokeStyle='rgba(80,78,100,0.85)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(0,-scale*0.60); ctx.lineTo(0,-scale*0.72); ctx.stroke();
+    ctx.fillStyle=eyeGlow; ctx.beginPath(); ctx.arc(0,-scale*0.72,scale*0.04,0,Math.PI*2); ctx.fill();
+
+    ctx.restore(); // lean
+    ctx.restore(); // translate
+  }
+
+  // ── Draw ball trail ────────────────────────────────────────────────────
+  for (let ti = 0; ti < ball.trail.length; ti++) {
+    const t = ball.trail[ti];
+    const a = (ti / ball.trail.length) * 0.30;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(255,255,220,1)';
+    ctx.beginPath(); ctx.arc(t.x, t.y, h*0.012*(ti/ball.trail.length), 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Draw ball ──────────────────────────────────────────────────────────
+  const bR = h * 0.017;
+  ctx.save();
+  // Glow on spike
+  if (vb.spikeFlash > 0) {
+    ctx.save(); ctx.globalCompositeOperation='lighter';
+    const bg2 = ctx.createRadialGradient(ball.x, ball.y, 0, ball.x, ball.y, bR*3.5);
+    bg2.addColorStop(0, `rgba(255,240,120,${vb.spikeFlash*0.80})`);
+    bg2.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle=bg2; ctx.beginPath(); ctx.arc(ball.x,ball.y,bR*3.5,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+  // Ball body — white with panel lines
+  const bg3 = ctx.createRadialGradient(ball.x-bR*0.3,ball.y-bR*0.3,0,ball.x,ball.y,bR);
+  bg3.addColorStop(0,'#ffffff'); bg3.addColorStop(0.6,'#eeeecc'); bg3.addColorStop(1,'#cccc88');
+  ctx.fillStyle=bg3; ctx.shadowColor='rgba(0,0,0,0.40)'; ctx.shadowBlur=4;
+  ctx.beginPath(); ctx.arc(ball.x,ball.y,bR,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+  // Panel curves (volleyball pattern)
+  ctx.strokeStyle='rgba(100,90,60,0.55)'; ctx.lineWidth=0.8;
+  const spinAng = (now*0.008+ball.x*0.01)%(Math.PI*2);
+  ctx.save(); ctx.translate(ball.x,ball.y); ctx.rotate(spinAng);
+  ctx.beginPath(); ctx.arc(0,0,bR,0,Math.PI); ctx.stroke();
+  ctx.rotate(Math.PI*0.666);
+  ctx.beginPath(); ctx.arc(0,0,bR,0,Math.PI); ctx.stroke();
+  ctx.rotate(Math.PI*0.666);
+  ctx.beginPath(); ctx.arc(0,0,bR,0,Math.PI); ctx.stroke();
+  ctx.restore();
+  ctx.restore();
+}
+
 
 // ── Better convertible car with sports proportions ────────────────────────
 // ── Saxophone ────────────────────────────────────────────────────────────────
@@ -15902,7 +16185,11 @@ function drawBeachCruiseScene(theme,now,playRects){
     ctx.restore();
   }
 
-  // ── 20. BIG sax notes drawn AFTER cutout so board mask doesn't erase them ──
+  // ── 20. Beach volleyball — drawn after cutout so it's always visible ────────
+  _drawBeachVolleyball(ctx, w, h, sc.vb, now, beatT, energy, cheer, drop, move,
+                       accentRgb ? [ar, ag, ab] : null);
+
+  // ── 21. BIG sax notes drawn AFTER cutout so board mask doesn't erase them ──
   sc.saxNotes=sc.saxNotes.filter(n=>n.life>0.04);
   for(const n of sc.saxNotes){
     n.x+=n.vx; n.y+=n.vy; n.vy+=0.03; n.vx*=0.98;
