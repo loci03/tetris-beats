@@ -15060,6 +15060,100 @@ function _initBeachScene(w, h) {
 }
 
 // ── Better convertible car with sports proportions ────────────────────────
+// ── Saxophone ────────────────────────────────────────────────────────────────
+function _drawSaxophone(ctx, sx, sy, len, ang, energy, beatT, accentRgb) {
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(ang);
+  const bw = len * 0.13;
+  const sax = '#c8860a', hi = '#f5d070', dk = '#8a5010';
+  const bg = ctx.createLinearGradient(-bw,0,bw,0);
+  bg.addColorStop(0,hi); bg.addColorStop(0.35,sax); bg.addColorStop(0.70,dk); bg.addColorStop(1,hi);
+  // Mouthpiece
+  ctx.fillStyle='#1e1208';
+  ctx.beginPath(); ctx.roundRect(-bw*0.22,-len*0.09,bw*0.44,len*0.09,bw*0.08); ctx.fill();
+  ctx.fillStyle='#d4b060'; ctx.fillRect(-bw*0.10,-len*0.085,bw*0.20,len*0.08);
+  // S-neck
+  ctx.strokeStyle=sax; ctx.lineWidth=bw*0.60; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.bezierCurveTo(bw*0.9,len*0.04,-bw*0.7,len*0.11,0,len*0.17); ctx.stroke();
+  ctx.fillStyle=dk; ctx.beginPath(); ctx.arc(-bw*0.10,len*0.08,bw*0.18,0,Math.PI*2); ctx.fill();
+  // Body
+  ctx.fillStyle=bg;
+  ctx.beginPath(); ctx.moveTo(-bw*0.55,len*0.17); ctx.lineTo(-bw*0.78,len*0.73); ctx.lineTo(bw*0.78,len*0.73); ctx.lineTo(bw*0.55,len*0.17); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(255,255,200,0.22)'; ctx.fillRect(-bw*0.10,len*0.19,bw*0.16,len*0.50);
+  ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.fillRect(-bw*0.68,len*0.19,bw*0.16,len*0.50);
+  // Key pads
+  const pads=[0.23,0.31,0.39,0.47,0.55,0.63], sides=[1,-1,1,-1,1,-1];
+  for(let ki=0;ki<pads.length;ki++){
+    const py=len*pads[ki], px=bw*sides[ki]*0.52, pr=bw*0.24;
+    ctx.strokeStyle=dk; ctx.lineWidth=bw*0.10;
+    ctx.beginPath(); ctx.moveTo(0,py); ctx.lineTo(px,py); ctx.stroke();
+    ctx.fillStyle='#b89828'; ctx.strokeStyle=dk; ctx.lineWidth=0.8;
+    ctx.beginPath(); ctx.arc(px,py,pr,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=dk; ctx.beginPath(); ctx.arc(px,py,pr*0.42,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,200,0.55)'; ctx.beginPath(); ctx.arc(px-pr*0.25,py-pr*0.25,pr*0.18,0,Math.PI*2); ctx.fill();
+  }
+  // Bell
+  ctx.fillStyle=bg;
+  ctx.beginPath(); ctx.moveTo(-bw*0.78,len*0.73); ctx.bezierCurveTo(-bw*1.05,len*0.80,-bw*1.70,len*0.88,-bw*1.90,len*0.97); ctx.bezierCurveTo(-bw*1.65,len*1.04,bw*0.50,len*1.01,bw*0.78,len*0.73); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle=hi; ctx.lineWidth=bw*0.20; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-bw*1.90,len*0.97); ctx.bezierCurveTo(-bw*1.55,len*1.06,bw*0.25,len*1.03,bw*0.78,len*0.73); ctx.stroke();
+  // Bell glow
+  const breathe=0.35+Math.sin(beatT*Math.PI*2)*0.18+energy*0.22;
+  ctx.save(); ctx.globalCompositeOperation='lighter';
+  const bellG=ctx.createRadialGradient(-bw*1.55,len*0.97,0,-bw*1.55,len*0.97,bw*2.2);
+  bellG.addColorStop(0,`rgba(255,200,60,${breathe*0.65})`); bellG.addColorStop(0.5,`rgba(255,160,20,${breathe*0.28})`); bellG.addColorStop(1,'rgba(255,120,0,0)');
+  ctx.fillStyle=bellG; ctx.beginPath(); ctx.arc(-bw*1.55,len*0.97,bw*2.2,0,Math.PI*2); ctx.fill();
+  if(accentRgb){
+    const [ar2,ag2,ab2]=accentRgb;
+    const ag3=ctx.createRadialGradient(-bw*1.55,len*0.97,0,-bw*1.55,len*0.97,bw*3.5);
+    ag3.addColorStop(0,`rgba(${ar2},${ag2},${ab2},${breathe*0.18})`); ag3.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=ag3; ctx.beginPath(); ctx.arc(-bw*1.55,len*0.97,bw*3.5,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+  // Strap ring
+  ctx.fillStyle=dk; ctx.beginPath(); ctx.arc(-bw*0.10,len*0.45,bw*0.16,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#6a3808'; ctx.lineWidth=bw*0.08; ctx.beginPath(); ctx.arc(-bw*0.10,len*0.45,bw*0.22,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+
+// ── Seagull ──────────────────────────────────────────────────────────────────
+function _drawBeachSeagull(ctx, gx, gy, flapPhase, scale, energy) {
+  const ws=22*scale, flap=Math.sin(flapPhase)*0.6;
+  ctx.save(); ctx.translate(gx,gy);
+  ctx.strokeStyle='rgba(240,240,240,0.90)'; ctx.lineWidth=2*scale; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(-ws*0.4,-flap*ws*0.55,-ws,flap*ws*0.25); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(ws*0.4,-flap*ws*0.55,ws,flap*ws*0.25); ctx.stroke();
+  ctx.fillStyle='rgba(240,240,240,0.85)';
+  ctx.beginPath(); ctx.ellipse(0,2*scale,5*scale,2.5*scale,0,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+// ── Beach palm tree ───────────────────────────────────────────────────────────
+function _drawBeachPalmTree(ctx, px, py, scale, swayAng, energy) {
+  ctx.save(); ctx.translate(px,py);
+  const trunkH=80*scale;
+  ctx.strokeStyle='#8b6020'; ctx.lineWidth=10*scale; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.quadraticCurveTo(swayAng*15,-trunkH*0.5,swayAng*25,-trunkH); ctx.stroke();
+  ctx.strokeStyle='#7a5518'; ctx.lineWidth=1.5*scale;
+  for(let ti=1;ti<=5;ti++){
+    const ty=-trunkH*(ti/6), tx=swayAng*25*(ti/6);
+    ctx.beginPath(); ctx.moveTo(tx-5*scale,ty); ctx.lineTo(tx+5*scale,ty); ctx.stroke();
+  }
+  const tipX=swayAng*25, tipY=-trunkH;
+  const frondAngles=[-1.2,-0.6,0,0.5,1.1,-1.7,1.6];
+  for(const fa of frondAngles){
+    const fLen=(50+Math.random()*20)*scale;
+    const bendX=tipX+Math.cos(fa+swayAng*0.4)*fLen, bendY=tipY+Math.sin(fa+swayAng*0.4)*fLen;
+    ctx.strokeStyle='#228b22'; ctx.lineWidth=4*scale;
+    ctx.beginPath(); ctx.moveTo(tipX,tipY); ctx.quadraticCurveTo(tipX+Math.cos(fa)*fLen*0.5,tipY+Math.sin(fa)*fLen*0.5-10*scale,bendX,bendY); ctx.stroke();
+    ctx.strokeStyle='#2da52d'; ctx.lineWidth=1.5*scale;
+    ctx.beginPath(); ctx.moveTo(tipX,tipY); ctx.quadraticCurveTo(tipX+Math.cos(fa)*fLen*0.5+4,tipY+Math.sin(fa)*fLen*0.5-10*scale,bendX+3,bendY-2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+
 function _drawConvertible(ctx,cx,baseY,w,h,car,beatT,energy,cheer,drop,accentRgb,glowRgb,now){
   const carW=w*0.22, carH=h*0.058;
   const bodyY=baseY-carH;
@@ -15570,7 +15664,7 @@ function drawBeachCruiseScene(theme,now,playRects){
     const px=palm.xFrac*w;
     const flipY=palm.side==='bottom'?-1:1;
     ctx.save(); ctx.scale(1,flipY);
-    _drawPalmTree(ctx,px,-py*flipY,palm.scale*(h/600),swayT,energy);
+    _drawBeachPalmTree(ctx,px,-py*flipY,palm.scale*(h/600),swayT,energy);
     ctx.restore();
   }
 
@@ -15584,7 +15678,7 @@ function drawBeachCruiseScene(theme,now,playRects){
     if(g.x<-50){g.x=w+40;g.y=h*(0.07+Math.random()*0.30);}
     if(g.y<h*0.03){g.vy=Math.abs(g.vy)+0.3;}
     if(g.y>h*0.46){g.vy=-0.6-Math.random()*0.5;}
-    _drawSeagull(ctx,g.x,g.y,g.flapPhase,g.scale,energy);
+    _drawBeachSeagull(ctx,g.x,g.y,g.flapPhase,g.scale,energy);
   }
 
   // ── 12. Pelican ───────────────────────────────────────────────────────
