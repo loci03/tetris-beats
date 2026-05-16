@@ -15147,7 +15147,7 @@ function _initNukeScene(w, h) {
 
 // ── Zombie silhouette ──────────────────────────────────────────────────────
 function _drawZombie(ctx, zx, zy, scale, phase, lurchAmt, energy) {
-  const s = scale * 52;
+  const s = scale * 80;
   ctx.save();
   ctx.translate(zx, zy);
 
@@ -15200,7 +15200,7 @@ function _drawZombie(ctx, zx, zy, scale, phase, lurchAmt, energy) {
 
 // ── Skeleton silhouette ────────────────────────────────────────────────────
 function _drawSkeleton(ctx, sx, sy, scale, phase, rattle, energy) {
-  const s = scale * 46;
+  const s = scale * 72;
   ctx.save();
   ctx.translate(sx, sy);
   ctx.shadowColor = 'rgba(220,220,180,0.45)'; ctx.shadowBlur = 6;
