@@ -5919,8 +5919,8 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
       else if (_bs === 'bullet')       drawBlockBullet(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'leaf')         drawBlockLeaf(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'taco')         drawBlockTaco(mc, 0, 0, color, size, 1, theme);
-      else if (_bs === 'beachball')    drawBlockBeachball(mc, 0, 0, color, size, 1, theme);
-      else if (_bs === 'skull')         drawBlockSkull(mc, 0, 0, color, size, 1, theme);
+      else if (_bs === 'beachball') { try { drawBlockBeachball(mc, 0, 0, color, size, 1, theme); } catch(e) { mc.fillStyle=color; mc.fillRect(2,2,size-4,size-4); } }
+      else if (_bs === 'skull')     { try { drawBlockSkull(mc, 0, 0, color, size, 1, theme); }     catch(e) { mc.fillStyle=color; mc.fillRect(2,2,size-4,size-4); } }
       _blockMiniCache.set(key, mini);
     }
     if (alpha !== 1) context.globalAlpha = alpha;
@@ -15272,13 +15272,6 @@ function _drawSkeleton(ctx, sx, sy, scale, phase, rattle, energy) {
 
 // ── Main nuclear waste scene draw ──────────────────────────────────────────
 function drawNuclearWasteScene(theme, now, playRects) {
-  // Safari <15.4 polyfill
-  if (!bgCtx.roundRect) bgCtx.roundRect = function(x,y,w2,h2,r){
-    r=Math.min(r,w2/2,h2/2);
-    this.moveTo(x+r,y);this.lineTo(x+w2-r,y);this.quadraticCurveTo(x+w2,y,x+w2,y+r);
-    this.lineTo(x+w2,y+h2-r);this.quadraticCurveTo(x+w2,y+h2,x+w2-r,y+h2);
-    this.lineTo(x+r,y+h2);this.quadraticCurveTo(x,y+h2,x,y+h2-r);
-    this.lineTo(x,y+r);this.quadraticCurveTo(x,y,x+r,y);};
   const ctx = bgCtx;
   const w = bgCanvas.width, h = bgCanvas.height;
   if (!_nukeScene || _nukeScene.w !== w || _nukeScene.h !== h) _initNukeScene(w, h);
@@ -15331,7 +15324,7 @@ function drawNuclearWasteScene(theme, now, playRects) {
     ctx.fillStyle = bOn
       ? (bRed ? `rgba(255,40,40,${0.85 + energy*0.15})` : `rgba(40,80,255,${0.85 + energy*0.15})`)
       : 'rgba(20,20,20,0.90)';
-    ctx.beginPath(); ctx.roundRect(bx - w*0.018, h*0.028, w*0.036, barH, barH*0.3); ctx.fill();
+    ctx.fillRect(bx - w*0.018, h*0.028, w*0.036, barH);  // LED (no roundRect needed)
     if (bOn) {
       ctx.save(); ctx.globalCompositeOperation='lighter';
       const blg = ctx.createRadialGradient(bx, h*0.037, 0, bx, h*0.037, w*0.08);
@@ -15413,7 +15406,7 @@ function drawNuclearWasteScene(theme, now, playRects) {
     const bx = bxf * w, by = groundY - h*0.055, bw = w*0.028, bh = h*0.055;
     // Body
     ctx.fillStyle = '#2a2a2a';
-    ctx.beginPath(); ctx.roundRect(bx-bw/2, by, bw, bh, bw*0.12); ctx.fill();
+    ctx.fillRect(bx-bw/2, by, bw, bh);  // barrel (no roundRect needed)
     // Yellow stripe
     ctx.fillStyle = '#e0c000';
     ctx.fillRect(bx-bw/2+1, by+bh*0.35, bw-2, bh*0.18);
@@ -17018,8 +17011,13 @@ function drawBackground() {
     return;
   }
   // Living My Life (Level 17): robots in convertibles cruising to the beach.
-  if (style === 'beach-cruise' || style === 'nuclear-waste') {
+  if (style === 'beach-cruise') {
     drawBeachCruiseScene(theme, now, playRects);
+    return;
+  }
+  // Nuclear Waste (Level 18): toxic wasteland, zombies, skeletons, police lights.
+  if (style === 'nuclear-waste') {
+    drawNuclearWasteScene(theme, now, playRects);
     return;
   }
 
@@ -17692,7 +17690,7 @@ function render(timestamp) {
   if (stageFlash > 0) stageFlash = Math.max(0, stageFlash - 0.05);
   // Board drop pulse - quick decay, gone in ~400ms
   if (boardDropPulse > 0) boardDropPulse = Math.max(0, boardDropPulse - 0.06);
-  drawBackground();
+  try { drawBackground(); } catch(e) { /* background scene error — pieces still draw */ }
   // Screen-shake decay applied via CSS transform on the main canvas. Cheaper
   // than redrawing into a translated context, and respects the per-player
   // canvas swap because we always target the *active* canvas.
