@@ -14991,7 +14991,7 @@ function drawBlockSkull(context, x, y, color, size, alpha, theme) {
   context.globalAlpha = alpha;
   context.save();
 
-  // Subtle toxic glow halo
+  // Subtle toxic glow halo (drawn outside the scale transform so it stays round)
   context.save();
   context.globalCompositeOperation = 'lighter';
   const halo = context.createRadialGradient(cx, cy, r*0.3, cx, cy, r*1.2);
@@ -15000,6 +15000,13 @@ function drawBlockSkull(context, x, y, color, size, alpha, theme) {
   context.fillStyle = halo;
   context.beginPath(); context.arc(cx, cy, r*1.2, 0, Math.PI*2); context.fill();
   context.restore();
+
+  // Squeeze the skull face to portrait proportions: narrower horizontally,
+  // taller vertically so each cell reads as a skull head rather than a disc.
+  context.save();
+  context.translate(cx, cy);
+  context.scale(0.78, 1.14);
+  context.translate(-cx, -cy);
 
   // Cranium
   const skullGrad = context.createRadialGradient(cx - r*0.2, cy - r*0.25, r*0.1, cx, cy, r);
@@ -15061,7 +15068,8 @@ function drawBlockSkull(context, x, y, color, size, alpha, theme) {
   context.fillStyle = shadeColor(color, -15);
   context.fillRect(teethStart - 1, teethY - 3, 5*teethW + 4*teethGap + 2, 4);
 
-  context.restore();
+  context.restore(); // end portrait scale transform
+  context.restore(); // end outer save
   context.globalAlpha = 1;
 }
 
