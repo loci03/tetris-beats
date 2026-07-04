@@ -1710,6 +1710,12 @@
 <div id="lobby-screen">
   <div id="lobby-connection-badge">connecting...</div>
   <h2>VS FRIEND</h2>
+  <!-- Shows the world both players will fight in. The host's pick is
+       authoritative and is synced to the guest when they join. -->
+  <div id="lobby-stage-line" style="font-size:12px;letter-spacing:2px;color:rgba(255,255,255,0.55);margin:-4px 0 10px;text-transform:uppercase;">
+    Stage: <span id="lobby-stage-name" style="color:#7df9ff;font-weight:800;">Underground</span>
+    <span id="lobby-stage-who" style="opacity:0.5;"></span>
+  </div>
   <div class="lobby-mode-btns">
     <button class="lm-btn active" data-lm="create">CREATE ROOM</button>
     <button class="lm-btn" data-lm="join">JOIN ROOM</button>
@@ -2709,8 +2715,24 @@ const MARATHON_THEME = {
 // finishes — Sir wanted Marathon to keep things fresh after the song
 // ends. Set in startGame() and updated by _marathonRotateVibe().
 let _marathonActiveTheme = null;
+// VS stage/world selection. In a VS match the whole match plays in ONE chosen
+// world (theme + music + block style), fixed for the duration — independent of
+// the difficulty `level`, which still ramps as lines clear. `_vsStage` is the
+// LEVEL_THEMES index of the chosen world; 1 (Underground) is the default.
+// For LOCAL VS it comes from the start-screen picker; for ONLINE VS it's the
+// host's pick, synced to the guest via the `start` message.
+let _vsStage = 1;
+function _clampStage(v) {
+  const n = v | 0;
+  return Math.max(1, Math.min(LEVEL_THEMES.length - 1, n || 1));
+}
 function getTheme(lvl) {
   if (gameMode === 'marathon') return _marathonActiveTheme || MARATHON_THEME;
+  // VS / VS-FRIEND: the selected world is fixed for the whole match, so the
+  // backdrop + music don't drift as the difficulty level climbs.
+  if (gameMode === 'vs' || gameMode === 'human') {
+    return LEVEL_THEMES[_clampStage(_vsStage)];
+  }
   const idx = Math.min(lvl, LEVEL_THEMES.length - 1);
   return LEVEL_THEMES[idx];
 }
@@ -5452,6 +5474,9 @@ function handleNetMessage(msg) {
     case 'peer': {
       if (msg.joined) {
         NET.opponentName = msg.name || 'OPPONENT';
+        // Guest learns the host's chosen world here so the lobby shows it
+        // before the match starts. (Host sees their own pick already.)
+        if (msg.stage != null && !NET.isHost) updateLobbyStage(msg.stage, "host's pick");
         // Both players land on the "live" view once the peer joins. The
         // guest is on the Join panel before this fires - flip them to
         // Create so the match status is visible and the Start button works.
@@ -5486,6 +5511,10 @@ function handleNetMessage(msg) {
       NET.seed = msg.seed;
       NET.side = msg.yourSide;
       NET.opponentName = msg.opponent || NET.opponentName || 'OPPONENT';
+      // Online VS stage sync: the server sends the HOST's chosen world with the
+      // start message so both clients play the same stage. Falls back to a
+      // valid default if an older server omits it.
+      if (msg.stage != null) _vsStage = _clampStage(msg.stage);
       setNetworkSeed(msg.seed);
       document.getElementById('lobby-screen').classList.remove('visible');
       startNetworkMatch();
@@ -5601,7 +5630,7 @@ async function lobbyCreateRoom(name) {
   try {
     await netConnect({ code: 'CREATE' });
     netSend({ type: 'hello', name });
-    netSend({ type: 'create' });
+    netSend({ type: 'create', stage: _clampStage(startLevel) });
     setLobbyStatus('');
   } catch (e) {
     setLobbyStatus('Cannot reach server', true);
@@ -5618,7 +5647,10 @@ async function lobbyJoinRoom(name, code) {
   }
 }
 function lobbyStartMatch() {
-  netSend({ type: 'ready' });
+  // Send the host's chosen stage with `ready` too (belt-and-suspenders — the
+  // server already captured it on `create`, but this covers a stage change
+  // made after room creation).
+  netSend({ type: 'ready', stage: _clampStage(startLevel) });
   setLobbyStatus('Starting...');
 }
 function lobbyLeave() {
@@ -18331,6 +18363,13 @@ function startGame() {
   }
   _vsContinueMatch = false;
 
+  // Resolve the VS world/stage. Local VS (vs Alfred) uses the start-screen
+  // picker; online VS keeps the host's stage that arrived via the `start`
+  // message (already applied to _vsStage in the 'start' handler before this
+  // runs). Both fall back to a valid clamped index.
+  if (gameMode === 'vs') _vsStage = _clampStage(startLevel);
+  else if (gameMode === 'human') _vsStage = _clampStage(_vsStage);
+
   // Build the player roster based on selected mode.
   players = [];
   activePlayer = null;
@@ -18613,11 +18652,22 @@ function handleNetworkRoundResult(msg) {
   audioEngine.stop();
 }
 
+// Reflect the VS-FRIEND world in the lobby. `who` is a short qualifier
+// ("your pick" for the host, "host's pick" for the guest once it arrives).
+function updateLobbyStage(stageIdx, who) {
+  const nameEl = document.getElementById('lobby-stage-name');
+  const whoEl = document.getElementById('lobby-stage-who');
+  const t = LEVEL_THEMES[_clampStage(stageIdx)];
+  if (nameEl) nameEl.textContent = (t && t.name) ? t.name : 'Underground';
+  if (whoEl) whoEl.textContent = who ? '· ' + who : '';
+}
 function openLobby() {
   document.getElementById('lobby-screen').classList.add('visible');
   setLobbyStatus('');
   resetLobbyView();
   setLobbyPanel('create');
+  // Host: the world is whatever they picked on the start screen.
+  updateLobbyStage(startLevel, 'your pick');
   // Probe via the HTTP /api/health rather than pre-opening a WS - opening a WS
   // without a code on the Cloudflare Worker would mint a throwaway room.
   probeServer().then(ok => {
@@ -18750,7 +18800,7 @@ document.getElementById('vs-replay-btn').addEventListener('click', () => {
     try {
       await netConnect({ code: 'CREATE' });
       netSend({ type: 'hello', name: getName() });
-      netSend({ type: 'create' });
+      netSend({ type: 'create', stage: _clampStage(startLevel) });
       // Show the "waiting for opponent" half once we get the `room` reply.
     } catch {
       setLobbyStatus('Cannot reach server', true);
@@ -19178,7 +19228,7 @@ window.addEventListener('resize', () => positionP2Monitor());
         if (target) target.click();
       }
     }
-    if (levelSelect) levelSelect.style.display = (gameMode === 'sprint' || gameMode === 'marathon') ? 'flex' : 'none';
+    if (levelSelect) levelSelect.style.display = (gameMode === 'sprint' || gameMode === 'marathon' || gameMode === 'vs' || gameMode === 'human') ? 'flex' : 'none';
   }
   tabs.forEach(tab => tab.addEventListener('click', () => setTab(tab.dataset.tab)));
   btns.forEach(btn => btn.addEventListener('click', () => {
@@ -19189,7 +19239,7 @@ window.addEventListener('resize', () => positionP2Monitor());
     // Marathon defaults to L19 (The Singularity) when selected
     if (gameMode === 'marathon') setStartLevel(LEVEL_THEMES.length - 1);
     const levelSelect = document.getElementById('level-select');
-    const showsPicker = (gameMode === 'sprint' || gameMode === 'marathon');
+    const showsPicker = (gameMode === 'sprint' || gameMode === 'marathon' || gameMode === 'vs' || gameMode === 'human');
     if (levelSelect) levelSelect.style.display = showsPicker ? 'flex' : 'none';
     refreshLb();
   }));
@@ -19286,12 +19336,17 @@ window.addEventListener('resize', () => positionP2Monitor());
     });
   }
   refresh();
-  // Hide the picker in vs modes - the seeded-level escape hatch above forces
-  // both players to L1 so the match stays fair.
+  // Show the picker for Sprint / Marathon (starting vibe) and for VS / VS
+  // FRIEND (the world/stage the whole match plays in). In VS the same picker
+  // is relabelled "STAGE"; difficulty still starts at L1 so the match is fair —
+  // the pick only changes the world (backdrop + music + block style).
+  const vtLabel = trigger && trigger.querySelector('.vt-label');
   const modeBtns = document.querySelectorAll('.mode-btn');
   const sync = () => {
-    const showsPicker = (gameMode === 'sprint' || gameMode === 'marathon');
+    const isVs = (gameMode === 'vs' || gameMode === 'human');
+    const showsPicker = (gameMode === 'sprint' || gameMode === 'marathon' || isVs);
     wrap.style.display = showsPicker ? 'flex' : 'none';
+    if (vtLabel) vtLabel.textContent = isVs ? 'STAGE' : 'VIBE';
     refresh(); // keep label in sync whenever mode changes
   };
   modeBtns.forEach(mb => mb.addEventListener('click', sync));

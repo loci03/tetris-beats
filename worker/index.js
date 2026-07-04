@@ -50,6 +50,13 @@ function sanitizeMode(m) {
   m = String(m || 'story').toLowerCase();
   return VALID_MODES.has(m) ? m : 'story';
 }
+// VS stage/world index (into the client's LEVEL_THEMES). Relayed as-is; the
+// client clamps to the real theme count. Bounded so a bogus value can't be
+// echoed to peers.
+function clampStage(v) {
+  const n = Math.floor(Number(v));
+  return (Number.isFinite(n) && n >= 1) ? Math.min(n, 40) : 1;
+}
 function dailyDateStr(now) {
   const d = now ? new Date(now) : new Date();
   const y = d.getUTCFullYear();
@@ -210,6 +217,8 @@ export class Room {
     // "award the match" timer that a reconnect cancels.
     this.awaiting = { host: false, guest: false };
     this.graceT = { host: null, guest: null };
+    // VS world/stage chosen by the host; synced to the guest on join + start.
+    this.stage = 1;
   }
 
   async fetch(request) {
@@ -261,7 +270,8 @@ export class Room {
       this.send(ws, { type: 'hello', you: 'guest' });
       this.send(ws, { type: 'room', code, host: false });
       this.send(this.host, { type: 'peer', joined: true, name: ws.name });
-      this.send(this.guest, { type: 'peer', joined: true, name: this.host.name });
+      // Guest learns the host's chosen world so their lobby shows it.
+      this.send(this.guest, { type: 'peer', joined: true, name: this.host.name, stage: this.stage });
     } else {
       this.send(ws, { type: 'error', message: 'room full' });
       try { ws.close(1000, 'full'); } catch {}
@@ -283,10 +293,12 @@ export class Room {
           break;
         }
         case 'create':
+          // The Worker assigned the room before this DO ran, so join/create
+          // are otherwise no-ops — but the host's `create` carries their VS
+          // stage pick, which we capture here to sync to the guest.
+          if (this.host === ws && msg.stage != null) this.stage = clampStage(msg.stage);
+          break;
         case 'join':
-          // The Worker assigned the room before this DO ran, so these are
-          // no-ops here; the existing client sends them but we already
-          // hello/room'd above.
           break;
         case 'spectate': {
           // Read-only join. Demote the role: this socket is now a spectator,
@@ -305,10 +317,12 @@ export class Room {
         }
         case 'ready': {
           if (!this.host || !this.guest || this.started) return;
+          // Host may refresh their stage pick at match start.
+          if (this.host === ws && msg.stage != null) this.stage = clampStage(msg.stage);
           this.started = true;
           const seed = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
-          this.send(this.host,  { type: 'start', seed, yourSide: 'host',  opponent: this.guest.name });
-          this.send(this.guest, { type: 'start', seed, yourSide: 'guest', opponent: this.host.name });
+          this.send(this.host,  { type: 'start', seed, yourSide: 'host',  opponent: this.guest.name, stage: this.stage });
+          this.send(this.guest, { type: 'start', seed, yourSide: 'guest', opponent: this.host.name, stage: this.stage });
           break;
         }
         case 'state':

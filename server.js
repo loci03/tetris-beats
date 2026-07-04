@@ -78,6 +78,13 @@ function sanitizeMode(m) {
   m = String(m || 'story').toLowerCase();
   return VALID_MODES.has(m) ? m : 'story';
 }
+// VS stage/world index (into the client's LEVEL_THEMES). The server just
+// relays the host's pick; the client clamps to the real theme count. Bound to
+// a sane range so a bogus value can't be echoed to peers.
+function clampStage(v) {
+  const n = Math.floor(Number(v));
+  return (Number.isFinite(n) && n >= 1) ? Math.min(n, 40) : 1;
+}
 
 // ----------------------------------------------------------------
 // Rate limiting (per-IP, naive sliding window) for POST /api/scores
@@ -266,6 +273,9 @@ wss.on('connection', (ws, req) => {
           // `graceT[side]` holds the pending "award the match" timer.
           awaiting: { host: false, guest: false },
           graceT: { host: null, guest: null },
+          // VS world/stage chosen by the host; synced to the guest at join +
+          // match start so both play the same world.
+          stage: clampStage(msg.stage),
         };
         rooms.set(code, room);
         ws.room = room;
@@ -302,19 +312,23 @@ wss.on('connection', (ws, req) => {
         ws.room = room;
         send(ws, { type: 'room', code, host: false });
         send(room.host, { type: 'peer', joined: true, name: ws.name });
-        send(room.guest, { type: 'peer', joined: true, name: room.host.name });
+        // Tell the guest the host's chosen world so their lobby shows it.
+        send(room.guest, { type: 'peer', joined: true, name: room.host.name, stage: room.stage });
         break;
       }
       case 'ready': {
         const room = ws.room;
         if (!room || !room.host || !room.guest) return;
+        // Let the host refresh their stage pick at match start (covers a change
+        // made after room creation). Only the host's choice counts.
+        if (ws === room.host && msg.stage != null) room.stage = clampStage(msg.stage);
         // Host triggers start when ready is received. Both sides get the same
-        // seed so their 7-bag sequences are identical.
+        // seed so their 7-bag sequences are identical, and the same stage.
         if (room.started) return;
         room.started = true;
         const seed = newSeed();
-        send(room.host,  { type: 'start', seed, yourSide: 'host',  opponent: room.guest.name });
-        send(room.guest, { type: 'start', seed, yourSide: 'guest', opponent: room.host.name });
+        send(room.host,  { type: 'start', seed, yourSide: 'host',  opponent: room.guest.name, stage: room.stage });
+        send(room.guest, { type: 'start', seed, yourSide: 'guest', opponent: room.host.name, stage: room.stage });
         break;
       }
       case 'state':
@@ -396,8 +410,8 @@ wss.on('connection', (ws, req) => {
           room.nextReady = { host: false, guest: false };
           room.started = true;
           const seed = newSeed();
-          send(room.host,  { type: 'start', seed, yourSide: 'host',  opponent: room.guest.name });
-          send(room.guest, { type: 'start', seed, yourSide: 'guest', opponent: room.host.name });
+          send(room.host,  { type: 'start', seed, yourSide: 'host',  opponent: room.guest.name, stage: room.stage });
+          send(room.guest, { type: 'start', seed, yourSide: 'guest', opponent: room.host.name, stage: room.stage });
         }
         break;
       }
