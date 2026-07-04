@@ -22,6 +22,13 @@ const MAX_SCORES = 50;
 const MAX_SCORE_VALUE = 10_000_000;
 const VALID_MODES = new Set(['story', 'marathon', 'sprint', 'ultra', 'daily']);
 
+// Grace window (ms) a mid-match player may be disconnected before the match is
+// awarded to the opponent. Mobile browsers drop the WebSocket on backgrounding
+// / network switches; ending the match instantly on that is the "it ended
+// without me beating them" bug. The room is held open during this window so a
+// quick reconnect resumes the same game.
+const RECONNECT_GRACE_MS = 30_000;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
@@ -198,6 +205,11 @@ export class Room {
     this.guest = null;
     this.started = false;
     this.spectators = new Set();
+    // Reconnect bookkeeping: `awaiting[side]` marks a slot whose player dropped
+    // but is still inside their grace window; `graceT[side]` is the pending
+    // "award the match" timer that a reconnect cancels.
+    this.awaiting = { host: false, guest: false };
+    this.graceT = { host: null, guest: null };
   }
 
   async fetch(request) {
@@ -220,6 +232,10 @@ export class Room {
   }
 
   closeRoom(reason) {
+    for (const side of ['host', 'guest']) {
+      if (this.graceT[side]) { clearTimeout(this.graceT[side]); this.graceT[side] = null; }
+      this.awaiting[side] = false;
+    }
     for (const m of [this.host, this.guest]) {
       if (!m) continue;
       this.send(m, { type: 'peer', joined: false, reason });
@@ -315,6 +331,23 @@ export class Room {
           this.closeRoom('match-ended');
           break;
         }
+        case 'rejoin': {
+          // A player whose socket dropped mid-match reconnected. attach() has
+          // already re-seated them into the empty slot; confirm it, cancel the
+          // grace timer, and tell the peer we're back.
+          const side = (msg.side === 'host' || msg.side === 'guest') ? msg.side : null;
+          if (!side) { this.send(ws, { type: 'rejoin-failed', reason: 'bad-side' }); break; }
+          const occupant = side === 'host' ? this.host : this.guest;
+          if (occupant !== ws) { this.send(ws, { type: 'rejoin-failed', reason: 'slot-taken' }); break; }
+          if (this.awaiting[side]) {
+            this.awaiting[side] = false;
+            if (this.graceT[side]) { clearTimeout(this.graceT[side]); this.graceT[side] = null; }
+          }
+          const peer = this.peerOf(ws);
+          this.send(ws, { type: 'rejoined', side, opponent: peer ? peer.name : 'OPPONENT', started: !!this.started });
+          if (peer) this.send(peer, { type: 'opponent-reconnected' });
+          break;
+        }
         case 'leave': {
           const peer = this.peerOf(ws);
           if (peer) this.send(peer, { type: 'result', youWon: true, reason: 'disconnect' });
@@ -329,10 +362,29 @@ export class Room {
         this.spectators.delete(ws);
         return; // spectator leaving doesn't end the match
       }
+      const side = this.host === ws ? 'host' : (this.guest === ws ? 'guest' : null);
       const peer = this.peerOf(ws);
-      if (peer && this.started) this.send(peer, { type: 'result', youWon: true, reason: 'disconnect' });
       if (this.host === ws) this.host = null;
       if (this.guest === ws) this.guest = null;
+      // Mid-match drop: hold a grace window for reconnect rather than ending
+      // the match on a transient mobile disconnect. Only if the window lapses
+      // (and no socket has re-seated the slot) do we award the opponent.
+      if (this.started && side && !this.awaiting[side]) {
+        this.awaiting[side] = true;
+        if (peer) this.send(peer, { type: 'opponent-dropped', graceMs: RECONNECT_GRACE_MS });
+        if (this.graceT[side]) clearTimeout(this.graceT[side]);
+        this.graceT[side] = setTimeout(() => {
+          if (!this.awaiting[side]) return;                          // rejoin cleared it
+          const slot = side === 'host' ? this.host : this.guest;
+          if (slot) { this.awaiting[side] = false; return; }         // socket re-seated
+          this.awaiting[side] = false;
+          const p = side === 'host' ? this.guest : this.host;
+          if (p) this.send(p, { type: 'result', youWon: true, reason: 'disconnect' });
+          this.closeRoom('disconnect-timeout');
+        }, RECONNECT_GRACE_MS);
+        return;
+      }
+      if (peer && this.started) this.send(peer, { type: 'result', youWon: true, reason: 'disconnect' });
       if (!this.host && !this.guest) this.started = false;
     });
   }

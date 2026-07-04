@@ -616,6 +616,14 @@
     align-items: center;
     background: rgba(5,5,15,0.9);
     backdrop-filter: blur(20px);
+    /* Keyboard-safe: let the overlay scroll so the REPLAY / Save buttons stay
+       reachable even when the mobile soft keyboard shrinks the viewport.
+       Without this, Android players could get stuck on the game-over screen
+       with the only button hidden behind the keyboard. */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 24px 16px;
+    box-sizing: border-box;
   }
   #game-over-screen h2 {
     font-size: 48px;
@@ -640,8 +648,13 @@
     align-items: center;
     background: rgba(5,5,15,0.92);
     backdrop-filter: blur(20px);
-    padding: 0 32px;
+    padding: 24px 32px;
     text-align: center;
+    /* Keyboard-safe / small-screen-safe: allow scroll so the REPLAY / NEXT
+       ROUND button is always reachable on short mobile viewports. */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
   }
   #vs-result-title {
     font-size: 72px;
@@ -5276,7 +5289,10 @@ function netConnect(opts = {}) {
     ws.addEventListener('close', () => {
       NET.connected = false;
       updateLobbyBadge('disconnected', 'err');
-      // Clear room state so the lobby doesn't think we're still in one.
+      // Mid-match, unintentional drop → transparently reconnect instead of
+      // tearing the room state down (which would strand us / end the match).
+      if (shouldAutoReconnect()) { attemptReconnect(); return; }
+      // Otherwise clear room state so the lobby doesn't think we're still in one.
       NET.roomCode = null;
       NET.isHost = false;
       NET.opponentName = null;
@@ -5290,9 +5306,86 @@ function netConnect(opts = {}) {
 }
 
 function netSend(obj) {
+  // Remember the name we introduced ourselves with so an auto-reconnect can
+  // re-`hello` before it `rejoin`s.
+  if (obj && obj.type === 'hello' && obj.name) NET.name = obj.name;
   if (NET.ws && NET.ws.readyState === 1) {
     try { NET.ws.send(JSON.stringify(obj)); } catch {}
   }
+}
+
+// ── PvP reconnect ───────────────────────────────────────────────────────────
+// Mobile browsers drop the WebSocket on backgrounding, screen-lock, and network
+// switches. Rather than treat that as the match ending, we transparently
+// reconnect to the same room+side within the server's grace window and resume
+// the round. This is what stops a 2-player match from "ending weirdly" when a
+// phone blips its connection.
+const NET_RECONNECT_MAX_TRIES = 12;     // ~30s of attempts vs the server grace
+const NET_RECONNECT_INTERVAL  = 2500;
+let _reconnectTries = 0;
+let _reconnectTimer = null;
+let _netPausedForReconnect = false;
+
+function shouldAutoReconnect() {
+  return !NET.reconnecting
+      && !NET.intentionalClose
+      && NET.matchStarted
+      && !!NET.roomCode
+      && !!NET.side
+      && typeof gameStarted !== 'undefined' && gameStarted
+      && !gameOver;
+}
+
+function attemptReconnect() {
+  if (NET.reconnecting) return;
+  NET.reconnecting = true;
+  _reconnectTries = 0;
+  // Pause locally so pieces don't keep dropping while we're off the wire.
+  _netPausedForReconnect = true;
+  paused = true;
+  try { audioEngine.stop(); } catch {}
+  showReconnectToast('Connection lost — reconnecting…');
+  _tryReconnectOnce();
+}
+
+function _tryReconnectOnce() {
+  _reconnectTries++;
+  if (_reconnectTries > NET_RECONNECT_MAX_TRIES) {
+    // Give up: surface a genuine lost-connection end (not a spurious win).
+    NET.reconnecting = false;
+    _netPausedForReconnect = false;
+    hideReconnectToast();
+    handleNetworkResult({ youWon: false, reason: 'disconnect' });
+    return;
+  }
+  showReconnectToast(`Connection lost — reconnecting… (${_reconnectTries}/${NET_RECONNECT_MAX_TRIES})`);
+  netConnect({ code: NET.roomCode }).then(() => {
+    netSend({ type: 'hello', name: NET.name || 'YOU' });
+    netSend({ type: 'rejoin', code: NET.roomCode, side: NET.side });
+    // Resolution arrives async as `rejoined` or `rejoin-failed` (handled in
+    // handleNetMessage). If neither lands, the socket error/close will retry.
+  }).catch(() => {
+    _reconnectTimer = setTimeout(_tryReconnectOnce, NET_RECONNECT_INTERVAL);
+  });
+}
+
+function showReconnectToast(text) {
+  let el = document.getElementById('reconnect-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'reconnect-toast';
+    el.style.cssText = 'position:fixed;left:50%;top:18px;transform:translateX(-50%);' +
+      'z-index:60;background:rgba(10,10,25,0.94);color:#fff;border:1px solid rgba(255,0,153,0.5);' +
+      'border-radius:12px;padding:12px 18px;font-weight:700;letter-spacing:1px;font-size:14px;' +
+      'box-shadow:0 0 24px rgba(255,0,153,0.35);text-align:center;max-width:92vw;';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.style.display = 'block';
+}
+function hideReconnectToast() {
+  const el = document.getElementById('reconnect-toast');
+  if (el) el.style.display = 'none';
 }
 
 function updateLobbyBadge(text, cls) {
@@ -5361,6 +5454,10 @@ function handleNetMessage(msg) {
     }
     case 'start': {
       NET.matchStarted = true;
+      NET.intentionalClose = false;   // a live match may now auto-reconnect
+      NET.reconnecting = false;
+      _netPausedForReconnect = false;
+      hideReconnectToast();
       NET.seed = msg.seed;
       NET.side = msg.yourSide;
       NET.opponentName = msg.opponent || NET.opponentName || 'OPPONENT';
@@ -5422,6 +5519,51 @@ function handleNetMessage(msg) {
       if (sub) sub.textContent = (NET.opponentName || 'Opponent') + ' is ready — your move.';
       break;
     }
+    case 'rejoined': {
+      // Our reconnect succeeded — resume the same round where we left off.
+      NET.reconnecting = false;
+      _netPausedForReconnect = false;
+      hideReconnectToast();
+      if (msg.opponent) NET.opponentName = msg.opponent;
+      if (msg.match) _pvpMatch = msg.match;
+      paused = false;
+      try {
+        if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+          audioEngine.ctx.resume().then(() => audioEngine.start(), () => audioEngine.start());
+        } else { audioEngine.start(); }
+      } catch {}
+      // Restart our outbound state stream to the peer.
+      if (typeof beginNetStateStream === 'function') beginNetStateStream();
+      break;
+    }
+    case 'rejoin-failed': {
+      // Grace window lapsed or the match already ended server-side. End cleanly
+      // as a genuine disconnect rather than hanging on a paused board.
+      NET.reconnecting = false;
+      _netPausedForReconnect = false;
+      hideReconnectToast();
+      handleNetworkResult({ youWon: false, reason: 'disconnect' });
+      break;
+    }
+    case 'opponent-dropped': {
+      // The peer lost connection; hold the round and wait for them to return.
+      _netPausedForReconnect = true;
+      paused = true;
+      try { audioEngine.stop(); } catch {}
+      showReconnectToast((NET.opponentName || 'Opponent') + ' lost connection — waiting…');
+      break;
+    }
+    case 'opponent-reconnected': {
+      _netPausedForReconnect = false;
+      paused = false;
+      try {
+        if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
+          audioEngine.ctx.resume().then(() => audioEngine.start(), () => audioEngine.start());
+        } else { audioEngine.start(); }
+      } catch {}
+      hideReconnectToast();
+      break;
+    }
     case 'error': {
       setLobbyStatus(msg.message || 'Error', true);
       break;
@@ -5455,6 +5597,13 @@ function lobbyStartMatch() {
   setLobbyStatus('Starting...');
 }
 function lobbyLeave() {
+  // Intentional exit — suppress the auto-reconnect that a mid-match socket
+  // close would otherwise trigger, and cancel any in-flight reconnect.
+  NET.intentionalClose = true;
+  NET.reconnecting = false;
+  _netPausedForReconnect = false;
+  if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+  hideReconnectToast();
   netSend({ type: 'leave' });
   if (NET.ws) try { NET.ws.close(); } catch {}
   NET.ws = null; NET.connected = false;
@@ -5723,13 +5872,25 @@ async function showGameOver() {
     banner.textContent = rank === 1 ? '★ New Top Score ★' : `★ Rank #${rank} ★`;
     banner.classList.remove('hidden');
     entry.classList.remove('hidden');
-    replayBtn.style.display = 'none';
+    // Keep REPLAY visible even while initials entry is up. Previously this was
+    // hidden until the player saved a score — but since ANY positive score
+    // qualifies while the board has < LB_MAX entries, the button was hidden on
+    // essentially every game-over. On mobile the auto-focused initials keyboard
+    // then covered the only remaining button (Save), trapping the player on the
+    // game-over screen with "just the scoreboard and no way to start again".
+    // REPLAY now always offers an escape back into a fresh game.
+    replayBtn.style.display = '';
     const input = document.getElementById('initials-input');
     input.value = '';
-    // Defer focus until after the overlay animates in so iOS Safari actually
-    // pops the keyboard. Without the timeout, focus fires during the display
-    // transition and Safari silently drops it.
-    setTimeout(() => { try { input.focus(); input.select(); } catch {} }, 80);
+    // Only auto-pop the soft keyboard on non-touch devices. On phones, forcing
+    // focus opens the keyboard over the buttons with no reliable way to dismiss
+    // it; let touch players tap the field themselves if they want to enter
+    // initials. (Desktop keeps the convenience auto-focus.)
+    if (!IS_TOUCH) {
+      // Defer focus until after the overlay animates in so Safari actually
+      // pops the keyboard rather than dropping focus mid-transition.
+      setTimeout(() => { try { input.focus(); input.select(); } catch {} }, 80);
+    }
   } else {
     banner.classList.add('hidden');
     entry.classList.add('hidden');
@@ -17877,7 +18038,9 @@ document.addEventListener('visibilitychange', async () => {
   // the tab. A user-initiated P pause stays paused on return.
   if (_pausedByHide) {
     _pausedByHide = false;
-    if (gameStarted && !gameOver) {
+    // Stay paused if we're mid-reconnect (waiting for the socket / opponent) —
+    // gameplay resumes only once the round is actually live again.
+    if (gameStarted && !gameOver && !_netPausedForReconnect) {
       paused = false;
       try { audioEngine.start(); } catch {}
     }
@@ -18382,7 +18545,8 @@ function handleNetworkResult(msg) {
   const title = document.getElementById('vs-result-title');
   const opp = NET.opponentName || 'OPPONENT';
   if (msg.reason === 'disconnect') {
-    title.textContent = 'OPPONENT LEFT';
+    // youWon → the opponent dropped out; !youWon → our own reconnect gave up.
+    title.textContent = msg.youWon ? 'OPPONENT LEFT' : 'CONNECTION LOST';
   } else {
     title.textContent = msg.youWon ? 'MATCH — YOU WIN' : `MATCH — ${opp} WINS`;
   }

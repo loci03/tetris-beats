@@ -163,6 +163,7 @@ app.use(express.static(ROOT, { index: 'index.html' }));
 //                     piece:{type,x,y,rot} }
 //     { type:"garbage", n:<int> }
 //     { type:"topout" }
+//     { type:"next-round" }            // ack readiness for next round (best-of-3)
 //     { type:"leave" }
 //   server → client:
 //     { type:"hello", you:<id> }
@@ -171,10 +172,22 @@ app.use(express.static(ROOT, { index: 'index.html' }));
 //     { type:"start", seed:<str>, yourSide:"host"|"guest", opponent:<name> }
 //     { type:"state", ... }           (forwarded from peer)
 //     { type:"garbage", n }           (forwarded from peer)
-//     { type:"result", youWon:bool, reason:"topout"|"disconnect" }
+//     { type:"round-result", youWon:bool, reason:"topout",
+//         match:{ yours, theirs, target } }     // mid-match: room stays open
+//     { type:"result", youWon:bool, reason:"topout"|"disconnect",
+//         match?:{ yours, theirs, target } }    // match over: room closes
+//     { type:"peer-ready" }            // opponent clicked NEXT ROUND
 //     { type:"error", message }
 
-const rooms = new Map();    // code -> { host, guest, started, spectators }
+// How long a mid-match player may be disconnected before we award the match to
+// the opponent. Mobile browsers routinely close the WebSocket on backgrounding,
+// screen-lock, or a WiFi<->cellular switch; ending the match the instant that
+// happens is the "it ended without me beating them" bug. During this window the
+// room is held open and the peer is told to wait, so a quick reconnect resumes
+// the same round instead of spuriously ending it.
+const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS) || 30_000;
+
+const rooms = new Map();    // code -> { host, guest, started, spectators, awaiting, graceT }
 function randomCode() {
   // 4-char uppercase — easy to read aloud ("tango-oscar-one-seven")
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no I/L/O/0/1 (ambiguous)
@@ -196,6 +209,12 @@ function peerOf(ws, room) {
 
 function closeRoom(room, reason) {
   if (!room) return;
+  // Cancel any pending reconnect grace timers so they don't fire after teardown.
+  if (room.graceT) {
+    for (const side of ['host', 'guest']) {
+      if (room.graceT[side]) { clearTimeout(room.graceT[side]); room.graceT[side] = null; }
+    }
+  }
   for (const member of [room.host, room.guest]) {
     if (!member) continue;
     send(member, { type: 'peer', joined: false, reason });
@@ -234,7 +253,20 @@ wss.on('connection', (ws, req) => {
       case 'create': {
         if (ws.room) return send(ws, { type: 'error', message: 'already in room' });
         let code; do { code = randomCode(); } while (rooms.has(code));
-        const room = { code, host: ws, guest: null, started: false, spectators: new Set() };
+        // Best-of-3: scores persist across rounds; nextReady tracks per-side
+        // readiness for the next round handshake; target is the first-to count
+        // that wins the match (2 = first-to-2 round wins).
+        const room = {
+          code, host: ws, guest: null, started: false, spectators: new Set(),
+          target: 2,
+          scores: { host: 0, guest: 0 },
+          nextReady: { host: false, guest: false },
+          // Reconnect bookkeeping: `awaiting[side]` is true while that slot's
+          // player is disconnected but still inside their grace window;
+          // `graceT[side]` holds the pending "award the match" timer.
+          awaiting: { host: false, guest: false },
+          graceT: { host: null, guest: null },
+        };
         rooms.set(code, room);
         ws.room = room;
         send(ws, { type: 'room', code, host: true });
@@ -304,10 +336,97 @@ wss.on('connection', (ws, req) => {
       case 'topout': {
         const room = ws.room;
         if (!room || !room.started) return;
+        // Award the round to the peer (whoever didn't top out).
+        const loserSide  = room.host === ws ? 'host' : 'guest';
+        const winnerSide = loserSide === 'host' ? 'guest' : 'host';
+        room.scores[winnerSide] = (room.scores[winnerSide] | 0) + 1;
+        const matchOver = room.scores[winnerSide] >= room.target;
+        // Per-side payload: each player gets a match summary in their own
+        // perspective ({yours, theirs, target}) so client UIs don't need to
+        // know which side they are.
+        const payloadFor = (side) => ({
+          match: {
+            yours: room.scores[side] | 0,
+            theirs: room.scores[side === 'host' ? 'guest' : 'host'] | 0,
+            target: room.target,
+          },
+          reason: 'topout',
+        });
         const peer = peerOf(ws, room);
-        if (peer) send(peer, { type: 'result', youWon: true, reason: 'topout' });
-        send(ws, { type: 'result', youWon: false, reason: 'topout' });
-        closeRoom(room, 'match-ended');
+        if (matchOver) {
+          if (peer) send(peer, Object.assign({ type: 'result', youWon: true },  payloadFor(winnerSide)));
+          send(ws,            Object.assign({ type: 'result', youWon: false }, payloadFor(loserSide)));
+          closeRoom(room, 'match-ended');
+        } else {
+          // Round done, match continues. Keep the room alive but mark it not
+          // started so neither side can stream stale state until both clients
+          // send `next-round` and we mint a fresh `start`.
+          room.started = false;
+          room.nextReady = { host: false, guest: false };
+          if (peer) send(peer, Object.assign({ type: 'round-result', youWon: true },  payloadFor(winnerSide)));
+          send(ws,            Object.assign({ type: 'round-result', youWon: false }, payloadFor(loserSide)));
+          // Spectators see both feeds; broadcast a tagged version so their UI
+          // can update its scoreboard.
+          if (room.spectators && room.spectators.size) {
+            const tagged = {
+              type: 'round-result',
+              spectator: true,
+              hostWins: room.scores.host | 0,
+              guestWins: room.scores.guest | 0,
+              target: room.target,
+              loserSide,
+            };
+            for (const sp of room.spectators) send(sp, tagged);
+          }
+        }
+        break;
+      }
+      case 'next-round': {
+        const room = ws.room;
+        if (!room || !room.host || !room.guest) return;
+        if (room.started) return; // gameplay still active; ignore stale clicks
+        const side = room.host === ws ? 'host' : 'guest';
+        room.nextReady[side] = true;
+        const peer = peerOf(ws, room);
+        if (peer) send(peer, { type: 'peer-ready' });
+        if (room.nextReady.host && room.nextReady.guest) {
+          // Both sides clicked NEXT ROUND — start a fresh round with a new
+          // seed (so the 7-bag sequence isn't a replay). Match scores stay
+          // intact for the next topout to read.
+          room.nextReady = { host: false, guest: false };
+          room.started = true;
+          const seed = newSeed();
+          send(room.host,  { type: 'start', seed, yourSide: 'host',  opponent: room.guest.name });
+          send(room.guest, { type: 'start', seed, yourSide: 'guest', opponent: room.host.name });
+        }
+        break;
+      }
+      case 'rejoin': {
+        // A player whose socket dropped mid-match reconnects and reclaims its
+        // original side. Only valid while that slot is inside its grace window.
+        const code = String(msg.code || '').toUpperCase();
+        const side = (msg.side === 'host' || msg.side === 'guest') ? msg.side : null;
+        const room = rooms.get(code);
+        if (!room || !side) return send(ws, { type: 'rejoin-failed', reason: 'no-room' });
+        if (!room.awaiting[side]) return send(ws, { type: 'rejoin-failed', reason: 'slot-active' });
+        // Re-bind this socket to the slot and cancel the pending award timer.
+        room.awaiting[side] = false;
+        if (room.graceT[side]) { clearTimeout(room.graceT[side]); room.graceT[side] = null; }
+        if (side === 'host') room.host = ws; else room.guest = ws;
+        ws.room = room;
+        const peer = peerOf(ws, room);
+        send(ws, {
+          type: 'rejoined',
+          code, side,
+          opponent: peer ? peer.name : 'OPPONENT',
+          started: !!room.started,
+          match: {
+            yours: room.scores[side] | 0,
+            theirs: room.scores[side === 'host' ? 'guest' : 'host'] | 0,
+            target: room.target,
+          },
+        });
+        if (peer) send(peer, { type: 'opponent-reconnected' });
         break;
       }
       case 'leave': {
@@ -323,14 +442,36 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', () => {
     if (!ws.room) return;
+    const room = ws.room;
     if (ws.isSpectator) {
       // Spectator leaving doesn't end the match.
-      try { ws.room.spectators.delete(ws); } catch {}
+      try { room.spectators.delete(ws); } catch {}
       return;
     }
-    const peer = peerOf(ws, ws.room);
+    const side = room.host === ws ? 'host' : (room.guest === ws ? 'guest' : null);
+    const peer = peerOf(ws, room);
+    // Mid-match drop: hold a grace window for reconnection instead of ending
+    // the match immediately. The opponent is told to wait; if the player
+    // reconnects (via `rejoin`) in time the same round resumes. Only if the
+    // window lapses do we award the match on a genuine disconnect.
+    if (room.started && side && !room.awaiting[side]) {
+      if (room.host === ws) room.host = null;
+      if (room.guest === ws) room.guest = null;
+      room.awaiting[side] = true;
+      if (peer) send(peer, { type: 'opponent-dropped', graceMs: RECONNECT_GRACE_MS });
+      if (room.graceT[side]) clearTimeout(room.graceT[side]);
+      room.graceT[side] = setTimeout(() => {
+        if (!room.awaiting[side]) return;          // reconnected in time
+        room.awaiting[side] = false;
+        const stillPeer = side === 'host' ? room.guest : room.host;
+        if (stillPeer) send(stillPeer, { type: 'result', youWon: true, reason: 'disconnect' });
+        closeRoom(room, 'disconnect-timeout');
+      }, RECONNECT_GRACE_MS);
+      return;
+    }
+    // Lobby stage / already-ended / no active slot: tear down as before.
     if (peer) send(peer, { type: 'result', youWon: true, reason: 'disconnect' });
-    closeRoom(ws.room, 'disconnect');
+    closeRoom(room, 'disconnect');
   });
 });
 
