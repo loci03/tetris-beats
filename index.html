@@ -241,7 +241,13 @@
     z-index: 10;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    /* `safe center` centers the panel when it fits, but falls back to top
+       alignment when the content is taller than the viewport (small phones +
+       the tall mode picker / 20-row leaderboard). Plain `center` clips the
+       TOP of an overflowing flex column and makes it un-scrollable-to — which
+       hid the DROP THE BEAT button above the fold on Android, so players
+       couldn't start. Degrades to flex-start on browsers without `safe`. */
+    justify-content: safe center;
     align-items: center;
     /* Underground lair gradient — dark at the top fading to a richer
        indigo glow near the floor, like a subterranean speakeasy lit by
@@ -612,7 +618,10 @@
     z-index: 10;
     display: none;
     flex-direction: column;
-    justify-content: center;
+    /* `safe center`: center when it fits, top-anchor when the content
+       overflows a short viewport so nothing (incl. the REPLAY button) is
+       clipped above an un-scrollable-to fold. */
+    justify-content: safe center;
     align-items: center;
     background: rgba(5,5,15,0.9);
     backdrop-filter: blur(20px);
@@ -644,7 +653,7 @@
     z-index: 11;
     display: none;
     flex-direction: column;
-    justify-content: center;
+    justify-content: safe center;
     align-items: center;
     background: rgba(5,5,15,0.92);
     backdrop-filter: blur(20px);
