@@ -3055,10 +3055,21 @@ var activePlayer = null;   // whichever player's fields currently live in global
 // was AI bad placement). With the heuristic clear-weight bumped, Alfred
 // regularly clears lines → garbage flows → Sir has to clear his incoming
 // or top out. Last player standing wins, traditional VS mode.
+// AI difficulty knobs:
+//   thinkPause/movePause/dropPause — frames of delay before planning / between
+//     moves / after a drop. Higher = Alfred places pieces slower = less garbage
+//     pressure and more time for the player.
+//   mistakeChance — probability Alfred takes the 2nd–5th best placement instead
+//     of the optimal one. Higher = weaker stacking, more self-inflicted holes.
+//   garbageMult — scales DOWN the garbage Alfred SENDS (never the player's), so
+//     lower tiers don't bury you. Applied in lockPiece.
+// Rebalanced 2026-07: medium/hard were brutal (near-optimal + fast + full
+// garbage). Now easy is clearly beatable, medium a fair moderate challenge,
+// hard tough-but-beatable. See the playtest win-rates in the commit.
 const AI_DIFFICULTIES = {
-  easy:   { thinkPause: 24, movePause: 10, dropPause: 38, mistakeChance: 0.25 },
-  medium: { thinkPause: 12, movePause: 6,  dropPause: 22, mistakeChance: 0.08 },
-  hard:   { thinkPause: 6,  movePause: 3,  dropPause: 12, mistakeChance: 0.02 },
+  easy:   { thinkPause: 34, movePause: 13, dropPause: 54, mistakeChance: 0.45, garbageMult: 0.35 },
+  medium: { thinkPause: 18, movePause: 8,  dropPause: 32, mistakeChance: 0.18, garbageMult: 0.68 },
+  hard:   { thinkPause: 13, movePause: 6,  dropPause: 24, mistakeChance: 0.13, garbageMult: 0.80 },
 };
 let aiDifficulty = (() => {
   try { const v = localStorage.getItem('tetris.aiDifficulty'); return AI_DIFFICULTIES[v] ? v : 'medium'; }
@@ -3544,8 +3555,14 @@ function lockPiece() {
       activePlayer.incomingGarbage -= offset;
       attack -= offset;
       if (attack > 0 && activePlayer.opponent) {
-        activePlayer.opponent.incomingGarbage += attack;
-        audioEngine.playGarbageSend(attack, !!activePlayer.isAI);
+        // Difficulty easing: scale down the garbage ALFRED sends on lower
+        // tiers (never the human's). A clear still sends >=1 so it matters.
+        let sent = attack;
+        if (activePlayer.isAI && activePlayer.ai && typeof activePlayer.ai.garbageMult === 'number') {
+          sent = Math.max(1, Math.round(attack * activePlayer.ai.garbageMult));
+        }
+        activePlayer.opponent.incomingGarbage += sent;
+        audioEngine.playGarbageSend(sent, !!activePlayer.isAI);
       }
     } else if (activePlayer.incomingGarbage > 0) {
       riseGarbage(activePlayer.incomingGarbage);
@@ -3595,6 +3612,21 @@ function comboBonus(comboCount) {
 // lets you dig through with one I-piece). If the rise would push any
 // locked block past the top of the field, flag gameOver.
 function riseGarbage(n) {
+  // Feedback when garbage lands on YOUR board: a satisfying block "thunk" plus
+  // a short, light screen shake. Only for the local human — Alfred receiving
+  // garbage shouldn't rattle the player's screen, and the remote friend's
+  // board is painted from snapshots (never rises locally). Fires even if the
+  // rise tops you out, so a fatal dump still registers.
+  if (n > 0 && activePlayer && !activePlayer.isAI && !activePlayer.isRemote) {
+    try { audioEngine.playGarbageReceive(n); } catch {}
+    // Light shake: short + subtle. Peak displacement is shakeMag*(frames/28)
+    // px, so this tops out under ~1px and decays over ~10 frames (~165ms) —
+    // well below a Tetris clear's 4-8 magnitude / 28 frames. Scales a touch
+    // with the rows that landed and is capped so a big dump can't nauseate.
+    const gMag = Math.min(3.0, 1.8 + n * 0.3);
+    if (gMag > shakeMag) { shakeMag = gMag; }
+    shakeFrames = Math.max(shakeFrames, 10);
+  }
   // Top-out check: blocks in the topmost n rows would be pushed off-screen.
   for (let r = 0; r < n; r++) {
     if (board[r] && board[r].some(c => c !== null)) {
@@ -4940,6 +4972,59 @@ const audioEngine = {
     og.gain.exponentialRampToValueAtTime(0.001, thumpAt + 0.22);
     o.connect(og); og.connect(this.compressor);
     o.start(thumpAt); o.stop(thumpAt + 0.24);
+  },
+
+  // Impact SFX for garbage ROWS actually LANDING on your board (distinct from
+  // the send-whoosh above, which fires earlier when the attack is queued). A
+  // short, satisfying "thunk" — low body thump + woody block click + a brief
+  // clatter — so incoming garbage physically registers. Scales with the number
+  // of rows. Routed through the master chain, so it honours the game volume and
+  // goes silent when audio is muted/suspended. NOT gated by _isAiPlayer — the
+  // caller only fires this for the local human receiving garbage.
+  playGarbageReceive(rows) {
+    if (!this.ctx || !this.compressor) return;
+    const t = this.ctx.currentTime;
+    const n = Math.max(1, Math.min(rows | 0, 8));
+    const scale = 0.7 + Math.min(n, 6) * 0.09;   // 0.79 (1 row) → ~1.24 (6+)
+    // Low body thump.
+    const o = this.ctx.createOscillator();
+    const og = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.16);
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.5 * scale, t + 0.008); // fast attack
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.20);
+    o.connect(og); og.connect(this.compressor);
+    o.start(t); o.stop(t + 0.22);
+    // Woody click — the "block edge".
+    const o2 = this.ctx.createOscillator();
+    const og2 = this.ctx.createGain();
+    o2.type = 'triangle';
+    o2.frequency.setValueAtTime(230, t);
+    o2.frequency.exponentialRampToValueAtTime(90, t + 0.09);
+    og2.gain.setValueAtTime(0.22 * scale, t);
+    og2.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+    o2.connect(og2); og2.connect(this.compressor);
+    o2.start(t); o2.stop(t + 0.12);
+    // Short filtered-noise clatter for texture.
+    const dur = 0.07;
+    const sr = this.ctx.sampleRate;
+    const bufSz = Math.max(1, Math.floor(sr * dur));
+    const buf = this.ctx.createBuffer(1, bufSz, sr);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufSz; i++) {
+      const env = (bufSz - i) / bufSz;
+      d[i] = (Math.random() * 2 - 1) * env * env;
+    }
+    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 900;
+    const ng = this.ctx.createGain();
+    ng.gain.setValueAtTime(0.18 * scale, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(lp); lp.connect(ng); ng.connect(this.compressor);
+    src.start(t); src.stop(t + dur + 0.01);
   },
 
   playLineClear(count) {
