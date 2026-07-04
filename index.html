@@ -5128,6 +5128,7 @@ const NET = {
   matchStarted: false,
   seed: null,
   apiAvailable: null,    // null=unknown, true/false after probe
+  apiProbedAt: 0,        // ms timestamp of the last /api/health probe (TTL cache)
   onMessage: null,       // replaced per-phase
 };
 
@@ -5155,11 +5156,26 @@ function wsUrl() {
 }
 
 async function probeServer() {
-  if (NET.apiAvailable !== null) return NET.apiAvailable;
+  // Re-probe on a short TTL instead of caching the first result forever.
+  // Previously a single transient failure at load (common on flaky mobile
+  // networks) latched `apiAvailable=false` for the whole session, silently
+  // killing leaderboard sync, score submission (queued scores never flushed),
+  // and VS FRIEND — with no recovery even after the network came back. A
+  // "reachable" result is trusted for 30s; a failure re-checks after 5s so
+  // recovery is picked up quickly.
+  const now = Date.now();
+  const ttl = NET.apiAvailable ? 30000 : 5000;
+  if (NET.apiAvailable !== null && (now - (NET.apiProbedAt || 0)) < ttl) {
+    return NET.apiAvailable;
+  }
   try {
-    const r = await fetch(apiUrl('/api/health'), { cache: 'no-store' });
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 5000);   // don't hang on a dead socket
+    const r = await fetch(apiUrl('/api/health'), { cache: 'no-store', signal: ctrl.signal });
+    clearTimeout(to);
     NET.apiAvailable = r.ok;
   } catch { NET.apiAvailable = false; }
+  NET.apiProbedAt = Date.now();
   return NET.apiAvailable;
 }
 
