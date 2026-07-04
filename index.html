@@ -6074,13 +6074,25 @@ async function submitInitials() {
 // player's spawn/rise top-out path, but guarded so it only fires once per
 // round even if both players happen to top out on the same frame.
 let _vsResultShown = false;
-// Best-of-3 match state. `_vsRoundsP1/P2` track round wins across the
-// current match; reset when startGame() runs without _vsContinueMatch set
-// (i.e. user came back through the start screen, not via "NEXT ROUND").
-const _VS_MATCH_TARGET = 2;
+// Best-of-5 match state (first to 3 round wins). `_vsRoundsP1/P2` track round
+// wins across the current match; reset when startGame() runs without
+// _vsContinueMatch set (i.e. user came back through the start screen, not via
+// "NEXT ROUND"). Longer than a best-of-3 so a match "goes a few rounds" and
+// tours several worlds — the stage/vibe changes each round (see _vsRoundIndex).
+const _VS_MATCH_TARGET = 3;
 let _vsRoundsP1 = 0;
 let _vsRoundsP2 = 0;
 let _vsContinueMatch = false;
+// Per-round vibe rotation. `_vsStartStage` is the world the match opened on
+// (the player's pick / host's pick); each subsequent round advances one world
+// so the backdrop + music change up round to round. `_vsRoundIndex` is the
+// 0-based round number within the current match.
+let _vsStartStage = 1;
+let _vsRoundIndex = 0;
+function _vsVibeForRound(startStage, roundIdx) {
+  const maxLvl = LEVEL_THEMES.length - 1;   // number of real worlds (1..maxLvl)
+  return ((_clampStage(startStage) - 1 + (roundIdx | 0)) % maxLvl) + 1;
+}
 function showVsResult() {
   if (_vsResultShown) return;
   _vsResultShown = true;
@@ -6128,14 +6140,25 @@ function showVsResult() {
     `<div class="vs-score-row" style="font-weight:700;letter-spacing:0.08em;">` +
     `MATCH ${_vsRoundsP1} — ${_vsRoundsP2} · BEST OF ${_VS_MATCH_TARGET * 2 - 1}` +
     `</div>`;
+  // Preview the next round's world so the vibe change is advertised.
+  let nextVibeRow = '';
+  if (!matchOver) {
+    const nextStage = _vsVibeForRound(_vsStartStage, _vsRoundIndex + 1);
+    const nt = LEVEL_THEMES[nextStage];
+    if (nt && nt.name) {
+      nextVibeRow = `<div class="vs-score-row" style="color:#7df9ff;font-weight:700;">` +
+        `Next vibe: ${nt.name}</div>`;
+    }
+  }
   document.getElementById('vs-result-sub').innerHTML =
     `<div class="vs-flavor"><span class="vs-flavor-who">${speakerLabel}:</span> ` +
     `<span class="vs-flavor-line">"${flavor}"</span></div>` +
     matchScoreRow +
     `<div class="vs-score-row">You: ${Math.floor(p1.score).toLocaleString()} · ${p1.lines} lines</div>` +
-    `<div class="vs-score-row">Alfred: ${Math.floor(p2.score).toLocaleString()} · ${p2.lines} lines</div>`;
+    `<div class="vs-score-row">Alfred: ${Math.floor(p2.score).toLocaleString()} · ${p2.lines} lines</div>` +
+    nextVibeRow;
   // Swap the button label so it reads "NEXT ROUND" mid-match, "REPLAY" once
-  // someone has clinched the best-of-3.
+  // someone has clinched the best-of-5.
   const replayBtn = document.getElementById('vs-replay-btn');
   if (replayBtn) replayBtn.textContent = matchOver ? 'REPLAY MATCH' : 'NEXT ROUND';
   document.getElementById('vs-result-screen').style.display = 'flex';
@@ -18442,18 +18465,30 @@ function startGame() {
   // Best-of-3 bookkeeping: keep round wins ONLY when the previous result
   // overlay's "NEXT ROUND" button kicked us back here. Any other entry path
   // (start screen, replay match, mode switch) starts a fresh match at 0-0.
-  if (gameMode === 'vs' && !_vsContinueMatch) {
+  const _vsFreshMatch = !_vsContinueMatch;   // false => this is a NEXT ROUND
+  if (gameMode === 'vs' && _vsFreshMatch) {
     _vsRoundsP1 = 0;
     _vsRoundsP2 = 0;
   }
   _vsContinueMatch = false;
 
-  // Resolve the VS world/stage. Local VS (vs Alfred) uses the start-screen
-  // picker; online VS keeps the host's stage that arrived via the `start`
-  // message (already applied to _vsStage in the 'start' handler before this
-  // runs). Both fall back to a valid clamped index.
-  if (gameMode === 'vs') _vsStage = _clampStage(startLevel);
-  else if (gameMode === 'human') _vsStage = _clampStage(_vsStage);
+  // Resolve the VS world/stage.
+  //  - Local VS (vs Alfred): a fresh match opens on the start-screen pick;
+  //    each subsequent round advances one world so the vibe changes round to
+  //    round (a mini "tour" across the match's best-of-5).
+  //  - Online VS: keeps the host's synced stage (applied in the 'start'
+  //    handler before this runs).
+  if (gameMode === 'vs') {
+    if (_vsFreshMatch) {
+      _vsStartStage = _clampStage(startLevel);
+      _vsRoundIndex = 0;
+    } else {
+      _vsRoundIndex++;
+    }
+    _vsStage = _vsVibeForRound(_vsStartStage, _vsRoundIndex);
+  } else if (gameMode === 'human') {
+    _vsStage = _clampStage(_vsStage);
+  }
 
   // Build the player roster based on selected mode.
   players = [];
