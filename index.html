@@ -892,6 +892,40 @@
     opacity: 0.7;
   }
 
+  /* ---------- DESKTOP HUD CONTROLS (mute / pause) ---------- */
+  #hud-controls {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 6;
+    display: flex;
+    gap: 8px;
+  }
+  .hud-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(18, 22, 36, 0.78);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: rgba(255,255,255,0.92);
+    font-size: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+    transition: transform 0.08s ease-out, background 0.12s, box-shadow 0.12s, border-color 0.12s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hud-btn:hover { background: rgba(30, 36, 54, 0.9); }
+  .hud-btn:active { transform: scale(0.92); }
+  .hud-btn[aria-pressed="true"] {
+    border-color: rgba(255,100,255,0.5);
+    box-shadow: 0 0 12px rgba(255,60,255,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+
   /* ---------- TOUCH CONTROLS ---------- */
   #touch-controls {
     display: none;
@@ -1684,7 +1718,7 @@
     Arrow Keys / WASD - Move<br>
     ↑ / X - Rotate CW &nbsp;·&nbsp; Z - Rotate CCW<br>
     Space - Hard Drop | Shift / C - Hold<br>
-    Q - Zone | P - Pause
+    Q - Zone | P - Pause | M - Mute
   </div>
   <div class="controls-info mobile-only" style="display:none;">
     Buttons below to play<br>
@@ -1850,6 +1884,20 @@
 <div id="level-announce"></div>
 <div id="zone-active-badge">ZONE × 2.5</div>
 
+<!-- Desktop in-game HUD: mute + pause. Mobile already has a PAUSE button in
+     the touch controls below and mute has less of a gap there (audio still
+     starts muted-off by default), so this stays desktop-only to avoid
+     crowding the mobile board. Fixed top-right, clear of the side panels at
+     every desktop width. -->
+<div id="hud-controls" class="desktop-only">
+  <button class="hud-btn" id="mute-btn" type="button" aria-label="Mute" aria-pressed="false">
+    <span class="hud-icon">🔊</span>
+  </button>
+  <button class="hud-btn" id="pause-btn" type="button" aria-label="Pause" aria-pressed="false">
+    <span class="hud-icon">❚❚</span>
+  </button>
+</div>
+
 <!-- Touch HUD: minimal - swipe handles left/right/down + hard-drop, tap rotates.
      The remaining buttons are the ones that don't have a natural gesture: HOLD
      (held while keeping your finger off the board), ZONE (special activation),
@@ -1931,6 +1979,40 @@ function setVoiceEnabled(v) {
     // Slight delay to let the fetch/decode complete on first use.
     setTimeout(() => voiceEngine.sayGreeting(), 250);
   }
+}
+
+// Full audio mute - separate from `voiceEnabled` (announcer callouts only).
+// Silences everything routed through audioEngine.masterGain: backing track,
+// procedural drums/bass/synth, SFX, and the pre-rendered voice clips.
+// Toggleable via the desktop HUD mute button or the `M` key; persists like
+// the other options.
+let muted = (() => {
+  try { return localStorage.getItem('tetris.muted') === 'true'; }
+  catch { return false; }
+})();
+function setMuted(v) {
+  muted = !!v;
+  try { localStorage.setItem('tetris.muted', String(muted)); } catch {}
+  if (audioEngine.masterGain) {
+    audioEngine.masterGain.gain.value = muted ? 0 : audioEngine.MASTER_LEVEL;
+  }
+  updateHudMuteButton();
+}
+function updateHudMuteButton() {
+  const btn = document.getElementById('mute-btn');
+  if (!btn) return;
+  btn.setAttribute('aria-pressed', String(muted));
+  btn.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+  const icon = btn.querySelector('.hud-icon');
+  if (icon) icon.textContent = muted ? '🔇' : '🔊';
+}
+function updateHudPauseButton() {
+  const btn = document.getElementById('pause-btn');
+  if (!btn) return;
+  btn.setAttribute('aria-pressed', String(!!paused));
+  btn.setAttribute('aria-label', paused ? 'Resume' : 'Pause');
+  const icon = btn.querySelector('.hud-icon');
+  if (icon) icon.textContent = paused ? '▶' : '❚❚';
 }
 
 const voiceEngine = (() => {
@@ -3945,7 +4027,7 @@ const audioEngine = {
     this.compressor.attack.value = 0.005;
     this.compressor.release.value = 0.12;
     this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = this.MASTER_LEVEL;
+    this.masterGain.gain.value = muted ? 0 : this.MASTER_LEVEL;
     this.reverbNode = this._createReverb();
     this._createDelay();
     // Bass bus with sidechain-style ducking gain
@@ -18013,8 +18095,16 @@ function update(timestamp) {
   update._lastZoneTick = timestamp;
 }
 
+let _hudPauseSynced = null;
 function render(timestamp) {
   animFrame = requestAnimationFrame(render);
+  // Pause can also flip via tab-hide/reconnect handlers that don't go
+  // through togglePause() - cheap per-frame sync keeps the HUD button
+  // honest regardless of which path changed it.
+  if (_hudPauseSynced !== paused) {
+    _hudPauseSynced = paused;
+    updateHudPauseButton();
+  }
   // Cheer pulse decays each frame (rises only on line clears in clearLines()).
   // Linear decay over ~1.4s feels right against a 4-beat cheer at 100 bpm.
   if (cheerPulse > 0) cheerPulse = Math.max(0, cheerPulse - 0.012);
@@ -18125,7 +18215,7 @@ const DAS = 133, ARR = 30;
 
 document.addEventListener('keydown', (e) => {
   if (gameOver || !gameStarted) return;
-  if (paused && e.key !== 'p' && e.key !== 'P') return;
+  if (paused && !['p', 'P', 'm', 'M'].includes(e.key)) return;
   switch (e.key) {
     case 'ArrowLeft': case 'a': case 'A':
       if (!keys['left']) { moveLeft(); keys['left'] = true; dasTimer['left'] = Date.now(); } break;
@@ -18147,6 +18237,7 @@ document.addEventListener('keydown', (e) => {
     case 'Shift': case 'c': case 'C': holdCurrentPiece(); break;
     case 'g': case 'G': setShowGhost(!showGhost); break;
     case 'v': case 'V': setVoiceEnabled(!voiceEnabled); break;
+    case 'm': case 'M': setMuted(!muted); break;
     case 'p': case 'P':
       paused = !paused;
       _pausedByHide = false;  // user explicitly chose pause state
@@ -18163,6 +18254,7 @@ document.addEventListener('keydown', (e) => {
           }
         } catch { audioEngine.start(); }
       }
+      updateHudPauseButton();
       break;
   }
 });
@@ -18271,6 +18363,7 @@ function togglePause() {
       }
     } catch { audioEngine.start(); }
   }
+  updateHudPauseButton();
 }
 
 function doAction(action) {
@@ -19615,6 +19708,16 @@ window.addEventListener('resize', () => positionP2Monitor());
   if (!cb) return;
   cb.checked = showGhost;
   cb.addEventListener('change', () => setShowGhost(cb.checked));
+})();
+
+// Wire the desktop HUD mute + pause buttons.
+(function wireHudControls() {
+  updateHudMuteButton();
+  updateHudPauseButton();
+  const muteBtn = document.getElementById('mute-btn');
+  if (muteBtn) muteBtn.addEventListener('click', () => setMuted(!muted));
+  const pauseBtn = document.getElementById('pause-btn');
+  if (pauseBtn) pauseBtn.addEventListener('click', () => togglePause());
 })();
 
 particles = [];
