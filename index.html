@@ -925,6 +925,70 @@
     border-color: rgba(255,100,255,0.5);
     box-shadow: 0 0 12px rgba(255,60,255,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
   }
+  /* Desktop-only volume slider, sits left of the mute/pause cluster. Mobile
+     keeps mute as a single icon toggle (see #mobile-mute-btn below) - a
+     drag slider is fiddly on a touch board this small. */
+  #volume-slider-wrap {
+    display: flex; align-items: center;
+    padding: 0 12px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(18, 22, 36, 0.78);
+    border: 1px solid rgba(255,255,255,0.14);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  #volume-slider {
+    -webkit-appearance: none; appearance: none;
+    width: 74px; height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.22);
+    outline: none;
+    cursor: pointer;
+    margin: 0;
+  }
+  #volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 13px; height: 13px; border-radius: 50%;
+    background: #ffd166;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    cursor: pointer;
+  }
+  #volume-slider::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: #ffd166; border: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+    cursor: pointer;
+  }
+  /* Mobile mute toggle - fixed top-right icon button, no slider. Positioned
+     below the hold/score/next panel row once in-game (that row runs edge to
+     edge on mobile, so top-right is occupied while playing); sits at the
+     normal corner on the start screen where that row doesn't exist yet. */
+  #mobile-mute-btn {
+    display: none;
+    position: fixed; top: 8px; right: 8px;
+    z-index: 60;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: rgba(18,22,36,0.78);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.92);
+    font-size: 15px;
+    align-items: center; justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+    transition: transform 0.08s ease-out, color 0.12s;
+  }
+  #mobile-mute-btn:active { transform: scale(0.88); }
+  #mobile-mute-btn[aria-pressed="true"] { color: #ff4466; border-color: rgba(255,68,102,0.55); }
+  @media (max-width: 720px) {
+    #mobile-mute-btn { display: flex; }
+    /* In-game the hold/score/next panel row runs edge-to-edge across the
+       top strip, so the top-right corner isn't free anymore - drop below
+       that row into the empty band above the board. */
+    body.in-game #mobile-mute-btn { top: 92px; }
+  }
 
   /* ---------- TOUCH CONTROLS ---------- */
   #touch-controls {
@@ -1884,12 +1948,15 @@
 <div id="level-announce"></div>
 <div id="zone-active-badge">ZONE × 2.5</div>
 
-<!-- Desktop in-game HUD: mute + pause. Mobile already has a PAUSE button in
-     the touch controls below and mute has less of a gap there (audio still
-     starts muted-off by default), so this stays desktop-only to avoid
-     crowding the mobile board. Fixed top-right, clear of the side panels at
-     every desktop width. -->
+<!-- Desktop in-game HUD: volume + mute + pause. Mobile already has a PAUSE
+     button in the touch controls below and gets its own single-icon mute
+     toggle (#mobile-mute-btn) instead of a drag slider, so this cluster
+     stays desktop-only to avoid crowding the mobile board. Fixed top-right,
+     clear of the side panels at every desktop width. -->
 <div id="hud-controls" class="desktop-only">
+  <div id="volume-slider-wrap">
+    <input type="range" id="volume-slider" min="0" max="100" value="100" step="1" aria-label="Volume">
+  </div>
   <button class="hud-btn" id="mute-btn" type="button" aria-label="Mute" aria-pressed="false">
     <span class="hud-icon">🔊</span>
   </button>
@@ -1897,6 +1964,13 @@
     <span class="hud-icon">❚❚</span>
   </button>
 </div>
+
+<!-- Mobile mute toggle - single icon, no slider (per spec: a drag slider is
+     unnecessary fiddliness on a touch board this small). Independent of
+     #hud-controls above so it isn't caught by the .desktop-only display:none. -->
+<button id="mobile-mute-btn" type="button" aria-label="Mute" aria-pressed="false">
+  <span class="hud-icon">🔊</span>
+</button>
 
 <!-- Touch HUD: minimal - swipe handles left/right/down + hard-drop, tap rotates.
      The remaining buttons are the ones that don't have a natural gesture: HOLD
@@ -1984,27 +2058,48 @@ function setVoiceEnabled(v) {
 // Full audio mute - separate from `voiceEnabled` (announcer callouts only).
 // Silences everything routed through audioEngine.masterGain: backing track,
 // procedural drums/bass/synth, SFX, and the pre-rendered voice clips.
-// Toggleable via the desktop HUD mute button or the `M` key; persists like
-// the other options.
+// Toggleable via the desktop HUD mute button, the mobile mute icon, or the
+// `M` key; persists like the other options.
 let muted = (() => {
   try { return localStorage.getItem('tetris.muted') === 'true'; }
   catch { return false; }
+})();
+// Desktop-only trim (mobile has no slider - see #mobile-mute-btn). Kept as
+// a separate value from `muted` so unmuting restores the level the player
+// dialled in rather than jumping back to full volume.
+let volume = (() => {
+  try {
+    const v = parseFloat(localStorage.getItem('tetris.volume'));
+    return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
+  } catch { return 1; }
 })();
 function setMuted(v) {
   muted = !!v;
   try { localStorage.setItem('tetris.muted', String(muted)); } catch {}
   if (audioEngine.masterGain) {
-    audioEngine.masterGain.gain.value = muted ? 0 : audioEngine.MASTER_LEVEL;
+    audioEngine.masterGain.gain.value = muted ? 0 : audioEngine.MASTER_LEVEL * volume;
+  }
+  updateHudMuteButton();
+}
+function setVolume(v) {
+  volume = Math.min(1, Math.max(0, v));
+  try { localStorage.setItem('tetris.volume', String(volume)); } catch {}
+  if (audioEngine.masterGain && !muted) {
+    audioEngine.masterGain.gain.value = audioEngine.MASTER_LEVEL * volume;
   }
   updateHudMuteButton();
 }
 function updateHudMuteButton() {
-  const btn = document.getElementById('mute-btn');
-  if (!btn) return;
-  btn.setAttribute('aria-pressed', String(muted));
-  btn.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
-  const icon = btn.querySelector('.hud-icon');
-  if (icon) icon.textContent = muted ? '🔇' : '🔊';
+  const silent = muted || volume <= 0;
+  const icon = silent ? '🔇' : (volume < 0.5 ? '🔉' : '🔊');
+  for (const id of ['mute-btn', 'mobile-mute-btn']) {
+    const btn = document.getElementById(id);
+    if (!btn) continue;
+    btn.setAttribute('aria-pressed', String(muted));
+    btn.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+    const iconEl = btn.querySelector('.hud-icon');
+    if (iconEl) iconEl.textContent = icon;
+  }
 }
 function updateHudPauseButton() {
   const btn = document.getElementById('pause-btn');
@@ -4027,7 +4122,7 @@ const audioEngine = {
     this.compressor.attack.value = 0.005;
     this.compressor.release.value = 0.12;
     this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = muted ? 0 : this.MASTER_LEVEL;
+    this.masterGain.gain.value = muted ? 0 : this.MASTER_LEVEL * volume;
     this.reverbNode = this._createReverb();
     this._createDelay();
     // Bass bus with sidechain-style ducking gain
@@ -18719,6 +18814,7 @@ function startGame() {
   }
   initBgParticles();
   gameStarted = true;
+  document.body.classList.add('in-game');
 
   // VS FRIEND: begin state stream to opponent on a 10 Hz interval.
   if (gameMode === 'human' && NET.matchStarted) beginNetStateStream();
@@ -18980,6 +19076,7 @@ document.getElementById('vs-replay-btn').addEventListener('click', () => {
   document.getElementById('start-screen').style.display = 'flex';
   renderStartLeaderboard();
   gameStarted = false;
+  document.body.classList.remove('in-game');
   // If we were in a PvP match, leave the room so the next round is clean.
   if (gameMode === 'human') lobbyLeave();
 });
@@ -19710,7 +19807,7 @@ window.addEventListener('resize', () => positionP2Monitor());
   cb.addEventListener('change', () => setShowGhost(cb.checked));
 })();
 
-// Wire the desktop HUD mute + pause buttons.
+// Wire the desktop HUD volume/mute/pause buttons + the mobile mute icon.
 (function wireHudControls() {
   updateHudMuteButton();
   updateHudPauseButton();
@@ -19718,6 +19815,18 @@ window.addEventListener('resize', () => positionP2Monitor());
   if (muteBtn) muteBtn.addEventListener('click', () => setMuted(!muted));
   const pauseBtn = document.getElementById('pause-btn');
   if (pauseBtn) pauseBtn.addEventListener('click', () => togglePause());
+  const mobileMuteBtn = document.getElementById('mobile-mute-btn');
+  if (mobileMuteBtn) mobileMuteBtn.addEventListener('click', () => setMuted(!muted));
+  const slider = document.getElementById('volume-slider');
+  if (slider) {
+    slider.value = String(Math.round(volume * 100));
+    slider.addEventListener('input', () => {
+      setVolume(Number(slider.value) / 100);
+      // Dragging the slider up while muted should audibly unmute - a
+      // silent slider move would look broken.
+      if (Number(slider.value) > 0 && muted) setMuted(false);
+    });
+  }
 })();
 
 particles = [];
@@ -20572,6 +20681,7 @@ async function _initSpectatorIfRequested() {
   setActivePlayer(p2); initBoard(); spawnPiece();
   setActivePlayer(p1);
   gameStarted = true;
+  document.body.classList.add('in-game');
   if (typeof positionP2Monitor === 'function') positionP2Monitor();
   try {
     await netConnect({ code });
