@@ -102,6 +102,13 @@ function allowPost(ip) {
   const now = Date.now();
   const WINDOW = 60_000;
   const LIMIT = 10;
+  // Opportunistic sweep: a hot long-lived isolate would otherwise keep one
+  // entry per IP forever. (No global timers in Workers, so prune inline.)
+  if (postBuckets.size > 500) {
+    for (const [k, b] of postBuckets) {
+      if (!b.length || b[b.length - 1] < now - WINDOW) postBuckets.delete(k);
+    }
+  }
   const bucket = (postBuckets.get(ip) || []).filter(t => now - t < WINDOW);
   if (bucket.length >= LIMIT) return false;
   bucket.push(now);
@@ -236,6 +243,13 @@ export class Room {
     try { ws.send(JSON.stringify(obj)); } catch {}
   }
 
+  // Forward an already-serialized frame verbatim — the 10 Hz state relay
+  // shouldn't pay a re-encode per message.
+  sendRaw(ws, text) {
+    if (!ws || ws.readyState !== 1) return;
+    try { ws.send(text); } catch {}
+  }
+
   peerOf(ws) {
     return this.host === ws ? this.guest : this.host;
   }
@@ -279,8 +293,9 @@ export class Room {
     }
 
     ws.addEventListener('message', (ev) => {
+      const text = typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data);
       let msg;
-      try { msg = JSON.parse(typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data)); }
+      try { msg = JSON.parse(text); }
       catch { return this.send(ws, { type: 'error', message: 'bad json' }); }
       if (!msg || typeof msg.type !== 'string') return;
       switch (msg.type) {
@@ -330,10 +345,11 @@ export class Room {
           if (!this.started) return;
           if (ws.isSpectator) return; // spectators never push state
           const peer = this.peerOf(ws);
-          if (peer) this.send(peer, msg);
+          // Relay the original frame verbatim — parse above already validated it.
+          if (peer) this.sendRaw(peer, text);
           if (this.spectators.size) {
-            const tagged = Object.assign({}, msg, { side: this.host === ws ? 'host' : 'guest' });
-            for (const sp of this.spectators) this.send(sp, tagged);
+            const tagged = JSON.stringify(Object.assign({}, msg, { side: this.host === ws ? 'host' : 'guest' }));
+            for (const sp of this.spectators) this.sendRaw(sp, tagged);
           }
           break;
         }

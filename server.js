@@ -53,23 +53,37 @@ function fileForMode(mode) {
   if (mode === 'daily') return path.join(LB_DIR, `daily-${dailyDateStr()}.json`);
   return path.join(LB_DIR, `${mode}.json`);
 }
+// In-memory leaderboard cache keyed by resolved file path. This process is
+// the only writer, so entries stay valid until saveScores() refreshes them.
+// Keying by path (not mode) means the daily file's UTC-midnight rollover is
+// a natural cache miss — no TTL bookkeeping needed.
+const _scoresCache = new Map();
 function loadScores(mode) {
+  const file = fileForMode(mode || 'story');
+  const cached = _scoresCache.get(file);
+  // Return a copy so callers can push/sort without corrupting the cache.
+  if (cached) return cached.slice();
+  let list;
   try {
-    const raw = fs.readFileSync(fileForMode(mode || 'story'), 'utf8');
-    const list = JSON.parse(raw);
-    if (!Array.isArray(list)) return [];
-    const lower = (mode === 'sprint');
-    return list
-      .filter(e => e && (typeof e.score === 'number' || typeof e.timeMs === 'number'))
-      .sort((a, b) => lower
-        ? ((a.timeMs || Infinity) - (b.timeMs || Infinity))
-        : (b.score - a.score))
-      .slice(0, MAX_SCORES);
-  } catch { return []; }
+    list = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!Array.isArray(list)) list = [];
+  } catch { list = []; }
+  const lower = (mode === 'sprint');
+  const cleaned = list
+    .filter(e => e && (typeof e.score === 'number' || typeof e.timeMs === 'number'))
+    .sort((a, b) => lower
+      ? ((a.timeMs || Infinity) - (b.timeMs || Infinity))
+      : (b.score - a.score))
+    .slice(0, MAX_SCORES);
+  _scoresCache.set(file, cleaned);
+  return cleaned.slice();
 }
 function saveScores(list, mode) {
   ensureDataDir();
-  fs.writeFileSync(fileForMode(mode || 'story'), JSON.stringify(list.slice(0, MAX_SCORES), null, 2));
+  const file = fileForMode(mode || 'story');
+  const trimmed = list.slice(0, MAX_SCORES);
+  fs.writeFileSync(file, JSON.stringify(trimmed, null, 2));
+  _scoresCache.set(file, trimmed.slice());
 }
 function sanitizeName(name) {
   return String(name || 'AAA').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3) || 'AAA';
@@ -90,17 +104,26 @@ function clampStage(v) {
 // Rate limiting (per-IP, naive sliding window) for POST /api/scores
 // ----------------------------------------------------------------
 const postBuckets = new Map();
+const RATE_WINDOW = 60_000; // 1 min
 function allowPost(ip) {
   const now = Date.now();
-  const WINDOW = 60_000;   // 1 min
   const LIMIT = 10;        // 10 submits/min/IP — fine for playing, blocks floods
   let bucket = postBuckets.get(ip) || [];
-  bucket = bucket.filter(t => now - t < WINDOW);
+  bucket = bucket.filter(t => now - t < RATE_WINDOW);
   if (bucket.length >= LIMIT) return false;
   bucket.push(now);
   postBuckets.set(ip, bucket);
   return true;
 }
+// Sweep stale rate-limit buckets so the map doesn't grow one entry per IP
+// forever on a long-lived server. unref() keeps the timer from holding the
+// process open on shutdown.
+setInterval(() => {
+  const cutoff = Date.now() - RATE_WINDOW;
+  for (const [ip, bucket] of postBuckets) {
+    if (!bucket.length || bucket[bucket.length - 1] < cutoff) postBuckets.delete(ip);
+  }
+}, 5 * 60_000).unref();
 
 // ----------------------------------------------------------------
 // Express setup
@@ -154,8 +177,20 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Static — index.html and any other assets in the folder. Default route falls
-// through to index.html for the SPA experience.
-app.use(express.static(ROOT, { index: 'index.html' }));
+// through to index.html for the SPA experience. Heavy immutable-ish media
+// (84 MB of MP3s + tile art) gets a real max-age so phones on the LAN don't
+// re-request every track on each reload; index.html stays no-cache so code
+// changes land on refresh.
+app.use(express.static(ROOT, {
+  index: 'index.html',
+  setHeaders(res, filePath) {
+    if (/\.(mp3|ogg|wav|png|jpg|jpeg|webp)$/i.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    } else {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 
 // ----------------------------------------------------------------
 // WebSocket PvP — rooms, seeded bags, state relay
@@ -209,6 +244,12 @@ function send(ws, obj) {
   if (!ws || ws.readyState !== 1) return;
   try { ws.send(JSON.stringify(obj)); } catch {}
 }
+// Forward an already-serialized frame verbatim. The 10 Hz state relay is the
+// hot path — re-encoding the parsed object there just burns CPU per message.
+function sendRaw(ws, text) {
+  if (!ws || ws.readyState !== 1) return;
+  try { ws.send(text); } catch {}
+}
 
 function peerOf(ws, room) {
   return room.host === ws ? room.guest : room.host;
@@ -247,8 +288,9 @@ wss.on('connection', (ws, req) => {
   send(ws, { type: 'hello', you: ws.id });
 
   ws.on('message', (raw) => {
+    const text = String(raw);
     let msg;
-    try { msg = JSON.parse(String(raw)); }
+    try { msg = JSON.parse(text); }
     catch { return send(ws, { type: 'error', message: 'bad json' }); }
     if (!msg || typeof msg.type !== 'string') return;
 
@@ -337,13 +379,15 @@ wss.on('connection', (ws, req) => {
         if (!room || !room.started) return;
         if (ws.isSpectator) return; // spectators never push state
         const peer = peerOf(ws, room);
-        if (peer) send(peer, msg);
+        // Relay the original frame verbatim — no re-serialization on the
+        // 10 Hz hot path. The parse above already validated it as JSON.
+        if (peer) sendRaw(peer, text);
         // Tag the side that produced the update so spectators can render
         // both player feeds (server already knows; player code already in
         // PvP doesn't need the tag because there are exactly 2 sides).
         if (room.spectators && room.spectators.size) {
-          const tagged = Object.assign({}, msg, { side: room.host === ws ? 'host' : 'guest' });
-          for (const sp of room.spectators) send(sp, tagged);
+          const tagged = JSON.stringify(Object.assign({}, msg, { side: room.host === ws ? 'host' : 'guest' }));
+          for (const sp of room.spectators) sendRaw(sp, tagged);
         }
         break;
       }
