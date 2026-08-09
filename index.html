@@ -131,11 +131,16 @@
     min-width: 130px;
   }
   .panel-box {
-    background: rgba(10, 10, 20, 0.7);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px;
+    /* Soft top-lit gradient + inner highlight so the panels read as glass
+       cards floating over the scene instead of flat grey boxes. */
+    background: linear-gradient(180deg, rgba(18, 18, 34, 0.78), rgba(8, 8, 18, 0.72));
+    border: 1px solid rgba(255,255,255,0.10);
+    border-top-color: rgba(255,255,255,0.18);
+    border-radius: 10px;
     padding: 12px;
     backdrop-filter: blur(10px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
   .panel-box h3 {
     font-size: 11px;
@@ -204,8 +209,12 @@
     margin-top: 4px;
   }
   /* ── Score panel redesign ── */
-  /* SPB rows + rank: hidden on desktop, revealed on mobile */
-  .spb-row1, .spb-row2, .spb-rank-target { display: none; }
+  /* SPB row 2 + rank chip: hidden on desktop, revealed on mobile */
+  .spb-row2, .spb-rank-target { display: none; }
+  /* Desktop keeps row 1 — it holds the big score number. (The mobile
+     redesign originally hid every spb row on desktop, which silently
+     removed the score readout from the desktop HUD entirely.) */
+  .spb-row1 { display: flex; justify-content: center; }
 
   #zone-bar-container {
     width: 100%;
@@ -2949,6 +2958,7 @@ function _marathonRotateVibe() {
     _gxScene = _dhScene = _jzScene = _ofScene = _zenScene = _wzScene = _hzScene = null;
     _jzBgCanvas = null;
     _blockMiniCache.clear();
+    _ghostMiniCache.clear();
     _playRectsCache = null;
     const eraEl = document.getElementById('era-display');
     if (eraEl) eraEl.textContent = next.name;
@@ -3112,6 +3122,11 @@ function resizeCanvases() {
   const next = document.getElementById('next-canvas');
   const nr = next.getBoundingClientRect();
   if (nr.width > 0) { next.width = nr.width; next.height = nr.height; }
+  // Invalidate the repaint-skip signatures + cached display height — the
+  // resize wiped the bitmaps, so the next drawHold/drawNext must repaint.
+  hold._sig = null;
+  next._sig = null;
+  next._dispH = nr.height > 0 ? nr.height : null;
   // Match the bg canvas to the actually-visible viewport so the dark
   // background fills the full screen on iOS regardless of URL-bar state.
   const vvw = (window.visualViewport && window.visualViewport.width)  || window.innerWidth;
@@ -3195,6 +3210,10 @@ var _playRectsCacheKey = '';
 // Shockwaves: rings emitted from cleared rows that expand and fade.
 // Each entry: { x, y, r, maxR, alpha, color, life }
 var shockwaves = [];
+// Row-clear flashes: bright horizontal bands over just-cleared rows that
+// collapse + fade over ~260 ms. Purely visual — rows are spliced immediately;
+// the flash plays over the settled stack. Each entry: { y, h, t }.
+var rowFlashes = [];
 // Screen shake: number of frames remaining + magnitude in px. Decays each frame.
 var shakeFrames = 0;
 var shakeMag = 0;
@@ -3853,6 +3872,8 @@ function clearLines() {
           color: wColor,
           life: 1,
         });
+        // Bright band over the row itself — the "zap" that sells the clear.
+        rowFlashes.push({ y: r * CELL, h: CELL, t: performance.now() });
       }
       // Screen shake: doubles → tiny, triples → light, tetris → heavy. Scales
       // up at high levels so L19 has real punch even on a single.
@@ -3967,6 +3988,7 @@ function clearLines() {
         level = newLevel;
         _boardCacheDirty = true; // block style may change at new level
         _blockMiniCache.clear();
+        _ghostMiniCache.clear();
         _playRectsCache = null;
         dropInterval = computeDropInterval(level);
         lockDelay = computeLockDelay(level);
@@ -6369,6 +6391,10 @@ function shadeColor(color, percent) {
 // On Tetris-Effect levels (Underground), every block face is the theme's
 // accent color regardless of piece type - so the ghost should match. Other
 // levels keep the piece-colored ghost for clarity.
+// Ghost cells are deterministic per (colour, size) too, so they get their own
+// mini-cache — the old version paid setLineDash + two strokes per cell per
+// frame for the lifetime of every piece.
+const _ghostMiniCache = new Map();
 function drawGhostBlock(context, x, y, color, size) {
   const theme = getTheme(level);
   // tetrisEffect, matrix, tires, and macncheese all override face colour,
@@ -6378,16 +6404,35 @@ function drawGhostBlock(context, x, y, color, size) {
   // automatically renders as the yellow guide outline Sir asked for.
   const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star' || theme.blockStyle === 'taco');
   const outlineColor = useThemeColor ? theme.colors.accent : color;
-  context.save();
-  const [r, g, b] = hexToRgb(outlineColor);
-  context.fillStyle = `rgba(${r},${g},${b},0.08)`;
-  context.fillRect(x + 2, y + 2, size - 4, size - 4);
-  context.strokeStyle = `rgba(${r},${g},${b},0.85)`;
-  context.lineWidth = 1.5;
-  context.setLineDash([4, 3]);
-  context.strokeRect(x + 2.5, y + 2.5, size - 5, size - 5);
-  context.setLineDash([]);
-  context.restore();
+  const key = `${outlineColor}-${size}`;
+  let mini = _ghostMiniCache.get(key);
+  if (!mini) {
+    mini = document.createElement('canvas');
+    mini.width = size; mini.height = size;
+    const c = mini.getContext('2d');
+    const [r, g, b] = hexToRgb(outlineColor);
+    // Faint interior wash so the landing zone reads as a filled slot.
+    c.fillStyle = `rgba(${r},${g},${b},0.10)`;
+    c.fillRect(2, 2, size - 4, size - 4);
+    c.strokeStyle = `rgba(${r},${g},${b},0.80)`;
+    c.lineWidth = 1.5;
+    c.setLineDash([4, 3]);
+    c.strokeRect(2.5, 2.5, size - 5, size - 5);
+    c.setLineDash([]);
+    // Bright corner ticks anchor the outline so the target cell stays crisp
+    // even over busy backdrops.
+    c.strokeStyle = `rgba(${r},${g},${b},1)`;
+    c.lineWidth = 2;
+    const t = Math.max(3, size * 0.18);
+    c.beginPath();
+    c.moveTo(2, 2 + t); c.lineTo(2, 2); c.lineTo(2 + t, 2);
+    c.moveTo(size - 2 - t, 2); c.lineTo(size - 2, 2); c.lineTo(size - 2, 2 + t);
+    c.moveTo(size - 2, size - 2 - t); c.lineTo(size - 2, size - 2); c.lineTo(size - 2 - t, size - 2);
+    c.moveTo(2 + t, size - 2); c.lineTo(2, size - 2); c.lineTo(2, size - 2 - t);
+    c.stroke();
+    _ghostMiniCache.set(key, mini);
+  }
+  context.drawImage(mini, x, y);
 }
 
 // Reverse map of piece-color → piece-type so locked blocks (which only carry
@@ -6405,7 +6450,8 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   // active piece, ghost). Only skips time-dependent styles (matrix, star).
   if (_bs === 'beefpatty' || _bs === 'trumpet' || _bs === 'brain' ||
       _bs === 'mug' || _bs === 'tetrisEffect' || _bs === 'tires' || _bs === 'macncheese' ||
-      _bs === 'bullet' || _bs === 'leaf' || _bs === 'taco' || _bs === 'beachball' || _bs === 'skull') {
+      _bs === 'bullet' || _bs === 'leaf' || _bs === 'taco' || _bs === 'beachball' || _bs === 'skull' ||
+      _bs === 'default') {
     const key = `${_bs}-${color}-${size}`;
     let mini = _blockMiniCache.get(key);
     if (!mini) {
@@ -6424,6 +6470,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
       else if (_bs === 'taco')         drawBlockTaco(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'beachball') { try { drawBlockBeachball(mc, 0, 0, color, size, 1, theme); } catch(e) { mc.fillStyle=color; mc.fillRect(2,2,size-4,size-4); } }
       else if (_bs === 'skull')     { try { drawBlockSkull(mc, 0, 0, color, size, 1, theme); }     catch(e) { mc.fillStyle=color; mc.fillRect(2,2,size-4,size-4); } }
+      else                             drawBlockDefault(mc, 0, 0, color, size);
       _blockMiniCache.set(key, mini);
     }
     if (alpha !== 1) context.globalAlpha = alpha;
@@ -6487,20 +6534,53 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
     drawBlockStar(context, x, y, color, size, alpha, theme);
     return;
   }
+  // Unrecognised style string — same glossy tile as 'default'.
   context.globalAlpha = alpha;
-  const grad = context.createLinearGradient(x, y, x + size, y + size);
-  grad.addColorStop(0, color);
-  grad.addColorStop(1, shadeColor(color, -30));
-  context.fillStyle = grad;
-  context.fillRect(x + 1, y + 1, size - 2, size - 2);
-  context.fillStyle = 'rgba(255,255,255,0.2)';
-  context.fillRect(x + 1, y + 1, size - 2, 3);
-  context.fillRect(x + 1, y + 1, 3, size - 2);
-  context.fillStyle = 'rgba(0,0,0,0.2)';
-  context.fillRect(x + 1, y + size - 3, size - 2, 2);
-  context.fillRect(x + size - 3, y + 1, 2, size - 2);
-  // Glow halo dropped - see drawBlockTE comment. Was cost #1 in render loop.
+  drawBlockDefault(context, x, y, color, size);
   context.globalAlpha = 1;
+}
+
+// Default block: rounded glossy tile — vertical light ramp (lit top face →
+// deep base), a specular gloss wash across the top, a hairline inner rim,
+// and a seat shadow at the bottom so stacked pieces read as separate tiles.
+// Deterministic per (color, size), so it renders once into _blockMiniCache
+// and every subsequent call is a single drawImage.
+function _roundRectPath(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y,     x + w, y + h, r);
+  c.arcTo(x + w, y + h, x,     y + h, r);
+  c.arcTo(x,     y + h, x,     y,     r);
+  c.arcTo(x,     y,     x + w, y,     r);
+  c.closePath();
+}
+function drawBlockDefault(context, x, y, color, size) {
+  const inset = 1;
+  const bx = x + inset, by = y + inset, bs = size - inset * 2;
+  const r = Math.max(2, size * 0.16);
+  // Face: lit from above.
+  const grad = context.createLinearGradient(bx, by, bx, by + bs);
+  grad.addColorStop(0,    shadeColor(color, 48));
+  grad.addColorStop(0.45, color);
+  grad.addColorStop(1,    shadeColor(color, -55));
+  _roundRectPath(context, bx, by, bs, bs, r);
+  context.fillStyle = grad;
+  context.fill();
+  // Specular gloss: soft white wash over the top half.
+  const gloss = context.createLinearGradient(bx, by, bx, by + bs * 0.55);
+  gloss.addColorStop(0, 'rgba(255,255,255,0.38)');
+  gloss.addColorStop(1, 'rgba(255,255,255,0)');
+  _roundRectPath(context, bx + 1, by + 1, bs - 2, bs * 0.55, Math.max(1, r - 1));
+  context.fillStyle = gloss;
+  context.fill();
+  // Hairline inner rim lifts the tile off the grid.
+  _roundRectPath(context, bx + 0.5, by + 0.5, bs - 1, bs - 1, Math.max(1.5, r - 0.5));
+  context.strokeStyle = 'rgba(255,255,255,0.20)';
+  context.lineWidth = 1;
+  context.stroke();
+  // Seat shadow along the bottom edge.
+  context.fillStyle = 'rgba(0,0,0,0.32)';
+  context.fillRect(bx + r * 0.6, by + bs - 2, bs - r * 1.2, 1.6);
 }
 
 // Tetris Effect-style block: glossy 3D bevel (bright top-left highlight,
@@ -6895,18 +6975,35 @@ function drawBoard() {
       bctx.fillStyle = `rgb(${r},${g},${b})`;
     }
     bctx.fillRect(0, 0, cw, ch);
-    // Grid lines
-    bctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    // Grid: one stroked path of straight lines instead of ROWS×COLS
+    // strokeRects (200 stroke calls → 1), with slightly stronger verticals
+    // so columns read at a glance.
     bctx.lineWidth = 1;
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) bctx.strokeRect(col * CELL, row * CELL, CELL, CELL);
+    bctx.strokeStyle = 'rgba(255,255,255,0.028)';
+    bctx.beginPath();
+    for (let row = 1; row < ROWS; row++) {
+      bctx.moveTo(0, row * CELL + 0.5); bctx.lineTo(cw, row * CELL + 0.5);
     }
-    // Locked blocks — the expensive part, now only runs on board changes
+    bctx.stroke();
+    bctx.strokeStyle = 'rgba(255,255,255,0.045)';
+    bctx.beginPath();
+    for (let col = 1; col < COLS; col++) {
+      bctx.moveTo(col * CELL + 0.5, 0); bctx.lineTo(col * CELL + 0.5, ch);
+    }
+    bctx.stroke();
+    // Locked blocks — the expensive part, now only runs on board changes.
+    // Track the highest occupied row in the same pass; the danger tint in
+    // the per-frame path reads it for free.
+    let stackTop = ROWS;
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
-        if (board[row][col]) drawBlock(bctx, col * CELL, row * CELL, board[row][col], CELL);
+        if (board[row][col]) {
+          if (row < stackTop) stackTop = row;
+          drawBlock(bctx, col * CELL, row * CELL, board[row][col], CELL);
+        }
       }
     }
+    _boardCache._stackTop = stackTop;
     _boardCacheDirty = false;
   }
 
@@ -6921,6 +7018,37 @@ function drawBoard() {
     const [ar, ag, ab] = hexToRgb(theme.colors.accent);
     ctx.fillStyle = `rgba(${ar},${ag},${ab},${pulse})`;
     ctx.fillRect(0, 0, cw, ch);
+  }
+
+  // Edge light — a thin accent frame that breathes with the beat and flares
+  // on hard drops, so the board reads as a lit stage instead of a cutout.
+  // One strokeRect per frame.
+  {
+    const edgeA = 0.06 + Math.max(0, pulse) * 1.4 + boardDropPulse * 0.35;
+    const [er, eg, eb] = hexToRgb(theme.colors.accent);
+    ctx.strokeStyle = `rgba(${er},${eg},${eb},${Math.min(0.55, edgeA)})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, cw - 2, ch - 2);
+  }
+
+  // Danger tint — red wash bleeding down from the ceiling once the stack
+  // climbs within 5 rows of topping out, pulsing harder the closer it gets.
+  // Stack height comes from the board-cache rebuild, so this is ~free.
+  const _stackTop = (_boardCache && _boardCache._stackTop != null) ? _boardCache._stackTop : ROWS;
+  if (_stackTop <= 5 && !gameOver) {
+    let dGrad = _boardCache._dangerGrad;
+    if (!dGrad || _boardCache._dangerGradH !== ch) {
+      dGrad = ctx.createLinearGradient(0, 0, 0, ch * 0.38);
+      dGrad.addColorStop(0, 'rgba(255,36,52,0.50)');
+      dGrad.addColorStop(1, 'rgba(255,36,52,0)');
+      _boardCache._dangerGrad = dGrad;
+      _boardCache._dangerGradH = ch;
+    }
+    const closeness = (6 - _stackTop) / 6;                     // 1/6 … 1
+    ctx.globalAlpha = closeness * (0.55 + 0.30 * Math.sin(Date.now() / 170));
+    ctx.fillStyle = dGrad;
+    ctx.fillRect(0, 0, cw, ch * 0.38);
+    ctx.globalAlpha = 1;
   }
 
   if (currentPiece && !gameOver) {
@@ -6998,6 +7126,30 @@ function drawBoard() {
     levelTransitionAlpha -= 0.02;
   }
 
+  // Row-clear flash — a white-hot band with theme-glow edges that collapses
+  // and fades over ~260 ms at each cleared row's position. Drawn additively
+  // so it pops over any block style. Human board only (same rule as shockwaves).
+  if (rowFlashes.length && (!activePlayer || !activePlayer.isAI)) {
+    const nowT = performance.now();
+    const [fr2, fg2, fb2] = hexToRgb(theme.colors.glow || theme.colors.accent);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = rowFlashes.length - 1; i >= 0; i--) {
+      const f = rowFlashes[i];
+      const k = 1 - (nowT - f.t) / 260;
+      if (k <= 0) { rowFlashes.splice(i, 1); continue; }
+      const cy = f.y + f.h / 2;
+      const bandH = f.h * (0.3 + 0.9 * k);
+      const g = ctx.createLinearGradient(0, cy - bandH / 2, 0, cy + bandH / 2);
+      g.addColorStop(0,   `rgba(${fr2},${fg2},${fb2},0)`);
+      g.addColorStop(0.5, `rgba(255,255,255,${0.8 * k})`);
+      g.addColorStop(1,   `rgba(${fr2},${fg2},${fb2},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, cy - bandH / 2, cw, bandH);
+    }
+    ctx.restore();
+  }
+
   // Tetris Effect-style shockwaves: expanding rings drawn over the board after
   // a line clear. Lives in shared state (not per-player) so we only draw them
   // on the human player's main canvas (skipped for the AI mini board).
@@ -7056,9 +7208,27 @@ function drawMiniPiece(context, type, ox, oy, cs) {
   for (const [bx, by] of def.shape) drawBlock(context, ox + bx * cs, oy + by * cs, color, cs);
 }
 
+// Shared backdrop for the HOLD/NEXT mini canvases — soft vertical falloff +
+// hairline border reads as a recessed slot instead of a flat black square.
+function _paintMiniPanelBg(c, w, h) {
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#10101c');
+  g.addColorStop(1, '#06060e');
+  c.fillStyle = g;
+  c.fillRect(0, 0, w, h);
+  c.strokeStyle = 'rgba(255,255,255,0.055)';
+  c.lineWidth = 1;
+  c.strokeRect(0.5, 0.5, w - 1, h - 1);
+}
+
 function drawHold() {
-  holdCtx.fillStyle = 'rgba(8,8,16,1)';
-  holdCtx.fillRect(0, 0, holdCanvas.width, holdCanvas.height);
+  // Repaint only when an input changed — this runs every frame but the held
+  // piece / theme / canvas size change a few times a minute at most. The
+  // signature lives on the canvas element so it stays per-player in vs mode.
+  const _sig = `${holdPieceType || ''}|${getTheme(level).name}|${holdCanvas.width}x${holdCanvas.height}`;
+  if (holdCanvas._sig === _sig) return;
+  holdCanvas._sig = _sig;
+  _paintMiniPanelBg(holdCtx, holdCanvas.width, holdCanvas.height);
   if (holdPieceType) {
     const cs = Math.max(6, Math.min(14, Math.floor(holdCanvas.width / 5.5)));
     // Measure actual piece bounding box so centering is pixel-perfect for
@@ -7074,12 +7244,17 @@ function drawHold() {
 }
 
 function drawNext() {
-  nextCtx.fillStyle = 'rgba(8,8,16,1)';
-  nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
-  // Use bitmap dimensions for drawing, but CSS display height for mode decision
-  // so a 320px bitmap displayed at 46px CSS still picks the compact single-piece mode.
+  // CSS display height decides compact vs list mode. offsetHeight is a layout
+  // read — cache it on the element (resizeCanvases clears the cache) instead
+  // of forcing the browser to answer it every frame.
   const nw = nextCanvas.width, nh = nextCanvas.height;
-  const displayH = nextCanvas.offsetHeight || nh;
+  let displayH = nextCanvas._dispH;
+  if (!displayH) displayH = nextCanvas._dispH = (nextCanvas.offsetHeight || nh);
+  // Skip repaint unless the visible slice of the queue / theme / size changed.
+  const _sig = `${nextQueue.slice(0, 5).join('')}|${getTheme(level).name}|${nw}x${nh}|${displayH}`;
+  if (nextCanvas._sig === _sig) return;
+  nextCanvas._sig = _sig;
+  _paintMiniPanelBg(nextCtx, nw, nh);
   const horizontal = displayH < 80 || nh < 80;
   if (horizontal) {
     // Single piece centered, sized to fill the canvas compactly.
@@ -7096,6 +7271,14 @@ function drawNext() {
   } else {
     const cs = 16;
     const count = Math.min(5, Math.floor((nh - 10) / 62), nextQueue.length);
+    // "On deck" spotlight: a faint plate behind slot 0 so the very next piece
+    // reads at a glance.
+    if (count > 0) {
+      nextCtx.fillStyle = 'rgba(255,255,255,0.05)';
+      nextCtx.fillRect(4, 5, nw - 8, 56);
+      nextCtx.strokeStyle = 'rgba(255,255,255,0.07)';
+      nextCtx.strokeRect(4.5, 5.5, nw - 9, 55);
+    }
     for (let i = 0; i < count; i++) drawMiniPiece(nextCtx, nextQueue[i], 18, 10 + i * 62, cs);
   }
 }
@@ -17832,94 +18015,158 @@ function drawBackground() {
   }
 }
 
+// Pre-rendered soft-glow sprites, one per particle colour. shadowBlur was the
+// single most expensive canvas state in the loop (it re-blurs per fill);
+// blitting a cached radial sprite additively is ~10× cheaper AND gives the
+// sparks a hot white core that reads better than the old flat dot.
+const _particleSprites = new Map();
+function _anyColorToRgb(color) {
+  if (color && color[0] === '#') return hexToRgb(color);
+  const m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(color || '');
+  return m ? [+m[1], +m[2], +m[3]] : [255, 255, 255];
+}
+function _particleSprite(color) {
+  let s = _particleSprites.get(color);
+  if (s) return s;
+  const D = 32;
+  s = document.createElement('canvas');
+  s.width = s.height = D;
+  const c = s.getContext('2d');
+  const [r, g, b] = _anyColorToRgb(color);
+  const grad = c.createRadialGradient(D / 2, D / 2, 0, D / 2, D / 2, D / 2);
+  grad.addColorStop(0,    'rgba(255,255,255,0.95)');
+  grad.addColorStop(0.28, `rgba(${r},${g},${b},0.85)`);
+  grad.addColorStop(1,    `rgba(${r},${g},${b},0)`);
+  c.fillStyle = grad;
+  c.fillRect(0, 0, D, D);
+  _particleSprites.set(color, s);
+  return s;
+}
 function drawParticles() {
+  if (!particles.length) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= p.decay;
     if (p.life <= 0) { particles.splice(i, 1); continue; }
+    // Sprite diameter covers core + halo — matches the old dot+blur footprint.
+    const d = p.size * p.life * 3.2;
     ctx.globalAlpha = p.life;
-    ctx.fillStyle = p.color;
-    ctx.shadowColor = p.color;
-    ctx.shadowBlur = 10;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 1;
+    ctx.drawImage(_particleSprite(p.color), p.x - d / 2, p.y - d / 2, d, d);
   }
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
+// ── updateUI plumbing ──────────────────────────────────────────────────────
+// updateUI runs every render frame. Elements are looked up once (they're all
+// static in the markup), and every textContent/style write is guarded by a
+// last-written check — setting textContent to an identical string is still a
+// real DOM mutation, so an unguarded write per frame invalidates layout 60×/s
+// for values that change a few times a minute.
+let _uiEls = null;
+const _uiLast = {};
+function _getUiEls() {
+  if (_uiEls) return _uiEls;
+  const $ = (id) => document.getElementById(id);
+  _uiEls = {
+    score: $('score-display'), level: $('level-display'), lines: $('lines-display'),
+    lvlBar: $('score-lvl-bar'), spbLines: $('spb-lines-progress'),
+    rankLabel: $('spb-rank-label'), rankScore: $('spb-rank-score'), rankTarget: $('spb-rank-target'),
+    nextLevel: $('next-level-display'),
+    zoneBar: $('zone-bar'), zoneLabel: $('zone-label'),
+    modeHud: $('mode-hud'), mhPri: $('mh-primary'), mhSec: $('mh-secondary'), mhLab: $('mh-label'),
+    zoneBtn: $('tc-zone-btn'),
+  };
+  _uiEls.zoneBtnLabel = _uiEls.zoneBtn ? _uiEls.zoneBtn.querySelector('.tc-label') : null;
+  return _uiEls;
+}
+function _setText(el, key, txt) {
+  if (!el || _uiLast[key] === txt) return;
+  _uiLast[key] = txt;
+  el.textContent = txt;
+}
+// Mobile rank-target leaderboard cache. The old code did a localStorage read
+// + JSON.parse EVERY FRAME; now the list refreshes at most every 2 s and the
+// target itself recomputes only when the score moves.
+let _lbUiCache = null, _lbUiCacheMode = null, _lbUiCacheAt = 0;
+
 function updateUI() {
-  const _scoreEl = document.getElementById('score-display');
-  const _newScoreText = Math.floor(score).toLocaleString();
-  if (_scoreEl.textContent !== _newScoreText) {
-    _scoreEl.textContent = _newScoreText;
+  const ui = _getUiEls();
+  const _scoreInt = Math.floor(score);
+  if (_uiLast.scoreInt !== _scoreInt) {
+    _uiLast.scoreInt = _scoreInt;
+    ui.score.textContent = _scoreInt.toLocaleString();
     // Trigger pop animation on every score change
-    _scoreEl.classList.remove('score-popping');
-    void _scoreEl.offsetWidth; // force reflow to restart animation
-    _scoreEl.classList.add('score-popping');
+    ui.score.classList.remove('score-popping');
+    void ui.score.offsetWidth; // force reflow to restart animation
+    ui.score.classList.add('score-popping');
   }
   const _isMobileUI = window.innerWidth <= 720;
   const _linesInLevel = lines % LINES_PER_LEVEL;
-  document.getElementById('level-display').textContent = _isMobileUI ? `${level}` : `Level ${level}`;
+  _setText(ui.level, 'level', _isMobileUI ? `${level}` : `Level ${level}`);
   // Desktop: show "6 / 15 Lines" so progress toward next level is clear
-  document.getElementById('lines-display').textContent = _isMobileUI
-    ? `${lines}`
-    : `${_linesInLevel} / ${LINES_PER_LEVEL} Lines`;
+  _setText(ui.lines, 'lines', _isMobileUI ? `${lines}` : `${_linesInLevel} / ${LINES_PER_LEVEL} Lines`);
   // Progress bar (mobile)
-  const _lvlBar = document.getElementById('score-lvl-bar');
-  if (_lvlBar) {
-    const _pct = Math.min(100, (_linesInLevel / LINES_PER_LEVEL) * 100);
-    _lvlBar.style.width = _pct + '%';
+  if (ui.lvlBar) {
+    const _pct = Math.min(100, Math.round((_linesInLevel / LINES_PER_LEVEL) * 100));
+    if (_uiLast.lvlPct !== _pct) { _uiLast.lvlPct = _pct; ui.lvlBar.style.width = _pct + '%'; }
   }
-  const _linesEl = document.getElementById('spb-lines-progress');
-  if (_linesEl) _linesEl.textContent = `${_linesInLevel} / ${LINES_PER_LEVEL}`;
+  _setText(ui.spbLines, 'spbLines', `${_linesInLevel} / ${LINES_PER_LEVEL}`);
 
   // Leaderboard rank target — show the next score to beat + its rank
-  if (_isMobileUI && gameStarted) {
-    const _rankLabel = document.getElementById('spb-rank-label');
-    const _rankScore = document.getElementById('spb-rank-score');
-    const _rankTarget = document.getElementById('spb-rank-target');
-    if (_rankLabel && _rankScore && _rankTarget) {
-      const _lb = loadLeaderboard(_currentLbMode);
-      const _cur = Math.floor(score);
+  if (_isMobileUI && gameStarted && ui.rankLabel && ui.rankScore && ui.rankTarget) {
+    const _tNow = performance.now();
+    let _lbFresh = false;
+    if (!_lbUiCache || _lbUiCacheMode !== _currentLbMode || _tNow - _lbUiCacheAt > 2000) {
+      _lbUiCache = loadLeaderboard(_currentLbMode);
+      _lbUiCacheMode = _currentLbMode;
+      _lbUiCacheAt = _tNow;
+      _lbFresh = true;
+    }
+    if (_lbFresh || _uiLast.rankForScore !== _scoreInt) {
+      _uiLast.rankForScore = _scoreInt;
+      const _lb = _lbUiCache;
+      const _cur = _scoreInt;
       // Find the lowest-ranked entry the player hasn't beaten yet
       let _targetIdx = -1;
       for (let _ri = _lb.length - 1; _ri >= 0; _ri--) {
         if (_lb[_ri].score > _cur) { _targetIdx = _ri; break; }
       }
       if (_cur <= 0 && _lb.length === 0) {
-        _rankLabel.textContent = 'BEAT';
-        _rankScore.textContent = '—';
+        _setText(ui.rankLabel, 'rankLabel', 'BEAT');
+        _setText(ui.rankScore, 'rankScore', '—');
       } else if (_targetIdx === -1) {
         // Player is beating everyone or board is empty
-        _rankLabel.textContent = _lb.length === 0 ? 'FIRST!' : '🏆 #1';
-        _rankScore.textContent = _lb.length > 0 ? '#1 ' + _lb[0].score.toLocaleString() : 'NEW REC';
-        _rankScore.style.color = 'rgba(120,255,160,0.95)';
-        _rankScore.style.textShadow = '0 0 8px rgba(0,255,100,0.45)';
+        _setText(ui.rankLabel, 'rankLabel', _lb.length === 0 ? 'FIRST!' : '🏆 #1');
+        _setText(ui.rankScore, 'rankScore', _lb.length > 0 ? '#1 ' + _lb[0].score.toLocaleString() : 'NEW REC');
+        if (_uiLast.rankTone !== 'top') {
+          _uiLast.rankTone = 'top';
+          ui.rankScore.style.color = 'rgba(120,255,160,0.95)';
+          ui.rankScore.style.textShadow = '0 0 8px rgba(0,255,100,0.45)';
+        }
       } else {
         const _rank = _targetIdx + 1;
-        _rankLabel.textContent = `BEAT #${_rank}`;
-        _rankScore.textContent = _lb[_targetIdx].score.toLocaleString();
-        _rankScore.style.color = 'rgba(255,220,100,0.95)';
-        _rankScore.style.textShadow = '0 0 8px rgba(255,180,0,0.45)';
+        _setText(ui.rankLabel, 'rankLabel', `BEAT #${_rank}`);
+        _setText(ui.rankScore, 'rankScore', _lb[_targetIdx].score.toLocaleString());
+        if (_uiLast.rankTone !== 'chasing') {
+          _uiLast.rankTone = 'chasing';
+          ui.rankScore.style.color = 'rgba(255,220,100,0.95)';
+          ui.rankScore.style.textShadow = '0 0 8px rgba(255,180,0,0.45)';
+        }
       }
-      _rankTarget.style.display = '';
+      if (_uiLast.rankShown !== true) { _uiLast.rankShown = true; ui.rankTarget.style.display = ''; }
     }
   }
   // "X to L<next>" - how many more line clears until the next level. Levels
   // advance every 10 lines, capped at the last theme so L19 just shows "MAX".
-  const nextLevelEl = document.getElementById('next-level-display');
-  if (nextLevelEl) {
+  if (ui.nextLevel) {
     const maxLevel = LEVEL_THEMES.length - 1;
-    if (level >= maxLevel) {
-      nextLevelEl.textContent = 'MAX LEVEL';
-    } else {
-      const remaining = LINES_PER_LEVEL - (lines % LINES_PER_LEVEL);
-      nextLevelEl.textContent = `${remaining} to L${level + 1}`;
-    }
+    _setText(ui.nextLevel, 'nextLevel', level >= maxLevel
+      ? 'MAX LEVEL'
+      : `${LINES_PER_LEVEL - (lines % LINES_PER_LEVEL)} to L${level + 1}`);
   }
-  document.getElementById('zone-bar').style.width = zoneEnergy + '%';
 
   // ── Mode HUD (Sprint lines-left / Ultra time-left) ─────────────────────
   // Big labelled panel above the play area. Sprint shows TIME as the
@@ -17927,11 +18174,14 @@ function updateUI() {
   // lines-remaining + pieces-per-second secondary. Ultra shows
   // time-remaining as the primary plus current score secondary. Goes
   // urgent (red, pulse) at 5 lines / 10 seconds.
-  const modeHud = document.getElementById('mode-hud');
+  const modeHud = ui.modeHud;
   if (modeHud) {
-    const elPri = document.getElementById('mh-primary');
-    const elSec = document.getElementById('mh-secondary');
-    const elLab = document.getElementById('mh-label');
+    const elPri = ui.mhPri;
+    const elSec = ui.mhSec;
+    const elLab = ui.mhLab;
+    // The primary readout is a live centisecond timer in sprint/ultra, so
+    // those writes fire per frame by design; label/secondary/display only
+    // change occasionally and are guarded.
     if (gameMode === 'sprint' && _sprintTarget > 0) {
       const remain = Math.max(0, _sprintTarget - lines);
       const elapsed = ((_modeFinishTime || performance.now()) - _modeStartTime);
@@ -17939,26 +18189,26 @@ function updateUI() {
       const pps = (_pieceLockCount > 0 && elapsed > 100)
                   ? (_pieceLockCount / (elapsed / 1000)).toFixed(2)
                   : '0.00';
-      elLab.textContent = 'SPRINT';
+      _setText(elLab, 'mhLab', 'SPRINT');
       elPri.textContent = fmtSprintTime(elapsed);
-      elSec.textContent = `${remain} lines · ${pps} PPS`;
+      _setText(elSec, 'mhSec', `${remain} lines · ${pps} PPS`);
       modeHud.classList.toggle('is-urgent', remain <= 5 && remain > 0);
-      modeHud.style.display = '';
+      if (_uiLast.mhShown !== true) { _uiLast.mhShown = true; modeHud.style.display = ''; }
     } else if (gameMode === 'ultra' && _ultraTimeLimit > 0) {
       const remainMs = Math.max(0, _ultraTimeLimit - (performance.now() - _modeStartTime));
-      elLab.textContent = 'ULTRA';
+      _setText(elLab, 'mhLab', 'ULTRA');
       elPri.textContent = fmtSprintTime(remainMs);
-      elSec.textContent = `${Math.floor(score).toLocaleString()} · ${lines} ln`;
+      _setText(elSec, 'mhSec', `${_scoreInt.toLocaleString()} · ${lines} ln`);
       modeHud.classList.toggle('is-urgent', remainMs <= 10000);
-      modeHud.style.display = '';
+      if (_uiLast.mhShown !== true) { _uiLast.mhShown = true; modeHud.style.display = ''; }
     } else if (gameMode === 'marathon') {
-      const goal = _marathonGoal;
-      elLab.textContent = 'MARATHON';
-      elPri.textContent = `${lines}/${goal}`;   // compact — no spaces, fits in 72px slot
-      elSec.textContent = `L${level} · ${lines}`;
+      _setText(elLab, 'mhLab', 'MARATHON');
+      _setText(elPri, 'mhPri', `${lines}/${_marathonGoal}`);   // compact — no spaces, fits in 72px slot
+      _setText(elSec, 'mhSec', `L${level} · ${lines}`);
       modeHud.classList.remove('is-urgent');
-      modeHud.style.display = '';
-    } else {
+      if (_uiLast.mhShown !== true) { _uiLast.mhShown = true; modeHud.style.display = ''; }
+    } else if (_uiLast.mhShown !== false) {
+      _uiLast.mhShown = false;
       modeHud.style.display = 'none';
       modeHud.classList.remove('is-urgent');
     }
@@ -17968,37 +18218,37 @@ function updateUI() {
   // Three states: charging (energy %), ready (energy=100), active (drain).
   // The CSS variable `--zone-fill` is the single source of truth. We also
   // toggle two state classes that own the colour palette and animations.
-  const zb = document.getElementById('tc-zone-btn');
+  const zb = ui.zoneBtn;
+  const lbl = ui.zoneBtnLabel;
+  // Fill % quantized to whole percent — the bar is ~60px wide, so sub-percent
+  // style writes are invisible churn.
+  const _zonePct = zoneActive
+    ? Math.max(0, Math.min(100, Math.round((zoneTimer / 12000) * 100)))
+    : Math.round(zoneEnergy);
+  const _zoneSecs = zoneActive ? Math.ceil(zoneTimer / 1000) : null;
   if (zb) {
-    if (zoneActive) {
-      const pct = Math.max(0, Math.min(100, (zoneTimer / 12000) * 100));
-      zb.style.setProperty('--zone-fill', pct + '%');
-      zb.classList.add('is-active');
-      zb.classList.remove('is-ready');
-      const lbl = zb.querySelector('.tc-label');
-      if (lbl) lbl.setAttribute('data-zone-secs', Math.ceil(zoneTimer / 1000));
-    } else {
-      zb.style.setProperty('--zone-fill', zoneEnergy + '%');
-      zb.classList.remove('is-active');
-      if (zoneEnergy >= 100) zb.classList.add('is-ready');
-      else zb.classList.remove('is-ready');
-      const lbl = zb.querySelector('.tc-label');
-      if (lbl) lbl.removeAttribute('data-zone-secs');
+    if (_uiLast.zonePct !== _zonePct) zb.style.setProperty('--zone-fill', _zonePct + '%');
+    zb.classList.toggle('is-active', !!zoneActive);
+    zb.classList.toggle('is-ready', !zoneActive && zoneEnergy >= 100);
+    if (lbl && _uiLast.zoneSecs !== _zoneSecs) {
+      if (_zoneSecs == null) lbl.removeAttribute('data-zone-secs');
+      else lbl.setAttribute('data-zone-secs', _zoneSecs);
     }
   }
   // Desktop zone bar mirrors the same logic — turns into a draining bar
   // (right-to-left) when zone is active so it reads as a countdown rather
   // than empty energy.
-  const zoneBar = document.getElementById('zone-bar');
-  const zoneLabel = document.getElementById('zone-label');
-  if (zoneActive && zoneBar) {
-    zoneBar.style.width = (zoneTimer / 12000) * 100 + '%';
-    zoneBar.style.background = 'linear-gradient(90deg, #ff3df0, #00e5ff)';
-    if (zoneLabel) zoneLabel.textContent = `ZONE · ${Math.ceil(zoneTimer / 1000)}s`;
-  } else if (zoneBar) {
-    zoneBar.style.background = 'linear-gradient(90deg, #ff00ff, #00ffff)';
-    if (zoneLabel) zoneLabel.textContent = zoneEnergy >= 100 ? 'ZONE · READY' : 'ZONE';
+  if (ui.zoneBar) {
+    if (_uiLast.zonePct !== _zonePct) ui.zoneBar.style.width = _zonePct + '%';
+    const _zoneBg = zoneActive
+      ? 'linear-gradient(90deg, #ff3df0, #00e5ff)'
+      : 'linear-gradient(90deg, #ff00ff, #00ffff)';
+    if (_uiLast.zoneBg !== _zoneBg) { _uiLast.zoneBg = _zoneBg; ui.zoneBar.style.background = _zoneBg; }
+    _setText(ui.zoneLabel, 'zoneLabel',
+      zoneActive ? `ZONE · ${_zoneSecs}s` : (zoneEnergy >= 100 ? 'ZONE · READY' : 'ZONE'));
   }
+  _uiLast.zonePct = _zonePct;
+  _uiLast.zoneSecs = _zoneSecs;
 }
 // Updates the small stats line beneath Alfred's bare canvas: score, level,
 // lines. Runs every render frame in vs-mode so it stays fresh.
@@ -19260,26 +19510,31 @@ setInterval(() => {
       phase: Math.random() * Math.PI * 2,
     });
   }
+  let _brickCache = null;   // baked seam layer — rebuild only on resize
   function drawBrickWall(w, h) {
     // Very subtle: only the seams are drawn, the brick face is the
     // gradient already painted by start-screen background. Two-row
-    // staggered pattern, dim mortar.
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.025)';
-    ctx.lineWidth = 1;
-    const brickH = 22, brickW = 80;
-    for (let y = 0; y < h; y += brickH) {
-      ctx.beginPath();
-      ctx.moveTo(0, y); ctx.lineTo(w, y);
-      ctx.stroke();
-      const rowOff = ((y / brickH) | 0) % 2 === 0 ? 0 : brickW / 2;
-      for (let x = -rowOff; x < w; x += brickW) {
-        ctx.beginPath();
-        ctx.moveTo(x, y); ctx.lineTo(x, y + brickH);
-        ctx.stroke();
+    // staggered pattern, dim mortar. Baked to an offscreen layer — the
+    // seam grid is ~1,200 stroke calls at 1080p, far too many to redo
+    // every frame for pixels that never change between resizes.
+    if (!_brickCache || _brickCache.width !== w || _brickCache.height !== h) {
+      _brickCache = document.createElement('canvas');
+      _brickCache.width = w; _brickCache.height = h;
+      const bc = _brickCache.getContext('2d');
+      bc.strokeStyle = 'rgba(255,255,255,0.025)';
+      bc.lineWidth = 1;
+      const brickH = 22, brickW = 80;
+      bc.beginPath();
+      for (let y = 0; y < h; y += brickH) {
+        bc.moveTo(0, y); bc.lineTo(w, y);
+        const rowOff = ((y / brickH) | 0) % 2 === 0 ? 0 : brickW / 2;
+        for (let x = -rowOff; x < w; x += brickW) {
+          bc.moveTo(x, y); bc.lineTo(x, y + brickH);
+        }
       }
+      bc.stroke();
     }
-    ctx.restore();
+    ctx.drawImage(_brickCache, 0, 0);
   }
   function drawSpotlight(w, h, t) {
     // Overhead cone of warm light from above the title down toward the
@@ -19396,11 +19651,16 @@ setInterval(() => {
       if (m.y < -10) { motes.splice(i, 1); continue; }
       drawMote(m);
     }
-    // Faint vignette that pulls the eye toward the center where the title sits
-    const vign = ctx.createRadialGradient(w * 0.5, h * 0.45, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.65);
-    vign.addColorStop(0, 'rgba(0,0,0,0)');
-    vign.addColorStop(1, 'rgba(0,0,0,0.55)');
-    ctx.fillStyle = vign;
+    // Faint vignette that pulls the eye toward the center where the title
+    // sits. Gradient cached per canvas size — building it per frame is waste.
+    if (!tick._vign || tick._vignKey !== `${w}x${h}`) {
+      const vign = ctx.createRadialGradient(w * 0.5, h * 0.45, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.65);
+      vign.addColorStop(0, 'rgba(0,0,0,0)');
+      vign.addColorStop(1, 'rgba(0,0,0,0.55)');
+      tick._vign = vign;
+      tick._vignKey = `${w}x${h}`;
+    }
+    ctx.fillStyle = tick._vign;
     ctx.fillRect(0, 0, w, h);
 
     frame++;
