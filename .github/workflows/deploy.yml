@@ -79,6 +79,10 @@ jobs:
           cp index.html _site/
           cp -r audio _site/ 2>/dev/null || true
           cp -r tiles _site/ 2>/dev/null || true
+          # For the Waves ships as head/body content (its Claude-artifact source
+          # form); prepend a doctype so Pages serves it in standards mode.
+          printf '<!doctype html>\n' > _site/for-the-waves.html
+          cat for-the-waves.html >> _site/for-the-waves.html
       - uses: actions/upload-pages-artifact@v3
         with: { path: _site }
       - id: deployment
