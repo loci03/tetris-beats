@@ -3286,6 +3286,14 @@ var beatPhase = 0;
 // global-swap. Reads/writes here always target the active player's cache.
 var _boardCache = null;
 var _boardCacheDirty = true;
+// Background fill + grid, split out of _boardCache so a line-clear collapse
+// can slide rows of blocks over a static grid. Rebuilt only on size/theme.
+var _boardBgCache = null;
+// Per-player game-feel FX state (line-clear collapse, lock flash, hard-drop
+// trail, spawn fade). Purely visual - see "BOARD FX" near drawBoard.
+var _boardFx = null;
+// Hard-drop "kick": the board dips down and springs back. { t, mag } | null.
+var dropKick = null;
 // Per-cell block image cache: each style+color combination rendered once to a
 // tiny offscreen canvas so drawBlock becomes a single drawImage call.
 // Eliminates shadowBlur + gradient allocations from active/ghost AND cache rebuild.
@@ -3391,7 +3399,7 @@ const PLAYER_FIELDS = [
   'lockResets',
   'zoneEnergy','zoneActive','zoneTimer','combo','b2bChain',
   'particles','levelTransitionAlpha','levelTransitionColor',
-  '_boardCache','_boardCacheDirty',
+  '_boardCache','_boardCacheDirty','_boardBgCache','_boardFx',
 ];
 // Canvas refs that also differ per player in vs mode. `CELL` is also in
 // here because P2's mini-board uses a smaller cell size than P1's full one.
@@ -3421,6 +3429,7 @@ function createPlayer({ id, isAI, name, mainCanvas: mc, holdCanvas: hc, nextCanv
     // different CELL sizes — sharing thrashed the cache to a full rebuild
     // every frame in vs/PvP mode. Each player now owns its own.
     _boardCache: null, _boardCacheDirty: true,
+    _boardBgCache: null, _boardFx: null,
     // AI difficulty tuning. Pulled from a preset in AI_DIFFICULTIES keyed on
     // the global aiDifficulty (set via the start-screen selector).
     ai: isAI ? Object.assign({
@@ -3578,6 +3587,7 @@ function spawnPiece() {
   _lastRotation.wasKick = false;
   _lastRotation.isTSpin = false;
   _lastRotation.isTSpinMini = false;
+  if (_fxEnabled()) _fx().spawnT = performance.now();
   if (collides(currentPiece, currentX, currentY)) {
     gameOver = true;
     handleTopOut();
@@ -3795,7 +3805,20 @@ function softDrop() {
 
 function hardDrop() {
   let drop = 0;
+  const startY = currentY;
   while (!collides(currentPiece, currentX, currentY + 1)) { currentY++; drop++; }
+  if (drop > 0 && _fxEnabled()) {
+    // Streak from where each column of the piece started to where it
+    // landed, plus a short downward board kick scaled by drop distance.
+    const tops = {};
+    for (const [bx, by] of currentPiece) if (tops[bx] == null || by < tops[bx]) tops[bx] = by;
+    _fx().trail = {
+      t: performance.now(),
+      color: _themePieceColor(currentType),
+      cols: Object.keys(tops).map(bx => ({ x: currentX + +bx, top: startY + tops[bx], bottom: currentY + tops[bx] })),
+    };
+    if (!REDUCED_MOTION) dropKick = { t: performance.now(), mag: Math.min(1, 0.35 + drop / 14) };
+  }
   score += drop * 2;
   audioEngine.playHardDrop();
   recordReplayEvent('H');
@@ -3817,6 +3840,9 @@ function lockPiece() {
   // Only counted on the human player's lock so AI activity doesn't
   // pollute Sir's PPS.
   if (!activePlayer || !activePlayer.isAI) _pieceLockCount++;
+  // A lock mid-collapse changes the board under the animation's row map, so
+  // snap any in-flight line-clear animation to its end state first.
+  if (_boardFx) _boardFx.clear = null;
   // Use the active theme's piece-palette override so locked cells render
   // in the level's color set (e.g. purple on Dream or Nightmare).
   const color = _themePieceColor(currentType);
@@ -3828,7 +3854,21 @@ function lockPiece() {
   for (const [bx, by] of currentPiece) {
     spawnParticles((currentX + bx) * CELL + CELL / 2, (currentY + by) * CELL + CELL / 2, color, 3);
   }
+  const lockCells = currentPiece.map(([bx, by]) => [currentX + bx, currentY + by]);
   const cleared = clearLines();
+  if (_fxEnabled()) {
+    // Flash the cells that just landed. If this lock cleared rows, drop the
+    // cells that vanished and move the rest to their post-clear rows (the
+    // collapse animation then carries them down visually).
+    const fx = _fx();
+    const gone = fx.clear ? fx.clear.rows.map(r => r.y) : [];
+    fx.lock = {
+      t: performance.now(),
+      cells: lockCells
+        .filter(([, y]) => !gone.includes(y))
+        .map(([x, y]) => [x, y + gone.filter(r => r > y).length]),
+    };
+  }
   // Vs mode: garbage exchange. When you clear lines, you first offset your
   // own pending garbage; any surplus rains on Alfred. If you didn't clear
   // anything this lock, any pending garbage rises up on your board now.
@@ -3928,6 +3968,7 @@ function riseGarbage(n) {
     board.push(row);
   }
   _boardCacheDirty = true;
+  if (_boardFx) _boardFx.clear = null;
 }
 
 function clearLines() {
@@ -3996,6 +4037,19 @@ function clearLines() {
         const flashStrength = [0, 0.15, 0.35, 0.6, 0.85][cleared] || 0.85;
         stageFlash = Math.max(stageFlash, flashStrength + Math.min(0.3, Math.max(0, combo) * 0.08));
       }
+    }
+    if (_fxEnabled()) {
+      // Snapshot for the clear animation: the cleared rows' cells, and for
+      // every post-clear row how many rows it fell (= cleared rows below it).
+      const k = clearRows.length;
+      const shift = new Array(ROWS).fill(0);
+      for (let i = 0; i < k; i++) shift[i] = k;
+      for (let o = 0; o < ROWS; o++) {
+        if (clearRows.includes(o)) continue;
+        const below = clearRows.filter(r => r > o).length;
+        shift[o + below] = below;
+      }
+      _fx().clear = { t: performance.now(), shift, rows: clearRows.map(r => ({ y: r, cells: board[r].slice() })) };
     }
     for (const r of clearRows.sort((a, b) => a - b)) {
       board.splice(r, 1);
@@ -7031,6 +7085,63 @@ function glyphPath(context, cx, cy, r, type) {
   context.fill();
 }
 
+// ── BOARD FX ── game-feel animations layered over the board. All of them
+// are purely visual and time-based (performance.now), so game logic, AI,
+// replays and online sync never wait on an animation, and they run at the
+// same speed on 60 Hz and 144 Hz screens. Only the local human's board gets
+// them — the AI mini-board and remote snapshots stay instant.
+const FX_CLEAR_FLASH = 110;     // cleared rows flash + dissolve centre-out
+const FX_CLEAR_COLLAPSE = 140;  // then the rows above fall into place
+const FX_LOCK_MS = 170;
+const FX_TRAIL_MS = 200;
+const FX_SPAWN_MS = 110;
+const FX_KICK_MS = 190;
+const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+function _fxEnabled() { return !activePlayer || (!activePlayer.isAI && !activePlayer.isRemote); }
+function _fx() { return _boardFx || (_boardFx = { clear: null, lock: null, trail: null, spawnT: 0 }); }
+function _fxRgb(color) {
+  return (typeof color === 'string' && color[0] === '#') ? hexToRgb(color) : _anyColorToRgb(color);
+}
+// Vertical draw offset (px) for post-clear board row `row` while a line
+// clear collapses: rows hold at their old height during the flash, then
+// fall with gravity-style easing.
+function _clearRowOffset(fx, row, now) {
+  const c = fx && fx.clear;
+  if (!c || !c.shift[row]) return 0;
+  const t = now - c.t;
+  const p = t <= FX_CLEAR_FLASH ? 0 : Math.min(1, (t - FX_CLEAR_FLASH) / FX_CLEAR_COLLAPSE);
+  return -c.shift[row] * CELL * (1 - p * p);
+}
+// Cleared rows: flash white, then each cell shrinks away, centre columns
+// first, edges last — a zipper that reads clearly even on busy themes.
+function _drawClearDissolve(c, now) {
+  const p = (now - c.t) / FX_CLEAR_FLASH;
+  if (p >= 1) return;
+  const mid = (COLS - 1) / 2;
+  for (const row of c.rows) {
+    for (let col = 0; col < COLS; col++) {
+      const color = row.cells[col];
+      if (!color) continue;
+      const d = Math.abs(col - mid) / mid;                 // 0 centre … 1 edge
+      const q = Math.max(0, Math.min(1, (p - d * 0.45) / 0.55));
+      const sc = 1 - q;
+      if (sc <= 0.02) continue;
+      const size = CELL * sc;
+      const x = col * CELL + (CELL - size) / 2, y = row.y * CELL + (CELL - size) / 2;
+      ctx.save();
+      ctx.globalAlpha = sc;
+      // Draw at full CELL size under a transform so the block-sprite cache
+      // isn't filled with one entry per intermediate size.
+      ctx.translate(x, y);
+      ctx.scale(sc, sc);
+      drawBlock(ctx, 0, 0, color, CELL);
+      ctx.restore();
+      ctx.fillStyle = `rgba(255,255,255,${(0.9 * (1 - q) * Math.min(1, p * 4 + 0.35)).toFixed(3)})`;
+      ctx.fillRect(x, y, size, size);
+    }
+  }
+}
+
 function drawBoard() {
   const theme = getTheme(level);
   const [r, g, b] = hexToRgb(theme.colors.bg2);
@@ -7049,36 +7160,41 @@ function drawBoard() {
   // Complex block styles (beefpatty, trumpet, brain…) allocate 2-3 gradient
   // objects per cell per call. At a half-full board that's 300+ allocations/frame.
   // Caching cuts that to zero between piece locks/line clears.
+  // Background fill + grid: static per size/theme, own cache.
+  const bgFill = useAlpha ? `rgba(${r},${g},${b},${fillAlpha})` : `rgb(${r},${g},${b})`;
+  const bgSig = `${cw}x${ch}|${CELL}|${bgFill}`;
+  if (!_boardBgCache || _boardBgCache._sig !== bgSig) {
+    if (!_boardBgCache) _boardBgCache = hiDpi(document.createElement('canvas'));
+    _boardBgCache.width = cw; _boardBgCache.height = ch; // resizing also clears it
+    const gctx = _boardBgCache.getContext('2d');
+    gctx.fillStyle = bgFill;
+    gctx.fillRect(0, 0, cw, ch);
+    // Grid: one stroked path of straight lines instead of ROWS×COLS
+    // strokeRects (200 stroke calls → 1), with slightly stronger verticals
+    // so columns read at a glance.
+    gctx.lineWidth = 1;
+    gctx.strokeStyle = 'rgba(255,255,255,0.028)';
+    gctx.beginPath();
+    for (let row = 1; row < ROWS; row++) {
+      gctx.moveTo(0, row * CELL + 0.5); gctx.lineTo(cw, row * CELL + 0.5);
+    }
+    gctx.stroke();
+    gctx.strokeStyle = 'rgba(255,255,255,0.045)';
+    gctx.beginPath();
+    for (let col = 1; col < COLS; col++) {
+      gctx.moveTo(col * CELL + 0.5, 0); gctx.lineTo(col * CELL + 0.5, ch);
+    }
+    gctx.stroke();
+    _boardBgCache._sig = bgSig;
+  }
+
   if (_boardCacheDirty || !_boardCache || _boardCache.width !== cw || _boardCache.height !== ch) {
     if (!_boardCache || _boardCache.width !== cw || _boardCache.height !== ch) {
       _boardCache = hiDpi(document.createElement('canvas'));
       _boardCache.width = cw; _boardCache.height = ch;
     }
     const bctx = _boardCache.getContext('2d');
-    // Background fill (same logic as before)
-    if (useAlpha) {
-      bctx.clearRect(0, 0, cw, ch);
-      bctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
-    } else {
-      bctx.fillStyle = `rgb(${r},${g},${b})`;
-    }
-    bctx.fillRect(0, 0, cw, ch);
-    // Grid: one stroked path of straight lines instead of ROWS×COLS
-    // strokeRects (200 stroke calls → 1), with slightly stronger verticals
-    // so columns read at a glance.
-    bctx.lineWidth = 1;
-    bctx.strokeStyle = 'rgba(255,255,255,0.028)';
-    bctx.beginPath();
-    for (let row = 1; row < ROWS; row++) {
-      bctx.moveTo(0, row * CELL + 0.5); bctx.lineTo(cw, row * CELL + 0.5);
-    }
-    bctx.stroke();
-    bctx.strokeStyle = 'rgba(255,255,255,0.045)';
-    bctx.beginPath();
-    for (let col = 1; col < COLS; col++) {
-      bctx.moveTo(col * CELL + 0.5, 0); bctx.lineTo(col * CELL + 0.5, ch);
-    }
-    bctx.stroke();
+    bctx.clearRect(0, 0, cw, ch);
     // Locked blocks — the expensive part, now only runs on board changes.
     // Track the highest occupied row in the same pass; the danger tint in
     // the per-frame path reads it for free.
@@ -7095,9 +7211,66 @@ function drawBoard() {
     _boardCacheDirty = false;
   }
 
-  // Blit cached board in one drawImage call
+  // Blit background, then the cached blocks — in one drawImage normally, or
+  // as horizontal strips sliding down while a line clear collapses.
   if (useAlpha) ctx.clearRect(0, 0, cw, ch);
-  ctx.drawImage(_boardCache, 0, 0, cw, ch);
+  ctx.drawImage(_boardBgCache, 0, 0, cw, ch);
+  const now = performance.now();
+  const fx = _boardFx;
+  if (fx && fx.clear && now - fx.clear.t >= FX_CLEAR_FLASH + FX_CLEAR_COLLAPSE) fx.clear = null;
+  if (fx && fx.clear) {
+    const dpr = _boardCache._dpr || 1;
+    // Rows that fall the same distance move as one strip (no seams).
+    for (let row = 0; row < ROWS; ) {
+      let end = row + 1;
+      while (end < ROWS && fx.clear.shift[end] === fx.clear.shift[row]) end++;
+      const off = Math.round(_clearRowOffset(fx, row, now) * dpr) / dpr;
+      const y = row * CELL, h = (end - row) * CELL;
+      ctx.drawImage(_boardCache, 0, y * dpr, cw * dpr, h * dpr, 0, y + off, cw, h);
+      row = end;
+    }
+    _drawClearDissolve(fx.clear, now);
+  } else {
+    ctx.drawImage(_boardCache, 0, 0, cw, ch);
+  }
+
+  // Lock flash: the cells that just landed flare white and fade.
+  if (fx && fx.lock) {
+    const k = 1 - (now - fx.lock.t) / FX_LOCK_MS;
+    if (k <= 0) fx.lock = null;
+    else {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255,255,255,${(0.5 * k * k).toFixed(3)})`;
+      for (const [x, y] of fx.lock.cells) {
+        ctx.fillRect(x * CELL + 1, y * CELL + _clearRowOffset(fx, y, now) + 1, CELL - 2, CELL - 2);
+      }
+      ctx.restore();
+    }
+  }
+
+  // Hard-drop trail: a streak per column from where the piece started to
+  // where it landed, bright at the bottom, narrowing as it fades.
+  if (fx && fx.trail) {
+    const k = 1 - (now - fx.trail.t) / FX_TRAIL_MS;
+    if (k <= 0) fx.trail = null;
+    else {
+      const [tr, tg, tb] = _fxRgb(fx.trail.color);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const w = CELL * (0.3 + 0.55 * k);
+      for (const c of fx.trail.cols) {
+        const y0 = c.top * CELL, y1 = c.bottom * CELL;
+        if (y1 - y0 < 1) continue;
+        const grad = ctx.createLinearGradient(0, y0, 0, y1);
+        grad.addColorStop(0, `rgba(${tr},${tg},${tb},0)`);
+        grad.addColorStop(1, `rgba(${tr},${tg},${tb},${(0.5 * k).toFixed(3)})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(c.x * CELL + (CELL - w) / 2, y0, w, y1 - y0);
+      }
+      ctx.restore();
+    }
+  }
 
   // Beat pulse — still per-frame, but just a fillRect (cheap)
   const pulseIntensity = 0.04 + Math.max(0, level - 13) * 0.012;
@@ -7148,7 +7321,23 @@ function drawBoard() {
         for (const [bx, by] of currentPiece) drawGhostBlock(ctx, (currentX + bx) * CELL, (ghostY + by) * CELL, color, CELL);
       }
     }
+    // Spawn: fade in from 40% with a white flare that burns off.
+    const sp = fx ? now - (fx.spawnT || 0) : FX_SPAWN_MS;
+    const spK = sp < FX_SPAWN_MS ? 1 - sp / FX_SPAWN_MS : 0;
+    if (spK > 0) ctx.globalAlpha = 1 - 0.6 * spK;
     for (const [bx, by] of currentPiece) drawBlock(ctx, (currentX + bx) * CELL, (currentY + by) * CELL, color, CELL);
+    ctx.globalAlpha = 1;
+    // Lock delay: the grounded piece brightens as its lock timer runs out,
+    // so a slide-and-tuck has a visible deadline.
+    let glow = 0.55 * spK;
+    if (fx && isLocking && lockDelay > 0) glow = Math.max(glow, 0.26 * Math.min(1, Math.max(0, now - lockTimer) / lockDelay));
+    if (glow > 0.01) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255,255,255,${glow.toFixed(3)})`;
+      for (const [bx, by] of currentPiece) ctx.fillRect((currentX + bx) * CELL + 1, (currentY + by) * CELL + 1, CELL - 2, CELL - 2);
+      ctx.restore();
+    }
   }
 
   // Tetris-Effect shimmer pass - diagonal highlight stripe sweeping across
@@ -18538,31 +18727,54 @@ function render(timestamp) {
     _hudPauseSynced = paused;
     updateHudPauseButton();
   }
+  // Frame-rate independence: the decay constants below were tuned per frame
+  // at 60 Hz, so scale them by elapsed 60 Hz frames. Without this, effects
+  // ran twice as fast on 120/144 Hz screens. Clamped so a stalled tab
+  // doesn't jump every effect to zero in one step.
+  const nowT = (typeof timestamp === 'number') ? timestamp : performance.now();
+  const dtF = render._lastT ? Math.min(4, Math.max(0, (nowT - render._lastT) / (1000 / 60))) : 1;
+  render._lastT = nowT;
   // Cheer pulse decays each frame (rises only on line clears in clearLines()).
   // Linear decay over ~1.4s feels right against a 4-beat cheer at 100 bpm.
-  if (cheerPulse > 0) cheerPulse = Math.max(0, cheerPulse - 0.012);
+  if (cheerPulse > 0) cheerPulse = Math.max(0, cheerPulse - 0.012 * dtF);
   // Move pulse decays faster - quick ripple per move, not a sustained cheer.
-  if (movePulse > 0) movePulse = Math.max(0, movePulse - 0.04);
+  if (movePulse > 0) movePulse = Math.max(0, movePulse - 0.04 * dtF);
   // Stage flash decays faster - should feel like a camera flash, not a fade.
-  if (stageFlash > 0) stageFlash = Math.max(0, stageFlash - 0.05);
+  if (stageFlash > 0) stageFlash = Math.max(0, stageFlash - 0.05 * dtF);
   // Board drop pulse - quick decay, gone in ~400ms
-  if (boardDropPulse > 0) boardDropPulse = Math.max(0, boardDropPulse - 0.06);
+  if (boardDropPulse > 0) boardDropPulse = Math.max(0, boardDropPulse - 0.06 * dtF);
   try { drawBackground(); } catch(e) { /* background scene error — pieces still draw */ }
-  // Screen-shake decay applied via CSS transform on the main canvas. Cheaper
-  // than redrawing into a translated context, and respects the per-player
-  // canvas swap because we always target the *active* canvas.
-  if (shakeFrames > 0) {
-    shakeFrames--;
-    const m = shakeMag * (shakeFrames / 28);
-    const dx = (Math.random() - 0.5) * 2 * m;
-    const dy = (Math.random() - 0.5) * 2 * m;
-    const rot = (Math.random() - 0.5) * (m * 0.012);
+  // Screen shake + hard-drop kick, applied via CSS transform on P1's main
+  // canvas (cheaper than redrawing into a translated context).
+  //  - Shake: smooth layered sine wobble with a random phase per shake
+  //    instead of per-frame white noise, so it reads as a rumble rather than
+  //    jitter. Same magnitude/duration tuning as before.
+  //  - Kick: the board dips down and springs back (critically damped).
+  // Both are skipped under prefers-reduced-motion.
+  {
     const target = (players[0] && players[0].mainCanvas) || mainCanvas;
-    target.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}rad)`;
-    if (shakeFrames === 0) {
-      shakeMag = 0;
-      target.style.transform = '';
+    let dx = 0, dy = 0, rot = 0;
+    if (shakeFrames > 0) {
+      shakeFrames = Math.max(0, shakeFrames - dtF);
+      if (!render._shakePh || render._shakeWasIdle) render._shakePh = [Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28];
+      render._shakeWasIdle = false;
+      const m = REDUCED_MOTION ? 0 : shakeMag * (shakeFrames / 28);
+      const t = nowT / 1000, ph = render._shakePh;
+      dx = m * (Math.sin(t * 53 + ph[0]) * 0.7 + Math.sin(t * 97 + ph[1]) * 0.3);
+      dy = m * (Math.sin(t * 61 + ph[1]) * 0.7 + Math.sin(t * 89 + ph[2]) * 0.3);
+      rot = m * 0.006 * Math.sin(t * 41 + ph[2]);
+      if (shakeFrames === 0) { shakeMag = 0; render._shakeWasIdle = true; }
     }
+    if (dropKick) {
+      const k = (performance.now() - dropKick.t) / FX_KICK_MS;
+      if (k >= 1) dropKick = null;
+      else {
+        const x = k * 6; // spring: fast dip, settle with a tiny overshoot
+        dy += dropKick.mag * Math.min(6, CELL * 0.16) * Math.exp(-x) * Math.sin(Math.min(x * 1.6, Math.PI) + 0.35) * 1.4;
+      }
+    }
+    const tf = (dx || dy || rot) ? `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) rotate(${rot.toFixed(4)}rad)` : '';
+    if (target.style.transform !== tf) target.style.transform = tf;
   }
   // Pre-game: only the background animates behind the start screen.
   // `board` is undefined until startGame() fills it, so we skip all board
