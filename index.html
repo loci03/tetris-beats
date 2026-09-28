@@ -120,7 +120,7 @@
   #main-canvas-2 {
     border: 1px solid rgba(255,255,255,0.15);
     border-radius: 3px;
-    image-rendering: pixelated;
+    box-sizing: content-box; /* inline width = bitmap size, border outside */
     box-shadow: 0 0 30px rgba(255, 60, 60, 0.15);
     display: block;
   }
@@ -154,10 +154,14 @@
     display: flex;
     justify-content: center;
   }
+  /* Explicit CSS sizes: the bitmaps are DPR-scaled (see hiDpi), so without
+     these the canvases would display at their larger backing-store size. */
+  #hold-canvas { width: 80px; height: 60px; }
+  #next-canvas { width: 100px; height: 320px; }
   #main-canvas {
     border: 1px solid rgba(255,255,255,0.15);
     border-radius: 4px;
-    image-rendering: pixelated;
+    box-sizing: content-box; /* inline width = bitmap size, border outside */
     box-shadow: 0 0 60px rgba(128, 0, 255, 0.15), 0 0 120px rgba(0, 128, 255, 0.08);
     transition: box-shadow 0.8s;
     will-change: transform;
@@ -374,7 +378,10 @@
      instead of cramming four narrow pills onto one row. */
   @media (max-width: 720px), (pointer: coarse) {
     #mode-select { grid-template-columns: repeat(2, 1fr); max-width: 360px; }
-    .mode-tab { padding: 8px 20px; min-width: 90px; font-size: 12px; }
+    /* Four equal columns that always fit the screen — the old 90px
+       min-width + 20px padding overflowed a 390px phone and clipped ARCADE. */
+    .mode-tabs { width: calc(100% - 24px); max-width: 440px; box-sizing: border-box; }
+    .mode-tab { flex: 1 1 0; min-width: 0; padding: 9px 4px; font-size: 12px; letter-spacing: 1.5px; }
   }
   .mode-btn[data-mode="marathon"].mode-active,
   .mode-btn[data-mode="sprint"].mode-active,
@@ -653,6 +660,12 @@
     font-size: 24px;
     color: rgba(255,255,255,0.6);
     margin-bottom: 32px;
+    padding: 0 16px;
+    text-align: center;
+    text-wrap: balance;   /* no lone "1" dangling on its own line */
+  }
+  @media (max-width: 480px) {
+    #final-score { font-size: 19px; margin-bottom: 24px; }
   }
   /* Vs-mode result overlay - same layout as game-over, different copy. */
   #vs-result-screen {
@@ -998,6 +1011,17 @@
        that row into the empty band above the board. */
     body.in-game #mobile-mute-btn { top: 92px; }
   }
+  /* Wherever the touch bar is shown, mute lives in it while playing (and on
+     the solo Game Over screen, which keeps body.in-game) — the floating
+     icon used to sit on top of the board's corner and over the overlays. */
+  @media (max-width: 720px), (pointer: coarse) {
+    body.in-game #mobile-mute-btn { display: none; }
+    /* The sync badge shares the bottom edge with the touch hint. */
+    body.in-game #lb-sync-badge { display: none; }
+  }
+  .tc-btn.tc-mute { flex: 0 0 auto; min-width: 44px; }
+  .tc-btn.tc-mute .hud-icon { font-size: 18px; line-height: 1; }
+  .tc-btn.tc-mute[aria-pressed="true"] { color: #ff4466; border-color: rgba(255,68,102,0.55); }
 
   /* ---------- TOUCH CONTROLS ---------- */
   #touch-controls {
@@ -2000,6 +2024,10 @@
       <span class="tc-icon">⇧</span>
       <span class="tc-label">HOLD</span>
     </button>
+    <button class="tc-btn tc-mute" id="tc-mute-btn" data-action="mute" aria-label="Mute" aria-pressed="false">
+      <span class="hud-icon">🔊</span>
+      <span class="tc-label">SOUND</span>
+    </button>
     <button class="tc-btn tc-pause" data-action="pause" aria-label="Pause">
       <span class="tc-icon">II</span>
       <span class="tc-label">PAUSE</span>
@@ -2101,7 +2129,7 @@ function setVolume(v) {
 function updateHudMuteButton() {
   const silent = muted || volume <= 0;
   const icon = silent ? '🔇' : (volume < 0.5 ? '🔉' : '🔊');
-  for (const id of ['mute-btn', 'mobile-mute-btn']) {
+  for (const id of ['mute-btn', 'mobile-mute-btn', 'tc-mute-btn']) {
     const btn = document.getElementById(id);
     if (!btn) continue;
     btn.setAttribute('aria-pressed', String(muted));
@@ -3009,6 +3037,66 @@ function computeLockDelay(lvl) {
   if (lvl <= 18) return 300;
   return 220; // level 19 - almost no breathing room
 }
+
+// ── High-DPI canvases ──
+// Retina/phone screens have devicePixelRatio 2-3, so a canvas whose bitmap
+// matches its CSS size gets upscaled and looks soft. hiDpi() keeps every
+// existing draw call working in CSS pixels: `canvas.width/height` still read
+// and write the logical size, while the real bitmap is `scale`× larger and
+// the context is pre-scaled to match. Shadow blur/offsets are in device
+// pixels (the transform doesn't touch them), so they're scaled too — glows
+// keep the same apparent size. Capped at 2× to bound fill-rate cost.
+const DPR = Math.min(2, window.devicePixelRatio || 1);
+// The full-screen backdrop is the heaviest thing we paint; on touch devices
+// cap it lower so busy scenes keep their frame rate.
+const BG_DPR = IS_TOUCH ? Math.min(1.5, DPR) : DPR;
+function hiDpi(canvas, scale = DPR, opts = {}) {
+  if (canvas._dpr || scale <= 1) return canvas;
+  const proto = HTMLCanvasElement.prototype;
+  const wD = Object.getOwnPropertyDescriptor(proto, 'width');
+  const hD = Object.getOwnPropertyDescriptor(proto, 'height');
+  const c = canvas.getContext('2d');
+  let lw = wD.get.call(canvas), lh = hD.get.call(canvas);
+  const reset = () => c.setTransform(scale, 0, 0, scale, 0, 0);
+  Object.defineProperty(canvas, 'width', {
+    configurable: true,
+    get() { return lw; },
+    set(v) {
+      lw = Math.max(0, Math.floor(+v) || 0);
+      wD.set.call(canvas, Math.round(lw * scale));
+      if (opts.styleSize) canvas.style.width = lw + 'px';
+      reset();
+    },
+  });
+  Object.defineProperty(canvas, 'height', {
+    configurable: true,
+    get() { return lh; },
+    set(v) {
+      lh = Math.max(0, Math.floor(+v) || 0);
+      hD.set.call(canvas, Math.round(lh * scale));
+      if (opts.styleSize) canvas.style.height = lh + 'px';
+      reset();
+    },
+  });
+  const cp = CanvasRenderingContext2D.prototype;
+  for (const k of ['shadowBlur', 'shadowOffsetX', 'shadowOffsetY']) {
+    const d = Object.getOwnPropertyDescriptor(cp, k);
+    Object.defineProperty(c, k, {
+      configurable: true,
+      get() { return d.get.call(c) / scale; },
+      set(v) { d.set.call(c, v * scale); },
+    });
+  }
+  canvas._dpr = scale;
+  canvas.width = lw; canvas.height = lh;
+  return canvas;
+}
+hiDpi(document.getElementById('main-canvas'), DPR, { styleSize: true });
+hiDpi(document.getElementById('main-canvas-2'), DPR, { styleSize: true });
+hiDpi(document.getElementById('hold-canvas'));
+hiDpi(document.getElementById('next-canvas'));
+hiDpi(document.getElementById('bg-canvas'), BG_DPR);
+hiDpi(document.getElementById('home-bg-canvas'), BG_DPR);
 
 // Canvas setup - `var` (not let) so the vs-Alfred context swap can reassign
 // them via globalThis['mainCanvas'] when switching between P1 and P2 turns
@@ -6407,7 +6495,7 @@ function drawGhostBlock(context, x, y, color, size) {
   const key = `${outlineColor}-${size}`;
   let mini = _ghostMiniCache.get(key);
   if (!mini) {
-    mini = document.createElement('canvas');
+    mini = hiDpi(document.createElement('canvas'));
     mini.width = size; mini.height = size;
     const c = mini.getContext('2d');
     const [r, g, b] = hexToRgb(outlineColor);
@@ -6432,7 +6520,7 @@ function drawGhostBlock(context, x, y, color, size) {
     c.stroke();
     _ghostMiniCache.set(key, mini);
   }
-  context.drawImage(mini, x, y);
+  context.drawImage(mini, x, y, size, size);
 }
 
 // Reverse map of piece-color → piece-type so locked blocks (which only carry
@@ -6455,7 +6543,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
     const key = `${_bs}-${color}-${size}`;
     let mini = _blockMiniCache.get(key);
     if (!mini) {
-      mini = document.createElement('canvas');
+      mini = hiDpi(document.createElement('canvas'));
       mini.width = size; mini.height = size;
       const mc = mini.getContext('2d');
       if      (_bs === 'tetrisEffect') drawBlockTE(mc, 0, 0, color, size, 1);
@@ -6474,7 +6562,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
       _blockMiniCache.set(key, mini);
     }
     if (alpha !== 1) context.globalAlpha = alpha;
-    context.drawImage(mini, x, y);
+    context.drawImage(mini, x, y, size, size);
     if (alpha !== 1) context.globalAlpha = 1;
     return;
   }
@@ -6963,7 +7051,7 @@ function drawBoard() {
   // Caching cuts that to zero between piece locks/line clears.
   if (_boardCacheDirty || !_boardCache || _boardCache.width !== cw || _boardCache.height !== ch) {
     if (!_boardCache || _boardCache.width !== cw || _boardCache.height !== ch) {
-      _boardCache = document.createElement('canvas');
+      _boardCache = hiDpi(document.createElement('canvas'));
       _boardCache.width = cw; _boardCache.height = ch;
     }
     const bctx = _boardCache.getContext('2d');
@@ -7009,7 +7097,7 @@ function drawBoard() {
 
   // Blit cached board in one drawImage call
   if (useAlpha) ctx.clearRect(0, 0, cw, ch);
-  ctx.drawImage(_boardCache, 0, 0);
+  ctx.drawImage(_boardCache, 0, 0, cw, ch);
 
   // Beat pulse — still per-frame, but just a fillRect (cheap)
   const pulseIntensity = 0.04 + Math.max(0, level - 13) * 0.012;
@@ -11440,8 +11528,8 @@ function drawWarzoneScene(theme, now, playRects) {
 
   const cheer          = typeof cheerEnergy   !== 'undefined' ? cheerEnergy   : 0;
   const energy         = typeof beatEnergy    !== 'undefined' ? beatEnergy    : 0;
-  const movePulse      = typeof _movePulse      !== 'undefined' ? _movePulse      : 0;
-  const boardDropPulse = typeof _boardDropPulse !== 'undefined' ? _boardDropPulse : 0;
+  const movePulse      = window.movePulse || 0;
+  const boardDropPulse = window.boardDropPulse || 0;
   const ctx = bgCtx;
   const floorY = h * 0.75;
 
@@ -12461,8 +12549,8 @@ function drawHazeScene(theme, now, playRects) {
 
   const cheer          = typeof cheerEnergy    !== 'undefined' ? cheerEnergy    : 0;
   const energy         = typeof beatEnergy     !== 'undefined' ? beatEnergy     : 0;
-  const movePulse      = typeof _movePulse     !== 'undefined' ? _movePulse     : 0;
-  const boardDropPulse = typeof _boardDropPulse !== 'undefined' ? _boardDropPulse : 0;
+  const movePulse      = window.movePulse || 0;
+  const boardDropPulse = window.boardDropPulse || 0;
 
   // Update timers
   sc.tripMeter  = Math.min(1, sc.tripMeter * 0.9994 + cheer * 0.006);
@@ -18029,7 +18117,7 @@ function _particleSprite(color) {
   let s = _particleSprites.get(color);
   if (s) return s;
   const D = 32;
-  s = document.createElement('canvas');
+  s = hiDpi(document.createElement('canvas'));
   s.width = s.height = D;
   const c = s.getContext('2d');
   const [r, g, b] = _anyColorToRgb(color);
@@ -18560,7 +18648,18 @@ const DAS = 133, ARR = 30;
 
 document.addEventListener('keydown', (e) => {
   if (gameOver || !gameStarted) return;
+  // Let form controls (e.g. the volume slider) keep their own arrow keys
+  // instead of also moving the piece.
+  const tag = e.target && e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (paused && !['p', 'P', 'm', 'M'].includes(e.key)) return;
+  // OS key auto-repeat: movement keys have their own DAS/ARR (guarded by
+  // `keys[...]` below), but one-shot actions must fire once per press —
+  // otherwise holding Space chain-drops pieces and holding Up spins forever.
+  if (e.repeat && !['ArrowLeft', 'ArrowRight', 'ArrowDown', 'a', 'A', 'd', 'D', 's', 'S'].includes(e.key)) {
+    if (e.key === ' ') e.preventDefault();
+    return;
+  }
   switch (e.key) {
     case 'ArrowLeft': case 'a': case 'A':
       if (!keys['left']) { moveLeft(); keys['left'] = true; dasTimer['left'] = Date.now(); } break;
@@ -18570,13 +18669,13 @@ document.addEventListener('keydown', (e) => {
       if (!keys['down']) { softDrop(); keys['down'] = true; dasTimer['down'] = Date.now(); } break;
     case 'ArrowUp': case 'w': case 'W': case 'x': case 'X':
       rotatePiece(1); break;
-    // Z = counter-clockwise rotate (Tetris-canon: Z=CCW, X=CW). Shift+Z (or Q)
-    // activates Zone — moved off bare-Z so muscle-memory CCW spins don't fire
-    // the bonus-meter button.
-    case 'z':
-      if (e.shiftKey || e.ctrlKey) activateZone(); else rotatePiece(-1);
+    // Z = counter-clockwise rotate (Tetris-canon: Z=CCW, X=CW). Q (or
+    // Ctrl+Z) activates Zone. Shift+Z used to as well, but Shift is Hold and
+    // its keydown fires first, so the combo held the piece AND rotated it.
+    // 'Z' also arrives with Caps Lock on, so it must rotate like 'z'.
+    case 'z': case 'Z':
+      if (e.ctrlKey) activateZone(); else rotatePiece(-1);
       break;
-    case 'Z': rotatePiece(-1); break;
     case 'q': case 'Q': activateZone(); break;
     case ' ': e.preventDefault(); hardDrop(); break;
     case 'Shift': case 'c': case 'C': holdCurrentPiece(); break;
@@ -18712,6 +18811,7 @@ function togglePause() {
 }
 
 function doAction(action) {
+  if (action === 'mute') { setMuted(!muted); return; }
   if (!gameStarted || gameOver || paused) {
     if (action === 'pause') togglePause();
     return;
@@ -20115,8 +20215,11 @@ render(0);
   const SCALE = window.devicePixelRatio || 1;
   canvas.width  = 340 * SCALE;
   canvas.height = 180 * SCALE;
-  canvas.style.width  = '340px';
-  canvas.style.height = '180px';
+  // Fluid width so phones narrower than ~372px don't scroll sideways;
+  // height follows the bitmap's aspect ratio.
+  canvas.style.width  = '100%';
+  canvas.style.maxWidth = '340px';
+  canvas.style.height = 'auto';
 
   const ctx = canvas.getContext('2d');
   ctx.scale(SCALE, SCALE);
