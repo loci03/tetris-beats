@@ -11,12 +11,26 @@
 -->
 <meta name="api-base" content="">
 <title>TETRIS BEATS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800;900&family=Orbitron:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
+  /* Type system: Orbitron for display (titles, big numbers, overlays),
+     Exo 2 for everything else. Both fall back to the system UI font, so
+     offline play still looks right - it just loses the custom faces. */
+  :root {
+    --font-display: 'Orbitron', 'Segoe UI', system-ui, sans-serif;
+    --font-ui: 'Exo 2', 'Segoe UI', system-ui, sans-serif;
+    /* Numbers use Exo 2 Black: Orbitron's slashed zero reads as "Ø". */
+    --font-num: 'Exo 2', 'Segoe UI', system-ui, sans-serif;
+  }
+  /* Form controls don't inherit the page font by default. */
+  button, input, select, textarea { font-family: inherit; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     background: #0a0a0f;
     color: #fff;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     overflow: hidden;
     /* iOS Safari treats `100vh` as the URL-bar-hidden viewport, which is
        always TALLER than what's actually visible while the URL bar is up.
@@ -56,7 +70,7 @@
   .p2-stats-line {
     text-align: center;
     line-height: 1.15;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     color: rgba(255,255,255,0.85);
   }
   .p2-stats-line .p2-name {
@@ -110,7 +124,7 @@
   }
   .p2-name { font-weight: 700; color: rgba(255,255,255,0.9); letter-spacing: 3px; }
   #p2-stats {
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     font-size: 10px;
     letter-spacing: 1px;
     color: rgba(255,255,255,0.75);
@@ -167,6 +181,7 @@
     will-change: transform;
   }
   #score-display {
+    font-family: var(--font-num);
     font-size: 34px;
     font-weight: 900;
     text-align: center;
@@ -200,7 +215,7 @@
   #next-level-display {
     font-size: 11px;
     text-align: center;
-    color: rgba(255,255,255,0.45);
+    color: rgba(255,255,255,0.62);
     letter-spacing: 1.5px;
     text-transform: uppercase;
     margin-top: 2px;
@@ -208,7 +223,7 @@
   #era-display {
     font-size: 12px;
     text-align: center;
-    color: rgba(255,255,255,0.4);
+    color: rgba(255,255,255,0.62);
     font-style: italic;
     margin-top: 4px;
   }
@@ -239,7 +254,7 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 2px;
-    color: rgba(255,255,255,0.4);
+    color: rgba(255,255,255,0.62);
     text-align: center;
   }
   #start-screen {
@@ -292,6 +307,7 @@
      would draw on top of (i.e. hide) the title + buttons. */
   #start-screen > *:not(#home-bg-canvas) { position: relative; z-index: 1; }
   #start-screen h1 {
+    font-family: var(--font-display);
     font-size: 68px;
     font-weight: 900;
     /* Animated multi-stop hue gradient — looks like a marquee shifting
@@ -331,12 +347,13 @@
   }
   #start-screen .sub {
     font-size: 16px;
-    color: rgba(255,255,255,0.4);
+    color: rgba(255,255,255,0.62);
     margin-bottom: 40px;
     letter-spacing: 6px;
     text-transform: uppercase;
   }
   #start-btn, #start-btn-2 {
+    font-family: var(--font-display);
     padding: 16px 48px;
     font-size: 18px;
     font-weight: 700;
@@ -359,7 +376,7 @@
   .mode-tab {
     padding: 10px 28px; min-width: 110px;
     font-size: 13px; font-weight: 800; letter-spacing: 3px;
-    background: transparent; color: rgba(255,255,255,0.45);
+    background: transparent; color: rgba(255,255,255,0.6);
     border: none; border-radius: 22px;
     cursor: pointer; transition: color 0.18s, background 0.18s;
   }
@@ -584,7 +601,7 @@
   .controls-info {
     margin-top: 30px;
     font-size: 12px;
-    color: rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.62);
     text-align: center;
     line-height: 1.8;
   }
@@ -606,7 +623,7 @@
   }
   .options-toggle .opt-hint {
     font-size: 10px;
-    color: rgba(255,255,255,0.35);
+    color: rgba(255,255,255,0.62);
     letter-spacing: 0;
     margin-left: 2px;
   }
@@ -651,22 +668,163 @@
     box-sizing: border-box;
   }
   #game-over-screen h2 {
-    font-size: 48px;
+    font-family: var(--font-display);
+    font-size: clamp(30px, 8vw, 44px);
     font-weight: 900;
+    letter-spacing: 3px;
     color: #ff0066;
-    margin-bottom: 16px;
+    text-shadow: 0 0 28px rgba(255,0,102,0.45);
+    margin-bottom: 6px;
   }
+  #game-over-screen h2.go-win { color: #5dffb0; text-shadow: 0 0 28px rgba(93,255,176,0.4); }
+  /* Mode / vibe subtitle under the title. */
   #final-score {
-    font-size: 24px;
-    color: rgba(255,255,255,0.6);
-    margin-bottom: 32px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.62);
+    margin-bottom: 14px;
     padding: 0 16px;
     text-align: center;
-    text-wrap: balance;   /* no lone "1" dangling on its own line */
+    text-wrap: balance;
   }
+  /* The run's headline number (score, or time for Sprint). */
+  #go-hero { text-align: center; margin-bottom: 14px; }
+  #go-hero .go-hero-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 4px;
+    color: rgba(255,255,255,0.6);
+  }
+  #go-hero .go-hero-value {
+    font-family: var(--font-num);
+    font-weight: 900;
+    font-size: clamp(44px, 13vw, 76px);
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(135deg, #ffffff 15%, #d4b3ff 55%, #7df9ff 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    filter: drop-shadow(0 0 22px rgba(160,90,255,0.35));
+  }
+  .go-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: min(420px, 100%);
+    margin-bottom: 20px;
+  }
+  .go-stat {
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 12px;
+    padding: 10px 6px 8px;
+    text-align: center;
+  }
+  .go-stat b {
+    display: block;
+    font-family: var(--font-num);
+    font-size: 20px; font-weight: 800;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .go-stat span {
+    display: block; margin-top: 4px;
+    font-size: 10px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+  }
+  .go-stat.go-stat-hi b { color: #ffd166; }
   @media (max-width: 480px) {
-    #final-score { font-size: 19px; margin-bottom: 24px; }
+    .go-stat b { font-size: 16px; }
+    .go-stat span { font-size: 9px; letter-spacing: 1.5px; }
   }
+
+  /* Shared overlay buttons (pause menu, game-over secondary actions). */
+  .overlay-actions {
+    display: flex; gap: 10px;
+    justify-content: center; align-items: center; flex-wrap: wrap;
+  }
+  .ov-btn {
+    font-family: var(--font-display);
+    padding: 14px 28px;
+    font-size: 14px; font-weight: 700; letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #fff;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 50px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  }
+  .ov-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.4); transform: translateY(-1px); }
+  .ov-btn.ov-primary {
+    background: linear-gradient(135deg, #8000ff, #ff00ff);
+    border-color: transparent;
+    box-shadow: 0 6px 24px rgba(200,0,255,0.35);
+  }
+  .go-actions .ov-btn { padding: 17px 30px; }
+  .overlay-hint {
+    margin-top: 14px;
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* Pause menu */
+  #pause-screen {
+    position: fixed; inset: 0;
+    z-index: 12;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(5,5,15,0.72);
+    backdrop-filter: blur(10px);
+    padding: 24px 16px;
+    box-sizing: border-box;
+  }
+  #pause-screen.visible { display: flex; }
+  .pause-card {
+    width: min(360px, 100%);
+    text-align: center;
+    background: linear-gradient(180deg, rgba(26,20,48,0.94), rgba(10,10,22,0.94));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 26px 22px 20px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+  #pause-title {
+    font-family: var(--font-display);
+    font-size: 32px; font-weight: 900; letter-spacing: 6px;
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    margin-bottom: 6px;
+  }
+  #pause-stats {
+    font-size: 13px; font-weight: 600; letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.65);
+    margin-bottom: 20px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pause-actions { display: flex; flex-direction: column; gap: 10px; }
+  .pause-actions .ov-btn { width: 100%; }
+  .pause-toggles { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+  .ov-chip {
+    font-family: var(--font-ui);
+    font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+    padding: 8px 14px;
+    border-radius: 50px;
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.9);
+    border: 1px solid rgba(255,255,255,0.18);
+    cursor: pointer;
+  }
+  .ov-chip::before { content: '● '; color: #5dffb0; }
+  .ov-chip[aria-pressed="false"] { color: rgba(255,255,255,0.5); }
+  .ov-chip[aria-pressed="false"]::before { content: '○ '; color: rgba(255,255,255,0.4); }
+  /* Online VS can't be paused (your board would freeze while the opponent
+     keeps playing), so hide the pause controls for those matches. */
+  body.online-match #pause-btn,
+  body.online-match #touch-controls .tc-pause { display: none; }
   /* Vs-mode result overlay - same layout as game-over, different copy. */
   #vs-result-screen {
     position: fixed;
@@ -688,6 +846,7 @@
     box-sizing: border-box;
   }
   #vs-result-title {
+    font-family: var(--font-display);
     font-size: 72px;
     font-weight: 900;
     background: linear-gradient(135deg, #ff00ff, #00ffff);
@@ -770,7 +929,7 @@
     background: linear-gradient(135deg, rgba(255,40,68,0.95), rgba(255,140,40,0.95));
     color: #fff;
     box-shadow: 0 3px 12px rgba(255,40,68,0.6), 0 0 18px rgba(255,40,68,0.4);
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     white-space: nowrap;
     max-width: 140px;
     text-align: center;
@@ -783,7 +942,7 @@
     position: fixed; top: 8px; left: 50%;
     transform: translateX(-50%);
     z-index: 50; pointer-events: none;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     color: #fff;
     padding: 10px 22px;
     background: linear-gradient(180deg, rgba(255,209,102,0.20), rgba(8,8,16,0.85));
@@ -800,6 +959,7 @@
     margin-bottom: 2px;
   }
   #mode-hud .mh-primary {
+    font-family: var(--font-num);
     display: block;
     font-size: 32px; font-weight: 900;
     letter-spacing: 1px;
@@ -854,8 +1014,8 @@
       flex: 1 1 auto;
     }
     #mode-hud .mh-primary   { font-size: 14px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-secondary { font-size: 7px; letter-spacing: 0px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-label     { font-size: 6px; letter-spacing: 1px; white-space: nowrap; }
+    #mode-hud .mh-secondary { font-size: 8px; letter-spacing: 0px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-label     { font-size: 7.5px; letter-spacing: 1px; white-space: nowrap; }
   }
   #zone-active-badge {
     position: fixed;
@@ -876,6 +1036,7 @@
   }
   .zone-active #zone-active-badge { transform: translateX(-50%) scale(1); }
   #combo-display {
+    font-family: var(--font-display);
     position: fixed;
     font-size: 24px;
     font-weight: 900;
@@ -890,6 +1051,7 @@
     transform: translateX(-50%);
   }
   #level-announce {
+    font-family: var(--font-display);
     position: fixed;
     z-index: 8;
     top: 50%;
@@ -1055,7 +1217,7 @@
     text-align: center;
     font-size: 9px;
     letter-spacing: 2.5px;
-    color: rgba(255,255,255,0.35);
+    color: rgba(255,255,255,0.62);
     margin-top: 4px;
     text-transform: uppercase;
   }
@@ -1341,7 +1503,7 @@
       margin-left: 6px;
     }
     #spb-rank-label {
-      font-size: 7px;
+      font-size: 8px;
       letter-spacing: 1.5px;
       font-weight: 800;
       color: rgba(255,200,80,0.70);
@@ -1381,9 +1543,9 @@
       flex-shrink: 0;
     }
     .spb-chip-lbl {
-      font-size: 7px;
+      font-size: 8px;
       font-weight: 700;
-      color: rgba(255,255,255,0.35);
+      color: rgba(255,255,255,0.62);
     }
     .spb-bar-wrap {
       flex: 1 1 auto;
@@ -1427,12 +1589,12 @@
       overflow: hidden;
     }
     #mode-hud .mh-primary   { font-size: 14px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-secondary { font-size: 7px; letter-spacing: 0px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-label     { font-size: 6px; letter-spacing: 1px; white-space: nowrap; }
+    #mode-hud .mh-secondary { font-size: 8px; letter-spacing: 0px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-label     { font-size: 7.5px; letter-spacing: 1px; white-space: nowrap; }
 
     #zone-label { font-size: 9px; }
     #touch-controls { display: block; }
-    #start-screen h1 { font-size: 38px; letter-spacing: 2px; margin-top: 0; margin-bottom: 6px; }
+    #start-screen h1 { font-size: clamp(26px, 8.6vw, 38px); letter-spacing: 1px; margin-top: 0; margin-bottom: 6px; }
     #start-screen .sub { font-size: 12px; letter-spacing: 3px; margin-bottom: 18px; }
     #start-btn, #start-btn-2 { padding: 14px 36px; font-size: 15px; }
     .controls-info { font-size: 11px; padding: 0 20px; }
@@ -1485,7 +1647,7 @@
     grid-template-columns: 28px 48px 1fr auto;
     gap: 10px;
     align-items: baseline;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     font-size: 13px;
     padding: 4px 2px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
@@ -1501,7 +1663,7 @@
     color: #fff;
     font-weight: 700;
     letter-spacing: 2px;
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   }
   .lb-score {
     color: rgba(255, 255, 255, 0.85);
@@ -1535,6 +1697,7 @@
   }
 
   #new-hs-banner {
+    font-family: var(--font-display);
     font-size: 18px;
     font-weight: 900;
     letter-spacing: 4px;
@@ -1594,7 +1757,7 @@
     margin-bottom: 8px;
   }
   #lobby-room-code {
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-ui); font-variant-numeric: tabular-nums;
     font-size: 48px; font-weight: 900; letter-spacing: 14px;
     text-indent: 14px;
     background: linear-gradient(135deg, #ff00ff, #00ffff);
@@ -1604,7 +1767,7 @@
   #lobby-join-input {
     width: 100%;
     padding: 12px 14px;
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-ui); font-variant-numeric: tabular-nums;
     font-size: 28px; font-weight: 900;
     letter-spacing: 12px; text-indent: 12px;
     text-align: center; text-transform: uppercase;
@@ -1664,7 +1827,7 @@
   #initials-input {
     width: 170px;
     padding: 10px 12px;
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-ui); font-variant-numeric: tabular-nums;
     font-size: 36px;
     font-weight: 900;
     letter-spacing: 12px;
@@ -1706,6 +1869,20 @@
   @media (max-height: 720px) {
     #start-screen .leaderboard { margin-top: 14px; padding: 10px 14px; }
     #start-screen .leaderboard .lb-row { font-size: 12px; padding: 2px 2px; }
+  }
+  /* Keyboard focus ring for every control (mouse clicks don't show it). */
+  button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid #7df9ff;
+    outline-offset: 3px;
+  }
+  /* Respect the OS "reduce motion" setting: stop looping UI animations.
+     (Screen shake and the hard-drop kick are gated in JS.) */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 </style>
 </head>
@@ -1856,7 +2033,7 @@
     <input id="lobby-name-input" type="text" maxlength="3"
            autocomplete="off" autocapitalize="characters" spellcheck="false"
            value="YOU"
-           style="width: 150px; padding: 8px 10px; font-family: 'Courier New', monospace;
+           style="width: 150px; padding: 8px 10px; font-family: var(--font-ui); font-variant-numeric: tabular-nums;
                   font-size: 22px; font-weight: 900; letter-spacing: 8px; text-indent: 8px;
                   text-align: center; text-transform: uppercase;
                   background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
@@ -1894,10 +2071,15 @@
   </div>
 </div>
 
-<div id="game-over-screen">
+<div id="game-over-screen" role="dialog" aria-modal="true" aria-labelledby="go-title">
   <div id="new-hs-banner" class="hidden">★ New High Score ★</div>
-  <h2>GAME OVER</h2>
+  <h2 id="go-title">GAME OVER</h2>
   <div id="final-score"></div>
+  <div id="go-hero">
+    <div class="go-hero-label" id="go-hero-label">SCORE</div>
+    <div class="go-hero-value" id="go-hero-value">0</div>
+  </div>
+  <div id="go-stats" class="go-stats"></div>
   <div id="initials-entry" class="hidden">
     <div class="prompt">Enter your initials</div>
     <input id="initials-input" type="text" maxlength="3" autocomplete="off"
@@ -1909,7 +2091,31 @@
     <h3>Arcade</h3>
     <div class="lb-body"></div>
   </div>
-  <button id="start-btn-2">REPLAY</button>
+  <div class="overlay-actions go-actions">
+    <button id="start-btn-2">REPLAY</button>
+    <button id="go-menu-btn" class="ov-btn" type="button">MENU</button>
+  </div>
+  <div class="overlay-hint desktop-only">Enter · replay &nbsp;·&nbsp; Esc · menu</div>
+</div>
+
+<!-- Pause menu. Shown whenever a run is paused (P / Esc / pause button, or
+     auto-pause when the tab is hidden). Online VS can't be paused. -->
+<div id="pause-screen" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+  <div class="pause-card">
+    <h2 id="pause-title">PAUSED</h2>
+    <div id="pause-stats"></div>
+    <div class="pause-actions">
+      <button class="ov-btn ov-primary" id="pause-resume" type="button">RESUME</button>
+      <button class="ov-btn" id="pause-restart" type="button">RESTART</button>
+      <button class="ov-btn" id="pause-menu" type="button">QUIT TO MENU</button>
+    </div>
+    <div class="pause-toggles">
+      <button class="ov-chip" id="pause-sound" type="button" aria-pressed="true">SOUND</button>
+      <button class="ov-chip" id="pause-ghost" type="button" aria-pressed="true">GHOST</button>
+      <button class="ov-chip" id="pause-voice" type="button" aria-pressed="true">ANNOUNCER</button>
+    </div>
+    <div class="overlay-hint desktop-only">P or Esc to resume</div>
+  </div>
 </div>
 
 <!-- Vs-mode result overlay - appears when either player tops out. -->
@@ -3276,6 +3482,14 @@ var _modeStartTime = 0, _modeFinishTime = null, _ultraTimeLimit = 0, _sprintTarg
 // `_marathonGoal`: line target for Marathon (default 150 per Tetris
 // Effect's standard). Reaching it ends the run as a SUCCESS.
 var _pieceLockCount = 0;
+// Per-run stats for the results screen (human player only). `_runId`
+// bumps on every startGame so async game-over work from a previous run
+// can tell it's stale. Paused time is tracked so the TIME stat is real
+// play time.
+var _runStats = { tetrises: 0, maxCombo: -1 };
+var _runId = 0;
+var _pausedTotalMs = 0;
+var _pauseStartedAt = null;
 var _marathonGoal = 150;
 var bgParticles;
 var beatPhase = 0;
@@ -4056,6 +4270,10 @@ function clearLines() {
       board.unshift(Array(COLS).fill(null));
     }
     combo++;
+    if (!activePlayer || (!activePlayer.isAI && !activePlayer.isRemote)) {
+      if (cleared === 4) _runStats.tetrises++;
+      if (combo > _runStats.maxCombo) _runStats.maxCombo = combo;
+    }
     const basePoints = [0, 100, 300, 500, 800];
     // Zone mode multiplies line-clear score 2.5×. Combined with combo this
     // means a Tetris-while-Zoned with a 3-combo is huge - exactly the burst
@@ -5710,7 +5928,7 @@ function updateSyncBadge(state) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'lb-sync-badge';
-    el.style.cssText = 'position:fixed;bottom:6px;right:8px;z-index:20;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);pointer-events:none;font-family:Segoe UI,system-ui;';
+    el.style.cssText = 'position:fixed;bottom:6px;right:8px;z-index:20;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);pointer-events:none;font-family:var(--font-ui);';
     document.body.appendChild(el);
   }
   const queued = loadPendingScores().length;
@@ -6287,7 +6505,14 @@ async function refreshSharedLeaderboard() {
 let _pendingRank = null;
 let _pendingMode = 'story';
 let _pendingTimeMs = null;
+// "1:07" style clock for the results screen.
+function fmtClock(ms) {
+  const t = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
 async function showGameOver() {
+  const runId = _runId;
   const finalScore = Math.floor(score);
   // Persist the replay (if anything was recorded). Returned ID is used by
   // the share button on the game-over screen.
@@ -6333,6 +6558,49 @@ async function showGameOver() {
     _pendingTimeMs = null;
     resultLine = `Score: ${finalScore.toLocaleString()} · Lines: ${lines} · Level: ${level}`;
   }
+  // Results card: title, mode subtitle, headline number, stat tiles.
+  {
+    const endT = _modeFinishTime || performance.now();
+    const pausedMs = _pausedTotalMs + (_pauseStartedAt != null ? endT - _pauseStartedAt : 0);
+    const playMs = Math.max(0, endT - _modeStartTime - pausedMs);
+    const sprintDone = _pendingMode === 'sprint' && _pendingTimeMs != null;
+    const won = sprintDone || (_pendingMode === 'marathon' && !runFailed);
+    const title = sprintDone ? 'FINISHED'
+      : (_pendingMode === 'marathon' && !runFailed) ? 'CLEARED'
+      : (_pendingMode === 'ultra' && !runFailed) ? "TIME'S UP"
+      : 'GAME OVER';
+    const titleEl = document.getElementById('go-title');
+    titleEl.textContent = title;
+    titleEl.classList.toggle('go-win', won || title === "TIME'S UP");
+    const modeName = { sprint: 'Sprint', ultra: 'Ultra', marathon: 'Marathon', daily: 'Daily Challenge' }[_pendingMode]
+      || `Arcade · ${getTheme(level).name}`;
+    resultLine = (_pendingMode === 'sprint' && !sprintDone) ? `Sprint · topped out at ${lines}/40`
+      : (_pendingMode === 'marathon' && runFailed) ? `Marathon · topped out at ${lines}/${_marathonGoal}`
+      : (_pendingMode === 'ultra' && runFailed) ? 'Ultra · topped out'
+      : modeName;
+    document.getElementById('go-hero-label').textContent = sprintDone ? 'TIME' : 'SCORE';
+    document.getElementById('go-hero-value').textContent = sprintDone ? fmtSprintTime(_pendingTimeMs) : finalScore.toLocaleString();
+    const pps = playMs > 0 ? _pieceLockCount / (playMs / 1000) : 0;
+    const chain = _runStats.maxCombo > 0 ? `×${_runStats.maxCombo + 1}` : '—';
+    const tiles = [
+      [lines, 'Lines'],
+      [sprintDone ? finalScore.toLocaleString() : level, sprintDone ? 'Score' : 'Level'],
+      [sprintDone ? pps.toFixed(2) : fmtClock(playMs), sprintDone ? 'Pieces/s' : 'Time'],
+      [_runStats.tetrises, 'Tetrises', _runStats.tetrises > 0],
+      [chain, 'Best combo', _runStats.maxCombo > 0],
+      [sprintDone ? _pieceLockCount : pps.toFixed(2), sprintDone ? 'Pieces' : 'Pieces/s'],
+    ];
+    const statsEl = document.getElementById('go-stats');
+    statsEl.textContent = '';
+    for (const [v, label, hi] of tiles) {
+      const d = document.createElement('div');
+      d.className = 'go-stat' + (hi ? ' go-stat-hi' : '');
+      const b = document.createElement('b'); b.textContent = String(v);
+      const sp = document.createElement('span'); sp.textContent = label;
+      d.append(b, sp);
+      statsEl.appendChild(d);
+    }
+  }
   // Reset the flag for the next run.
   _modeRunFailed = false;
   finalLine.textContent = resultLine;
@@ -6345,6 +6613,9 @@ async function showGameOver() {
   // mode is shared cross-device today; per-mode shared boards are a follow-up.
   if (_pendingMode === 'story') {
     const remote = await fetchSharedScores();
+    // The player may have hit REPLAY / MENU while we waited on the network;
+    // don't paint this run's rank banner over the next run.
+    if (runId !== _runId || !gameOver) return;
     if (remote) saveLeaderboard(remote, 'story');
   }
 
@@ -6501,7 +6772,7 @@ function showVsResult() {
   // Swap the button label so it reads "NEXT ROUND" mid-match, "REPLAY" once
   // someone has clinched the best-of-5.
   const replayBtn = document.getElementById('vs-replay-btn');
-  if (replayBtn) replayBtn.textContent = matchOver ? 'REPLAY MATCH' : 'NEXT ROUND';
+  if (replayBtn) replayBtn.textContent = matchOver ? 'BACK TO MENU' : 'NEXT ROUND';
   document.getElementById('vs-result-screen').style.display = 'flex';
   audioEngine.stop();
   // Play a pre-rendered flavor clip 400ms after the screen appears so the
@@ -18726,7 +18997,10 @@ function render(timestamp) {
   if (_hudPauseSynced !== paused) {
     _hudPauseSynced = paused;
     updateHudPauseButton();
+    if (paused) _pauseStartedAt = performance.now();
+    else if (_pauseStartedAt != null) { _pausedTotalMs += performance.now() - _pauseStartedAt; _pauseStartedAt = null; }
   }
+  syncPauseOverlay();
   // Frame-rate independence: the decay constants below were tuned per frame
   // at 60 Hz, so scale them by elapsed 60 Hz frames. Without this, effects
   // ran twice as fast on 120/144 Hz screens. Clamped so a stalled tab
@@ -18864,7 +19138,7 @@ document.addEventListener('keydown', (e) => {
   // instead of also moving the piece.
   const tag = e.target && e.target.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  if (paused && !['p', 'P', 'm', 'M'].includes(e.key)) return;
+  if (paused && !['p', 'P', 'm', 'M', 'Escape'].includes(e.key)) return;
   // OS key auto-repeat: movement keys have their own DAS/ARR (guarded by
   // `keys[...]` below), but one-shot actions must fire once per press —
   // otherwise holding Space chain-drops pieces and holding Up spins forever.
@@ -18894,23 +19168,8 @@ document.addEventListener('keydown', (e) => {
     case 'g': case 'G': setShowGhost(!showGhost); break;
     case 'v': case 'V': setVoiceEnabled(!voiceEnabled); break;
     case 'm': case 'M': setMuted(!muted); break;
-    case 'p': case 'P':
-      paused = !paused;
-      _pausedByHide = false;  // user explicitly chose pause state
-      if (paused) {
-        audioEngine.stop();
-      } else {
-        // Resume the AudioContext FIRST (if suspended by a prior tab-hide)
-        // so that audioEngine.start()'s scheduled notes actually fire.
-        try {
-          if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
-            audioEngine.ctx.resume().then(() => audioEngine.start());
-          } else {
-            audioEngine.start();
-          }
-        } catch { audioEngine.start(); }
-      }
-      updateHudPauseButton();
+    case 'p': case 'P': case 'Escape':
+      togglePause();
       break;
   }
 });
@@ -19006,6 +19265,9 @@ setInterval(() => {
 // ============================================================
 function togglePause() {
   if (!gameStarted || gameOver) return;
+  // Online VS: pausing would freeze only your board while the opponent
+  // keeps playing, so it's disabled (the pause controls are hidden too).
+  if (gameMode === 'human' && !paused) return;
   paused = !paused;
   _pausedByHide = false;  // user explicitly chose pause state
   if (paused) {
@@ -19308,6 +19570,11 @@ function startGame() {
   _sprintTarget   = (gameMode === 'sprint')   ? 40     : 0;
   _marathonGoal   = (gameMode === 'marathon') ? 150    : 0;
   _pieceLockCount = 0;
+  _runStats = { tetrises: 0, maxCombo: -1 };
+  _runId++;
+  _pausedTotalMs = 0;
+  _pauseStartedAt = null;
+  document.body.classList.toggle('online-match', gameMode === 'human');
   for (const p of players) {
     setActivePlayer(p);
     initBoard();
@@ -19492,7 +19759,7 @@ function handleNetworkResult(msg) {
     `<div class="vs-score-row">${(NET.opponentName || 'Opponent')}: ${(p2.score|0).toLocaleString()} · ${p2.lines|0} lines</div>`;
   // Match is over — button takes the player back to the start screen.
   const replayBtn = document.getElementById('vs-replay-btn');
-  if (replayBtn) { replayBtn.textContent = 'REPLAY MATCH'; replayBtn.disabled = false; }
+  if (replayBtn) { replayBtn.textContent = 'BACK TO MENU'; replayBtn.disabled = false; }
   document.getElementById('vs-result-screen').style.display = 'flex';
   audioEngine.stop();
   NET.matchStarted = false;
@@ -19634,14 +19901,86 @@ document.getElementById('vs-replay-btn').addEventListener('click', () => {
     primeVoiceOnClick();
     return;
   }
-  document.getElementById('vs-result-screen').style.display = 'none';
-  document.getElementById('start-screen').style.display = 'flex';
-  renderStartLeaderboard();
-  gameStarted = false;
-  document.body.classList.remove('in-game');
-  // If we were in a PvP match, leave the room so the next round is clean.
-  if (gameMode === 'human') lobbyLeave();
+  quitToMenu();
 });
+
+// Leave the current run (or a finished one) and return to the start screen.
+// Used by the pause menu, the Game Over MENU button and the VS result screen.
+function quitToMenu() {
+  // Online: leave the room so the opponent gets a clean result and the next
+  // match starts fresh.
+  if (gameMode === 'human') {
+    try { stopNetStateStream(); } catch {}
+    try { lobbyLeave(); } catch {}
+  }
+  try { audioEngine.stop(); } catch {}
+  paused = false;
+  _pausedByHide = false;
+  gameStarted = false;
+  for (const id of ['game-over-screen', 'vs-result-screen']) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  }
+  document.getElementById('start-screen').style.display = 'flex';
+  document.body.classList.remove('in-game', 'vs-mode', 'online-match');
+  const c = document.getElementById('main-canvas');
+  if (c) c.style.transform = '';
+  shakeFrames = 0; shakeMag = 0; dropKick = null;
+  for (const k of Object.keys(keys)) keys[k] = false;
+  syncPauseOverlay();
+  updateHudPauseButton();
+  renderStartLeaderboard();
+}
+
+// Pause menu: visible exactly while a live run is paused.
+function syncPauseOverlay() {
+  const el = document.getElementById('pause-screen');
+  if (!el) return;
+  const show = !!(paused && gameStarted && !gameOver);
+  if (el.classList.contains('visible') === show) return;
+  el.classList.toggle('visible', show);
+  if (show) {
+    document.getElementById('pause-stats').textContent =
+      `${Math.floor(score).toLocaleString()} pts · Level ${level} · ${lines} lines`;
+    syncPauseToggles();
+    // Keyboard users land on RESUME; don't steal focus on touch (no ring).
+    if (!IS_TOUCH) setTimeout(() => { try { document.getElementById('pause-resume').focus(); } catch {} }, 0);
+  } else if (document.activeElement && el.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+}
+function syncPauseToggles() {
+  const set = (id, on) => { const b = document.getElementById(id); if (b) b.setAttribute('aria-pressed', String(!!on)); };
+  set('pause-sound', !muted);
+  set('pause-ghost', showGhost);
+  set('pause-voice', voiceEnabled);
+}
+(function wirePauseAndResults() {
+  const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+  on('pause-resume', () => { if (paused) togglePause(); });
+  on('pause-restart', () => { primeVoiceOnClick(); startGame(); syncPauseOverlay(); });
+  on('pause-menu', () => quitToMenu());
+  on('pause-sound', () => { setMuted(!muted); syncPauseToggles(); });
+  on('pause-ghost', () => { setShowGhost(!showGhost); syncPauseToggles(); });
+  on('pause-voice', () => { setVoiceEnabled(!voiceEnabled); syncPauseToggles(); });
+  on('go-menu-btn', () => quitToMenu());
+  // Keys that work outside a live run: Enter/Esc on the results screen, and
+  // the G / V shortcuts advertised next to the start-screen toggles.
+  document.addEventListener('keydown', (e) => {
+    const tag = e.target && e.target.tagName;
+    const goOpen = document.getElementById('game-over-screen').style.display === 'flex';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.repeat) return;
+    if (goOpen && gameOver && e.key === 'Escape') { e.preventDefault(); quitToMenu(); return; }
+    if (goOpen && gameOver) {
+      if (e.key === 'Enter' && tag !== 'BUTTON') { e.preventDefault(); document.getElementById('start-btn-2').click(); }
+      return;
+    }
+    if (!gameStarted && document.getElementById('start-screen').style.display !== 'none') {
+      if (e.key === 'g' || e.key === 'G') setShowGhost(!showGhost);
+      else if (e.key === 'v' || e.key === 'V') setVoiceEnabled(!voiceEnabled);
+    }
+  });
+})();
 
 // Lobby button wiring - explicit flows, no auto-create.
 (function wireLobby() {
@@ -19735,6 +20074,8 @@ document.getElementById('vs-replay-btn').addEventListener('click', () => {
   input.addEventListener('keydown', (e) => {
     e.stopPropagation();
     if (e.key === 'Enter') { e.preventDefault(); submitInitials(); }
+    // Esc = skip entering initials and go back to the menu.
+    else if (e.key === 'Escape') { e.preventDefault(); quitToMenu(); }
   });
   btn.addEventListener('click', submitInitials);
 })();
@@ -20096,6 +20437,7 @@ window.addEventListener('resize', () => positionP2Monitor());
     const levelSelect = document.getElementById('level-select');
     if (isStory) {
       if (levelSelect) levelSelect.style.display = 'none';
+      if (diff) diff.style.display = 'none';
       return; // no sub-mode to auto-select
     }
     // Arcade tab has no sub-mode buttons — set gameMode directly
@@ -20104,13 +20446,18 @@ window.addEventListener('resize', () => positionP2Monitor());
       btns.forEach(b => b.classList.remove('mode-active'));
     } else {
       const prev = document.querySelector(`.mode-btn.mode-active[data-tab="${tab}"]`);
-      if (!prev) {
+      // Coming back to a tab: its highlighted sub-mode must be the live mode
+      // again (was left on the other tab's mode while still highlighted).
+      if (prev) gameMode = prev.dataset.mode;
+      else {
         const target = document.querySelector(`.mode-btn[data-tab="${tab}"][data-mode="${tabSubmodes[tab]}"]`)
                      || document.querySelector(`.mode-btn[data-tab="${tab}"]`);
         if (target) target.click();
       }
     }
     if (levelSelect) levelSelect.style.display = (gameMode === 'sprint' || gameMode === 'marathon' || gameMode === 'vs' || gameMode === 'human') ? 'flex' : 'none';
+    if (diff) diff.style.display = (gameMode === 'vs') ? 'flex' : 'none';
+    refreshLb();
   }
   tabs.forEach(tab => tab.addEventListener('click', () => setTab(tab.dataset.tab)));
   btns.forEach(btn => btn.addEventListener('click', () => {
