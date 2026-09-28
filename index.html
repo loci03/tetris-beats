@@ -11,12 +11,26 @@
 -->
 <meta name="api-base" content="">
 <title>TETRIS BEATS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700;800;900&family=Orbitron:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
+  /* Type system: Orbitron for display (titles, big numbers, overlays),
+     Exo 2 for everything else. Both fall back to the system UI font, so
+     offline play still looks right - it just loses the custom faces. */
+  :root {
+    --font-display: 'Orbitron', 'Segoe UI', system-ui, sans-serif;
+    --font-ui: 'Exo 2', 'Segoe UI', system-ui, sans-serif;
+    /* Numbers use Exo 2 Black: Orbitron's slashed zero reads as "Ø". */
+    --font-num: 'Exo 2', 'Segoe UI', system-ui, sans-serif;
+  }
+  /* Form controls don't inherit the page font by default. */
+  button, input, select, textarea { font-family: inherit; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     background: #0a0a0f;
     color: #fff;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     overflow: hidden;
     /* iOS Safari treats `100vh` as the URL-bar-hidden viewport, which is
        always TALLER than what's actually visible while the URL bar is up.
@@ -56,7 +70,7 @@
   .p2-stats-line {
     text-align: center;
     line-height: 1.15;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     color: rgba(255,255,255,0.85);
   }
   .p2-stats-line .p2-name {
@@ -110,7 +124,7 @@
   }
   .p2-name { font-weight: 700; color: rgba(255,255,255,0.9); letter-spacing: 3px; }
   #p2-stats {
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     font-size: 10px;
     letter-spacing: 1px;
     color: rgba(255,255,255,0.75);
@@ -120,7 +134,7 @@
   #main-canvas-2 {
     border: 1px solid rgba(255,255,255,0.15);
     border-radius: 3px;
-    image-rendering: pixelated;
+    box-sizing: content-box; /* inline width = bitmap size, border outside */
     box-shadow: 0 0 30px rgba(255, 60, 60, 0.15);
     display: block;
   }
@@ -154,15 +168,20 @@
     display: flex;
     justify-content: center;
   }
+  /* Explicit CSS sizes: the bitmaps are DPR-scaled (see hiDpi), so without
+     these the canvases would display at their larger backing-store size. */
+  #hold-canvas { width: 80px; height: 60px; }
+  #next-canvas { width: 100px; height: 320px; }
   #main-canvas {
     border: 1px solid rgba(255,255,255,0.15);
     border-radius: 4px;
-    image-rendering: pixelated;
+    box-sizing: content-box; /* inline width = bitmap size, border outside */
     box-shadow: 0 0 60px rgba(128, 0, 255, 0.15), 0 0 120px rgba(0, 128, 255, 0.08);
     transition: box-shadow 0.8s;
     will-change: transform;
   }
   #score-display {
+    font-family: var(--font-num);
     font-size: 34px;
     font-weight: 900;
     text-align: center;
@@ -196,7 +215,7 @@
   #next-level-display {
     font-size: 11px;
     text-align: center;
-    color: rgba(255,255,255,0.45);
+    color: rgba(255,255,255,0.62);
     letter-spacing: 1.5px;
     text-transform: uppercase;
     margin-top: 2px;
@@ -204,7 +223,7 @@
   #era-display {
     font-size: 12px;
     text-align: center;
-    color: rgba(255,255,255,0.4);
+    color: rgba(255,255,255,0.62);
     font-style: italic;
     margin-top: 4px;
   }
@@ -235,7 +254,7 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 2px;
-    color: rgba(255,255,255,0.4);
+    color: rgba(255,255,255,0.62);
     text-align: center;
   }
   #start-screen {
@@ -288,6 +307,7 @@
      would draw on top of (i.e. hide) the title + buttons. */
   #start-screen > *:not(#home-bg-canvas) { position: relative; z-index: 1; }
   #start-screen h1 {
+    font-family: var(--font-display);
     font-size: 68px;
     font-weight: 900;
     /* Animated multi-stop hue gradient — looks like a marquee shifting
@@ -327,12 +347,13 @@
   }
   #start-screen .sub {
     font-size: 16px;
-    color: rgba(255,255,255,0.4);
+    color: rgba(255,255,255,0.62);
     margin-bottom: 40px;
     letter-spacing: 6px;
     text-transform: uppercase;
   }
   #start-btn, #start-btn-2 {
+    font-family: var(--font-display);
     padding: 16px 48px;
     font-size: 18px;
     font-weight: 700;
@@ -355,7 +376,7 @@
   .mode-tab {
     padding: 10px 28px; min-width: 110px;
     font-size: 13px; font-weight: 800; letter-spacing: 3px;
-    background: transparent; color: rgba(255,255,255,0.45);
+    background: transparent; color: rgba(255,255,255,0.6);
     border: none; border-radius: 22px;
     cursor: pointer; transition: color 0.18s, background 0.18s;
   }
@@ -374,7 +395,10 @@
      instead of cramming four narrow pills onto one row. */
   @media (max-width: 720px), (pointer: coarse) {
     #mode-select { grid-template-columns: repeat(2, 1fr); max-width: 360px; }
-    .mode-tab { padding: 8px 20px; min-width: 90px; font-size: 12px; }
+    /* Four equal columns that always fit the screen — the old 90px
+       min-width + 20px padding overflowed a 390px phone and clipped ARCADE. */
+    .mode-tabs { width: calc(100% - 24px); max-width: 440px; box-sizing: border-box; }
+    .mode-tab { flex: 1 1 0; min-width: 0; padding: 9px 4px; font-size: 12px; letter-spacing: 1.5px; }
   }
   .mode-btn[data-mode="marathon"].mode-active,
   .mode-btn[data-mode="sprint"].mode-active,
@@ -577,7 +601,7 @@
   .controls-info {
     margin-top: 30px;
     font-size: 12px;
-    color: rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.62);
     text-align: center;
     line-height: 1.8;
   }
@@ -599,7 +623,7 @@
   }
   .options-toggle .opt-hint {
     font-size: 10px;
-    color: rgba(255,255,255,0.35);
+    color: rgba(255,255,255,0.62);
     letter-spacing: 0;
     margin-left: 2px;
   }
@@ -644,16 +668,251 @@
     box-sizing: border-box;
   }
   #game-over-screen h2 {
-    font-size: 48px;
+    font-family: var(--font-display);
+    font-size: clamp(30px, 8vw, 44px);
     font-weight: 900;
+    letter-spacing: 3px;
     color: #ff0066;
-    margin-bottom: 16px;
+    text-shadow: 0 0 28px rgba(255,0,102,0.45);
+    margin-bottom: 6px;
   }
+  #game-over-screen h2.go-win { color: #5dffb0; text-shadow: 0 0 28px rgba(93,255,176,0.4); }
+  /* Mode / vibe subtitle under the title. */
   #final-score {
-    font-size: 24px;
-    color: rgba(255,255,255,0.6);
-    margin-bottom: 32px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.62);
+    margin-bottom: 14px;
+    padding: 0 16px;
+    text-align: center;
+    text-wrap: balance;
   }
+  /* The run's headline number (score, or time for Sprint). */
+  #go-hero { text-align: center; margin-bottom: 14px; }
+  #go-hero .go-hero-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 4px;
+    color: rgba(255,255,255,0.6);
+  }
+  #go-hero .go-hero-value {
+    font-family: var(--font-num);
+    font-weight: 900;
+    font-size: clamp(44px, 13vw, 76px);
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(135deg, #ffffff 15%, #d4b3ff 55%, #7df9ff 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    filter: drop-shadow(0 0 22px rgba(160,90,255,0.35));
+  }
+  .go-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: min(420px, 100%);
+    margin-bottom: 20px;
+  }
+  .go-stat {
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 12px;
+    padding: 10px 6px 8px;
+    text-align: center;
+  }
+  .go-stat b {
+    display: block;
+    font-family: var(--font-num);
+    font-size: 20px; font-weight: 800;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .go-stat span {
+    display: block; margin-top: 4px;
+    font-size: 10px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+  }
+  .go-stat.go-stat-hi b { color: #ffd166; }
+  @media (max-width: 480px) {
+    .go-stat b { font-size: 16px; }
+    .go-stat span { font-size: 9px; letter-spacing: 1.5px; }
+  }
+
+  /* Shared overlay buttons (pause menu, game-over secondary actions). */
+  .overlay-actions {
+    display: flex; gap: 10px;
+    justify-content: center; align-items: center; flex-wrap: wrap;
+  }
+  .ov-btn {
+    font-family: var(--font-display);
+    padding: 14px 28px;
+    font-size: 14px; font-weight: 700; letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #fff;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 50px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  }
+  .ov-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.4); transform: translateY(-1px); }
+  .ov-btn.ov-primary {
+    background: linear-gradient(135deg, #8000ff, #ff00ff);
+    border-color: transparent;
+    box-shadow: 0 6px 24px rgba(200,0,255,0.35);
+  }
+  .go-actions .ov-btn { padding: 17px 30px; }
+  .overlay-hint {
+    margin-top: 14px;
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* Pause menu */
+  #pause-screen {
+    position: fixed; inset: 0;
+    z-index: 12;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(5,5,15,0.72);
+    backdrop-filter: blur(10px);
+    padding: 24px 16px;
+    box-sizing: border-box;
+  }
+  #pause-screen.visible { display: flex; }
+  .pause-card {
+    width: min(360px, 100%);
+    text-align: center;
+    background: linear-gradient(180deg, rgba(26,20,48,0.94), rgba(10,10,22,0.94));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 26px 22px 20px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+  #pause-title {
+    font-family: var(--font-display);
+    font-size: 32px; font-weight: 900; letter-spacing: 6px;
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    margin-bottom: 6px;
+  }
+  #pause-stats {
+    font-size: 13px; font-weight: 600; letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.65);
+    margin-bottom: 20px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pause-actions { display: flex; flex-direction: column; gap: 10px; }
+  .pause-actions .ov-btn { width: 100%; }
+  .pause-toggles { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+  .ov-chip {
+    font-family: var(--font-ui);
+    font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+    padding: 8px 14px;
+    border-radius: 50px;
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.9);
+    border: 1px solid rgba(255,255,255,0.18);
+    cursor: pointer;
+  }
+  .ov-chip::before { content: '● '; color: #5dffb0; }
+  .ov-chip[aria-pressed="false"] { color: rgba(255,255,255,0.5); }
+  .ov-chip[aria-pressed="false"]::before { content: '○ '; color: rgba(255,255,255,0.4); }
+  /* Plain action chips (RESET …) aren't toggles - no state dot. */
+  .ov-chip:not([aria-pressed])::before { content: none; }
+  /* Settings panel */
+  #settings-btn { margin-top: 12px; padding: 10px 22px; font-size: 12px; }
+  #settings-screen {
+    position: fixed; inset: 0;
+    z-index: 13;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(5,5,15,0.78);
+    backdrop-filter: blur(10px);
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  #settings-screen.visible { display: flex; }
+  .settings-card {
+    width: min(460px, 100%);
+    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: linear-gradient(180deg, rgba(26,20,48,0.96), rgba(10,10,22,0.96));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 18px 20px 20px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    text-align: left;
+  }
+  .settings-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    position: sticky; top: -18px; margin: -18px -20px 8px; padding: 16px 20px 12px;
+    background: rgba(22,18,42,0.97);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    z-index: 1;
+  }
+  #settings-title {
+    font-family: var(--font-display);
+    font-size: 22px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  .settings-done { padding: 9px 18px; font-size: 12px; }
+  .settings-card section { padding: 12px 0 14px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .settings-card section:last-child { border-bottom: none; }
+  .settings-card h3 {
+    font-size: 11px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase;
+    color: rgba(255,255,255,0.62);
+    margin-bottom: 10px;
+  }
+  .set-row {
+    display: grid; grid-template-columns: 1fr 1.3fr 44px; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9);
+    margin: 10px 0;
+  }
+  .set-row small { font-size: 10px; letter-spacing: 1.5px; color: rgba(255,255,255,0.5); margin-left: 4px; }
+  .set-row input[type=range] { width: 100%; accent-color: #d44cff; }
+  .set-row output { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; color: #fff; }
+  .set-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+  .set-note { font-size: 12px; line-height: 1.45; color: rgba(255,255,255,0.55); margin: 6px 0 10px; }
+  .set-seg { display: flex; gap: 4px; padding: 4px; border-radius: 50px; background: rgba(255,255,255,0.05); width: fit-content; }
+  .set-seg button {
+    font-size: 12px; font-weight: 800; letter-spacing: 2px;
+    padding: 8px 16px; border-radius: 50px; border: none; cursor: pointer;
+    background: transparent; color: rgba(255,255,255,0.6);
+  }
+  .set-seg button[aria-checked="true"] { background: linear-gradient(135deg, #8000ff, #ff00ff); color: #fff; }
+  #set-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 4px; }
+  .key-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 10px; cursor: pointer;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 600; text-align: left;
+  }
+  .key-row:hover { border-color: rgba(255,255,255,0.25); }
+  .key-row kbd {
+    font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+    padding: 2px 7px; border-radius: 6px;
+    background: rgba(255,255,255,0.1); color: #fff; white-space: nowrap;
+  }
+  .key-row.listening { border-color: #d44cff; box-shadow: 0 0 0 2px rgba(212,76,255,0.35); }
+  .key-row.listening kbd { background: #d44cff; }
+  @media (max-width: 420px) { #set-keys { grid-template-columns: 1fr; } }
+  /* Keys section is hidden on touch layouts; drop the divider above it. */
+  @media (max-width: 720px), (pointer: coarse) {
+    .settings-card section:nth-last-of-type(2) { border-bottom: none; padding-bottom: 4px; }
+  }
+
+  /* Online VS can't be paused (your board would freeze while the opponent
+     keeps playing), so hide the pause controls for those matches. */
+  body.online-match #pause-btn,
+  body.online-match #touch-controls .tc-pause { display: none; }
   /* Vs-mode result overlay - same layout as game-over, different copy. */
   #vs-result-screen {
     position: fixed;
@@ -675,6 +934,7 @@
     box-sizing: border-box;
   }
   #vs-result-title {
+    font-family: var(--font-display);
     font-size: 72px;
     font-weight: 900;
     background: linear-gradient(135deg, #ff00ff, #00ffff);
@@ -757,7 +1017,7 @@
     background: linear-gradient(135deg, rgba(255,40,68,0.95), rgba(255,140,40,0.95));
     color: #fff;
     box-shadow: 0 3px 12px rgba(255,40,68,0.6), 0 0 18px rgba(255,40,68,0.4);
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     white-space: nowrap;
     max-width: 140px;
     text-align: center;
@@ -770,7 +1030,7 @@
     position: fixed; top: 8px; left: 50%;
     transform: translateX(-50%);
     z-index: 50; pointer-events: none;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     color: #fff;
     padding: 10px 22px;
     background: linear-gradient(180deg, rgba(255,209,102,0.20), rgba(8,8,16,0.85));
@@ -787,6 +1047,7 @@
     margin-bottom: 2px;
   }
   #mode-hud .mh-primary {
+    font-family: var(--font-num);
     display: block;
     font-size: 32px; font-weight: 900;
     letter-spacing: 1px;
@@ -841,8 +1102,8 @@
       flex: 1 1 auto;
     }
     #mode-hud .mh-primary   { font-size: 14px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-secondary { font-size: 7px; letter-spacing: 0px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-label     { font-size: 6px; letter-spacing: 1px; white-space: nowrap; }
+    #mode-hud .mh-secondary { font-size: 8px; letter-spacing: 0px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-label     { font-size: 7.5px; letter-spacing: 1px; white-space: nowrap; }
   }
   #zone-active-badge {
     position: fixed;
@@ -863,6 +1124,7 @@
   }
   .zone-active #zone-active-badge { transform: translateX(-50%) scale(1); }
   #combo-display {
+    font-family: var(--font-display);
     position: fixed;
     font-size: 24px;
     font-weight: 900;
@@ -877,6 +1139,7 @@
     transform: translateX(-50%);
   }
   #level-announce {
+    font-family: var(--font-display);
     position: fixed;
     z-index: 8;
     top: 50%;
@@ -998,6 +1261,17 @@
        that row into the empty band above the board. */
     body.in-game #mobile-mute-btn { top: 92px; }
   }
+  /* Wherever the touch bar is shown, mute lives in it while playing (and on
+     the solo Game Over screen, which keeps body.in-game) — the floating
+     icon used to sit on top of the board's corner and over the overlays. */
+  @media (max-width: 720px), (pointer: coarse) {
+    body.in-game #mobile-mute-btn { display: none; }
+    /* The sync badge shares the bottom edge with the touch hint. */
+    body.in-game #lb-sync-badge { display: none; }
+  }
+  .tc-btn.tc-mute { flex: 0 0 auto; min-width: 44px; }
+  .tc-btn.tc-mute .hud-icon { font-size: 18px; line-height: 1; }
+  .tc-btn.tc-mute[aria-pressed="true"] { color: #ff4466; border-color: rgba(255,68,102,0.55); }
 
   /* ---------- TOUCH CONTROLS ---------- */
   #touch-controls {
@@ -1031,7 +1305,7 @@
     text-align: center;
     font-size: 9px;
     letter-spacing: 2.5px;
-    color: rgba(255,255,255,0.35);
+    color: rgba(255,255,255,0.62);
     margin-top: 4px;
     text-transform: uppercase;
   }
@@ -1317,7 +1591,7 @@
       margin-left: 6px;
     }
     #spb-rank-label {
-      font-size: 7px;
+      font-size: 8px;
       letter-spacing: 1.5px;
       font-weight: 800;
       color: rgba(255,200,80,0.70);
@@ -1357,9 +1631,9 @@
       flex-shrink: 0;
     }
     .spb-chip-lbl {
-      font-size: 7px;
+      font-size: 8px;
       font-weight: 700;
-      color: rgba(255,255,255,0.35);
+      color: rgba(255,255,255,0.62);
     }
     .spb-bar-wrap {
       flex: 1 1 auto;
@@ -1403,12 +1677,12 @@
       overflow: hidden;
     }
     #mode-hud .mh-primary   { font-size: 14px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-secondary { font-size: 7px; letter-spacing: 0px; white-space: nowrap; overflow: hidden; }
-    #mode-hud .mh-label     { font-size: 6px; letter-spacing: 1px; white-space: nowrap; }
+    #mode-hud .mh-secondary { font-size: 8px; letter-spacing: 0px; white-space: nowrap; overflow: hidden; }
+    #mode-hud .mh-label     { font-size: 7.5px; letter-spacing: 1px; white-space: nowrap; }
 
     #zone-label { font-size: 9px; }
     #touch-controls { display: block; }
-    #start-screen h1 { font-size: 38px; letter-spacing: 2px; margin-top: 0; margin-bottom: 6px; }
+    #start-screen h1 { font-size: clamp(26px, 8.6vw, 38px); letter-spacing: 1px; margin-top: 0; margin-bottom: 6px; }
     #start-screen .sub { font-size: 12px; letter-spacing: 3px; margin-bottom: 18px; }
     #start-btn, #start-btn-2 { padding: 14px 36px; font-size: 15px; }
     .controls-info { font-size: 11px; padding: 0 20px; }
@@ -1461,7 +1735,7 @@
     grid-template-columns: 28px 48px 1fr auto;
     gap: 10px;
     align-items: baseline;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
     font-size: 13px;
     padding: 4px 2px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
@@ -1477,7 +1751,7 @@
     color: #fff;
     font-weight: 700;
     letter-spacing: 2px;
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   }
   .lb-score {
     color: rgba(255, 255, 255, 0.85);
@@ -1511,6 +1785,7 @@
   }
 
   #new-hs-banner {
+    font-family: var(--font-display);
     font-size: 18px;
     font-weight: 900;
     letter-spacing: 4px;
@@ -1570,7 +1845,7 @@
     margin-bottom: 8px;
   }
   #lobby-room-code {
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-ui); font-variant-numeric: tabular-nums;
     font-size: 48px; font-weight: 900; letter-spacing: 14px;
     text-indent: 14px;
     background: linear-gradient(135deg, #ff00ff, #00ffff);
@@ -1580,7 +1855,7 @@
   #lobby-join-input {
     width: 100%;
     padding: 12px 14px;
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-ui); font-variant-numeric: tabular-nums;
     font-size: 28px; font-weight: 900;
     letter-spacing: 12px; text-indent: 12px;
     text-align: center; text-transform: uppercase;
@@ -1640,7 +1915,7 @@
   #initials-input {
     width: 170px;
     padding: 10px 12px;
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-ui); font-variant-numeric: tabular-nums;
     font-size: 36px;
     font-weight: 900;
     letter-spacing: 12px;
@@ -1682,6 +1957,20 @@
   @media (max-height: 720px) {
     #start-screen .leaderboard { margin-top: 14px; padding: 10px 14px; }
     #start-screen .leaderboard .lb-row { font-size: 12px; padding: 2px 2px; }
+  }
+  /* Keyboard focus ring for every control (mouse clicks don't show it). */
+  button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid #7df9ff;
+    outline-offset: 3px;
+  }
+  /* Respect the OS "reduce motion" setting: stop looping UI animations.
+     (Screen shake and the hard-drop kick are gated in JS.) */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 </style>
 </head>
@@ -1787,6 +2076,7 @@
     </div>
   </div>
   <button id="start-btn">DROP THE BEAT</button>
+  <button id="settings-btn" class="ov-btn settings-open" type="button">SETTINGS</button>
   <div class="controls-info desktop-only">
     Arrow Keys / WASD - Move<br>
     ↑ / X - Rotate CW &nbsp;·&nbsp; Z - Rotate CCW<br>
@@ -1794,7 +2084,7 @@
     Q - Zone | P - Pause | M - Mute
   </div>
   <div class="controls-info mobile-only" style="display:none;">
-    Buttons below to play<br>
+    Zone · Hold · Pause buttons appear in game<br>
     Swipe: ← → move, ↓ soft, ↑ hard drop<br>
     Tap piece = hold, tap elsewhere = rotate
   </div>
@@ -1832,7 +2122,7 @@
     <input id="lobby-name-input" type="text" maxlength="3"
            autocomplete="off" autocapitalize="characters" spellcheck="false"
            value="YOU"
-           style="width: 150px; padding: 8px 10px; font-family: 'Courier New', monospace;
+           style="width: 150px; padding: 8px 10px; font-family: var(--font-ui); font-variant-numeric: tabular-nums;
                   font-size: 22px; font-weight: 900; letter-spacing: 8px; text-indent: 8px;
                   text-align: center; text-transform: uppercase;
                   background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.2);
@@ -1870,10 +2160,15 @@
   </div>
 </div>
 
-<div id="game-over-screen">
+<div id="game-over-screen" role="dialog" aria-modal="true" aria-labelledby="go-title">
   <div id="new-hs-banner" class="hidden">★ New High Score ★</div>
-  <h2>GAME OVER</h2>
+  <h2 id="go-title">GAME OVER</h2>
   <div id="final-score"></div>
+  <div id="go-hero">
+    <div class="go-hero-label" id="go-hero-label">SCORE</div>
+    <div class="go-hero-value" id="go-hero-value">0</div>
+  </div>
+  <div id="go-stats" class="go-stats"></div>
   <div id="initials-entry" class="hidden">
     <div class="prompt">Enter your initials</div>
     <input id="initials-input" type="text" maxlength="3" autocomplete="off"
@@ -1885,7 +2180,76 @@
     <h3>Arcade</h3>
     <div class="lb-body"></div>
   </div>
-  <button id="start-btn-2">REPLAY</button>
+  <div class="overlay-actions go-actions">
+    <button id="start-btn-2">REPLAY</button>
+    <button id="go-menu-btn" class="ov-btn" type="button">MENU</button>
+  </div>
+  <div class="overlay-hint desktop-only">Enter · replay &nbsp;·&nbsp; Esc · menu</div>
+</div>
+
+<!-- Settings panel - opened from the start screen or the pause menu. -->
+<div id="settings-screen" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="settings-card">
+    <div class="settings-head">
+      <h2 id="settings-title">SETTINGS</h2>
+      <button class="ov-btn ov-primary settings-done" id="settings-done" type="button">DONE</button>
+    </div>
+    <section>
+      <h3>Audio</h3>
+      <label class="set-row"><span>Volume</span><input type="range" id="set-volume" min="0" max="100" step="1"><output id="set-volume-val"></output></label>
+      <div class="set-chips">
+        <button class="ov-chip" id="set-sound" type="button" aria-pressed="true">SOUND</button>
+        <button class="ov-chip" id="set-voice" type="button" aria-pressed="true">ANNOUNCER</button>
+      </div>
+    </section>
+    <section>
+      <h3>Gameplay</h3>
+      <div class="set-chips">
+        <button class="ov-chip" id="set-ghost" type="button" aria-pressed="true">GHOST PIECE</button>
+        <button class="ov-chip" id="set-shake" type="button" aria-pressed="true">SCREEN SHAKE</button>
+      </div>
+      <label class="set-row"><span>Repeat delay <small>DAS</small></span><input type="range" id="set-das" min="50" max="300" step="1"><output id="set-das-val"></output></label>
+      <label class="set-row"><span>Repeat speed <small>ARR</small></span><input type="range" id="set-arr" min="0" max="100" step="1"><output id="set-arr-val"></output></label>
+      <p class="set-note">How long a held move waits before repeating, and how fast it repeats after that. Lower is faster; ARR 0 slides straight to the wall.</p>
+      <button class="ov-chip" id="set-handling-reset" type="button">RESET SPEED</button>
+    </section>
+    <section>
+      <h3>Graphics</h3>
+      <div class="set-seg" role="radiogroup" aria-label="Graphics quality">
+        <button type="button" role="radio" data-q="auto">AUTO</button>
+        <button type="button" role="radio" data-q="high">HIGH</button>
+        <button type="button" role="radio" data-q="low">LOW</button>
+      </div>
+      <p class="set-note" id="set-quality-note"></p>
+    </section>
+    <section class="desktop-only">
+      <h3>Keys</h3>
+      <div id="set-keys"></div>
+      <p class="set-note">Click an action, then press the key you want. Esc cancels.</p>
+      <button class="ov-chip" id="set-keys-reset" type="button">RESET KEYS</button>
+    </section>
+  </div>
+</div>
+
+<!-- Pause menu. Shown whenever a run is paused (P / Esc / pause button, or
+     auto-pause when the tab is hidden). Online VS can't be paused. -->
+<div id="pause-screen" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+  <div class="pause-card">
+    <h2 id="pause-title">PAUSED</h2>
+    <div id="pause-stats"></div>
+    <div class="pause-actions">
+      <button class="ov-btn ov-primary" id="pause-resume" type="button">RESUME</button>
+      <button class="ov-btn" id="pause-restart" type="button">RESTART</button>
+      <button class="ov-btn" id="pause-settings" type="button">SETTINGS</button>
+      <button class="ov-btn" id="pause-menu" type="button">QUIT TO MENU</button>
+    </div>
+    <div class="pause-toggles">
+      <button class="ov-chip" id="pause-sound" type="button" aria-pressed="true">SOUND</button>
+      <button class="ov-chip" id="pause-ghost" type="button" aria-pressed="true">GHOST</button>
+      <button class="ov-chip" id="pause-voice" type="button" aria-pressed="true">ANNOUNCER</button>
+    </div>
+    <div class="overlay-hint desktop-only">P or Esc to resume</div>
+  </div>
 </div>
 
 <!-- Vs-mode result overlay - appears when either player tops out. -->
@@ -2000,6 +2364,10 @@
       <span class="tc-icon">⇧</span>
       <span class="tc-label">HOLD</span>
     </button>
+    <button class="tc-btn tc-mute" id="tc-mute-btn" data-action="mute" aria-label="Mute" aria-pressed="false">
+      <span class="hud-icon">🔊</span>
+      <span class="tc-label">SOUND</span>
+    </button>
     <button class="tc-btn tc-pause" data-action="pause" aria-label="Pause">
       <span class="tc-icon">II</span>
       <span class="tc-label">PAUSE</span>
@@ -2101,7 +2469,7 @@ function setVolume(v) {
 function updateHudMuteButton() {
   const silent = muted || volume <= 0;
   const icon = silent ? '🔇' : (volume < 0.5 ? '🔉' : '🔊');
-  for (const id of ['mute-btn', 'mobile-mute-btn']) {
+  for (const id of ['mute-btn', 'mobile-mute-btn', 'tc-mute-btn']) {
     const btn = document.getElementById(id);
     if (!btn) continue;
     btn.setAttribute('aria-pressed', String(muted));
@@ -3010,6 +3378,79 @@ function computeLockDelay(lvl) {
   return 220; // level 19 - almost no breathing room
 }
 
+// ── High-DPI canvases ──
+// Retina/phone screens have devicePixelRatio 2-3, so a canvas whose bitmap
+// matches its CSS size gets upscaled and looks soft. hiDpi() keeps every
+// existing draw call working in CSS pixels: `canvas.width/height` still read
+// and write the logical size, while the real bitmap is `scale`× larger and
+// the context is pre-scaled to match. Shadow blur/offsets are in device
+// pixels (the transform doesn't touch them), so they're scaled too — glows
+// keep the same apparent size. Capped at 2× to bound fill-rate cost.
+const DPR = Math.min(2, window.devicePixelRatio || 1);
+// The full-screen backdrop is the heaviest thing we paint; on touch devices
+// cap it lower so busy scenes keep their frame rate.
+const BG_DPR = IS_TOUCH ? Math.min(1.5, DPR) : DPR;
+function hiDpi(canvas, scale = DPR, opts = {}) {
+  if (canvas._dpr) return canvas;
+  // `opts.adjustable` installs even at 1× so setCanvasDpr() can change the
+  // scale later (graphics-quality setting on the backdrop canvases).
+  if (scale <= 1 && !opts.adjustable) return canvas;
+  const proto = HTMLCanvasElement.prototype;
+  const wD = Object.getOwnPropertyDescriptor(proto, 'width');
+  const hD = Object.getOwnPropertyDescriptor(proto, 'height');
+  const c = canvas.getContext('2d');
+  let lw = wD.get.call(canvas), lh = hD.get.call(canvas);
+  const reset = () => c.setTransform(canvas._dpr, 0, 0, canvas._dpr, 0, 0);
+  Object.defineProperty(canvas, 'width', {
+    configurable: true,
+    get() { return lw; },
+    set(v) {
+      lw = Math.max(0, Math.floor(+v) || 0);
+      wD.set.call(canvas, Math.round(lw * canvas._dpr));
+      if (opts.styleSize) canvas.style.width = lw + 'px';
+      reset();
+    },
+  });
+  Object.defineProperty(canvas, 'height', {
+    configurable: true,
+    get() { return lh; },
+    set(v) {
+      lh = Math.max(0, Math.floor(+v) || 0);
+      hD.set.call(canvas, Math.round(lh * canvas._dpr));
+      if (opts.styleSize) canvas.style.height = lh + 'px';
+      reset();
+    },
+  });
+  const cp = CanvasRenderingContext2D.prototype;
+  for (const k of ['shadowBlur', 'shadowOffsetX', 'shadowOffsetY']) {
+    const d = Object.getOwnPropertyDescriptor(cp, k);
+    Object.defineProperty(c, k, {
+      configurable: true,
+      get() { return d.get.call(c) / canvas._dpr; },
+      // `_noShadow` (low graphics quality) drops blur - the single most
+      // expensive thing the backdrop scenes do - while keeping the shapes.
+      set(v) { d.set.call(c, (canvas._noShadow && k === 'shadowBlur') ? 0 : v * canvas._dpr); },
+    });
+  }
+  canvas._dpr = scale;
+  canvas.width = lw; canvas.height = lh;
+  return canvas;
+}
+// Change an adjustable canvas's pixel ratio (re-allocates its bitmap).
+function setCanvasDpr(canvas, scale, noShadow) {
+  if (!canvas || !canvas._dpr) return;
+  canvas._noShadow = !!noShadow;
+  if (canvas._dpr === scale) return;
+  canvas._dpr = scale;
+  canvas.width = canvas.width; canvas.height = canvas.height;
+}
+hiDpi(document.getElementById('main-canvas'), DPR, { styleSize: true });
+hiDpi(document.getElementById('main-canvas-2'), DPR, { styleSize: true });
+hiDpi(document.getElementById('hold-canvas'));
+hiDpi(document.getElementById('next-canvas'));
+hiDpi(document.getElementById('bg-canvas'), BG_DPR, { adjustable: true });
+hiDpi(document.getElementById('home-bg-canvas'), BG_DPR, { adjustable: true });
+
 // Canvas setup - `var` (not let) so the vs-Alfred context swap can reassign
 // them via globalThis['mainCanvas'] when switching between P1 and P2 turns
 // without having to thread a `p` argument through every draw function.
@@ -3188,6 +3629,14 @@ var _modeStartTime = 0, _modeFinishTime = null, _ultraTimeLimit = 0, _sprintTarg
 // `_marathonGoal`: line target for Marathon (default 150 per Tetris
 // Effect's standard). Reaching it ends the run as a SUCCESS.
 var _pieceLockCount = 0;
+// Per-run stats for the results screen (human player only). `_runId`
+// bumps on every startGame so async game-over work from a previous run
+// can tell it's stale. Paused time is tracked so the TIME stat is real
+// play time.
+var _runStats = { tetrises: 0, maxCombo: -1 };
+var _runId = 0;
+var _pausedTotalMs = 0;
+var _pauseStartedAt = null;
 var _marathonGoal = 150;
 var bgParticles;
 var beatPhase = 0;
@@ -3198,6 +3647,14 @@ var beatPhase = 0;
 // global-swap. Reads/writes here always target the active player's cache.
 var _boardCache = null;
 var _boardCacheDirty = true;
+// Background fill + grid, split out of _boardCache so a line-clear collapse
+// can slide rows of blocks over a static grid. Rebuilt only on size/theme.
+var _boardBgCache = null;
+// Per-player game-feel FX state (line-clear collapse, lock flash, hard-drop
+// trail, spawn fade). Purely visual - see "BOARD FX" near drawBoard.
+var _boardFx = null;
+// Hard-drop "kick": the board dips down and springs back. { t, mag } | null.
+var dropKick = null;
 // Per-cell block image cache: each style+color combination rendered once to a
 // tiny offscreen canvas so drawBlock becomes a single drawImage call.
 // Eliminates shadowBlur + gradient allocations from active/ghost AND cache rebuild.
@@ -3303,7 +3760,7 @@ const PLAYER_FIELDS = [
   'lockResets',
   'zoneEnergy','zoneActive','zoneTimer','combo','b2bChain',
   'particles','levelTransitionAlpha','levelTransitionColor',
-  '_boardCache','_boardCacheDirty',
+  '_boardCache','_boardCacheDirty','_boardBgCache','_boardFx',
 ];
 // Canvas refs that also differ per player in vs mode. `CELL` is also in
 // here because P2's mini-board uses a smaller cell size than P1's full one.
@@ -3333,6 +3790,7 @@ function createPlayer({ id, isAI, name, mainCanvas: mc, holdCanvas: hc, nextCanv
     // different CELL sizes — sharing thrashed the cache to a full rebuild
     // every frame in vs/PvP mode. Each player now owns its own.
     _boardCache: null, _boardCacheDirty: true,
+    _boardBgCache: null, _boardFx: null,
     // AI difficulty tuning. Pulled from a preset in AI_DIFFICULTIES keyed on
     // the global aiDifficulty (set via the start-screen selector).
     ai: isAI ? Object.assign({
@@ -3490,6 +3948,7 @@ function spawnPiece() {
   _lastRotation.wasKick = false;
   _lastRotation.isTSpin = false;
   _lastRotation.isTSpinMini = false;
+  if (_fxEnabled()) _fx().spawnT = performance.now();
   if (collides(currentPiece, currentX, currentY)) {
     gameOver = true;
     handleTopOut();
@@ -3707,7 +4166,20 @@ function softDrop() {
 
 function hardDrop() {
   let drop = 0;
+  const startY = currentY;
   while (!collides(currentPiece, currentX, currentY + 1)) { currentY++; drop++; }
+  if (drop > 0 && _fxEnabled()) {
+    // Streak from where each column of the piece started to where it
+    // landed, plus a short downward board kick scaled by drop distance.
+    const tops = {};
+    for (const [bx, by] of currentPiece) if (tops[bx] == null || by < tops[bx]) tops[bx] = by;
+    _fx().trail = {
+      t: performance.now(),
+      color: _themePieceColor(currentType),
+      cols: Object.keys(tops).map(bx => ({ x: currentX + +bx, top: startY + tops[bx], bottom: currentY + tops[bx] })),
+    };
+    if (motionAllowed()) dropKick = { t: performance.now(), mag: Math.min(1, 0.35 + drop / 14) };
+  }
   score += drop * 2;
   audioEngine.playHardDrop();
   recordReplayEvent('H');
@@ -3729,6 +4201,9 @@ function lockPiece() {
   // Only counted on the human player's lock so AI activity doesn't
   // pollute Sir's PPS.
   if (!activePlayer || !activePlayer.isAI) _pieceLockCount++;
+  // A lock mid-collapse changes the board under the animation's row map, so
+  // snap any in-flight line-clear animation to its end state first.
+  if (_boardFx) _boardFx.clear = null;
   // Use the active theme's piece-palette override so locked cells render
   // in the level's color set (e.g. purple on Dream or Nightmare).
   const color = _themePieceColor(currentType);
@@ -3740,7 +4215,21 @@ function lockPiece() {
   for (const [bx, by] of currentPiece) {
     spawnParticles((currentX + bx) * CELL + CELL / 2, (currentY + by) * CELL + CELL / 2, color, 3);
   }
+  const lockCells = currentPiece.map(([bx, by]) => [currentX + bx, currentY + by]);
   const cleared = clearLines();
+  if (_fxEnabled()) {
+    // Flash the cells that just landed. If this lock cleared rows, drop the
+    // cells that vanished and move the rest to their post-clear rows (the
+    // collapse animation then carries them down visually).
+    const fx = _fx();
+    const gone = fx.clear ? fx.clear.rows.map(r => r.y) : [];
+    fx.lock = {
+      t: performance.now(),
+      cells: lockCells
+        .filter(([, y]) => !gone.includes(y))
+        .map(([x, y]) => [x, y + gone.filter(r => r > y).length]),
+    };
+  }
   // Vs mode: garbage exchange. When you clear lines, you first offset your
   // own pending garbage; any surplus rains on Alfred. If you didn't clear
   // anything this lock, any pending garbage rises up on your board now.
@@ -3840,6 +4329,7 @@ function riseGarbage(n) {
     board.push(row);
   }
   _boardCacheDirty = true;
+  if (_boardFx) _boardFx.clear = null;
 }
 
 function clearLines() {
@@ -3909,11 +4399,28 @@ function clearLines() {
         stageFlash = Math.max(stageFlash, flashStrength + Math.min(0.3, Math.max(0, combo) * 0.08));
       }
     }
+    if (_fxEnabled()) {
+      // Snapshot for the clear animation: the cleared rows' cells, and for
+      // every post-clear row how many rows it fell (= cleared rows below it).
+      const k = clearRows.length;
+      const shift = new Array(ROWS).fill(0);
+      for (let i = 0; i < k; i++) shift[i] = k;
+      for (let o = 0; o < ROWS; o++) {
+        if (clearRows.includes(o)) continue;
+        const below = clearRows.filter(r => r > o).length;
+        shift[o + below] = below;
+      }
+      _fx().clear = { t: performance.now(), shift, rows: clearRows.map(r => ({ y: r, cells: board[r].slice() })) };
+    }
     for (const r of clearRows.sort((a, b) => a - b)) {
       board.splice(r, 1);
       board.unshift(Array(COLS).fill(null));
     }
     combo++;
+    if (!activePlayer || (!activePlayer.isAI && !activePlayer.isRemote)) {
+      if (cleared === 4) _runStats.tetrises++;
+      if (combo > _runStats.maxCombo) _runStats.maxCombo = combo;
+    }
     const basePoints = [0, 100, 300, 500, 800];
     // Zone mode multiplies line-clear score 2.5×. Combined with combo this
     // means a Tetris-while-Zoned with a 3-combo is huge - exactly the burst
@@ -5568,7 +6075,7 @@ function updateSyncBadge(state) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'lb-sync-badge';
-    el.style.cssText = 'position:fixed;bottom:6px;right:8px;z-index:20;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);pointer-events:none;font-family:Segoe UI,system-ui;';
+    el.style.cssText = 'position:fixed;bottom:6px;right:8px;z-index:20;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);pointer-events:none;font-family:var(--font-ui);';
     document.body.appendChild(el);
   }
   const queued = loadPendingScores().length;
@@ -6145,7 +6652,14 @@ async function refreshSharedLeaderboard() {
 let _pendingRank = null;
 let _pendingMode = 'story';
 let _pendingTimeMs = null;
+// "1:07" style clock for the results screen.
+function fmtClock(ms) {
+  const t = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
 async function showGameOver() {
+  const runId = _runId;
   const finalScore = Math.floor(score);
   // Persist the replay (if anything was recorded). Returned ID is used by
   // the share button on the game-over screen.
@@ -6191,6 +6705,49 @@ async function showGameOver() {
     _pendingTimeMs = null;
     resultLine = `Score: ${finalScore.toLocaleString()} · Lines: ${lines} · Level: ${level}`;
   }
+  // Results card: title, mode subtitle, headline number, stat tiles.
+  {
+    const endT = _modeFinishTime || performance.now();
+    const pausedMs = _pausedTotalMs + (_pauseStartedAt != null ? endT - _pauseStartedAt : 0);
+    const playMs = Math.max(0, endT - _modeStartTime - pausedMs);
+    const sprintDone = _pendingMode === 'sprint' && _pendingTimeMs != null;
+    const won = sprintDone || (_pendingMode === 'marathon' && !runFailed);
+    const title = sprintDone ? 'FINISHED'
+      : (_pendingMode === 'marathon' && !runFailed) ? 'CLEARED'
+      : (_pendingMode === 'ultra' && !runFailed) ? "TIME'S UP"
+      : 'GAME OVER';
+    const titleEl = document.getElementById('go-title');
+    titleEl.textContent = title;
+    titleEl.classList.toggle('go-win', won || title === "TIME'S UP");
+    const modeName = { sprint: 'Sprint', ultra: 'Ultra', marathon: 'Marathon', daily: 'Daily Challenge' }[_pendingMode]
+      || `Arcade · ${getTheme(level).name}`;
+    resultLine = (_pendingMode === 'sprint' && !sprintDone) ? `Sprint · topped out at ${lines}/40`
+      : (_pendingMode === 'marathon' && runFailed) ? `Marathon · topped out at ${lines}/${_marathonGoal}`
+      : (_pendingMode === 'ultra' && runFailed) ? 'Ultra · topped out'
+      : modeName;
+    document.getElementById('go-hero-label').textContent = sprintDone ? 'TIME' : 'SCORE';
+    document.getElementById('go-hero-value').textContent = sprintDone ? fmtSprintTime(_pendingTimeMs) : finalScore.toLocaleString();
+    const pps = playMs > 0 ? _pieceLockCount / (playMs / 1000) : 0;
+    const chain = _runStats.maxCombo > 0 ? `×${_runStats.maxCombo + 1}` : '—';
+    const tiles = [
+      [lines, 'Lines'],
+      [sprintDone ? finalScore.toLocaleString() : level, sprintDone ? 'Score' : 'Level'],
+      [sprintDone ? pps.toFixed(2) : fmtClock(playMs), sprintDone ? 'Pieces/s' : 'Time'],
+      [_runStats.tetrises, 'Tetrises', _runStats.tetrises > 0],
+      [chain, 'Best combo', _runStats.maxCombo > 0],
+      [sprintDone ? _pieceLockCount : pps.toFixed(2), sprintDone ? 'Pieces' : 'Pieces/s'],
+    ];
+    const statsEl = document.getElementById('go-stats');
+    statsEl.textContent = '';
+    for (const [v, label, hi] of tiles) {
+      const d = document.createElement('div');
+      d.className = 'go-stat' + (hi ? ' go-stat-hi' : '');
+      const b = document.createElement('b'); b.textContent = String(v);
+      const sp = document.createElement('span'); sp.textContent = label;
+      d.append(b, sp);
+      statsEl.appendChild(d);
+    }
+  }
   // Reset the flag for the next run.
   _modeRunFailed = false;
   finalLine.textContent = resultLine;
@@ -6203,6 +6760,9 @@ async function showGameOver() {
   // mode is shared cross-device today; per-mode shared boards are a follow-up.
   if (_pendingMode === 'story') {
     const remote = await fetchSharedScores();
+    // The player may have hit REPLAY / MENU while we waited on the network;
+    // don't paint this run's rank banner over the next run.
+    if (runId !== _runId || !gameOver) return;
     if (remote) saveLeaderboard(remote, 'story');
   }
 
@@ -6359,7 +6919,7 @@ function showVsResult() {
   // Swap the button label so it reads "NEXT ROUND" mid-match, "REPLAY" once
   // someone has clinched the best-of-5.
   const replayBtn = document.getElementById('vs-replay-btn');
-  if (replayBtn) replayBtn.textContent = matchOver ? 'REPLAY MATCH' : 'NEXT ROUND';
+  if (replayBtn) replayBtn.textContent = matchOver ? 'BACK TO MENU' : 'NEXT ROUND';
   document.getElementById('vs-result-screen').style.display = 'flex';
   audioEngine.stop();
   // Play a pre-rendered flavor clip 400ms after the screen appears so the
@@ -6407,7 +6967,7 @@ function drawGhostBlock(context, x, y, color, size) {
   const key = `${outlineColor}-${size}`;
   let mini = _ghostMiniCache.get(key);
   if (!mini) {
-    mini = document.createElement('canvas');
+    mini = hiDpi(document.createElement('canvas'));
     mini.width = size; mini.height = size;
     const c = mini.getContext('2d');
     const [r, g, b] = hexToRgb(outlineColor);
@@ -6432,7 +6992,7 @@ function drawGhostBlock(context, x, y, color, size) {
     c.stroke();
     _ghostMiniCache.set(key, mini);
   }
-  context.drawImage(mini, x, y);
+  context.drawImage(mini, x, y, size, size);
 }
 
 // Reverse map of piece-color → piece-type so locked blocks (which only carry
@@ -6441,6 +7001,52 @@ function drawGhostBlock(context, x, y, color, size) {
 const COLOR_TO_TYPE = Object.fromEntries(
   Object.entries(PIECES).map(([k, v]) => [v.color, k])
 );
+
+// Per-piece shades for themes whose block art is one uniform colour (brains,
+// burgers, tires, the Underground bevel...). Each piece type gets a small
+// hue shift + brightness tweak inside the theme's own colour family, so an
+// incoming T still reads differently from an L at a glance. Applied once per
+// sprite when it's cached - zero per-frame cost. Only styles that ignore the
+// piece colour are listed; themes with real per-piece colours are untouched.
+const PIECE_SHADE_STYLES = new Set(['tetrisEffect', 'tires', 'macncheese', 'beefpatty', 'brain', 'trumpet', 'mug', 'bullet', 'leaf']);
+const PIECE_SHADES = {         // [hue shift in degrees, lightness multiplier]
+  I: [0, 1.0], O: [16, 1.1], T: [-16, 0.93], S: [30, 1.0],
+  Z: [-30, 1.05], J: [8, 0.8], L: [-8, 1.18],
+};
+function _shadeSprite(canvas, type) {
+  const shade = PIECE_SHADES[type];
+  if (!shade || (shade[0] === 0 && shade[1] === 1)) return;
+  const dpr = canvas._dpr || 1;
+  const w = Math.round(canvas.width * dpr), h = Math.round(canvas.height * dpr);
+  if (!w || !h) return;
+  const c = canvas.getContext('2d');
+  let img;
+  try { img = c.getImageData(0, 0, w, h); } catch { return; }
+  const d = img.data, dh = shade[0] / 360, lm = shade[1];
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    // RGB → HSL
+    const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    let hh = 0, ss = 0, ll = (mx + mn) / 2;
+    if (mx !== mn) {
+      const df = mx - mn;
+      ss = ll > 0.5 ? df / (2 - mx - mn) : df / (mx + mn);
+      hh = mx === r ? (g - b) / df + (g < b ? 6 : 0) : mx === g ? (b - r) / df + 2 : (r - g) / df + 4;
+      hh /= 6;
+    }
+    hh = (hh + dh + 1) % 1;
+    ll = Math.min(1, ll * lm);
+    // HSL → RGB
+    if (ss === 0) { d[i] = d[i + 1] = d[i + 2] = Math.round(ll * 255); continue; }
+    const q = ll < 0.5 ? ll * (1 + ss) : ll + ss - ll * ss, pp = 2 * ll - q;
+    const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? pp + (q - pp) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? pp + (q - pp) * (2 / 3 - t) * 6 : pp; };
+    d[i] = Math.round(f(hh + 1 / 3) * 255);
+    d[i + 1] = Math.round(f(hh) * 255);
+    d[i + 2] = Math.round(f(hh - 1 / 3) * 255);
+  }
+  c.putImageData(img, 0, 0);
+}
 
 function drawBlock(context, x, y, color, size, alpha = 1) {
   const theme = getTheme(level);
@@ -6455,7 +7061,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
     const key = `${_bs}-${color}-${size}`;
     let mini = _blockMiniCache.get(key);
     if (!mini) {
-      mini = document.createElement('canvas');
+      mini = hiDpi(document.createElement('canvas'));
       mini.width = size; mini.height = size;
       const mc = mini.getContext('2d');
       if      (_bs === 'tetrisEffect') drawBlockTE(mc, 0, 0, color, size, 1);
@@ -6471,10 +7077,11 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
       else if (_bs === 'beachball') { try { drawBlockBeachball(mc, 0, 0, color, size, 1, theme); } catch(e) { mc.fillStyle=color; mc.fillRect(2,2,size-4,size-4); } }
       else if (_bs === 'skull')     { try { drawBlockSkull(mc, 0, 0, color, size, 1, theme); }     catch(e) { mc.fillStyle=color; mc.fillRect(2,2,size-4,size-4); } }
       else                             drawBlockDefault(mc, 0, 0, color, size);
+      if (PIECE_SHADE_STYLES.has(_bs) && COLOR_TO_TYPE[color]) _shadeSprite(mini, COLOR_TO_TYPE[color]);
       _blockMiniCache.set(key, mini);
     }
     if (alpha !== 1) context.globalAlpha = alpha;
-    context.drawImage(mini, x, y);
+    context.drawImage(mini, x, y, size, size);
     if (alpha !== 1) context.globalAlpha = 1;
     return;
   }
@@ -6943,6 +7550,63 @@ function glyphPath(context, cx, cy, r, type) {
   context.fill();
 }
 
+// ── BOARD FX ── game-feel animations layered over the board. All of them
+// are purely visual and time-based (performance.now), so game logic, AI,
+// replays and online sync never wait on an animation, and they run at the
+// same speed on 60 Hz and 144 Hz screens. Only the local human's board gets
+// them — the AI mini-board and remote snapshots stay instant.
+const FX_CLEAR_FLASH = 110;     // cleared rows flash + dissolve centre-out
+const FX_CLEAR_COLLAPSE = 140;  // then the rows above fall into place
+const FX_LOCK_MS = 170;
+const FX_TRAIL_MS = 200;
+const FX_SPAWN_MS = 110;
+const FX_KICK_MS = 190;
+const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+function _fxEnabled() { return !activePlayer || (!activePlayer.isAI && !activePlayer.isRemote); }
+function _fx() { return _boardFx || (_boardFx = { clear: null, lock: null, trail: null, spawnT: 0 }); }
+function _fxRgb(color) {
+  return (typeof color === 'string' && color[0] === '#') ? hexToRgb(color) : _anyColorToRgb(color);
+}
+// Vertical draw offset (px) for post-clear board row `row` while a line
+// clear collapses: rows hold at their old height during the flash, then
+// fall with gravity-style easing.
+function _clearRowOffset(fx, row, now) {
+  const c = fx && fx.clear;
+  if (!c || !c.shift[row]) return 0;
+  const t = now - c.t;
+  const p = t <= FX_CLEAR_FLASH ? 0 : Math.min(1, (t - FX_CLEAR_FLASH) / FX_CLEAR_COLLAPSE);
+  return -c.shift[row] * CELL * (1 - p * p);
+}
+// Cleared rows: flash white, then each cell shrinks away, centre columns
+// first, edges last — a zipper that reads clearly even on busy themes.
+function _drawClearDissolve(c, now) {
+  const p = (now - c.t) / FX_CLEAR_FLASH;
+  if (p >= 1) return;
+  const mid = (COLS - 1) / 2;
+  for (const row of c.rows) {
+    for (let col = 0; col < COLS; col++) {
+      const color = row.cells[col];
+      if (!color) continue;
+      const d = Math.abs(col - mid) / mid;                 // 0 centre … 1 edge
+      const q = Math.max(0, Math.min(1, (p - d * 0.45) / 0.55));
+      const sc = 1 - q;
+      if (sc <= 0.02) continue;
+      const size = CELL * sc;
+      const x = col * CELL + (CELL - size) / 2, y = row.y * CELL + (CELL - size) / 2;
+      ctx.save();
+      ctx.globalAlpha = sc;
+      // Draw at full CELL size under a transform so the block-sprite cache
+      // isn't filled with one entry per intermediate size.
+      ctx.translate(x, y);
+      ctx.scale(sc, sc);
+      drawBlock(ctx, 0, 0, color, CELL);
+      ctx.restore();
+      ctx.fillStyle = `rgba(255,255,255,${(0.9 * (1 - q) * Math.min(1, p * 4 + 0.35)).toFixed(3)})`;
+      ctx.fillRect(x, y, size, size);
+    }
+  }
+}
+
 function drawBoard() {
   const theme = getTheme(level);
   const [r, g, b] = hexToRgb(theme.colors.bg2);
@@ -6961,36 +7625,41 @@ function drawBoard() {
   // Complex block styles (beefpatty, trumpet, brain…) allocate 2-3 gradient
   // objects per cell per call. At a half-full board that's 300+ allocations/frame.
   // Caching cuts that to zero between piece locks/line clears.
-  if (_boardCacheDirty || !_boardCache || _boardCache.width !== cw || _boardCache.height !== ch) {
-    if (!_boardCache || _boardCache.width !== cw || _boardCache.height !== ch) {
-      _boardCache = document.createElement('canvas');
-      _boardCache.width = cw; _boardCache.height = ch;
-    }
-    const bctx = _boardCache.getContext('2d');
-    // Background fill (same logic as before)
-    if (useAlpha) {
-      bctx.clearRect(0, 0, cw, ch);
-      bctx.fillStyle = `rgba(${r},${g},${b},${fillAlpha})`;
-    } else {
-      bctx.fillStyle = `rgb(${r},${g},${b})`;
-    }
-    bctx.fillRect(0, 0, cw, ch);
+  // Background fill + grid: static per size/theme, own cache.
+  const bgFill = useAlpha ? `rgba(${r},${g},${b},${fillAlpha})` : `rgb(${r},${g},${b})`;
+  const bgSig = `${cw}x${ch}|${CELL}|${bgFill}`;
+  if (!_boardBgCache || _boardBgCache._sig !== bgSig) {
+    if (!_boardBgCache) _boardBgCache = hiDpi(document.createElement('canvas'));
+    _boardBgCache.width = cw; _boardBgCache.height = ch; // resizing also clears it
+    const gctx = _boardBgCache.getContext('2d');
+    gctx.fillStyle = bgFill;
+    gctx.fillRect(0, 0, cw, ch);
     // Grid: one stroked path of straight lines instead of ROWS×COLS
     // strokeRects (200 stroke calls → 1), with slightly stronger verticals
     // so columns read at a glance.
-    bctx.lineWidth = 1;
-    bctx.strokeStyle = 'rgba(255,255,255,0.028)';
-    bctx.beginPath();
+    gctx.lineWidth = 1;
+    gctx.strokeStyle = 'rgba(255,255,255,0.028)';
+    gctx.beginPath();
     for (let row = 1; row < ROWS; row++) {
-      bctx.moveTo(0, row * CELL + 0.5); bctx.lineTo(cw, row * CELL + 0.5);
+      gctx.moveTo(0, row * CELL + 0.5); gctx.lineTo(cw, row * CELL + 0.5);
     }
-    bctx.stroke();
-    bctx.strokeStyle = 'rgba(255,255,255,0.045)';
-    bctx.beginPath();
+    gctx.stroke();
+    gctx.strokeStyle = 'rgba(255,255,255,0.045)';
+    gctx.beginPath();
     for (let col = 1; col < COLS; col++) {
-      bctx.moveTo(col * CELL + 0.5, 0); bctx.lineTo(col * CELL + 0.5, ch);
+      gctx.moveTo(col * CELL + 0.5, 0); gctx.lineTo(col * CELL + 0.5, ch);
     }
-    bctx.stroke();
+    gctx.stroke();
+    _boardBgCache._sig = bgSig;
+  }
+
+  if (_boardCacheDirty || !_boardCache || _boardCache.width !== cw || _boardCache.height !== ch) {
+    if (!_boardCache || _boardCache.width !== cw || _boardCache.height !== ch) {
+      _boardCache = hiDpi(document.createElement('canvas'));
+      _boardCache.width = cw; _boardCache.height = ch;
+    }
+    const bctx = _boardCache.getContext('2d');
+    bctx.clearRect(0, 0, cw, ch);
     // Locked blocks — the expensive part, now only runs on board changes.
     // Track the highest occupied row in the same pass; the danger tint in
     // the per-frame path reads it for free.
@@ -7007,9 +7676,66 @@ function drawBoard() {
     _boardCacheDirty = false;
   }
 
-  // Blit cached board in one drawImage call
+  // Blit background, then the cached blocks — in one drawImage normally, or
+  // as horizontal strips sliding down while a line clear collapses.
   if (useAlpha) ctx.clearRect(0, 0, cw, ch);
-  ctx.drawImage(_boardCache, 0, 0);
+  ctx.drawImage(_boardBgCache, 0, 0, cw, ch);
+  const now = performance.now();
+  const fx = _boardFx;
+  if (fx && fx.clear && now - fx.clear.t >= FX_CLEAR_FLASH + FX_CLEAR_COLLAPSE) fx.clear = null;
+  if (fx && fx.clear) {
+    const dpr = _boardCache._dpr || 1;
+    // Rows that fall the same distance move as one strip (no seams).
+    for (let row = 0; row < ROWS; ) {
+      let end = row + 1;
+      while (end < ROWS && fx.clear.shift[end] === fx.clear.shift[row]) end++;
+      const off = Math.round(_clearRowOffset(fx, row, now) * dpr) / dpr;
+      const y = row * CELL, h = (end - row) * CELL;
+      ctx.drawImage(_boardCache, 0, y * dpr, cw * dpr, h * dpr, 0, y + off, cw, h);
+      row = end;
+    }
+    _drawClearDissolve(fx.clear, now);
+  } else {
+    ctx.drawImage(_boardCache, 0, 0, cw, ch);
+  }
+
+  // Lock flash: the cells that just landed flare white and fade.
+  if (fx && fx.lock) {
+    const k = 1 - (now - fx.lock.t) / FX_LOCK_MS;
+    if (k <= 0) fx.lock = null;
+    else {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255,255,255,${(0.5 * k * k).toFixed(3)})`;
+      for (const [x, y] of fx.lock.cells) {
+        ctx.fillRect(x * CELL + 1, y * CELL + _clearRowOffset(fx, y, now) + 1, CELL - 2, CELL - 2);
+      }
+      ctx.restore();
+    }
+  }
+
+  // Hard-drop trail: a streak per column from where the piece started to
+  // where it landed, bright at the bottom, narrowing as it fades.
+  if (fx && fx.trail) {
+    const k = 1 - (now - fx.trail.t) / FX_TRAIL_MS;
+    if (k <= 0) fx.trail = null;
+    else {
+      const [tr, tg, tb] = _fxRgb(fx.trail.color);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const w = CELL * (0.3 + 0.55 * k);
+      for (const c of fx.trail.cols) {
+        const y0 = c.top * CELL, y1 = c.bottom * CELL;
+        if (y1 - y0 < 1) continue;
+        const grad = ctx.createLinearGradient(0, y0, 0, y1);
+        grad.addColorStop(0, `rgba(${tr},${tg},${tb},0)`);
+        grad.addColorStop(1, `rgba(${tr},${tg},${tb},${(0.5 * k).toFixed(3)})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(c.x * CELL + (CELL - w) / 2, y0, w, y1 - y0);
+      }
+      ctx.restore();
+    }
+  }
 
   // Beat pulse — still per-frame, but just a fillRect (cheap)
   const pulseIntensity = 0.04 + Math.max(0, level - 13) * 0.012;
@@ -7060,7 +7786,23 @@ function drawBoard() {
         for (const [bx, by] of currentPiece) drawGhostBlock(ctx, (currentX + bx) * CELL, (ghostY + by) * CELL, color, CELL);
       }
     }
+    // Spawn: fade in from 40% with a white flare that burns off.
+    const sp = fx ? now - (fx.spawnT || 0) : FX_SPAWN_MS;
+    const spK = sp < FX_SPAWN_MS ? 1 - sp / FX_SPAWN_MS : 0;
+    if (spK > 0) ctx.globalAlpha = 1 - 0.6 * spK;
     for (const [bx, by] of currentPiece) drawBlock(ctx, (currentX + bx) * CELL, (currentY + by) * CELL, color, CELL);
+    ctx.globalAlpha = 1;
+    // Lock delay: the grounded piece brightens as its lock timer runs out,
+    // so a slide-and-tuck has a visible deadline.
+    let glow = 0.55 * spK;
+    if (fx && isLocking && lockDelay > 0) glow = Math.max(glow, 0.26 * Math.min(1, Math.max(0, now - lockTimer) / lockDelay));
+    if (glow > 0.01) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255,255,255,${glow.toFixed(3)})`;
+      for (const [bx, by] of currentPiece) ctx.fillRect((currentX + bx) * CELL + 1, (currentY + by) * CELL + 1, CELL - 2, CELL - 2);
+      ctx.restore();
+    }
   }
 
   // Tetris-Effect shimmer pass - diagonal highlight stripe sweeping across
@@ -11440,8 +12182,8 @@ function drawWarzoneScene(theme, now, playRects) {
 
   const cheer          = typeof cheerEnergy   !== 'undefined' ? cheerEnergy   : 0;
   const energy         = typeof beatEnergy    !== 'undefined' ? beatEnergy    : 0;
-  const movePulse      = typeof _movePulse      !== 'undefined' ? _movePulse      : 0;
-  const boardDropPulse = typeof _boardDropPulse !== 'undefined' ? _boardDropPulse : 0;
+  const movePulse      = window.movePulse || 0;
+  const boardDropPulse = window.boardDropPulse || 0;
   const ctx = bgCtx;
   const floorY = h * 0.75;
 
@@ -12461,8 +13203,8 @@ function drawHazeScene(theme, now, playRects) {
 
   const cheer          = typeof cheerEnergy    !== 'undefined' ? cheerEnergy    : 0;
   const energy         = typeof beatEnergy     !== 'undefined' ? beatEnergy     : 0;
-  const movePulse      = typeof _movePulse     !== 'undefined' ? _movePulse     : 0;
-  const boardDropPulse = typeof _boardDropPulse !== 'undefined' ? _boardDropPulse : 0;
+  const movePulse      = window.movePulse || 0;
+  const boardDropPulse = window.boardDropPulse || 0;
 
   // Update timers
   sc.tripMeter  = Math.min(1, sc.tripMeter * 0.9994 + cheer * 0.006);
@@ -18029,7 +18771,7 @@ function _particleSprite(color) {
   let s = _particleSprites.get(color);
   if (s) return s;
   const D = 32;
-  s = document.createElement('canvas');
+  s = hiDpi(document.createElement('canvas'));
   s.width = s.height = D;
   const c = s.getContext('2d');
   const [r, g, b] = _anyColorToRgb(color);
@@ -18449,32 +19191,60 @@ function render(timestamp) {
   if (_hudPauseSynced !== paused) {
     _hudPauseSynced = paused;
     updateHudPauseButton();
+    if (paused) _pauseStartedAt = performance.now();
+    else if (_pauseStartedAt != null) { _pausedTotalMs += performance.now() - _pauseStartedAt; _pauseStartedAt = null; }
   }
+  syncPauseOverlay();
+  // Frame-rate independence: the decay constants below were tuned per frame
+  // at 60 Hz, so scale them by elapsed 60 Hz frames. Without this, effects
+  // ran twice as fast on 120/144 Hz screens. Clamped so a stalled tab
+  // doesn't jump every effect to zero in one step.
+  const nowT = (typeof timestamp === 'number') ? timestamp : performance.now();
+  const rawDt = render._lastT ? nowT - render._lastT : 0;
+  const dtF = render._lastT ? Math.min(4, Math.max(0, rawDt / (1000 / 60))) : 1;
+  render._lastT = nowT;
+  monitorFrameRate(rawDt);
   // Cheer pulse decays each frame (rises only on line clears in clearLines()).
   // Linear decay over ~1.4s feels right against a 4-beat cheer at 100 bpm.
-  if (cheerPulse > 0) cheerPulse = Math.max(0, cheerPulse - 0.012);
+  if (cheerPulse > 0) cheerPulse = Math.max(0, cheerPulse - 0.012 * dtF);
   // Move pulse decays faster - quick ripple per move, not a sustained cheer.
-  if (movePulse > 0) movePulse = Math.max(0, movePulse - 0.04);
+  if (movePulse > 0) movePulse = Math.max(0, movePulse - 0.04 * dtF);
   // Stage flash decays faster - should feel like a camera flash, not a fade.
-  if (stageFlash > 0) stageFlash = Math.max(0, stageFlash - 0.05);
+  if (stageFlash > 0) stageFlash = Math.max(0, stageFlash - 0.05 * dtF);
   // Board drop pulse - quick decay, gone in ~400ms
-  if (boardDropPulse > 0) boardDropPulse = Math.max(0, boardDropPulse - 0.06);
+  if (boardDropPulse > 0) boardDropPulse = Math.max(0, boardDropPulse - 0.06 * dtF);
   try { drawBackground(); } catch(e) { /* background scene error — pieces still draw */ }
-  // Screen-shake decay applied via CSS transform on the main canvas. Cheaper
-  // than redrawing into a translated context, and respects the per-player
-  // canvas swap because we always target the *active* canvas.
-  if (shakeFrames > 0) {
-    shakeFrames--;
-    const m = shakeMag * (shakeFrames / 28);
-    const dx = (Math.random() - 0.5) * 2 * m;
-    const dy = (Math.random() - 0.5) * 2 * m;
-    const rot = (Math.random() - 0.5) * (m * 0.012);
+  // Screen shake + hard-drop kick, applied via CSS transform on P1's main
+  // canvas (cheaper than redrawing into a translated context).
+  //  - Shake: smooth layered sine wobble with a random phase per shake
+  //    instead of per-frame white noise, so it reads as a rumble rather than
+  //    jitter. Same magnitude/duration tuning as before.
+  //  - Kick: the board dips down and springs back (critically damped).
+  // Both are skipped under prefers-reduced-motion.
+  {
     const target = (players[0] && players[0].mainCanvas) || mainCanvas;
-    target.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}rad)`;
-    if (shakeFrames === 0) {
-      shakeMag = 0;
-      target.style.transform = '';
+    let dx = 0, dy = 0, rot = 0;
+    if (shakeFrames > 0) {
+      shakeFrames = Math.max(0, shakeFrames - dtF);
+      if (!render._shakePh || render._shakeWasIdle) render._shakePh = [Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28];
+      render._shakeWasIdle = false;
+      const m = motionAllowed() ? shakeMag * (shakeFrames / 28) : 0;
+      const t = nowT / 1000, ph = render._shakePh;
+      dx = m * (Math.sin(t * 53 + ph[0]) * 0.7 + Math.sin(t * 97 + ph[1]) * 0.3);
+      dy = m * (Math.sin(t * 61 + ph[1]) * 0.7 + Math.sin(t * 89 + ph[2]) * 0.3);
+      rot = m * 0.006 * Math.sin(t * 41 + ph[2]);
+      if (shakeFrames === 0) { shakeMag = 0; render._shakeWasIdle = true; }
     }
+    if (dropKick) {
+      const k = (performance.now() - dropKick.t) / FX_KICK_MS;
+      if (k >= 1) dropKick = null;
+      else {
+        const x = k * 6; // spring: fast dip, settle with a tiny overshoot
+        dy += dropKick.mag * Math.min(6, CELL * 0.16) * Math.exp(-x) * Math.sin(Math.min(x * 1.6, Math.PI) + 0.35) * 1.4;
+      }
+    }
+    const tf = (dx || dy || rot) ? `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) rotate(${rot.toFixed(4)}rad)` : '';
+    if (target.style.transform !== tf) target.style.transform = tf;
   }
   // Pre-game: only the background animates behind the start screen.
   // `board` is undefined until startGame() fills it, so we skip all board
@@ -18556,60 +19326,103 @@ function render(timestamp) {
 // ============================================================
 const keys = {};
 const dasTimer = {};
-const DAS = 133, ARR = 30;
+
+// ── SETTINGS ── persisted player preferences (movement tuning, key
+// bindings, screen shake, graphics quality). Volume / mute / ghost /
+// announcer keep their existing storage keys and setters.
+const DEFAULT_KEYMAP = {
+  left:  ['ArrowLeft', 'a'],
+  right: ['ArrowRight', 'd'],
+  soft:  ['ArrowDown', 's'],
+  hard:  [' '],
+  cw:    ['ArrowUp', 'w', 'x'],
+  ccw:   ['z'],
+  hold:  ['Shift', 'c'],
+  zone:  ['q'],
+  pause: ['p', 'Escape'],
+};
+const SETTINGS_DEFAULTS = { das: 133, arr: 30, shake: true, quality: 'auto', keymap: DEFAULT_KEYMAP };
+const settings = (() => {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('tetris.settings.v1') || '{}') || {}; } catch {}
+  const km = {};
+  for (const a of Object.keys(DEFAULT_KEYMAP)) {
+    km[a] = (saved.keymap && Array.isArray(saved.keymap[a]) && saved.keymap[a].length) ? saved.keymap[a].slice() : DEFAULT_KEYMAP[a].slice();
+  }
+  const num = (v, lo, hi, d) => (Number.isFinite(+v) ? Math.min(hi, Math.max(lo, +v)) : d);
+  return {
+    das: num(saved.das, 50, 300, SETTINGS_DEFAULTS.das),
+    arr: num(saved.arr, 0, 100, SETTINGS_DEFAULTS.arr),
+    shake: saved.shake !== false,
+    quality: ['auto', 'high', 'low'].includes(saved.quality) ? saved.quality : 'auto',
+    keymap: km,
+  };
+})();
+function saveSettings() {
+  try { localStorage.setItem('tetris.settings.v1', JSON.stringify(settings)); } catch {}
+}
+// DAS: how long a held direction waits before auto-repeating.
+// ARR: time between repeats (0 = slide instantly to the wall).
+let DAS = settings.das, ARR = settings.arr;
+function _normKey(k) { return (k && k.length === 1) ? k.toLowerCase() : k; }
+function actionForKey(k) {
+  k = _normKey(k);
+  for (const a in settings.keymap) if (settings.keymap[a].includes(k)) return a;
+  return null;
+}
+function keyLabel(k) {
+  return ({ ' ': 'Space', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Escape: 'Esc' })[k]
+    || (k.length === 1 ? k.toUpperCase() : k);
+}
+function motionAllowed() { return !REDUCED_MOTION && settings.shake; }
 
 document.addEventListener('keydown', (e) => {
   if (gameOver || !gameStarted) return;
-  if (paused && !['p', 'P', 'm', 'M'].includes(e.key)) return;
-  switch (e.key) {
-    case 'ArrowLeft': case 'a': case 'A':
+  // Let form controls (e.g. the volume slider) keep their own arrow keys
+  // instead of also moving the piece.
+  const tag = e.target && e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (_settingsOpen()) return;
+  const action = actionForKey(e.key);
+  const k = _normKey(e.key);
+  if (paused && action !== 'pause' && k !== 'm') return;
+  // OS key auto-repeat: movement keys have their own DAS/ARR (guarded by
+  // `keys[...]` below), but one-shot actions must fire once per press —
+  // otherwise holding Space chain-drops pieces and holding Up spins forever.
+  if (e.repeat && action !== 'left' && action !== 'right' && action !== 'soft') {
+    if (action) e.preventDefault();
+    return;
+  }
+  // Ctrl+Z is a fixed Zone shortcut on top of the Zone binding.
+  if (e.ctrlKey && k === 'z') { e.preventDefault(); activateZone(); return; }
+  // Bound game keys shouldn't also scroll the page or trigger buttons.
+  if (action && action !== 'pause') e.preventDefault();
+  switch (action) {
+    case 'left':
       if (!keys['left']) { moveLeft(); keys['left'] = true; dasTimer['left'] = Date.now(); } break;
-    case 'ArrowRight': case 'd': case 'D':
+    case 'right':
       if (!keys['right']) { moveRight(); keys['right'] = true; dasTimer['right'] = Date.now(); } break;
-    case 'ArrowDown': case 's': case 'S':
+    case 'soft':
       if (!keys['down']) { softDrop(); keys['down'] = true; dasTimer['down'] = Date.now(); } break;
-    case 'ArrowUp': case 'w': case 'W': case 'x': case 'X':
-      rotatePiece(1); break;
-    // Z = counter-clockwise rotate (Tetris-canon: Z=CCW, X=CW). Shift+Z (or Q)
-    // activates Zone — moved off bare-Z so muscle-memory CCW spins don't fire
-    // the bonus-meter button.
-    case 'z':
-      if (e.shiftKey || e.ctrlKey) activateZone(); else rotatePiece(-1);
-      break;
-    case 'Z': rotatePiece(-1); break;
-    case 'q': case 'Q': activateZone(); break;
-    case ' ': e.preventDefault(); hardDrop(); break;
-    case 'Shift': case 'c': case 'C': holdCurrentPiece(); break;
-    case 'g': case 'G': setShowGhost(!showGhost); break;
-    case 'v': case 'V': setVoiceEnabled(!voiceEnabled); break;
-    case 'm': case 'M': setMuted(!muted); break;
-    case 'p': case 'P':
-      paused = !paused;
-      _pausedByHide = false;  // user explicitly chose pause state
-      if (paused) {
-        audioEngine.stop();
-      } else {
-        // Resume the AudioContext FIRST (if suspended by a prior tab-hide)
-        // so that audioEngine.start()'s scheduled notes actually fire.
-        try {
-          if (audioEngine.ctx && audioEngine.ctx.state === 'suspended') {
-            audioEngine.ctx.resume().then(() => audioEngine.start());
-          } else {
-            audioEngine.start();
-          }
-        } catch { audioEngine.start(); }
-      }
-      updateHudPauseButton();
-      break;
+    case 'cw': rotatePiece(1); break;
+    case 'ccw': rotatePiece(-1); break;
+    case 'zone': activateZone(); break;
+    case 'hard': hardDrop(); break;
+    case 'hold': holdCurrentPiece(); break;
+    case 'pause': togglePause(); break;
+    default:
+      // Fixed toggles, unless the player bound that key to an action.
+      if (k === 'g') setShowGhost(!showGhost);
+      else if (k === 'v') setVoiceEnabled(!voiceEnabled);
+      else if (k === 'm') setMuted(!muted);
   }
 });
 
 document.addEventListener('keyup', (e) => {
-  switch (e.key) {
-    case 'ArrowLeft': case 'a': case 'A': keys['left'] = false; break;
-    case 'ArrowRight': case 'd': case 'D': keys['right'] = false; break;
-    case 'ArrowDown': case 's': case 'S': keys['down'] = false; break;
-  }
+  const action = actionForKey(e.key);
+  if (action === 'left') keys['left'] = false;
+  else if (action === 'right') keys['right'] = false;
+  else if (action === 'soft') keys['down'] = false;
 });
 
 // Pause-on-hide / resume-on-return. iOS Safari + some Chrome configs
@@ -18675,26 +19488,43 @@ window.addEventListener('pageshow', () => {
 // softDrops per tick to approximate ~20G, capped per tick so the loop
 // can't churn the whole board on a single iteration.
 const SOFT_DROP_ROWS_PER_TICK = 8;
+const SOFT_DROP_TICK_MS = 30;
+// Auto-repeat runs on a fast fixed tick so DAS/ARR can change live from
+// the settings panel (the interval period used to *be* ARR).
+const _repeatLast = {};
 setInterval(() => {
   if (gameOver || !gameStarted || paused) return;
   const now = Date.now();
-  if (keys['left'] && now - dasTimer['left'] > DAS) moveLeft();
-  if (keys['right'] && now - dasTimer['right'] > DAS) moveRight();
+  for (const dir of ['left', 'right']) {
+    if (!keys[dir] || now - dasTimer[dir] <= DAS) continue;
+    const move = dir === 'left' ? moveLeft : moveRight;
+    if (ARR <= 0) {
+      // Instant ARR: slide to the wall in one go.
+      for (let i = 0; i < COLS; i++) { const x = currentX; move(); if (currentX === x) break; }
+    } else if (now - (_repeatLast[dir] || 0) >= ARR) {
+      move();
+      _repeatLast[dir] = now;
+    }
+  }
   if (keys['down']) {
     // Initial press tap = single drop (handled in keydown). After DAS, drop
     // many rows per tick — still gated by `collides` inside softDrop so it
     // naturally stops at the floor.
-    if (now - dasTimer['down'] > DAS) {
+    if (now - dasTimer['down'] > DAS && now - (_repeatLast.down || 0) >= SOFT_DROP_TICK_MS) {
       for (let i = 0; i < SOFT_DROP_ROWS_PER_TICK; i++) softDrop();
+      _repeatLast.down = now;
     }
   }
-}, ARR);
+}, 8);
 
 // ============================================================
 // TOUCH INPUT
 // ============================================================
 function togglePause() {
   if (!gameStarted || gameOver) return;
+  // Online VS: pausing would freeze only your board while the opponent
+  // keeps playing, so it's disabled (the pause controls are hidden too).
+  if (gameMode === 'human' && !paused) return;
   paused = !paused;
   _pausedByHide = false;  // user explicitly chose pause state
   if (paused) {
@@ -18712,6 +19542,7 @@ function togglePause() {
 }
 
 function doAction(action) {
+  if (action === 'mute') { setMuted(!muted); return; }
   if (!gameStarted || gameOver || paused) {
     if (action === 'pause') togglePause();
     return;
@@ -18742,7 +19573,7 @@ document.querySelectorAll('#touch-controls .tc-btn').forEach(btn => {
       clearTimeout(touchBtnState[action + '_t']);
       clearInterval(touchBtnState[action + '_i']);
       touchBtnState[action + '_t'] = setTimeout(() => {
-        touchBtnState[action + '_i'] = setInterval(() => doAction(action), ARR);
+        touchBtnState[action + '_i'] = setInterval(() => doAction(action), Math.max(16, ARR));
       }, DAS);
     }
   };
@@ -18996,6 +19827,11 @@ function startGame() {
   _sprintTarget   = (gameMode === 'sprint')   ? 40     : 0;
   _marathonGoal   = (gameMode === 'marathon') ? 150    : 0;
   _pieceLockCount = 0;
+  _runStats = { tetrises: 0, maxCombo: -1 };
+  _runId++;
+  _pausedTotalMs = 0;
+  _pauseStartedAt = null;
+  document.body.classList.toggle('online-match', gameMode === 'human');
   for (const p of players) {
     setActivePlayer(p);
     initBoard();
@@ -19180,7 +20016,7 @@ function handleNetworkResult(msg) {
     `<div class="vs-score-row">${(NET.opponentName || 'Opponent')}: ${(p2.score|0).toLocaleString()} · ${p2.lines|0} lines</div>`;
   // Match is over — button takes the player back to the start screen.
   const replayBtn = document.getElementById('vs-replay-btn');
-  if (replayBtn) { replayBtn.textContent = 'REPLAY MATCH'; replayBtn.disabled = false; }
+  if (replayBtn) { replayBtn.textContent = 'BACK TO MENU'; replayBtn.disabled = false; }
   document.getElementById('vs-result-screen').style.display = 'flex';
   audioEngine.stop();
   NET.matchStarted = false;
@@ -19322,14 +20158,240 @@ document.getElementById('vs-replay-btn').addEventListener('click', () => {
     primeVoiceOnClick();
     return;
   }
-  document.getElementById('vs-result-screen').style.display = 'none';
-  document.getElementById('start-screen').style.display = 'flex';
-  renderStartLeaderboard();
-  gameStarted = false;
-  document.body.classList.remove('in-game');
-  // If we were in a PvP match, leave the room so the next round is clean.
-  if (gameMode === 'human') lobbyLeave();
+  quitToMenu();
 });
+
+// Leave the current run (or a finished one) and return to the start screen.
+// Used by the pause menu, the Game Over MENU button and the VS result screen.
+function quitToMenu() {
+  // Online: leave the room so the opponent gets a clean result and the next
+  // match starts fresh.
+  if (gameMode === 'human') {
+    try { stopNetStateStream(); } catch {}
+    try { lobbyLeave(); } catch {}
+  }
+  try { audioEngine.stop(); } catch {}
+  paused = false;
+  _pausedByHide = false;
+  gameStarted = false;
+  for (const id of ['game-over-screen', 'vs-result-screen']) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  }
+  document.getElementById('start-screen').style.display = 'flex';
+  document.body.classList.remove('in-game', 'vs-mode', 'online-match');
+  const c = document.getElementById('main-canvas');
+  if (c) c.style.transform = '';
+  shakeFrames = 0; shakeMag = 0; dropKick = null;
+  for (const k of Object.keys(keys)) keys[k] = false;
+  syncPauseOverlay();
+  updateHudPauseButton();
+  renderStartLeaderboard();
+}
+
+// Pause menu: visible exactly while a live run is paused.
+function syncPauseOverlay() {
+  const el = document.getElementById('pause-screen');
+  if (!el) return;
+  const show = !!(paused && gameStarted && !gameOver);
+  if (el.classList.contains('visible') === show) return;
+  el.classList.toggle('visible', show);
+  if (show) {
+    document.getElementById('pause-stats').textContent =
+      `${Math.floor(score).toLocaleString()} pts · Level ${level} · ${lines} lines`;
+    syncPauseToggles();
+    // Keyboard users land on RESUME; don't steal focus on touch (no ring).
+    if (!IS_TOUCH) setTimeout(() => { try { document.getElementById('pause-resume').focus(); } catch {} }, 0);
+  } else if (document.activeElement && el.contains(document.activeElement)) {
+    document.activeElement.blur();
+  }
+}
+function syncPauseToggles() {
+  const set = (id, on) => { const b = document.getElementById(id); if (b) b.setAttribute('aria-pressed', String(!!on)); };
+  set('pause-sound', !muted);
+  set('pause-ghost', showGhost);
+  set('pause-voice', voiceEnabled);
+}
+(function wirePauseAndResults() {
+  const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+  on('pause-resume', () => { if (paused) togglePause(); });
+  on('pause-restart', () => { primeVoiceOnClick(); startGame(); syncPauseOverlay(); });
+  on('pause-menu', () => quitToMenu());
+  on('pause-settings', () => openSettings());
+  on('pause-sound', () => { setMuted(!muted); syncPauseToggles(); });
+  on('pause-ghost', () => { setShowGhost(!showGhost); syncPauseToggles(); });
+  on('pause-voice', () => { setVoiceEnabled(!voiceEnabled); syncPauseToggles(); });
+  on('go-menu-btn', () => quitToMenu());
+  // Keys that work outside a live run: Enter/Esc on the results screen, and
+  // the G / V shortcuts advertised next to the start-screen toggles.
+  document.addEventListener('keydown', (e) => {
+    if (_settingsOpen()) return;
+    const tag = e.target && e.target.tagName;
+    const goOpen = document.getElementById('game-over-screen').style.display === 'flex';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.repeat) return;
+    if (goOpen && gameOver && e.key === 'Escape') { e.preventDefault(); quitToMenu(); return; }
+    if (goOpen && gameOver) {
+      if (e.key === 'Enter' && tag !== 'BUTTON') { e.preventDefault(); document.getElementById('start-btn-2').click(); }
+      return;
+    }
+    if (!gameStarted && document.getElementById('start-screen').style.display !== 'none') {
+      if (e.key === 'g' || e.key === 'G') setShowGhost(!showGhost);
+      else if (e.key === 'v' || e.key === 'V') setVoiceEnabled(!voiceEnabled);
+    }
+  });
+})();
+
+// ── Settings panel ──────────────────────────────────────────────────
+function _settingsOpen() {
+  const el = document.getElementById('settings-screen');
+  return !!(el && el.classList.contains('visible'));
+}
+let _settingsReturnFocus = null;
+function openSettings() {
+  const el = document.getElementById('settings-screen');
+  if (!el) return;
+  _settingsReturnFocus = document.activeElement;
+  syncSettingsUI();
+  el.classList.add('visible');
+  if (!IS_TOUCH) setTimeout(() => { try { document.getElementById('settings-done').focus(); } catch {} }, 0);
+}
+function closeSettings() {
+  _keyListenAction = null;
+  document.getElementById('settings-screen').classList.remove('visible');
+  syncPauseToggles();
+  renderControlsInfo();
+  if (_settingsReturnFocus && _settingsReturnFocus.focus) { try { _settingsReturnFocus.focus(); } catch {} }
+}
+const KEY_ACTION_LABELS = {
+  left: 'Move left', right: 'Move right', soft: 'Soft drop', hard: 'Hard drop',
+  cw: 'Rotate CW', ccw: 'Rotate CCW', hold: 'Hold', zone: 'Zone', pause: 'Pause',
+};
+let _keyListenAction = null;
+function syncSettingsUI() {
+  const $ = (id) => document.getElementById(id);
+  const press = (id, on) => { const b = $(id); if (b) b.setAttribute('aria-pressed', String(!!on)); };
+  $('set-volume').value = String(Math.round(volume * 100));
+  $('set-volume-val').textContent = Math.round(volume * 100) + '%';
+  press('set-sound', !muted);
+  press('set-voice', voiceEnabled);
+  press('set-ghost', showGhost);
+  press('set-shake', settings.shake);
+  $('set-das').value = String(settings.das);
+  $('set-das-val').textContent = settings.das + 'ms';
+  $('set-arr').value = String(settings.arr);
+  $('set-arr-val').textContent = settings.arr + 'ms';
+  document.querySelectorAll('.set-seg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.q === settings.quality)));
+  $('set-quality-note').textContent =
+    settings.quality === 'low' ? 'Lower-resolution background and no glow blur. Smoothest on older phones.'
+    : settings.quality === 'high' ? 'Full-resolution background on every device. Can be heavy on phones.'
+    : _autoDegraded ? 'Auto — lowered this session because frames were dropping.'
+    : 'Balanced for this device; drops to Low by itself if frames start dropping.';
+  if (REDUCED_MOTION) $('set-shake').title = 'Your device has "reduce motion" on, so shake stays off.';
+  const keysEl = $('set-keys');
+  keysEl.textContent = '';
+  for (const a of Object.keys(KEY_ACTION_LABELS)) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'key-row' + (_keyListenAction === a ? ' listening' : '');
+    const name = document.createElement('span'); name.textContent = KEY_ACTION_LABELS[a];
+    const kb = document.createElement('kbd');
+    kb.textContent = _keyListenAction === a ? 'press a key…' : (settings.keymap[a].map(keyLabel).join(' / ') || '—');
+    row.append(name, kb);
+    row.addEventListener('click', () => { _keyListenAction = (_keyListenAction === a) ? null : a; syncSettingsUI(); });
+    keysEl.appendChild(row);
+  }
+}
+// The start screen's key cheat-sheet follows the player's bindings.
+function renderControlsInfo() {
+  const el = document.querySelector('.controls-info.desktop-only');
+  if (!el) return;
+  const k = (a) => settings.keymap[a].map(keyLabel).join(' / ') || '—';
+  const lines = [
+    `${k('left')} · ${k('right')} - Move  ·  ${k('soft')} - Soft drop`,
+    `${k('cw')} - Rotate CW  ·  ${k('ccw')} - Rotate CCW`,
+    `${k('hard')} - Hard drop  ·  ${k('hold')} - Hold`,
+    `${k('zone')} - Zone  ·  ${k('pause')} - Pause  ·  M - Mute`,
+  ];
+  el.textContent = '';
+  lines.forEach((t, i) => { if (i) el.appendChild(document.createElement('br')); el.appendChild(document.createTextNode(t)); });
+}
+// Graphics quality: resolution + glow blur of the full-screen backdrops,
+// the heaviest thing drawn each frame. Auto starts balanced for the
+// device and steps down to Low for the session if gameplay drops frames.
+let _autoDegraded = false;
+function applyGraphicsQuality() {
+  const q = settings.quality;
+  const low = q === 'low' || (q === 'auto' && _autoDegraded);
+  const scale = low ? 1 : (q === 'high' ? DPR : BG_DPR);
+  for (const id of ['bg-canvas', 'home-bg-canvas']) setCanvasDpr(document.getElementById(id), scale, low);
+}
+const _fpsMon = { t0: 0, frames: 0, sum: 0 };
+function monitorFrameRate(rawDt) {
+  if (settings.quality !== 'auto' || _autoDegraded || !gameStarted || paused || gameOver) { _fpsMon.t0 = 0; return; }
+  const now = performance.now();
+  if (!_fpsMon.t0) { _fpsMon.t0 = now; _fpsMon.frames = 0; _fpsMon.sum = 0; return; }
+  if (rawDt > 0 && rawDt < 250) { _fpsMon.frames++; _fpsMon.sum += rawDt; }
+  if (now - _fpsMon.t0 < 4000) return;
+  const avg = _fpsMon.frames ? _fpsMon.sum / _fpsMon.frames : 0;
+  _fpsMon.t0 = 0;
+  // Under ~40 fps sustained over 4 s → step down.
+  if (avg > 25) {
+    _autoDegraded = true;
+    applyGraphicsQuality();
+    console.info(`[graphics] auto quality lowered (avg frame ${avg.toFixed(1)}ms)`);
+  }
+}
+(function wireSettings() {
+  const $ = (id) => document.getElementById(id);
+  const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+  on('settings-btn', 'click', () => openSettings());
+  on('settings-done', 'click', () => closeSettings());
+  on('settings-screen', 'click', (e) => { if (e.target.id === 'settings-screen') closeSettings(); });
+  on('set-volume', 'input', () => {
+    const v = Number($('set-volume').value) / 100;
+    setVolume(v);
+    if (v > 0 && muted) setMuted(false);
+    const hud = $('volume-slider'); if (hud) hud.value = String(Math.round(v * 100));
+    syncSettingsUI();
+  });
+  on('set-sound', 'click', () => { setMuted(!muted); syncSettingsUI(); });
+  on('set-voice', 'click', () => { setVoiceEnabled(!voiceEnabled); syncSettingsUI(); });
+  on('set-ghost', 'click', () => { setShowGhost(!showGhost); syncSettingsUI(); });
+  on('set-shake', 'click', () => { settings.shake = !settings.shake; saveSettings(); syncSettingsUI(); });
+  on('set-das', 'input', () => { settings.das = DAS = Number($('set-das').value); saveSettings(); syncSettingsUI(); });
+  on('set-arr', 'input', () => { settings.arr = ARR = Number($('set-arr').value); saveSettings(); syncSettingsUI(); });
+  on('set-handling-reset', 'click', () => {
+    settings.das = DAS = SETTINGS_DEFAULTS.das; settings.arr = ARR = SETTINGS_DEFAULTS.arr;
+    saveSettings(); syncSettingsUI();
+  });
+  document.querySelectorAll('.set-seg button').forEach(b => b.addEventListener('click', () => {
+    settings.quality = b.dataset.q;
+    if (settings.quality !== 'auto') _autoDegraded = false;
+    saveSettings(); applyGraphicsQuality(); syncSettingsUI();
+  }));
+  on('set-keys-reset', 'click', () => {
+    for (const a of Object.keys(DEFAULT_KEYMAP)) settings.keymap[a] = DEFAULT_KEYMAP[a].slice();
+    _keyListenAction = null; saveSettings(); syncSettingsUI();
+  });
+  // Capture phase so a key being bound never also reaches the game.
+  window.addEventListener('keydown', (e) => {
+    if (!_settingsOpen()) return;
+    if (_keyListenAction) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (e.key === 'Escape') { _keyListenAction = null; syncSettingsUI(); return; }
+      if (['Control', 'Alt', 'Meta', 'Tab', 'CapsLock'].includes(e.key)) return;
+      const k = _normKey(e.key);
+      for (const a of Object.keys(settings.keymap)) settings.keymap[a] = settings.keymap[a].filter(x => x !== k);
+      settings.keymap[_keyListenAction] = [k];
+      _keyListenAction = null;
+      saveSettings(); syncSettingsUI();
+      return;
+    }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); }
+  }, true);
+  applyGraphicsQuality();
+  renderControlsInfo();
+})();
 
 // Lobby button wiring - explicit flows, no auto-create.
 (function wireLobby() {
@@ -19423,6 +20485,8 @@ document.getElementById('vs-replay-btn').addEventListener('click', () => {
   input.addEventListener('keydown', (e) => {
     e.stopPropagation();
     if (e.key === 'Enter') { e.preventDefault(); submitInitials(); }
+    // Esc = skip entering initials and go back to the menu.
+    else if (e.key === 'Escape') { e.preventDefault(); quitToMenu(); }
   });
   btn.addEventListener('click', submitInitials);
 })();
@@ -19784,6 +20848,7 @@ window.addEventListener('resize', () => positionP2Monitor());
     const levelSelect = document.getElementById('level-select');
     if (isStory) {
       if (levelSelect) levelSelect.style.display = 'none';
+      if (diff) diff.style.display = 'none';
       return; // no sub-mode to auto-select
     }
     // Arcade tab has no sub-mode buttons — set gameMode directly
@@ -19792,13 +20857,18 @@ window.addEventListener('resize', () => positionP2Monitor());
       btns.forEach(b => b.classList.remove('mode-active'));
     } else {
       const prev = document.querySelector(`.mode-btn.mode-active[data-tab="${tab}"]`);
-      if (!prev) {
+      // Coming back to a tab: its highlighted sub-mode must be the live mode
+      // again (was left on the other tab's mode while still highlighted).
+      if (prev) gameMode = prev.dataset.mode;
+      else {
         const target = document.querySelector(`.mode-btn[data-tab="${tab}"][data-mode="${tabSubmodes[tab]}"]`)
                      || document.querySelector(`.mode-btn[data-tab="${tab}"]`);
         if (target) target.click();
       }
     }
     if (levelSelect) levelSelect.style.display = (gameMode === 'sprint' || gameMode === 'marathon' || gameMode === 'vs' || gameMode === 'human') ? 'flex' : 'none';
+    if (diff) diff.style.display = (gameMode === 'vs') ? 'flex' : 'none';
+    refreshLb();
   }
   tabs.forEach(tab => tab.addEventListener('click', () => setTab(tab.dataset.tab)));
   btns.forEach(btn => btn.addEventListener('click', () => {
@@ -20115,8 +21185,11 @@ render(0);
   const SCALE = window.devicePixelRatio || 1;
   canvas.width  = 340 * SCALE;
   canvas.height = 180 * SCALE;
-  canvas.style.width  = '340px';
-  canvas.style.height = '180px';
+  // Fluid width so phones narrower than ~372px don't scroll sideways;
+  // height follows the bitmap's aspect ratio.
+  canvas.style.width  = '100%';
+  canvas.style.maxWidth = '340px';
+  canvas.style.height = 'auto';
 
   const ctx = canvas.getContext('2d');
   ctx.scale(SCALE, SCALE);
