@@ -821,6 +821,94 @@
   .ov-chip::before { content: '● '; color: #5dffb0; }
   .ov-chip[aria-pressed="false"] { color: rgba(255,255,255,0.5); }
   .ov-chip[aria-pressed="false"]::before { content: '○ '; color: rgba(255,255,255,0.4); }
+  /* Plain action chips (RESET …) aren't toggles - no state dot. */
+  .ov-chip:not([aria-pressed])::before { content: none; }
+  /* Settings panel */
+  #settings-btn { margin-top: 12px; padding: 10px 22px; font-size: 12px; }
+  #settings-screen {
+    position: fixed; inset: 0;
+    z-index: 13;
+    display: none;
+    align-items: center; justify-content: center;
+    background: rgba(5,5,15,0.78);
+    backdrop-filter: blur(10px);
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  #settings-screen.visible { display: flex; }
+  .settings-card {
+    width: min(460px, 100%);
+    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: linear-gradient(180deg, rgba(26,20,48,0.96), rgba(10,10,22,0.96));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 18px 20px 20px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    text-align: left;
+  }
+  .settings-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    position: sticky; top: -18px; margin: -18px -20px 8px; padding: 16px 20px 12px;
+    background: rgba(22,18,42,0.97);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    z-index: 1;
+  }
+  #settings-title {
+    font-family: var(--font-display);
+    font-size: 22px; font-weight: 900; letter-spacing: 4px;
+    background: linear-gradient(135deg, #ff00ff, #00ffff);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  .settings-done { padding: 9px 18px; font-size: 12px; }
+  .settings-card section { padding: 12px 0 14px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .settings-card section:last-child { border-bottom: none; }
+  .settings-card h3 {
+    font-size: 11px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase;
+    color: rgba(255,255,255,0.62);
+    margin-bottom: 10px;
+  }
+  .set-row {
+    display: grid; grid-template-columns: 1fr 1.3fr 44px; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9);
+    margin: 10px 0;
+  }
+  .set-row small { font-size: 10px; letter-spacing: 1.5px; color: rgba(255,255,255,0.5); margin-left: 4px; }
+  .set-row input[type=range] { width: 100%; accent-color: #d44cff; }
+  .set-row output { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; color: #fff; }
+  .set-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+  .set-note { font-size: 12px; line-height: 1.45; color: rgba(255,255,255,0.55); margin: 6px 0 10px; }
+  .set-seg { display: flex; gap: 4px; padding: 4px; border-radius: 50px; background: rgba(255,255,255,0.05); width: fit-content; }
+  .set-seg button {
+    font-size: 12px; font-weight: 800; letter-spacing: 2px;
+    padding: 8px 16px; border-radius: 50px; border: none; cursor: pointer;
+    background: transparent; color: rgba(255,255,255,0.6);
+  }
+  .set-seg button[aria-checked="true"] { background: linear-gradient(135deg, #8000ff, #ff00ff); color: #fff; }
+  #set-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-bottom: 4px; }
+  .key-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 10px; cursor: pointer;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 600; text-align: left;
+  }
+  .key-row:hover { border-color: rgba(255,255,255,0.25); }
+  .key-row kbd {
+    font-family: var(--font-ui); font-size: 12px; font-weight: 700;
+    padding: 2px 7px; border-radius: 6px;
+    background: rgba(255,255,255,0.1); color: #fff; white-space: nowrap;
+  }
+  .key-row.listening { border-color: #d44cff; box-shadow: 0 0 0 2px rgba(212,76,255,0.35); }
+  .key-row.listening kbd { background: #d44cff; }
+  @media (max-width: 420px) { #set-keys { grid-template-columns: 1fr; } }
+  /* Keys section is hidden on touch layouts; drop the divider above it. */
+  @media (max-width: 720px), (pointer: coarse) {
+    .settings-card section:nth-last-of-type(2) { border-bottom: none; padding-bottom: 4px; }
+  }
+
   /* Online VS can't be paused (your board would freeze while the opponent
      keeps playing), so hide the pause controls for those matches. */
   body.online-match #pause-btn,
@@ -1988,6 +2076,7 @@
     </div>
   </div>
   <button id="start-btn">DROP THE BEAT</button>
+  <button id="settings-btn" class="ov-btn settings-open" type="button">SETTINGS</button>
   <div class="controls-info desktop-only">
     Arrow Keys / WASD - Move<br>
     ↑ / X - Rotate CW &nbsp;·&nbsp; Z - Rotate CCW<br>
@@ -1995,7 +2084,7 @@
     Q - Zone | P - Pause | M - Mute
   </div>
   <div class="controls-info mobile-only" style="display:none;">
-    Buttons below to play<br>
+    Zone · Hold · Pause buttons appear in game<br>
     Swipe: ← → move, ↓ soft, ↑ hard drop<br>
     Tap piece = hold, tap elsewhere = rotate
   </div>
@@ -2098,6 +2187,50 @@
   <div class="overlay-hint desktop-only">Enter · replay &nbsp;·&nbsp; Esc · menu</div>
 </div>
 
+<!-- Settings panel - opened from the start screen or the pause menu. -->
+<div id="settings-screen" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="settings-card">
+    <div class="settings-head">
+      <h2 id="settings-title">SETTINGS</h2>
+      <button class="ov-btn ov-primary settings-done" id="settings-done" type="button">DONE</button>
+    </div>
+    <section>
+      <h3>Audio</h3>
+      <label class="set-row"><span>Volume</span><input type="range" id="set-volume" min="0" max="100" step="1"><output id="set-volume-val"></output></label>
+      <div class="set-chips">
+        <button class="ov-chip" id="set-sound" type="button" aria-pressed="true">SOUND</button>
+        <button class="ov-chip" id="set-voice" type="button" aria-pressed="true">ANNOUNCER</button>
+      </div>
+    </section>
+    <section>
+      <h3>Gameplay</h3>
+      <div class="set-chips">
+        <button class="ov-chip" id="set-ghost" type="button" aria-pressed="true">GHOST PIECE</button>
+        <button class="ov-chip" id="set-shake" type="button" aria-pressed="true">SCREEN SHAKE</button>
+      </div>
+      <label class="set-row"><span>Repeat delay <small>DAS</small></span><input type="range" id="set-das" min="50" max="300" step="1"><output id="set-das-val"></output></label>
+      <label class="set-row"><span>Repeat speed <small>ARR</small></span><input type="range" id="set-arr" min="0" max="100" step="1"><output id="set-arr-val"></output></label>
+      <p class="set-note">How long a held move waits before repeating, and how fast it repeats after that. Lower is faster; ARR 0 slides straight to the wall.</p>
+      <button class="ov-chip" id="set-handling-reset" type="button">RESET SPEED</button>
+    </section>
+    <section>
+      <h3>Graphics</h3>
+      <div class="set-seg" role="radiogroup" aria-label="Graphics quality">
+        <button type="button" role="radio" data-q="auto">AUTO</button>
+        <button type="button" role="radio" data-q="high">HIGH</button>
+        <button type="button" role="radio" data-q="low">LOW</button>
+      </div>
+      <p class="set-note" id="set-quality-note"></p>
+    </section>
+    <section class="desktop-only">
+      <h3>Keys</h3>
+      <div id="set-keys"></div>
+      <p class="set-note">Click an action, then press the key you want. Esc cancels.</p>
+      <button class="ov-chip" id="set-keys-reset" type="button">RESET KEYS</button>
+    </section>
+  </div>
+</div>
+
 <!-- Pause menu. Shown whenever a run is paused (P / Esc / pause button, or
      auto-pause when the tab is hidden). Online VS can't be paused. -->
 <div id="pause-screen" role="dialog" aria-modal="true" aria-labelledby="pause-title">
@@ -2107,6 +2240,7 @@
     <div class="pause-actions">
       <button class="ov-btn ov-primary" id="pause-resume" type="button">RESUME</button>
       <button class="ov-btn" id="pause-restart" type="button">RESTART</button>
+      <button class="ov-btn" id="pause-settings" type="button">SETTINGS</button>
       <button class="ov-btn" id="pause-menu" type="button">QUIT TO MENU</button>
     </div>
     <div class="pause-toggles">
@@ -3257,19 +3391,22 @@ const DPR = Math.min(2, window.devicePixelRatio || 1);
 // cap it lower so busy scenes keep their frame rate.
 const BG_DPR = IS_TOUCH ? Math.min(1.5, DPR) : DPR;
 function hiDpi(canvas, scale = DPR, opts = {}) {
-  if (canvas._dpr || scale <= 1) return canvas;
+  if (canvas._dpr) return canvas;
+  // `opts.adjustable` installs even at 1× so setCanvasDpr() can change the
+  // scale later (graphics-quality setting on the backdrop canvases).
+  if (scale <= 1 && !opts.adjustable) return canvas;
   const proto = HTMLCanvasElement.prototype;
   const wD = Object.getOwnPropertyDescriptor(proto, 'width');
   const hD = Object.getOwnPropertyDescriptor(proto, 'height');
   const c = canvas.getContext('2d');
   let lw = wD.get.call(canvas), lh = hD.get.call(canvas);
-  const reset = () => c.setTransform(scale, 0, 0, scale, 0, 0);
+  const reset = () => c.setTransform(canvas._dpr, 0, 0, canvas._dpr, 0, 0);
   Object.defineProperty(canvas, 'width', {
     configurable: true,
     get() { return lw; },
     set(v) {
       lw = Math.max(0, Math.floor(+v) || 0);
-      wD.set.call(canvas, Math.round(lw * scale));
+      wD.set.call(canvas, Math.round(lw * canvas._dpr));
       if (opts.styleSize) canvas.style.width = lw + 'px';
       reset();
     },
@@ -3279,7 +3416,7 @@ function hiDpi(canvas, scale = DPR, opts = {}) {
     get() { return lh; },
     set(v) {
       lh = Math.max(0, Math.floor(+v) || 0);
-      hD.set.call(canvas, Math.round(lh * scale));
+      hD.set.call(canvas, Math.round(lh * canvas._dpr));
       if (opts.styleSize) canvas.style.height = lh + 'px';
       reset();
     },
@@ -3289,20 +3426,30 @@ function hiDpi(canvas, scale = DPR, opts = {}) {
     const d = Object.getOwnPropertyDescriptor(cp, k);
     Object.defineProperty(c, k, {
       configurable: true,
-      get() { return d.get.call(c) / scale; },
-      set(v) { d.set.call(c, v * scale); },
+      get() { return d.get.call(c) / canvas._dpr; },
+      // `_noShadow` (low graphics quality) drops blur - the single most
+      // expensive thing the backdrop scenes do - while keeping the shapes.
+      set(v) { d.set.call(c, (canvas._noShadow && k === 'shadowBlur') ? 0 : v * canvas._dpr); },
     });
   }
   canvas._dpr = scale;
   canvas.width = lw; canvas.height = lh;
   return canvas;
 }
+// Change an adjustable canvas's pixel ratio (re-allocates its bitmap).
+function setCanvasDpr(canvas, scale, noShadow) {
+  if (!canvas || !canvas._dpr) return;
+  canvas._noShadow = !!noShadow;
+  if (canvas._dpr === scale) return;
+  canvas._dpr = scale;
+  canvas.width = canvas.width; canvas.height = canvas.height;
+}
 hiDpi(document.getElementById('main-canvas'), DPR, { styleSize: true });
 hiDpi(document.getElementById('main-canvas-2'), DPR, { styleSize: true });
 hiDpi(document.getElementById('hold-canvas'));
 hiDpi(document.getElementById('next-canvas'));
-hiDpi(document.getElementById('bg-canvas'), BG_DPR);
-hiDpi(document.getElementById('home-bg-canvas'), BG_DPR);
+hiDpi(document.getElementById('bg-canvas'), BG_DPR, { adjustable: true });
+hiDpi(document.getElementById('home-bg-canvas'), BG_DPR, { adjustable: true });
 
 // Canvas setup - `var` (not let) so the vs-Alfred context swap can reassign
 // them via globalThis['mainCanvas'] when switching between P1 and P2 turns
@@ -4031,7 +4178,7 @@ function hardDrop() {
       color: _themePieceColor(currentType),
       cols: Object.keys(tops).map(bx => ({ x: currentX + +bx, top: startY + tops[bx], bottom: currentY + tops[bx] })),
     };
-    if (!REDUCED_MOTION) dropKick = { t: performance.now(), mag: Math.min(1, 0.35 + drop / 14) };
+    if (motionAllowed()) dropKick = { t: performance.now(), mag: Math.min(1, 0.35 + drop / 14) };
   }
   score += drop * 2;
   audioEngine.playHardDrop();
@@ -6855,6 +7002,52 @@ const COLOR_TO_TYPE = Object.fromEntries(
   Object.entries(PIECES).map(([k, v]) => [v.color, k])
 );
 
+// Per-piece shades for themes whose block art is one uniform colour (brains,
+// burgers, tires, the Underground bevel...). Each piece type gets a small
+// hue shift + brightness tweak inside the theme's own colour family, so an
+// incoming T still reads differently from an L at a glance. Applied once per
+// sprite when it's cached - zero per-frame cost. Only styles that ignore the
+// piece colour are listed; themes with real per-piece colours are untouched.
+const PIECE_SHADE_STYLES = new Set(['tetrisEffect', 'tires', 'macncheese', 'beefpatty', 'brain', 'trumpet', 'mug', 'bullet', 'leaf']);
+const PIECE_SHADES = {         // [hue shift in degrees, lightness multiplier]
+  I: [0, 1.0], O: [16, 1.1], T: [-16, 0.93], S: [30, 1.0],
+  Z: [-30, 1.05], J: [8, 0.8], L: [-8, 1.18],
+};
+function _shadeSprite(canvas, type) {
+  const shade = PIECE_SHADES[type];
+  if (!shade || (shade[0] === 0 && shade[1] === 1)) return;
+  const dpr = canvas._dpr || 1;
+  const w = Math.round(canvas.width * dpr), h = Math.round(canvas.height * dpr);
+  if (!w || !h) return;
+  const c = canvas.getContext('2d');
+  let img;
+  try { img = c.getImageData(0, 0, w, h); } catch { return; }
+  const d = img.data, dh = shade[0] / 360, lm = shade[1];
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    // RGB → HSL
+    const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    let hh = 0, ss = 0, ll = (mx + mn) / 2;
+    if (mx !== mn) {
+      const df = mx - mn;
+      ss = ll > 0.5 ? df / (2 - mx - mn) : df / (mx + mn);
+      hh = mx === r ? (g - b) / df + (g < b ? 6 : 0) : mx === g ? (b - r) / df + 2 : (r - g) / df + 4;
+      hh /= 6;
+    }
+    hh = (hh + dh + 1) % 1;
+    ll = Math.min(1, ll * lm);
+    // HSL → RGB
+    if (ss === 0) { d[i] = d[i + 1] = d[i + 2] = Math.round(ll * 255); continue; }
+    const q = ll < 0.5 ? ll * (1 + ss) : ll + ss - ll * ss, pp = 2 * ll - q;
+    const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? pp + (q - pp) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? pp + (q - pp) * (2 / 3 - t) * 6 : pp; };
+    d[i] = Math.round(f(hh + 1 / 3) * 255);
+    d[i + 1] = Math.round(f(hh) * 255);
+    d[i + 2] = Math.round(f(hh - 1 / 3) * 255);
+  }
+  c.putImageData(img, 0, 0);
+}
+
 function drawBlock(context, x, y, color, size, alpha = 1) {
   const theme = getTheme(level);
   const _bs = (theme && theme.blockStyle) || 'default';
@@ -6884,6 +7077,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
       else if (_bs === 'beachball') { try { drawBlockBeachball(mc, 0, 0, color, size, 1, theme); } catch(e) { mc.fillStyle=color; mc.fillRect(2,2,size-4,size-4); } }
       else if (_bs === 'skull')     { try { drawBlockSkull(mc, 0, 0, color, size, 1, theme); }     catch(e) { mc.fillStyle=color; mc.fillRect(2,2,size-4,size-4); } }
       else                             drawBlockDefault(mc, 0, 0, color, size);
+      if (PIECE_SHADE_STYLES.has(_bs) && COLOR_TO_TYPE[color]) _shadeSprite(mini, COLOR_TO_TYPE[color]);
       _blockMiniCache.set(key, mini);
     }
     if (alpha !== 1) context.globalAlpha = alpha;
@@ -19006,8 +19200,10 @@ function render(timestamp) {
   // ran twice as fast on 120/144 Hz screens. Clamped so a stalled tab
   // doesn't jump every effect to zero in one step.
   const nowT = (typeof timestamp === 'number') ? timestamp : performance.now();
-  const dtF = render._lastT ? Math.min(4, Math.max(0, (nowT - render._lastT) / (1000 / 60))) : 1;
+  const rawDt = render._lastT ? nowT - render._lastT : 0;
+  const dtF = render._lastT ? Math.min(4, Math.max(0, rawDt / (1000 / 60))) : 1;
   render._lastT = nowT;
+  monitorFrameRate(rawDt);
   // Cheer pulse decays each frame (rises only on line clears in clearLines()).
   // Linear decay over ~1.4s feels right against a 4-beat cheer at 100 bpm.
   if (cheerPulse > 0) cheerPulse = Math.max(0, cheerPulse - 0.012 * dtF);
@@ -19032,7 +19228,7 @@ function render(timestamp) {
       shakeFrames = Math.max(0, shakeFrames - dtF);
       if (!render._shakePh || render._shakeWasIdle) render._shakePh = [Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28];
       render._shakeWasIdle = false;
-      const m = REDUCED_MOTION ? 0 : shakeMag * (shakeFrames / 28);
+      const m = motionAllowed() ? shakeMag * (shakeFrames / 28) : 0;
       const t = nowT / 1000, ph = render._shakePh;
       dx = m * (Math.sin(t * 53 + ph[0]) * 0.7 + Math.sin(t * 97 + ph[1]) * 0.3);
       dy = m * (Math.sin(t * 61 + ph[1]) * 0.7 + Math.sin(t * 89 + ph[2]) * 0.3);
@@ -19130,7 +19326,55 @@ function render(timestamp) {
 // ============================================================
 const keys = {};
 const dasTimer = {};
-const DAS = 133, ARR = 30;
+
+// ── SETTINGS ── persisted player preferences (movement tuning, key
+// bindings, screen shake, graphics quality). Volume / mute / ghost /
+// announcer keep their existing storage keys and setters.
+const DEFAULT_KEYMAP = {
+  left:  ['ArrowLeft', 'a'],
+  right: ['ArrowRight', 'd'],
+  soft:  ['ArrowDown', 's'],
+  hard:  [' '],
+  cw:    ['ArrowUp', 'w', 'x'],
+  ccw:   ['z'],
+  hold:  ['Shift', 'c'],
+  zone:  ['q'],
+  pause: ['p', 'Escape'],
+};
+const SETTINGS_DEFAULTS = { das: 133, arr: 30, shake: true, quality: 'auto', keymap: DEFAULT_KEYMAP };
+const settings = (() => {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('tetris.settings.v1') || '{}') || {}; } catch {}
+  const km = {};
+  for (const a of Object.keys(DEFAULT_KEYMAP)) {
+    km[a] = (saved.keymap && Array.isArray(saved.keymap[a]) && saved.keymap[a].length) ? saved.keymap[a].slice() : DEFAULT_KEYMAP[a].slice();
+  }
+  const num = (v, lo, hi, d) => (Number.isFinite(+v) ? Math.min(hi, Math.max(lo, +v)) : d);
+  return {
+    das: num(saved.das, 50, 300, SETTINGS_DEFAULTS.das),
+    arr: num(saved.arr, 0, 100, SETTINGS_DEFAULTS.arr),
+    shake: saved.shake !== false,
+    quality: ['auto', 'high', 'low'].includes(saved.quality) ? saved.quality : 'auto',
+    keymap: km,
+  };
+})();
+function saveSettings() {
+  try { localStorage.setItem('tetris.settings.v1', JSON.stringify(settings)); } catch {}
+}
+// DAS: how long a held direction waits before auto-repeating.
+// ARR: time between repeats (0 = slide instantly to the wall).
+let DAS = settings.das, ARR = settings.arr;
+function _normKey(k) { return (k && k.length === 1) ? k.toLowerCase() : k; }
+function actionForKey(k) {
+  k = _normKey(k);
+  for (const a in settings.keymap) if (settings.keymap[a].includes(k)) return a;
+  return null;
+}
+function keyLabel(k) {
+  return ({ ' ': 'Space', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Escape: 'Esc' })[k]
+    || (k.length === 1 ? k.toUpperCase() : k);
+}
+function motionAllowed() { return !REDUCED_MOTION && settings.shake; }
 
 document.addEventListener('keydown', (e) => {
   if (gameOver || !gameStarted) return;
@@ -19138,48 +19382,47 @@ document.addEventListener('keydown', (e) => {
   // instead of also moving the piece.
   const tag = e.target && e.target.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  if (paused && !['p', 'P', 'm', 'M', 'Escape'].includes(e.key)) return;
+  if (_settingsOpen()) return;
+  const action = actionForKey(e.key);
+  const k = _normKey(e.key);
+  if (paused && action !== 'pause' && k !== 'm') return;
   // OS key auto-repeat: movement keys have their own DAS/ARR (guarded by
   // `keys[...]` below), but one-shot actions must fire once per press —
   // otherwise holding Space chain-drops pieces and holding Up spins forever.
-  if (e.repeat && !['ArrowLeft', 'ArrowRight', 'ArrowDown', 'a', 'A', 'd', 'D', 's', 'S'].includes(e.key)) {
-    if (e.key === ' ') e.preventDefault();
+  if (e.repeat && action !== 'left' && action !== 'right' && action !== 'soft') {
+    if (action) e.preventDefault();
     return;
   }
-  switch (e.key) {
-    case 'ArrowLeft': case 'a': case 'A':
+  // Ctrl+Z is a fixed Zone shortcut on top of the Zone binding.
+  if (e.ctrlKey && k === 'z') { e.preventDefault(); activateZone(); return; }
+  // Bound game keys shouldn't also scroll the page or trigger buttons.
+  if (action && action !== 'pause') e.preventDefault();
+  switch (action) {
+    case 'left':
       if (!keys['left']) { moveLeft(); keys['left'] = true; dasTimer['left'] = Date.now(); } break;
-    case 'ArrowRight': case 'd': case 'D':
+    case 'right':
       if (!keys['right']) { moveRight(); keys['right'] = true; dasTimer['right'] = Date.now(); } break;
-    case 'ArrowDown': case 's': case 'S':
+    case 'soft':
       if (!keys['down']) { softDrop(); keys['down'] = true; dasTimer['down'] = Date.now(); } break;
-    case 'ArrowUp': case 'w': case 'W': case 'x': case 'X':
-      rotatePiece(1); break;
-    // Z = counter-clockwise rotate (Tetris-canon: Z=CCW, X=CW). Q (or
-    // Ctrl+Z) activates Zone. Shift+Z used to as well, but Shift is Hold and
-    // its keydown fires first, so the combo held the piece AND rotated it.
-    // 'Z' also arrives with Caps Lock on, so it must rotate like 'z'.
-    case 'z': case 'Z':
-      if (e.ctrlKey) activateZone(); else rotatePiece(-1);
-      break;
-    case 'q': case 'Q': activateZone(); break;
-    case ' ': e.preventDefault(); hardDrop(); break;
-    case 'Shift': case 'c': case 'C': holdCurrentPiece(); break;
-    case 'g': case 'G': setShowGhost(!showGhost); break;
-    case 'v': case 'V': setVoiceEnabled(!voiceEnabled); break;
-    case 'm': case 'M': setMuted(!muted); break;
-    case 'p': case 'P': case 'Escape':
-      togglePause();
-      break;
+    case 'cw': rotatePiece(1); break;
+    case 'ccw': rotatePiece(-1); break;
+    case 'zone': activateZone(); break;
+    case 'hard': hardDrop(); break;
+    case 'hold': holdCurrentPiece(); break;
+    case 'pause': togglePause(); break;
+    default:
+      // Fixed toggles, unless the player bound that key to an action.
+      if (k === 'g') setShowGhost(!showGhost);
+      else if (k === 'v') setVoiceEnabled(!voiceEnabled);
+      else if (k === 'm') setMuted(!muted);
   }
 });
 
 document.addEventListener('keyup', (e) => {
-  switch (e.key) {
-    case 'ArrowLeft': case 'a': case 'A': keys['left'] = false; break;
-    case 'ArrowRight': case 'd': case 'D': keys['right'] = false; break;
-    case 'ArrowDown': case 's': case 'S': keys['down'] = false; break;
-  }
+  const action = actionForKey(e.key);
+  if (action === 'left') keys['left'] = false;
+  else if (action === 'right') keys['right'] = false;
+  else if (action === 'soft') keys['down'] = false;
 });
 
 // Pause-on-hide / resume-on-return. iOS Safari + some Chrome configs
@@ -19245,20 +19488,34 @@ window.addEventListener('pageshow', () => {
 // softDrops per tick to approximate ~20G, capped per tick so the loop
 // can't churn the whole board on a single iteration.
 const SOFT_DROP_ROWS_PER_TICK = 8;
+const SOFT_DROP_TICK_MS = 30;
+// Auto-repeat runs on a fast fixed tick so DAS/ARR can change live from
+// the settings panel (the interval period used to *be* ARR).
+const _repeatLast = {};
 setInterval(() => {
   if (gameOver || !gameStarted || paused) return;
   const now = Date.now();
-  if (keys['left'] && now - dasTimer['left'] > DAS) moveLeft();
-  if (keys['right'] && now - dasTimer['right'] > DAS) moveRight();
+  for (const dir of ['left', 'right']) {
+    if (!keys[dir] || now - dasTimer[dir] <= DAS) continue;
+    const move = dir === 'left' ? moveLeft : moveRight;
+    if (ARR <= 0) {
+      // Instant ARR: slide to the wall in one go.
+      for (let i = 0; i < COLS; i++) { const x = currentX; move(); if (currentX === x) break; }
+    } else if (now - (_repeatLast[dir] || 0) >= ARR) {
+      move();
+      _repeatLast[dir] = now;
+    }
+  }
   if (keys['down']) {
     // Initial press tap = single drop (handled in keydown). After DAS, drop
     // many rows per tick — still gated by `collides` inside softDrop so it
     // naturally stops at the floor.
-    if (now - dasTimer['down'] > DAS) {
+    if (now - dasTimer['down'] > DAS && now - (_repeatLast.down || 0) >= SOFT_DROP_TICK_MS) {
       for (let i = 0; i < SOFT_DROP_ROWS_PER_TICK; i++) softDrop();
+      _repeatLast.down = now;
     }
   }
-}, ARR);
+}, 8);
 
 // ============================================================
 // TOUCH INPUT
@@ -19316,7 +19573,7 @@ document.querySelectorAll('#touch-controls .tc-btn').forEach(btn => {
       clearTimeout(touchBtnState[action + '_t']);
       clearInterval(touchBtnState[action + '_i']);
       touchBtnState[action + '_t'] = setTimeout(() => {
-        touchBtnState[action + '_i'] = setInterval(() => doAction(action), ARR);
+        touchBtnState[action + '_i'] = setInterval(() => doAction(action), Math.max(16, ARR));
       }, DAS);
     }
   };
@@ -19960,6 +20217,7 @@ function syncPauseToggles() {
   on('pause-resume', () => { if (paused) togglePause(); });
   on('pause-restart', () => { primeVoiceOnClick(); startGame(); syncPauseOverlay(); });
   on('pause-menu', () => quitToMenu());
+  on('pause-settings', () => openSettings());
   on('pause-sound', () => { setMuted(!muted); syncPauseToggles(); });
   on('pause-ghost', () => { setShowGhost(!showGhost); syncPauseToggles(); });
   on('pause-voice', () => { setVoiceEnabled(!voiceEnabled); syncPauseToggles(); });
@@ -19967,6 +20225,7 @@ function syncPauseToggles() {
   // Keys that work outside a live run: Enter/Esc on the results screen, and
   // the G / V shortcuts advertised next to the start-screen toggles.
   document.addEventListener('keydown', (e) => {
+    if (_settingsOpen()) return;
     const tag = e.target && e.target.tagName;
     const goOpen = document.getElementById('game-over-screen').style.display === 'flex';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || e.repeat) return;
@@ -19980,6 +20239,158 @@ function syncPauseToggles() {
       else if (e.key === 'v' || e.key === 'V') setVoiceEnabled(!voiceEnabled);
     }
   });
+})();
+
+// ── Settings panel ──────────────────────────────────────────────────
+function _settingsOpen() {
+  const el = document.getElementById('settings-screen');
+  return !!(el && el.classList.contains('visible'));
+}
+let _settingsReturnFocus = null;
+function openSettings() {
+  const el = document.getElementById('settings-screen');
+  if (!el) return;
+  _settingsReturnFocus = document.activeElement;
+  syncSettingsUI();
+  el.classList.add('visible');
+  if (!IS_TOUCH) setTimeout(() => { try { document.getElementById('settings-done').focus(); } catch {} }, 0);
+}
+function closeSettings() {
+  _keyListenAction = null;
+  document.getElementById('settings-screen').classList.remove('visible');
+  syncPauseToggles();
+  renderControlsInfo();
+  if (_settingsReturnFocus && _settingsReturnFocus.focus) { try { _settingsReturnFocus.focus(); } catch {} }
+}
+const KEY_ACTION_LABELS = {
+  left: 'Move left', right: 'Move right', soft: 'Soft drop', hard: 'Hard drop',
+  cw: 'Rotate CW', ccw: 'Rotate CCW', hold: 'Hold', zone: 'Zone', pause: 'Pause',
+};
+let _keyListenAction = null;
+function syncSettingsUI() {
+  const $ = (id) => document.getElementById(id);
+  const press = (id, on) => { const b = $(id); if (b) b.setAttribute('aria-pressed', String(!!on)); };
+  $('set-volume').value = String(Math.round(volume * 100));
+  $('set-volume-val').textContent = Math.round(volume * 100) + '%';
+  press('set-sound', !muted);
+  press('set-voice', voiceEnabled);
+  press('set-ghost', showGhost);
+  press('set-shake', settings.shake);
+  $('set-das').value = String(settings.das);
+  $('set-das-val').textContent = settings.das + 'ms';
+  $('set-arr').value = String(settings.arr);
+  $('set-arr-val').textContent = settings.arr + 'ms';
+  document.querySelectorAll('.set-seg button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.q === settings.quality)));
+  $('set-quality-note').textContent =
+    settings.quality === 'low' ? 'Lower-resolution background and no glow blur. Smoothest on older phones.'
+    : settings.quality === 'high' ? 'Full-resolution background on every device. Can be heavy on phones.'
+    : _autoDegraded ? 'Auto — lowered this session because frames were dropping.'
+    : 'Balanced for this device; drops to Low by itself if frames start dropping.';
+  if (REDUCED_MOTION) $('set-shake').title = 'Your device has "reduce motion" on, so shake stays off.';
+  const keysEl = $('set-keys');
+  keysEl.textContent = '';
+  for (const a of Object.keys(KEY_ACTION_LABELS)) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'key-row' + (_keyListenAction === a ? ' listening' : '');
+    const name = document.createElement('span'); name.textContent = KEY_ACTION_LABELS[a];
+    const kb = document.createElement('kbd');
+    kb.textContent = _keyListenAction === a ? 'press a key…' : (settings.keymap[a].map(keyLabel).join(' / ') || '—');
+    row.append(name, kb);
+    row.addEventListener('click', () => { _keyListenAction = (_keyListenAction === a) ? null : a; syncSettingsUI(); });
+    keysEl.appendChild(row);
+  }
+}
+// The start screen's key cheat-sheet follows the player's bindings.
+function renderControlsInfo() {
+  const el = document.querySelector('.controls-info.desktop-only');
+  if (!el) return;
+  const k = (a) => settings.keymap[a].map(keyLabel).join(' / ') || '—';
+  const lines = [
+    `${k('left')} · ${k('right')} - Move  ·  ${k('soft')} - Soft drop`,
+    `${k('cw')} - Rotate CW  ·  ${k('ccw')} - Rotate CCW`,
+    `${k('hard')} - Hard drop  ·  ${k('hold')} - Hold`,
+    `${k('zone')} - Zone  ·  ${k('pause')} - Pause  ·  M - Mute`,
+  ];
+  el.textContent = '';
+  lines.forEach((t, i) => { if (i) el.appendChild(document.createElement('br')); el.appendChild(document.createTextNode(t)); });
+}
+// Graphics quality: resolution + glow blur of the full-screen backdrops,
+// the heaviest thing drawn each frame. Auto starts balanced for the
+// device and steps down to Low for the session if gameplay drops frames.
+let _autoDegraded = false;
+function applyGraphicsQuality() {
+  const q = settings.quality;
+  const low = q === 'low' || (q === 'auto' && _autoDegraded);
+  const scale = low ? 1 : (q === 'high' ? DPR : BG_DPR);
+  for (const id of ['bg-canvas', 'home-bg-canvas']) setCanvasDpr(document.getElementById(id), scale, low);
+}
+const _fpsMon = { t0: 0, frames: 0, sum: 0 };
+function monitorFrameRate(rawDt) {
+  if (settings.quality !== 'auto' || _autoDegraded || !gameStarted || paused || gameOver) { _fpsMon.t0 = 0; return; }
+  const now = performance.now();
+  if (!_fpsMon.t0) { _fpsMon.t0 = now; _fpsMon.frames = 0; _fpsMon.sum = 0; return; }
+  if (rawDt > 0 && rawDt < 250) { _fpsMon.frames++; _fpsMon.sum += rawDt; }
+  if (now - _fpsMon.t0 < 4000) return;
+  const avg = _fpsMon.frames ? _fpsMon.sum / _fpsMon.frames : 0;
+  _fpsMon.t0 = 0;
+  // Under ~40 fps sustained over 4 s → step down.
+  if (avg > 25) {
+    _autoDegraded = true;
+    applyGraphicsQuality();
+    console.info(`[graphics] auto quality lowered (avg frame ${avg.toFixed(1)}ms)`);
+  }
+}
+(function wireSettings() {
+  const $ = (id) => document.getElementById(id);
+  const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+  on('settings-btn', 'click', () => openSettings());
+  on('settings-done', 'click', () => closeSettings());
+  on('settings-screen', 'click', (e) => { if (e.target.id === 'settings-screen') closeSettings(); });
+  on('set-volume', 'input', () => {
+    const v = Number($('set-volume').value) / 100;
+    setVolume(v);
+    if (v > 0 && muted) setMuted(false);
+    const hud = $('volume-slider'); if (hud) hud.value = String(Math.round(v * 100));
+    syncSettingsUI();
+  });
+  on('set-sound', 'click', () => { setMuted(!muted); syncSettingsUI(); });
+  on('set-voice', 'click', () => { setVoiceEnabled(!voiceEnabled); syncSettingsUI(); });
+  on('set-ghost', 'click', () => { setShowGhost(!showGhost); syncSettingsUI(); });
+  on('set-shake', 'click', () => { settings.shake = !settings.shake; saveSettings(); syncSettingsUI(); });
+  on('set-das', 'input', () => { settings.das = DAS = Number($('set-das').value); saveSettings(); syncSettingsUI(); });
+  on('set-arr', 'input', () => { settings.arr = ARR = Number($('set-arr').value); saveSettings(); syncSettingsUI(); });
+  on('set-handling-reset', 'click', () => {
+    settings.das = DAS = SETTINGS_DEFAULTS.das; settings.arr = ARR = SETTINGS_DEFAULTS.arr;
+    saveSettings(); syncSettingsUI();
+  });
+  document.querySelectorAll('.set-seg button').forEach(b => b.addEventListener('click', () => {
+    settings.quality = b.dataset.q;
+    if (settings.quality !== 'auto') _autoDegraded = false;
+    saveSettings(); applyGraphicsQuality(); syncSettingsUI();
+  }));
+  on('set-keys-reset', 'click', () => {
+    for (const a of Object.keys(DEFAULT_KEYMAP)) settings.keymap[a] = DEFAULT_KEYMAP[a].slice();
+    _keyListenAction = null; saveSettings(); syncSettingsUI();
+  });
+  // Capture phase so a key being bound never also reaches the game.
+  window.addEventListener('keydown', (e) => {
+    if (!_settingsOpen()) return;
+    if (_keyListenAction) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (e.key === 'Escape') { _keyListenAction = null; syncSettingsUI(); return; }
+      if (['Control', 'Alt', 'Meta', 'Tab', 'CapsLock'].includes(e.key)) return;
+      const k = _normKey(e.key);
+      for (const a of Object.keys(settings.keymap)) settings.keymap[a] = settings.keymap[a].filter(x => x !== k);
+      settings.keymap[_keyListenAction] = [k];
+      _keyListenAction = null;
+      saveSettings(); syncSettingsUI();
+      return;
+    }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closeSettings(); }
+  }, true);
+  applyGraphicsQuality();
+  renderControlsInfo();
 })();
 
 // Lobby button wiring - explicit flows, no auto-create.
