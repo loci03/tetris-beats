@@ -24,7 +24,6 @@ const WORLDS = { taco: buildTacoWorld };
 const IN_DUR = 2.35;      // seconds, board → world
 const DROP_AT = 1.3;      // the music drop lands as the camera passes the board
 const OUT_DUR = 2.4;      // seconds, world → board
-const BATTLE_CAM = { pos: new THREE.Vector3(0, 2.1, 8.6), look: new THREE.Vector3(0, 1.25, 0), fov: 42 };
 
 const KEY_DIRS = { ArrowLeft: 'L', ArrowRight: 'R', ArrowUp: 'U', ArrowDown: 'D', a: 'L', d: 'R', w: 'U', s: 'D' };
 
@@ -163,6 +162,7 @@ export class BattleSession {
     this.world.dispose();
     this.pRig.dispose(); this.rRig.dispose();
     this.renderer.dispose();
+    this.renderer.forceContextLoss();   // browsers cap live WebGL contexts
     this.canvas.remove();
     document.body.classList.remove('story-dim');
     if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
@@ -407,12 +407,14 @@ export class BattleSession {
       const t = this.ctx.currentTime - (this.dropTime - DROP_AT);
       this.transition.updateIn(t);
       const u = Math.max(0, Math.min(1, (t - 0.55) / (IN_DUR - 0.55)));
-      cameraAlongPath(this.camera, u, BATTLE_CAM.pos, BATTLE_CAM.look, BATTLE_CAM.fov);
+      const f = this.director.framing();
+      cameraAlongPath(this.camera, u, f.pos, f.look, f.fov);
       this.world.setLightLevel((t - 1.05) / 0.6);
       if (t >= IN_DUR) {
         this.transition.group.visible = false;
         this.transition.curtain.visible = false;
-        this.director.snapTo(this.camera.position, BATTLE_CAM.look, BATTLE_CAM.fov);
+        const f = this.director.framing();
+        this.director.snapTo(this.camera.position, f.look, f.fov);
         this.trans = null;
       }
     } else if (this.trans === 'out') {
@@ -434,6 +436,8 @@ export class BattleSession {
     this.trans = 'out';
     this.outFrom = { pos: this.camera.position.clone(), look: this.director.look.clone(), fov: this.camera.fov };
     this.hud.show(false);
+    this.bridge.normalizeSpecialCells();
+    this.transition.recapture(this.bridge.renderCleanBoard());
     this.transition.layout(this._boardRect(), window.innerWidth, window.innerHeight);
     this.transition.group.visible = true;
     this.transition.curtain.visible = true;

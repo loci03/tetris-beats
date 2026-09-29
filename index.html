@@ -20461,6 +20461,19 @@ window.TetrisBridge = {
   },
   addScore(n) { score += Math.max(0, Math.round(n)); },
   getBoardCanvas() { return document.getElementById('main-canvas'); },
+  // Redraw the board with no transient effects (line flashes, shockwaves,
+  // trails, particles) — used when the story event hands the match back.
+  renderCleanBoard() {
+    rowFlashes.length = 0;
+    shockwaves.length = 0;
+    particles = [];
+    if (_boardFx) { _boardFx.clear = null; _boardFx.lock = null; _boardFx.trail = null; _boardFx.spawnT = 0; }
+    _boardCacheDirty = true;
+    const hide = storyHide2D;
+    storyHide2D = false;
+    try { drawBoard(); } finally { storyHide2D = hide; }
+    return document.getElementById('main-canvas');
+  },
   // Hand a playing music source to the level so Tetris keeps the song
   // going (and later level logic treats it as the current track).
   adoptMusic(node, gain, name) {

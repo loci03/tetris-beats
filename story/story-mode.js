@@ -84,7 +84,13 @@ class StoryModeManager {
   teardown() {
     for (const t of this._timers) clearTimeout(t);
     this._timers.length = 0;
-    if (this.session) { this.session.abort(); this.session = null; }
+    if (this.session) {
+      this.session.abort();
+      this.session = null;
+      // The battle owned the music; reset the engine so the next start()
+      // (restart / new game) brings the level track back.
+      try { this.bridge.audio.stop(); } catch {}
+    }
     document.body.classList.remove('story-charge', 'story-dim');
     this.toast.classList.remove('show');
     this.phase = 'idle';

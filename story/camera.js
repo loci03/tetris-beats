@@ -83,6 +83,13 @@ export class CameraDirector {
       }
     }
 
+    // Portrait / narrow screens: widen a little and pull back along the
+    // view line until both dancers fit horizontally.
+    const aspect = this.cam.aspect || 1.6;
+    if (aspect < 1.3) fov += 8;
+    const fit = this.fitFactor(fov);
+    if (fit > 1) { tp.sub(tl).multiplyScalar(fit).add(tl); tp.y += (fit - 1) * 1.1; }
+
     const k = 1 - Math.exp(-dt * (s.kind === 'orbit' ? 10 : 4.5));
     this.pos.lerp(tp, k);
     this.look.lerp(tl, k);
@@ -94,6 +101,24 @@ export class CameraDirector {
     this.cam.rotateZ(this.roll);
     this.cam.fov = this.fov - bump * 0.6;
     this.cam.updateProjectionMatrix();
+  }
+
+  // How far to pull back so ±2.8 units (both dancers + margin) fit across
+  // the screen at the default 8.6-unit shot distance.
+  fitFactor(fov) {
+    const aspect = this.cam.aspect || 1.6;
+    const halfW = Math.tan(THREE.MathUtils.degToRad(fov / 2)) * aspect * 8.6;
+    return Math.max(1, 2.8 / halfW);
+  }
+
+  // The default two-shot for the current screen shape.
+  framing() {
+    const fov = 42 + ((this.cam.aspect || 1.6) < 1.3 ? 8 : 0);
+    const look = new THREE.Vector3(0, 1.25, 0);
+    const fit = this.fitFactor(fov);
+    const pos = new THREE.Vector3(0, 2.1, 8.6).sub(look).multiplyScalar(fit).add(look);
+    pos.y += (fit - 1) * 1.1;
+    return { pos, look, fov };
   }
 
   // Snap (used when a transition hands the camera over).

@@ -25,12 +25,9 @@ export class BoardTransition {
     this.cols = cols;
     this.rows = rows;
     // Snapshot the board bitmap now — the texture must not change later.
-    const snap = document.createElement('canvas');
-    const bw = canvas._dpr ? Math.round(canvas.width * canvas._dpr) : canvas.width;
-    const bh = canvas._dpr ? Math.round(canvas.height * canvas._dpr) : canvas.height;
-    snap.width = bw; snap.height = bh;
-    snap.getContext('2d').drawImage(canvas, 0, 0, bw, bh, 0, 0, bw, bh);
-    this.texture = new THREE.CanvasTexture(snap);
+    this.snap = document.createElement('canvas');
+    this.recapture(canvas);
+    this.texture = new THREE.CanvasTexture(this.snap);
     this.texture.colorSpace = THREE.SRGBColorSpace;
 
     this.group = new THREE.Group();
@@ -72,6 +69,15 @@ export class BoardTransition {
       new THREE.MeshBasicMaterial({ color: 0x05050f, transparent: true, depthTest: false, depthWrite: false }));
     this.curtain.renderOrder = 2;
     this.curtain.position.z = -BOARD_DIST - 0.3;
+  }
+
+  // Re-snapshot the board (the return trip shows the clean, current board).
+  recapture(canvas) {
+    const bw = canvas._dpr ? Math.round(canvas.width * canvas._dpr) : canvas.width;
+    const bh = canvas._dpr ? Math.round(canvas.height * canvas._dpr) : canvas.height;
+    this.snap.width = bw; this.snap.height = bh;
+    this.snap.getContext('2d').drawImage(canvas, 0, 0, bw, bh, 0, 0, bw, bh);
+    if (this.texture) this.texture.needsUpdate = true;
   }
 
   attach(scene, camera) {

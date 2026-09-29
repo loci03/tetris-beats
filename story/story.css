@@ -23,6 +23,9 @@ body.story-dim #lb-sync-badge {
   transition: opacity 0.4s ease;
   pointer-events: none;
 }
+/* The frozen 2D board hides while the 3D tiles stand in for it. */
+body.story-dim #main-canvas { visibility: hidden; }
+
 /* The trigger moment: the board charges up with a golden glow. */
 body.story-charge #main-canvas {
   animation: storyCharge 0.45s ease-in-out infinite alternate;
@@ -185,7 +188,7 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
 .sh-lane-wrap { position: relative; width: 100%; }
 .sh-lane { display: block; width: 100%; height: 80px; }
 .sh-judge {
-  position: absolute; left: min(120px, 16%); bottom: 78px; transform: translateX(-50%);
+  position: absolute; left: clamp(72px, 16%, 120px); bottom: 78px; transform: translateX(-50%);
   font-family: var(--font-display, system-ui); font-weight: 900; font-size: 22px; letter-spacing: 2px;
   text-align: center; opacity: 0; white-space: nowrap;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
@@ -237,8 +240,8 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
   .sh-combo { display: none; }
   .sh-rjudge { top: 104px; right: 12px; font-size: 13px; }
   .sh-pad { width: 50px; height: 50px; font-size: 20px; }
-  .sh-pad-groove { width: 78px; }
-  .sh-pad-taunt { width: 58px; }
+  .sh-pad-groove { width: 84px; font-size: 11px; letter-spacing: 0.5px; }
+  .sh-pad-taunt { width: 62px; font-size: 10px; letter-spacing: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
