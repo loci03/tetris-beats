@@ -1,0 +1,4 @@
+{
+  "//": "Story Mode ships as native ES modules (loaded by the browser with import()). This marks the folder as ESM for Node-based tests.",
+  "type": "module"
+}
