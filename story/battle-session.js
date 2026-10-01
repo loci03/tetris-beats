@@ -12,7 +12,7 @@ import * as THREE from '../vendor/three/three.module.min.js';
 import { MusicClock } from './music-clock.js';
 import { RhythmBattle } from './rhythm-battle.js';
 import { createCharacter, CHARACTERS } from './characters.js';
-import { DanceController } from './dance.js';
+import { DanceController, MOVE_LABELS } from './dance.js';
 import { CameraDirector } from './camera.js';
 import { BoardTransition, cameraAlongPath, START_POSE } from './transition.js';
 import { BattleHUD } from './hud.js';
@@ -92,7 +92,7 @@ export class BattleSession {
     this.hud = new BattleHUD({
       names: { player: pDef.name, rival: rDef.name },
       isTouch: bridge.isTouch,
-      onPad: (kind, dir) => this._input(kind, dir, performance.now()),
+      onPad: (kind, dir, ts) => this._input(kind, dir, ts ?? performance.now()),
     });
 
     this._onKey = (e) => this._key(e);
@@ -107,6 +107,9 @@ export class BattleSession {
     const m = this.level.music;
     const buffer = this.audio._trackBuffers[m.track] || await this.audio._loadTrack(m.track);
     if (!buffer) throw new Error('battle track unavailable: ' + m.track);
+    // Lock the grid phase to the drums in this browser's decode of the song.
+    this.clock.alignPhase(buffer, this.clock.barTime(m.battleStartBar - m.introBars),
+      Math.min(buffer.duration, this.clock.barTime(m.battleStartBar + m.battleBars + m.resultBars)));
 
     // Warm up shaders before the first visible frame.
     this.transition.layout(this._boardRect(), window.innerWidth, window.innerHeight);
@@ -257,6 +260,7 @@ export class BattleSession {
           this.phase = 'intro';
           this.hud.show(true);
           this.hud.showBanner(`${this.level.title}<small>DANCE BATTLE vs ${rivalName}</small>`, 'big', 2000);
+          if (this.bridge.isTouch) this.hud.showCallout('<b>SWIPE</b> anywhere for the arrows · <b>TAP</b> for GROOVE', '', 4200);
           this.pDance.play('intro', d.bar * 4, 4); this.rDance.play('intro', d.bar * 4, 4);
           this.director.cut('wide', d.bar * 4, 4);
         } else if (d.bar === m.battleStartBar - 1) {
@@ -295,7 +299,8 @@ export class BattleSession {
         }
         this.world.react('move', { ...d, songTime: this.clock.barTime(d.bar) });
         if (d.who === 'player') {
-          if (d.perfect) this.hud.showCallout(`PERFECT MOVE <b>+${d.bonus}</b>`, 'good', 1100);
+          const label = MOVE_LABELS[name] || 'GROOVE';
+          this.hud.showCallout(d.perfect ? `${label} · PERFECT <b>+${d.bonus}</b>` : `${label} <b>+${d.bonus}</b>`, d.perfect ? 'good' : '', 1300);
           if (d.tier >= 3) this._voice('player', 'combo', 0.45);
         } else if (d.tier >= 4) {
           this._voice('rival', 'combo', 0.5);

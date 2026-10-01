@@ -22,12 +22,15 @@ export const STORY_LEVELS = {
     },
 
     // Music timeline. The battle is charted against the song's own beat
-    // grid (measured from the MP3: onset comb-fit, stable from ~60 s on).
-    // Swapping the track only requires updating these numbers.
+    // grid, measured from the MP3 with kick- and snare-band comb fits over
+    // the battle section (120-208 s: phase steady to ±6 ms at this tempo).
+    // The tempo has to be exact — 0.2 BPM off is half a beat by bar 56.
+    // At runtime MusicClock.alignPhase() re-checks the phase against the
+    // decoded buffer. Swapping the track only requires updating these.
     music: {
       track: 'extra-cheese-taco.mp3',
-      bpm: 100.84,
-      firstBeat: 0.454,     // song seconds of beat 0
+      bpm: 101.07,
+      firstBeat: 0.452,     // song seconds of beat 0 (kick on 1 & 3, snare on 2 & 4)
       beatsPerBar: 4,
       battleStartBar: 56,   // first scored bar (high-energy section)
       introBars: 2,         // READY / GROOVE lead-in before it

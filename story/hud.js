@@ -38,7 +38,7 @@ export class BattleHUD {
 
     const bottom = el('div', 'sh-bottom', this.root);
     this.hint = el('div', 'sh-hint', bottom, isTouch
-      ? 'Tap the arrows as notes hit the ring · GROOVE on the gold note'
+      ? 'Swipe the arrows as notes hit the ring · tap for GROOVE'
       : 'Arrows / WASD on the notes · SPACE = GROOVE / DODGE · T = TAUNT');
     const laneWrap = el('div', 'sh-lane-wrap', bottom);
     this.lane = el('canvas', 'sh-lane', laneWrap);
@@ -46,13 +46,16 @@ export class BattleHUD {
     this.lg = this.lane.getContext('2d');
 
     if (isTouch) {
+      // Touch: swipe anywhere for the arrows, tap anywhere for GROOVE;
+      // GROOVE and TAUNT also get real buttons.
       this.root.classList.add('sh-touch');
+      this.swipeZone = el('div', 'sh-swipe', this.root);
+      this._initSwipe(this.swipeZone, onPad);
       const pads = el('div', 'sh-pads', this.root);
-      const left = el('div', 'sh-pad-dirs', pads);
-      for (const d of ['L', 'U', 'D', 'R']) this._pad(left, 'sh-pad', DIR_GLYPH[d], () => onPad('arrow', d), DIR_COLOR[d]);
+      el('div', 'sh-swipe-hint', pads, 'SWIPE <b>←&#8202;↑&#8202;↓&#8202;→</b> ON THE NOTES<br>TAP ANYWHERE = GROOVE');
       const right = el('div', 'sh-pad-acts', pads);
-      this.tauntPad = this._pad(right, 'sh-pad sh-pad-taunt', 'TAUNT', () => onPad('taunt'));
-      this._pad(right, 'sh-pad sh-pad-groove', 'GROOVE', () => onPad('groove'));
+      this.tauntPad = this._pad(right, 'sh-pad sh-pad-taunt', 'TAUNT', (ts) => onPad('taunt', null, ts));
+      this._pad(right, 'sh-pad sh-pad-groove', 'GROOVE', (ts) => onPad('groove', null, ts));
     }
     document.body.appendChild(this.root);
     this._judgeTimer = 0;
@@ -83,6 +86,83 @@ export class BattleHUD {
     const up = () => b.classList.remove('down');
     b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('pointerleave', up);
     return b;
+  }
+
+  // Swipe recognition. A swipe is judged at the onset of the flick — the
+  // last moment the finger was still (the touch itself for a quick flick)
+  // plus a little of the travel — not when it finally crosses the distance
+  // threshold, so a swipe started on the beat counts as on the beat. The
+  // finger can keep going after a swipe: turning chains the next arrow from
+  // the turning point (zig-zags), and pausing re-arms the same direction.
+  // A touch that never travels is a tap (GROOVE), timed at touch-down.
+  _initSwipe(zone, onPad) {
+    const ptrs = new Map();
+    const threshold = () => Math.max(18, Math.min(42, Math.min(window.innerWidth, window.innerHeight) * 0.05));
+    const STILL = 2.5;                                   // px between samples that counts as "not moving"
+    const VEC = { L: [-1, 0], R: [1, 0], U: [0, -1], D: [0, 1] };
+    zone.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      try { zone.setPointerCapture(e.pointerId); } catch {}
+      const a = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+      ptrs.set(e.pointerId, { down: a, anchor: a, last: a, armed: true, dir: null, swiped: false });
+    });
+    zone.addEventListener('pointermove', (e) => {
+      const s = ptrs.get(e.pointerId);
+      if (!s) return;
+      const evs = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
+      for (const ev of (evs.length ? evs : [e])) {
+        const pt = { x: ev.clientX, y: ev.clientY, t: ev.timeStamp };
+        const step = Math.hypot(pt.x - s.last.x, pt.y - s.last.y);
+        s.last = pt;
+        if (step < STILL) {                              // resting: re-anchor here
+          if (Math.hypot(pt.x - s.anchor.x, pt.y - s.anchor.y) < threshold() * 0.5) { s.anchor = pt; s.armed = true; }
+          continue;
+        }
+        if (!s.armed && s.dir) {
+          // Still travelling the way we just swiped: drag the anchor along so
+          // a turn is measured from the turning point.
+          const v = VEC[s.dir], mx = pt.x - s.anchor.x, my = pt.y - s.anchor.y;
+          const along = mx * v[0] + my * v[1], across = Math.abs(mx * v[1] - my * v[0]);
+          if (along > 0 && along >= across) { s.anchor = pt; continue; }
+        }
+        const dx = pt.x - s.anchor.x, dy = pt.y - s.anchor.y;
+        const th = threshold();
+        if (dx * dx + dy * dy < th * th) continue;
+        const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U');
+        if (!s.armed && dir === s.dir) continue;
+        const ts = s.anchor.t + Math.min(40, (pt.t - s.anchor.t) * 0.4);
+        onPad('arrow', dir, ts);
+        this._swipeFx(s.anchor.x, s.anchor.y, dir);
+        s.armed = false; s.swiped = true; s.dir = dir;
+        s.anchor = pt;
+      }
+    });
+    const end = (e, cancel) => {
+      const s = ptrs.get(e.pointerId);
+      if (!s) return;
+      ptrs.delete(e.pointerId);
+      if (cancel || s.swiped) return;
+      const moved = Math.hypot(e.clientX - s.down.x, e.clientY - s.down.y);
+      if (moved < threshold() && e.timeStamp - s.down.t < 450) {
+        onPad('groove', null, s.down.t);
+        this._swipeFx(s.down.x, s.down.y, 'G');
+      }
+    };
+    zone.addEventListener('pointerup', (e) => end(e, false));
+    zone.addEventListener('pointercancel', (e) => end(e, true));
+  }
+
+  _swipeFx(x, y, dir) {
+    const fx = el('div', 'sh-swipe-fx' + (dir === 'G' ? ' tap' : ''), this.root, dir === 'G' ? '' : DIR_GLYPH[dir]);
+    fx.style.left = x + 'px';
+    fx.style.top = y + 'px';
+    if (dir !== 'G') {
+      fx.style.setProperty('--c', DIR_COLOR[dir]);
+      const v = { L: [-1, 0], R: [1, 0], U: [0, -1], D: [0, 1] }[dir];
+      fx.style.setProperty('--dx', v[0] * 70 + 'px');
+      fx.style.setProperty('--dy', v[1] * 70 + 'px');
+    }
+    setTimeout(() => fx.remove(), 450);
   }
 
   resize() {

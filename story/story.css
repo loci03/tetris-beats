@@ -208,12 +208,41 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
 }
 
 /* ── Touch pads ─────────────────────────────────────────────────────── */
+.sh-swipe {
+  position: absolute; inset: 0;
+  pointer-events: auto; touch-action: none;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
 .sh-pads {
   position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
   display: flex; justify-content: space-between; align-items: flex-end;
-  padding: 0 10px; pointer-events: auto;
+  padding: 0 10px; pointer-events: none;
 }
-.sh-pad-dirs, .sh-pad-acts { display: flex; gap: 6px; }
+.sh-pad-acts { display: flex; gap: 6px; pointer-events: auto; }
+.sh-swipe-hint {
+  font-size: 10px; font-weight: 800; letter-spacing: 1.2px; line-height: 1.5;
+  color: rgba(255, 255, 255, 0.8); text-shadow: 0 1px 3px #000;
+  padding-bottom: 6px;
+}
+.sh-swipe-hint b { color: #ffe45c; font-size: 13px; letter-spacing: 2px; }
+.sh-swipe-fx {
+  position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px;
+  border-radius: 50%; border: 3px solid var(--c, #fff);
+  background: color-mix(in srgb, var(--c, #fff) 35%, transparent);
+  color: #fff; font: 900 30px/58px var(--font-display, system-ui); text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  animation: shSwipe 0.45s ease-out forwards;
+}
+.sh-swipe-fx.tap { --c: #ffc93a; animation-name: shTap; }
+@keyframes shSwipe {
+  0% { opacity: 1; transform: translate(0, 0) scale(0.7); }
+  100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, 0)) scale(1.1); }
+}
+@keyframes shTap {
+  0% { opacity: 0.9; transform: scale(0.4); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
 .sh-pad {
   width: 56px; height: 56px; border-radius: 14px;
   border: 2px solid var(--pad, rgba(255, 255, 255, 0.4));
@@ -240,6 +269,7 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
   .sh-combo { display: none; }
   .sh-rjudge { top: 104px; right: 12px; font-size: 13px; }
   .sh-pad { width: 50px; height: 50px; font-size: 20px; }
+  .sh-swipe-hint { font-size: 9px; letter-spacing: 0.8px; }
   .sh-pad-groove { width: 84px; font-size: 11px; letter-spacing: 0.5px; }
   .sh-pad-taunt { width: 62px; font-size: 10px; letter-spacing: 0; }
 }

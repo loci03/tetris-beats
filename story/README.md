@@ -23,8 +23,8 @@ object; the mode never touches game internals directly.
 | `chart.js` | Command builder (rhythm templates × direction motifs, scaled by move tier). |
 | `rhythm-battle.js` | `RhythmBattle` — pure rules: timing windows, scoring, combos, move tiers, hype, taunt / dodge / stun, battle timer. Emits events. |
 | `opponent-ai.js` | Rival skill profile → hits, taunt decisions, dodges. |
-| `characters.js` | Toon dancer rigs (joint hierarchy + outlined parts + expressive face). |
-| `dance.js` | Beat-synced move library and `DanceController` (queue, crossfades, reactions). |
+| `characters.js` | Toon dancer rigs (joint hierarchy + outlined parts + expressive face), each dancer's base routines and move list per tier. |
+| `dance.js` | Choreography: beat-keyframed named moves (two-step, running man, Roger Rabbit, cabbage patch, robot, moonwalk, disco point, jump split…), a groove layer that bounces on every beat (harder on 2 & 4), always-on 8-count base routines, leg IK so planted feet stay planted, and `DanceController` (queue, crossfades, reactions). |
 | `camera.js` | `CameraDirector` — two-shot, push-ins, orbit, taunt and winner shots; aspect-aware. |
 | `transition.js` | Board capture → 3D tiles aligned to the 2D board; shatter/fly-through in, reassemble out. |
 | `hud.js`, `story.css` | Battle HUD, note lane, touch pads, toasts. |
@@ -39,8 +39,11 @@ GitHub Pages without a CDN.
 1. Add an entry to `STORY_LEVELS` in `levels.js` (copy `taco`).
 2. **Music:** set `track`, `bpm` and `firstBeat` for the MP3, plus `battleStartBar`
    (pick a high-energy section with ~28 bars of song after it). The Taco numbers
-   were measured with an onset comb-fit over the decoded track — re-measure for
-   a new song rather than trusting a rough BPM.
+   were measured with kick- and snare-band comb fits over the battle section of
+   the decoded track. The tempo must be exact for the section you battle in
+   (0.2 BPM off drifts half a beat over 50 bars); `MusicClock.alignPhase()`
+   then fine-tunes the phase (±60 ms) against the decoded buffer at runtime,
+   which also absorbs per-browser MP3 decoder padding.
 3. **Stage:** add a builder in `worlds/` that returns `{ group, anchors, update,
    react, setLightLevel, dispose }` and register it in `WORLDS` in
    `battle-session.js`.
@@ -51,8 +54,10 @@ GitHub Pages without a CDN.
 ## Controls (battle)
 
 Arrows / WASD on the notes · Space = GROOVE (and DODGE) · T = taunt ·
-P / Esc = pause. Touch devices get on-screen pads. The **Rhythm timing**
-slider in Settings compensates for audio latency (e.g. Bluetooth headphones).
+P / Esc = pause. On touch screens: **swipe anywhere** for the arrows (judged
+at the start of the flick; zig-zags chain without lifting), **tap anywhere**
+for GROOVE, plus GROOVE / TAUNT buttons. The **Rhythm timing** slider in
+Settings compensates for audio latency (e.g. Bluetooth headphones).
 
 ## Testing notes
 

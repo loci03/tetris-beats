@@ -15,9 +15,10 @@ export const CHARACTERS = {
       top: 0xff2e88, topShade: 0xd01a6a, pants: 0x232746, shoe: 0xf6f6ff, shoeAccent: 0x00e1ff,
       hair: 0x1b1016, cap: 0x00c8ff, capBrim: 0x0a2a5c, extra: 0x151515,
     },
-    style: { swagger: 1.0, bounce: 1.1 },
+    // Hip-hop: base routines cycle one 8-count each; moves are earned per tier.
+    style: { swagger: 1.0, bounce: 1.1, routines: ['twoStep', 'bounceRock', 'kickStep', 'bounceRock'] },
     look: 'player',
-    moves: { 1: ['stepClap', 'armWave'], 2: ['runningMan', 'cabbagePatch'], 3: ['robot', 'spinPoint'], 4: ['jumpSplit', 'windmillFreeze'] },
+    moves: { 1: ['stepClap', 'bodyRoll'], 2: ['runningMan', 'rogerRabbit', 'cabbagePatch'], 3: ['robot', 'moonwalk'], 4: ['jumpSplit', 'windmillFreeze'] },
   },
   alfred: {
     name: 'ALFRED',
@@ -27,9 +28,10 @@ export const CHARACTERS = {
       top: 0xe4e4ee, topShade: 0xc4c4d4, pants: 0xe4e4ee, shoe: 0xe01830, shoeAccent: 0xffffff,
       hair: 0x3a2213, stripe: 0xe01830, gold: 0xffc43a, shades: 0x0b0b12,
     },
-    style: { swagger: 1.35, bounce: 0.9 },
+    // Old-school disco swagger.
+    style: { swagger: 1.35, bounce: 0.9, routines: ['hustle', 'twoStep', 'hustle', 'bounceRock'] },
     look: 'alfred',
-    moves: { 1: ['armWave', 'stepClap'], 2: ['cabbagePatch', 'runningMan'], 3: ['spinPoint', 'robot'], 4: ['windmillFreeze', 'jumpSplit'] },
+    moves: { 1: ['discoPoint', 'stepClap'], 2: ['cabbagePatch', 'rogerRabbit', 'runningMan'], 3: ['spinPoint', 'moonwalk', 'robot'], 4: ['windmillFreeze', 'jumpSplit'] },
   },
 };
 
@@ -116,9 +118,11 @@ export function createCharacter(def) {
   for (const [side, sx] of [['L', 1], ['R', -1]]) {
     const sh = joint('sh' + side, chest, 0.2 * sx, 0.3, 0);
     const arm = joint('arm' + side, sh, 0.06 * sx, 0, 0);
+    arm.rotation.order = 'XZY';     // twist about the arm's own axis first (dance.js arm())
     const fore = joint('fore' + side, arm, 0, -0.3, 0);
     const hand = joint('hand' + side, fore, 0, -0.27, 0);
     const thigh = joint('thigh' + side, hips, 0.11 * sx, -0.04, 0);
+    thigh.rotation.order = 'ZXY';   // matches the leg IK in dance.js
     const shin = joint('shin' + side, thigh, 0, -0.44, 0);
     const foot = joint('foot' + side, shin, 0, -0.44, 0);
     limbs[side] = { sh, arm, fore, hand, thigh, shin, foot, sx };
