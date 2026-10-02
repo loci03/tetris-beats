@@ -18,10 +18,11 @@ export const CHARACTERS = {
     // Hip-hop: base routines cycle one 8-count each; moves are earned per tier.
     style: { swagger: 1.0, bounce: 1.1, routines: ['twoStep', 'bounceRock', 'kickStep', 'bounceRock'] },
     look: 'player',
-    moves: { 1: ['stepClap', 'bodyRoll'], 2: ['runningMan', 'rogerRabbit', 'cabbagePatch'], 3: ['robot', 'moonwalk'], 4: ['jumpSplit', 'windmillFreeze'] },
+    moves: { 1: ['stepClap', 'bodyRoll'], 2: ['runningMan', 'rogerRabbit', 'cabbagePatch'], 3: ['robot', 'moonwalk'], 4: ['windmillFreeze', 'airChair'] },
     // ★ branch signature moves per level, and the SOLO (command tree, chart.js).
     branchMoves: { 2: 'lockAndPop', 3: 'breakWindmill', 4: 'backflip' },
     solo: 'headspin',
+    fx: { move: 'note', big: 'sparkle', taunt: 'note' },
   },
   alfred: {
     name: 'ALFRED',
@@ -31,12 +32,34 @@ export const CHARACTERS = {
       top: 0xe4e4ee, topShade: 0xc4c4d4, pants: 0xe4e4ee, shoe: 0xe01830, shoeAccent: 0xffffff,
       hair: 0x3a2213, stripe: 0xe01830, gold: 0xffc43a, shades: 0x0b0b12,
     },
-    // Old-school disco swagger.
-    style: { swagger: 1.35, bounce: 0.9, routines: ['hustle', 'twoStep', 'hustle', 'bounceRock'] },
+    // Old-school disco + rock'n'roll swagger: Travolta, Elvis, air guitar.
+    style: { swagger: 1.35, bounce: 0.9, routines: ['hustle', 'discoStrut', 'elvisSwivel', 'discoStrut'] },
     look: 'alfred',
-    moves: { 1: ['discoPoint', 'stepClap'], 2: ['cabbagePatch', 'rogerRabbit', 'runningMan'], 3: ['spinPoint', 'moonwalk', 'robot'], 4: ['windmillFreeze', 'jumpSplit'] },
-    branchMoves: { 2: 'lockAndPop', 3: 'breakWindmill', 4: 'backflip' },
-    solo: 'headspin',
+    moves: { 1: ['discoPoint', 'elvisLegs'], 2: ['funkyChicken', 'fingerGuns'], 3: ['spinPoint', 'airGuitar'], 4: ['jumpSplit', 'splitDrop'] },
+    branchMoves: { 2: 'combBack', 3: 'kneeSlide', 4: 'discoSpin' },
+    solo: 'discoInferno',
+    introTaunt: 'introTaunt',
+    fx: { move: 'sparkle', big: 'sparkle', taunt: 'sparkle' },
+  },
+  // TINA — Taco Town's glam queen: taco tee, pink mini skirt, heels, big
+  // hair, gold hoops, shades up top, and she never puts the purse down.
+  tina: {
+    name: 'TINA',
+    scale: 0.97,
+    skin: 0xd99a72,
+    colors: {
+      top: 0xfff3dc, topShade: 0xffe2b8, pants: 0xd99a72, shoe: 0xff3d8b, shoeAccent: 0xffd23f,
+      hair: 0x3a1a12, skirt: 0xff4f9a, gold: 0xffc43a, purse: 0xb14bff, lips: 0xe8306f, shades: 0x1a1020,
+    },
+    bareForearms: true,
+    // Diva: big swagger, purse in the right hand at all times.
+    style: { swagger: 1.4, bounce: 1.0, routines: ['sassyStrut', 'shimmyBounce', 'purseGroove', 'sassyStrut'] },
+    look: 'tina',
+    moves: { 1: ['hairFlip', 'tacoHop'], 2: ['vogueHands', 'purseTwirl'], 3: ['twirlSpin', 'heartHands'], 4: ['catwalkPose', 'dropItLow'] },
+    branchMoves: { 2: 'kissBlow', 3: 'cartwheel', 4: 'toeTouch' },
+    solo: 'superstar',
+    introTaunt: 'tinaTaunt',
+    fx: { move: 'heart', big: 'sparkle', taunt: 'heart' },
   },
 };
 
@@ -84,7 +107,7 @@ export function createCharacter(def) {
     skin: toon(def.skin), top: toon(C.top), topShade: toon(C.topShade), pants: toon(C.pants),
     shoe: toon(C.shoe), shoeAccent: toon(C.shoeAccent), hair: toon(C.hair),
     white: toon(0xffffff), dark: new THREE.MeshBasicMaterial({ color: 0x120a10 }),
-    mouth: new THREE.MeshBasicMaterial({ color: 0x5a0f1f }),
+    mouth: new THREE.MeshBasicMaterial({ color: C.lips || 0x5a0f1f }),
   };
   const geoms = [];
   const g = (geo) => { geoms.push(geo); return geo; };
@@ -143,13 +166,13 @@ export function createCharacter(def) {
   const headMesh = part(head, sphere(0.25), mats.skin, 0, 0.21, 0, 0.95, 1.05, 0.95);
   part(head, sphere(0.05), mats.skin, 0.235, 0.2, 0, 0.5, 1, 1);   // ears
   part(head, sphere(0.05), mats.skin, -0.235, 0.2, 0, 0.5, 1, 1);
-  part(head, sphere(0.035), mats.skin, 0, 0.17, 0.235, 1, 0.9, 1, false); // nose
+  part(head, sphere(def.look === 'tina' ? 0.028 : 0.035), mats.skin, 0, 0.17, 0.235, 1, 0.9, 1, false); // nose
 
   for (const side of ['L', 'R']) {
     const L = limbs[side];
     part(L.sh, sphere(0.085), mats.top, 0.02 * L.sx, 0, 0, 1, 0.9, 1);
     part(L.arm, capsule(0.068, 0.2), mats.top, 0, -0.15, 0);
-    part(L.fore, capsule(0.058, 0.18), def.look === 'player' ? mats.topShade : mats.top, 0, -0.13, 0);
+    part(L.fore, capsule(0.058, 0.18), def.bareForearms ? mats.skin : def.look === 'player' ? mats.topShade : mats.top, 0, -0.13, 0);
     part(L.hand, sphere(0.075), mats.skin, 0, -0.06, 0.01, 0.95, 1.1, 0.75);
     part(L.thigh, capsule(0.09, 0.28), mats.pants, 0, -0.2, 0);
     part(L.shin, capsule(0.075, 0.28), mats.pants, 0, -0.2, 0);
@@ -170,7 +193,43 @@ export function createCharacter(def) {
   const mouth = part(face, sphere(0.05), mats.mouth, 0, 0.1, 0.225, 1.2, 0.45, 0.4, false);
 
   // ── Look-specific outfit / accessories ──
-  if (def.look === 'player') {
+  if (def.look === 'tina') {
+    const gold = toon(C.gold, { emissive: 0x4a3300 });
+    // Big glam hair: volume on top, long hair down the back, side bangs.
+    part(head, sphere(0.27), mats.hair, 0, 0.3, -0.1, 1.12, 1.02, 1.0);
+    part(head, capsule(0.2, 0.42), mats.hair, 0, -0.06, -0.15, 1.25, 1, 0.6);
+    for (const sx of [1, -1]) part(head, capsule(0.07, 0.3), mats.hair, 0.235 * sx, 0.1, 0.03, 1, 1, 0.8).rotation.z = 0.12 * sx;
+    // Swept fringe across the top of the forehead.
+    part(head, capsule(0.06, 0.22), mats.hair, 0.04, 0.4, 0.15, 1, 1, 0.8).rotation.z = 1.25;
+    // Shades pushed up on her head.
+    const shades = toon(C.shades, { emissive: 0x330a22 });
+    for (const sx of [1, -1]) part(head, new THREE.CylinderGeometry(0.06, 0.06, 0.025, 16), shades, 0.08 * sx, 0.44, 0.15, 1, 1, 1).rotation.x = 1.1;
+    // Lashes, hoop earrings.
+    for (const sx of [1, -1]) {
+      const lash = part(face, new THREE.BoxGeometry(0.1, 0.018, 0.02), mats.dark, 0.088 * sx, 0.285, 0.22, 1, 1, 1, false);
+      lash.rotation.z = -0.25 * sx;
+      part(head, new THREE.TorusGeometry(0.06, 0.012, 6, 18), gold, 0.245 * sx, 0.1, 0.02, 1, 1, 1, false).rotation.y = Math.PI / 2;
+    }
+    // Taco tee: a taco on the chest.
+    const shell = part(chest, new THREE.CircleGeometry(0.11, 24, 0, Math.PI), toon(0xffc23a, { side: THREE.DoubleSide }), 0, 0.12, 0.178, 1, 1, 1, false);
+    shell.rotation.z = Math.PI;
+    part(chest, new THREE.BoxGeometry(0.18, 0.025, 0.01), toon(0x5ccf3a), 0, 0.125, 0.182, 1, 1, 1, false);
+    part(chest, new THREE.BoxGeometry(0.06, 0.03, 0.01), toon(0xe83a2a), -0.04, 0.135, 0.185, 1, 1, 1, false);
+    part(chest, new THREE.BoxGeometry(0.06, 0.03, 0.01), toon(0xe83a2a), 0.045, 0.133, 0.185, 1, 1, 1, false);
+    // Mini skirt + gold belt.
+    part(hips, new THREE.CylinderGeometry(0.2, 0.31, 0.3, 20), toon(C.skirt), 0, -0.06, 0, 1, 1, 0.85);
+    part(hips, new THREE.TorusGeometry(0.2, 0.02, 6, 24), gold, 0, 0.08, 0, 1, 0.85, 1, false).rotation.x = Math.PI / 2;
+    // Heels.
+    for (const side of ['L', 'R']) {
+      part(limbs[side].foot, new THREE.CylinderGeometry(0.018, 0.012, 0.09, 8), toon(C.shoeAccent), 0, -0.05, -0.06, 1, 1, 1, false);
+      part(limbs[side].fore, new THREE.TorusGeometry(0.055, 0.014, 6, 16), gold, 0, -0.24, 0, 1, 1, 1, false).rotation.x = Math.PI / 2;
+    }
+    // The purse, held in her right hand.
+    const purseMat = toon(C.purse);
+    part(limbs.R.hand, new THREE.TorusGeometry(0.06, 0.012, 6, 16, Math.PI), gold, 0, -0.08, 0.02, 1, 1, 1, false).rotation.z = Math.PI;
+    part(limbs.R.hand, new THREE.BoxGeometry(0.2, 0.15, 0.08), purseMat, 0, -0.2, 0.02);
+    part(limbs.R.hand, new THREE.BoxGeometry(0.05, 0.03, 0.02), gold, 0, -0.15, 0.065, 1, 1, 1, false);
+  } else if (def.look === 'player') {
     // Short fade under a backwards cap
     part(head, sphere(0.255), mats.hair, 0, 0.225, -0.015, 0.97, 1.02, 0.97);
     const cap = part(head, new THREE.SphereGeometry(0.268, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2), toon(C.cap), 0, 0.235, -0.01, 0.99, 0.95, 0.99);
@@ -273,6 +332,7 @@ export function createCharacter(def) {
       const M = {
         smile: [1.2, 0.4, 0], grin: [1.45, 0.55, -0.05], shout: [0.95, 1.25, 0.05], o: [0.7, 0.9, 0.12],
         smirk: [1.1, 0.35, -0.12], focus: [0.9, 0.3, -0.14], dizzy: [0.8, 0.7, 0.1], sad: [1.0, 0.3, 0.16],
+        joy: [1.35, 1.15, -0.1], wink: [1.15, 0.45, -0.06], kiss: [0.5, 0.5, -0.04], angry: [1.0, 0.5, 0.28],
       }[kind] || [1.2, 0.4, 0];
       mouth.scale.set(M[0], M[1], 0.4);
       mouth.rotation.z = kind === 'smirk' ? 0.25 : 0;
@@ -280,7 +340,14 @@ export function createCharacter(def) {
       brows[0].position.y = brows[1].position.y = 0.31 + (kind === 'shout' || kind === 'o' ? 0.02 : 0);
       const blink = ((beat % 7) + 7) % 7 < 0.12 ? 0.12 : 1;
       const dizzy = kind === 'dizzy' ? 0.5 + 0.5 * Math.sin(beat * 12) : 1;
-      for (const e of eyes) { e.eye.scale.y = 1.25 * blink; e.pupil.scale.y = 1.2 * blink * dizzy; }
+      // Anime eyes: ^^ for joy, one shut for a wink / kiss.
+      eyes.forEach((e, i) => {
+        let k = blink;
+        if (kind === 'joy') k = 0.18;
+        else if ((kind === 'wink' || kind === 'kiss') && i === 1) k = 0.12;
+        e.eye.scale.y = 1.25 * k; e.pupil.scale.y = 1.2 * k * dizzy;
+      });
+      brows[0].position.y = brows[1].position.y = 0.31 + (kind === 'shout' || kind === 'o' || kind === 'joy' ? 0.025 : kind === 'angry' ? -0.012 : 0);
     },
     dispose() {
       for (const geo of geoms) geo.dispose();

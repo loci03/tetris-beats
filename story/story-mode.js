@@ -41,6 +41,11 @@ class StoryModeManager {
 
   themeIndex() { return this.level.themeIndex; }
 
+  // Pick the Story level for the next run (start-screen level cards).
+  selectLevel(id) {
+    if (STORY_LEVELS[id] && (this.phase === 'idle' || this.phase === 'tetris')) this.level = STORY_LEVELS[id];
+  }
+
   // ── Hooks called by the game ──────────────────────────────────────
   onGameStart() {
     this.teardown();

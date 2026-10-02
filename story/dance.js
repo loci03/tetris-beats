@@ -155,8 +155,11 @@ function solveLegs(a) {
 // 4, a head nod, shoulders that come up between beats, a two-beat sway.
 function groove(p, B, s, amt = 1) {
   if (amt <= 0) return;
-  const down = Math.pow(0.5 + 0.5 * Math.cos(TAU * frac(B)), 2);
-  const accent = (Math.floor(B) & 1) ? 1.3 : 1;
+  // Half-time songs bounce at double rate (style.bounceRate), so the
+  // body still hits every snare.
+  const Bb = B * (s.bounceRate || 1);
+  const down = Math.pow(0.5 + 0.5 * Math.cos(TAU * frac(Bb)), 2);
+  const accent = (Math.floor(Bb) & 1) ? 1.3 : 1;
   const e = s.energy || 1;                       // louder section → bigger bounce
   const d = down * amt * s.bounce * accent * e;
   p.root(0, -0.11 * d, 0);
@@ -760,6 +763,495 @@ export const MOVES = {
     }
   },
 
+
+  // ════════════════════════════════════════════════════════════════
+  // TINA — glam taco queen (purse always in her right hand)
+  // ════════════════════════════════════════════════════════════════
+  // Catwalk strut in place: cross-steps, hip pops, purse swinging.
+  sassyStrut: seq(4, [
+    [0, (p) => { p.footX('L', 0.02, 0, 0.12, 0.25); p.footX('R', -0.16, 0, -0.06, 0.4); p.hips(0.11, -0.07, 0, -0.18); p.lean(0, -0.12, 0.12, 0.18); p.arm('L', -0.45, 0.35, 0.5); p.arm('R', 0.55, 0.3, 1.3); p.look(-0.18, 0.25, 0.12); }, 'in'],
+    [0.5, (p) => { p.footX('L', 0.06, 0, 0.04); p.footX('R', -0.1, 0.12, 0.04, 0.3); p.hips(0, -0.02, 0, 0); p.arm('L', 0.1, 0.3, 0.7); p.arm('R', 0.2, 0.3, 1.4); p.look(-0.12); }],
+    [1, (p) => { p.footX('R', -0.02, 0, 0.12, 0.25); p.footX('L', 0.16, 0, -0.06, 0.4); p.hips(-0.11, -0.07, 0, 0.18); p.lean(0, -0.12, -0.12, -0.18); p.arm('L', 0.6, 0.35, 0.9); p.arm('R', -0.3, 0.35, 1.0); p.look(-0.18, -0.25, -0.12); }, 'in'],
+    [1.5, (p) => { p.footX('R', -0.06, 0, 0.04); p.footX('L', 0.1, 0.12, 0.04, 0.3); p.hips(0, -0.02, 0, 0); p.arm('L', 0.1, 0.3, 0.7); p.arm('R', 0.2, 0.3, 1.4); p.look(-0.12); }],
+    [2, (p) => { p.footX('L', 0.02, 0, 0.12, 0.25); p.footX('R', -0.16, 0, -0.06, 0.4); p.hips(0.11, -0.07, 0, -0.18); p.lean(0, -0.12, 0.12, 0.18); p.arm('L', -0.45, 0.35, 0.5); p.arm('R', 0.55, 0.3, 1.3); p.look(-0.18, 0.25, 0.12); }, 'in'],
+    [2.5, (p) => { p.footX('L', 0.1, 0, 0.04); p.footX('R', -0.12, 0.1, 0.04, 0.3); p.hips(0, -0.03); p.arm('L', 0.9, 0.5, 1.9, -0.5); p.arm('R', 0.2, 0.3, 1.4); }],
+    [3, (p) => { p.footX('L', 0.14); p.footX('R', -0.2, 0, 0.06, 0.5); p.hips(0.14, -0.1, 0, -0.3); hipHand(p, 'L'); p.arm('R', 0.3, 0.55, 1.6); p.lean(-0.05, -0.2, 0.2, 0.2); p.look(-0.3, 0.45, 0.15); }, 'snap'],
+  ], { groove: 0.7, hits: 0.9 }),
+
+  // Shoulder shimmy, knees bouncing, jazz hand up, purse hugged in.
+  shimmyBounce(p, b, B, s) {
+    groove(p, B, s, 1.1);
+    const sh = Math.sin(TAU * b * 4);
+    wideStance(p, 0.2);
+    p.hips(0.05 * Math.sin(Math.PI * b), -0.12, 0, 0.12 * Math.sin(Math.PI * b));
+    p.shrug(0.16 * sh, -0.16 * sh);
+    p.add('chest', 0, 0.16 * sh, 0);
+    const up = (Math.floor(b) & 1) ? 1 : 0;
+    p.arm('L', 0.4, 1.0 + 1.4 * up, 0.5 + 0.4 * (1 - up));
+    p.wrist('L', 0.3 * Math.sin(TAU * b * 4));
+    p.arm('R', 0.9, 0.1, 2.1, -0.9);
+    p.lean(0.08, -0.05); p.look(-0.1, 0.2 * (up ? 1 : -1));
+  },
+
+  // Two-step footwork with the purse swinging round in circles.
+  purseGroove(p, b, B, s) {
+    evalMove('twoStep', b, B, s, p);
+    const a = TAU * b / 2;
+    p.arm('R', 0.8 + 0.7 * Math.sin(a), 0.5 + 0.35 * Math.cos(a), 0.35);
+    hipHand(p, 'L');
+    p.look(-0.1, 0.2 * Math.sin(a));
+  },
+
+  // Hair flip: head down, WHIP back with a hand through the hair, pose.
+  hairFlip: seq(4, [
+    [0, (p) => { wideStance(p, 0.18); p.hips(0, -0.12, 0.03); p.lean(0.45, 0.25); p.look(0.4); p.arm('L', 0.6, 0.3, 0.6); p.arm('R', 0.3, 0.3, 1.3); }],
+    [0.75, (p) => { wideStance(p, 0.18); p.hips(0, -0.04, -0.03); p.lean(-0.15, -0.3, 0.2); p.look(-0.55, 0.3, 0.2); p.arm('L', 2.4, 0.9, 2.1, -0.4); p.arm('R', 0.3, 0.45, 1.4); }, 'snap'],
+    [1.5, (p) => { p.foot('L', 0.14); p.foot('R', 0.22, 0, 0.06, 0.5); p.hips(0.1, -0.08, 0, -0.2); hipHand(p, 'L'); p.arm('R', 0.2, 0.5, 1.5); p.lean(0, -0.15, 0, 0.15); p.look(-0.25, 0.4, 0.2); }, 'out'],
+    [2, (p) => { wideStance(p, 0.18); p.hips(0, -0.12, 0.03); p.lean(0.45, 0.25, -0.1); p.look(0.4, -0.1); p.arm('L', 0.6, 0.3, 0.6); p.arm('R', 0.3, 0.3, 1.3); }],
+    [2.75, (p) => { wideStance(p, 0.18); p.hips(0, -0.04, -0.03); p.lean(-0.15, -0.3, -0.2); p.look(-0.55, -0.3, -0.2); p.arm('L', 2.4, 0.9, 2.1, -0.4); p.arm('R', 0.3, 0.45, 1.4); }, 'snap'],
+    [3.5, (p) => { p.foot('R', 0.14); p.foot('L', 0.22, 0, 0.06, 0.5); p.hips(-0.1, -0.08, 0, 0.2); p.arm('L', 0.4, 2.3, 0.1); p.arm('R', 0.2, 0.5, 1.5); p.lean(0, -0.15, 0, -0.15); p.look(-0.3, -0.3); }, 'out'],
+  ], { groove: 0.5, hits: 0.7 }),
+
+  // So excited about tacos: little anime hops, fists at the chin, then a
+  // jump with both arms up on 3.
+  tacoHop(p, b, B, s) {
+    const ph = frac(b), beat = Math.floor(b), hop = Math.sin(Math.PI * Math.min(1, ph * 1.6));
+    if (beat < 3) {
+      const side = beat % 2 ? -1 : 1;
+      p.foot('L', 0.12, 0.1 * hop, 0, 0.5 * hop); p.foot('R', 0.12, 0.1 * hop, 0, 0.5 * hop);
+      p.hips(0.06 * side, -0.1 + 0.16 * hop, 0, 0.15 * side);
+      p.arm('L', 0.7, 0.05, 2.3, -0.7); p.arm('R', 0.7, 0.05, 2.2, -0.7);
+      p.add('foreL', 0.2 * Math.sin(TAU * b * 4)); p.add('foreR', -0.2 * Math.sin(TAU * b * 4));
+      p.lean(0.1, 0.05, 0, 0.12 * side); p.look(-0.1, 0.25 * side, 0.2 * side);
+    } else {
+      const air = Math.sin(Math.PI * Math.min(1, ph * 1.3));
+      p.foot('L', 0.16, 0.3 * air, -0.1 * air, 0.6 * air); p.foot('R', 0.16, 0.3 * air, -0.1 * air, 0.6 * air);
+      p.hips(0, -0.12 + 0.55 * air, 0);
+      p.arms(0.3, 2.5 * air + 0.3, 0.15);
+      p.look(-0.35 * air); p.lean(-0.1 * air, -0.15 * air);
+    }
+  },
+
+  // Vogue: hands frame the face in sharp boxes on every half beat.
+  vogueHands: seq(4, [
+    [0, (p) => { wideStance(p, 0.2); p.hips(0.05, -0.1, 0, -0.2); p.arm('L', 1.57, 0.9, 1.8, -1.3); p.arm('R', 0.3, 0.35, 1.5); p.look(-0.1, 0.35); }, 'snap'],
+    [0.5, (p) => { wideStance(p, 0.2); p.hips(0.05, -0.08, 0, -0.2); p.arm('L', 2.9, 0.15, 1.57, -1.57); p.arm('R', 0.3, 0.35, 1.5); p.look(-0.2, 0.35); }, 'snap'],
+    [1, (p) => { wideStance(p, 0.2); p.hips(-0.05, -0.12, 0, 0.2); p.arm('L', 0.5, 0.2, 2.4, -1.0); p.arm('R', 0.5, 1.2, 1.57, 1.57); p.lean(0, -0.1, -0.2); p.look(-0.1, -0.35); }, 'snap'],
+    [1.5, (p) => { wideStance(p, 0.2); p.hips(-0.05, -0.08, 0, 0.2); p.arm('L', 0.3, 2.6, 0.1); p.arm('R', 0.5, 1.2, 1.57, 1.57); p.look(-0.3, -0.2); }, 'snap'],
+    [2, (p) => { p.foot('L', 0.12); p.foot('R', 0.24, 0, 0.1, 0.5); p.hips(0.1, -0.14, 0, -0.3); p.arm('L', 1.2, 0.2, 2.6, -1.2); p.arm('R', 0.3, 0.4, 1.4); p.lean(-0.05, -0.2, 0.2); p.look(-0.25, 0.4, 0.15); }, 'snap'],
+    [2.5, (p) => { p.foot('L', 0.12); p.foot('R', 0.24, 0, 0.1, 0.5); p.hips(0.1, -0.12, 0, -0.3); p.arm('L', 1.2, 0.2, 2.6, -1.2); p.arm('R', 2.6, 0.5, 0.6); p.look(-0.3, 0.2); }, 'snap'],
+    [3, (p) => { wideStance(p, 0.26); p.hips(0, -0.26); p.arms(0.4, 1.57, 0.05); p.arm('L', 0.4, 1.57, 0.05); p.lean(0.05, -0.2); p.look(-0.2); }, 'snap'],
+    [3.5, (p) => { wideStance(p, 0.26); p.hips(0, -0.18); p.arm('L', 2.9, 0.2, 1.4, -1.2); p.arm('R', 2.7, 0.3, 1.4, -1.2); p.look(-0.25); }, 'snap'],
+  ], { groove: 0.4, hits: 0.6 }),
+
+  // Purse twirl: spin with the purse flung out, swing it overhead, hold it high.
+  purseTwirl(p, b, B, s) {
+    if (b < 1.5) {
+      const t = smooth(b / 1.5);
+      p.foot('L', 0.1); p.foot('R', 0.1, 0.1 * Math.sin(Math.PI * t), 0.05, 0.6);
+      p.hips(0, -0.03, 0, TAU * t);
+      p.arm('R', 0.3, 1.5, 0.1); p.arm('L', 0.4, 1.2, 0.6);
+    } else if (b < 3) {
+      groove(p, B, s, 0.8);
+      const a = TAU * (b - 1.5) / 0.75;
+      wideStance(p, 0.2);
+      p.hips(0, -0.1);
+      p.arm('R', 2.6, 0.3 + 0.5 * Math.cos(a), 0.3 + 0.3 * Math.sin(a));
+      hipHand(p, 'L');
+      p.look(-0.3, 0.2 * Math.sin(a));
+    } else {
+      groove(p, B, s, 0.5);
+      const k = smooth((b - 3) / 0.25);
+      p.foot('L', 0.14); p.foot('R', 0.22, 0, 0.08, 0.5 * k);
+      p.hips(0.08 * k, -0.08, 0, -0.2 * k);
+      p.arm('R', 0.4, 2.6 * k + 0.2, 0.05);
+      hipHand(p, 'L');
+      p.lean(-0.05, -0.15 * k, 0, 0.15 * k); p.look(-0.3 * k, 0.35 * k);
+    }
+  },
+
+  // Ballerina double twirl on her toes, then a curtsy.
+  twirlSpin(p, b, B, s) {
+    if (b < 2) {
+      const t = smooth(b / 2);
+      p.foot('L', 0.06, 0, 0, 0.9); p.foot('R', 0.06, 0.02, 0.03, 0.9);
+      p.hips(0, 0.06, 0, TAU * 2 * t);
+      p.arm('L', 0.6, 2.6, 0.7, -0.4); p.arm('R', 0.4, 1.2, 0.4);
+      p.look(-0.2);
+    } else if (b < 2.5) {
+      const k = smooth((b - 2) / 0.5);
+      p.foot('L', 0.12); p.foot('R', 0.12, 0, -0.2 * k, 0.5 * k);
+      p.hips(0, -0.02 - 0.22 * k, 0);
+      p.arm('L', 0.4, 1.2 - 0.5 * k, 0.3); p.arm('R', 0.3, 0.8, 0.5);
+      p.lean(0.25 * k, 0.1 * k);
+    } else {
+      groove(p, B, s, 0.4);
+      p.foot('L', 0.12); p.foot('R', 0.12, 0, -0.2, 0.5);
+      p.hips(0, -0.24, 0);
+      p.arm('L', 0.4, 0.7, 0.3); p.arm('R', 0.3, 0.8, 0.5);
+      p.lean(0.25, 0.1); p.look(0.15, 0.25, 0.15);
+    }
+  },
+
+  // Anime heart hands, heel kick-up hop, heart up high, send it over.
+  heartHands: seq(4, [
+    [0, (p) => { p.foot('L', 0.13); p.foot('R', 0.13, 0.26, -0.22, 0.5); p.hips(0, -0.02, 0, 0.2); p.arms(1.05, -0.2, 1.7, -0.7); p.lean(0, -0.05, 0, 0.12); p.look(-0.1, 0.2, 0.2); }, 'out'],
+    [1, (p) => { p.foot('R', 0.13); p.foot('L', 0.13, 0.26, -0.22, 0.5); p.hips(0, -0.02, 0, -0.2); p.arms(1.05, -0.2, 1.7, -0.7); p.lean(0, -0.05, 0, -0.12); p.look(-0.1, -0.2, -0.2); }, 'out'],
+    [2, (p) => { wideStance(p, 0.16); p.hips(0, 0.02); p.arms(2.7, 0.25, 1.2, -0.9); p.look(-0.35); p.lean(-0.05, -0.15); }, 'snap'],
+    [3, (p) => { p.foot('L', 0.13, 0, 0.12); p.foot('R', 0.16, 0, -0.08, 0.4); p.hips(0, -0.06, 0.04, 0.5); p.arms(1.4, 0.4, 0.1); p.lean(0.05, 0.05, 0.2); p.look(-0.1, 0.3); }, 'out'],
+  ], { groove: 0.6, hits: 0.6 }),
+
+  // Catwalk: strut forward, snap a hip-pop pose, look back over the shoulder.
+  catwalkPose(p, b, B, s) {
+    if (b < 2) {
+      const step = Math.floor(b), ph = b - step, z = 0.14 * smooth(b / 2);
+      const lead = step % 2 ? 'R' : 'L', back = lead === 'L' ? 'R' : 'L';
+      p.footX(lead, 0, 0.08 * Math.sin(Math.PI * ph), z + 0.12 * smooth(ph), 0.2);
+      p.footX(back, 0, 0, z - 0.06, 0.4);
+      p.hips((lead === 'L' ? 1 : -1) * 0.1, -0.05, z, (lead === 'L' ? -1 : 1) * 0.15);
+      p.arm('L', lead === 'L' ? -0.4 : 0.5, 0.3, 0.6); p.arm('R', 0.3, 0.3, 1.4);
+      p.look(-0.15, 0, 0.1 * (lead === 'L' ? 1 : -1));
+    } else if (b < 3) {
+      const k = smooth((b - 2) / 0.25);
+      p.foot('L', 0.12, 0, 0.14); p.foot('R', 0.24, 0, 0.18, 0.5 * k);
+      p.hips(0.14 * k, -0.1, 0.14, -0.3 * k);
+      p.arm('R', 1.2 * k + 0.3, 0.6, 2.2 * k);
+      hipHand(p, 'L');
+      p.lean(-0.05, -0.2 * k, 0, 0.2 * k); p.look(-0.3 * k, 0.4 * k, 0.15);
+    } else {
+      groove(p, B, s, 0.4);
+      const t = smooth((b - 3) / 0.4);
+      p.foot('L', 0.12, 0, 0.14 * (1 - t)); p.foot('R', 0.14, 0, 0.14 * (1 - t), 0.3);
+      p.hips(0, -0.08, 0.14 * (1 - t), -Math.PI * 0.7 * t * (1 - t) * 4 * 0.5);
+      p.arm('R', 1.5, 0.6, 2.2); hipHand(p, 'L');
+      p.look(-0.2, 0.6 * t);
+    }
+  },
+
+  // Drop it low: shimmy all the way down and back up.
+  dropItLow(p, b, B, s) {
+    const down = Math.sin(Math.PI * clamp01(b / 3.2));
+    const sh = Math.sin(TAU * b * 4);
+    wideStance(p, 0.22 + 0.12 * down);
+    p.hips(0.06 * Math.sin(TAU * b), -0.05 - 0.45 * down, 0.04 * down);
+    p.foot('L', 0.22 + 0.12 * down, 0, 0, 0.5 * down); p.foot('R', 0.22 + 0.12 * down, 0, 0, 0.5 * down);
+    p.shrug(0.15 * sh, -0.15 * sh); p.add('chest', 0, 0.15 * sh, 0);
+    p.arm('L', 0.5 + 1.8 * (1 - down), 0.6 + 1.2 * down, 0.4); p.arm('R', 0.6, 0.4, 1.6);
+    p.lean(0.2 * down, 0.1 * down); p.look(-0.15);
+    if (b > 3.2) { const k = smooth((b - 3.2) / 0.3); p.arm('L', 0.4, 2.5 * k + 0.3, 0.1); p.look(-0.3 * k, 0.3 * k); }
+  },
+
+  // Blow a kiss to the rival — twice.
+  kissBlow: seq(4, [
+    [0, (p) => { p.foot('L', 0.13, 0, 0.08); p.foot('R', 0.16, 0, -0.06, 0.5); p.hips(0, -0.06, 0, 0.45); p.arm('L', 1.25, 0.15, 2.55, -0.6); p.arm('R', 0.3, 0.4, 1.4); p.look(-0.05, 0.25, 0.1); p.lean(0, -0.05, 0.1); }],
+    [1, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.16, 0.1, -0.12, 0.6); p.hips(0, -0.02, 0.04, 0.6); p.arm('L', 1.0, 1.3, 0.05); p.arm('R', 0.3, 0.45, 1.4); p.look(-0.15, 0.35, 0.15); p.lean(0.05, 0.05, 0.25); }, 'out'],
+    [2, (p) => { p.foot('L', 0.13, 0, 0.08); p.foot('R', 0.16, 0, -0.06, 0.5); p.hips(0, -0.06, 0, 0.45); p.arm('L', 1.25, 0.15, 2.55, -0.6); p.arm('R', 0.3, 0.4, 1.4); p.look(-0.05, 0.25, -0.1); }],
+    [3, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.16, 0.1, -0.12, 0.6); p.hips(0, -0.02, 0.04, 0.6); p.arm('L', 0.9, 1.6, 0.05); p.arm('R', 2.4, 0.5, 0.4); p.look(-0.2, 0.35, 0.15); p.lean(0.05, 0.05, 0.25); }, 'out'],
+  ], { groove: 0.5, hits: 0.4 }),
+
+  // Cartwheel: over and back to her mark with a sassy step.
+  cartwheel(p, b, B, s) {
+    if (b < 0.5) {
+      const k = smooth(b / 0.5);
+      wideStance(p, 0.2 + 0.15 * k);
+      p.hips(0, -0.05, 0);
+      p.arms(0.2, 0.3 + 2.4 * k, 0.1);
+      p.lean(0, 0, 0, 0.3 * k);
+    } else if (b < 2.5) {
+      const t = smooth((b - 0.5) / 2);
+      p.foot('L', 0.5, 0.1, 0); p.foot('R', 0.5, 0.1, 0);
+      p.hips(0.9 * t, 0.12 * Math.sin(Math.PI * t), 0);
+      p.tumble(0, -TAU * t);
+      p.arms(0.15, 2.75, 0.05);
+    } else {
+      groove(p, B, s, 0.5);
+      const t = smooth((b - 2.5) / 1.2);
+      const step = Math.sin(Math.PI * t * 2);
+      p.footX('L', 0.9 * (1 - t) + 0.13, 0.08 * Math.max(0, step)); p.footX('R', 0.9 * (1 - t) - 0.13, 0.08 * Math.max(0, -step));
+      p.hips(0.9 * (1 - t), -0.06, 0, 0);
+      p.arm('L', 0.4, 2.3 * (1 - t) + 0.3, 0.2); p.arm('R', 0.3, 0.4, 1.4);
+      p.look(-0.2, -0.3 * (1 - t));
+    }
+  },
+
+  // Cheerleader toe-touch jump.
+  toeTouch(p, b, B, s) {
+    if (b < 1) {
+      const k = smooth(b);
+      wideStance(p, 0.14);
+      p.hips(0, -0.03 - 0.3 * k, 0);
+      p.arms(0.9 * k, -0.2, 1.2 * k, -0.6);
+      p.lean(0.25 * k);
+    } else if (b < 2) {
+      const t = b - 1, air = Math.sin(Math.PI * t);
+      p.hips(0, lerp(-0.33, -0.03, smooth(t / 0.15)) + 0.8 * air, 0);
+      p.foot('L', 0.15 + 0.6 * air, 0.62 * air, 0.25 * air, 0.7 * air); p.foot('R', 0.15 + 0.6 * air, 0.62 * air, 0.25 * air, 0.7 * air);
+      p.arms(0.5, 0.3 + 1.5 * air, 0.05);
+      p.lean(0.15 * air); p.look(-0.3 * air);
+    } else {
+      groove(p, B, s, 0.6);
+      const k = smooth((b - 2) / 0.4);
+      wideStance(p, 0.18);
+      p.hips(0, -0.3 * (1 - k) - 0.06);
+      p.arm('L', 0.3, 2.5 * k + 0.2, 0.1); p.arm('R', 0.3, 0.6, 1.3);
+      p.look(-0.3 * k, 0.2); p.lean(-0.05, -0.15 * k);
+    }
+  },
+
+  // ★★ SOLO — superstar: double spin, cartwheel, toe-touch, purse to the sky.
+  superstar(p, b, B, s) {
+    if (b < 1) {
+      const t = smooth(b);
+      p.foot('L', 0.06, 0, 0, 0.9); p.foot('R', 0.06, 0.02, 0.03, 0.9);
+      p.hips(0, 0.05, 0, TAU * 2 * t);
+      p.arm('L', 0.6, 2.6, 0.7, -0.4); p.arm('R', 0.4, 1.4, 0.3);
+    } else if (b < 2.4) {
+      MOVES.cartwheel(p, 0.5 + (b - 1) / 1.4 * 2, B, s);
+    } else if (b < 3.2) {
+      MOVES.toeTouch(p, 1 + (b - 2.4) / 0.8, B, s);
+    } else {
+      groove(p, B, s, 0.5);
+      const k = smooth((b - 3.2) / 0.25);
+      p.foot('L', 0.14); p.foot('R', 0.24, 0, 0.08, 0.5 * k);
+      p.hips(0.1 * k, -0.08, 0, -0.25 * k);
+      p.arm('R', 0.4, 2.7 * k + 0.1, 0.05);
+      hipHand(p, 'L');
+      p.lean(-0.05, -0.2 * k, 0, 0.18 * k); p.look(-0.35 * k, 0.4 * k);
+    }
+  },
+
+  // Intro: points the player out with a finger wag, hair flip, "bye-bye"
+  // finger wave, blows a kiss, purse-on-shoulder pose.
+  tinaTaunt(p, b, B, s) {
+    groove(p, B, s, 0.4);
+    p.foot('L', 0.13, 0, 0.1); p.foot('R', 0.17, 0, -0.06, 0.4);
+    if (b < 1) {
+      const k = smooth(b / 0.25), w = Math.sin(TAU * b * 3);
+      p.hips(0.05, -0.06, 0, 0.6 * k);
+      p.arm('L', 0.6, 1.0 * k + 0.2, 1.0, -0.2 + 0.4 * w);
+      p.arm('R', 0.3, 0.4, 1.4);
+      p.look(-0.1, 0.3 * k, 0.15);
+    } else if (b < 2) {
+      const t = b - 1, flip = smooth(t / 0.4);
+      p.hips(-0.05, -0.08, 0, 0.3);
+      p.arm('L', 2.4 * flip, 0.9, 2.1 * flip, -0.4);
+      p.arm('R', 0.3, 0.45, 1.4);
+      p.look(0.35 - 0.85 * flip, -0.2, 0.2 * flip);
+    } else if (b < 3) {
+      const w = Math.sin(TAU * (b - 2) * 4);
+      p.hips(0.05, -0.06, 0, 0.5);
+      p.arm('L', 1.4, 0.7, 1.4 + 0.5 * w, -0.3);
+      p.arm('R', 0.3, 0.45, 1.4);
+      p.look(-0.05, 0.35, -0.1);
+    } else {
+      const k = smooth((b - 3) / 0.25);
+      p.hips(0.1 * k, -0.08, 0, 0.5 - 0.3 * k);
+      p.arm('L', 1.25 - 0.3 * k, 0.2 + 1.2 * k, 2.5 - 2.4 * k, -0.6);
+      p.arm('R', 1.5, 0.6, 2.3);
+      p.look(-0.2, 0.4 * k, 0.15);
+      p.lean(0, -0.15, 0, 0.15 * k);
+    }
+  },
+
+  // ════════════════════════════════════════════════════════════════
+  // ALFRED — disco king / rock'n'roll
+  // ════════════════════════════════════════════════════════════════
+  // Travolta strut in place: step on each beat, pointing down across.
+  discoStrut: seq(4, [
+    [0, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.15, 0, -0.08, 0.5); p.hips(0.05, -0.08, 0, 0.12); p.arm('R', 0.9, -0.2, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.05, -0.1, -0.15); p.look(0.1, -0.2); }, 'in'],
+    [0.5, (p) => { p.foot('L', 0.13, 0, 0.04); p.foot('R', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.02, 0, 0); p.arm('R', 0.5, 0.3, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
+    [1, (p) => { p.foot('R', 0.13, 0, 0.14); p.foot('L', 0.15, 0, -0.08, 0.5); p.hips(-0.05, -0.08, 0, -0.12); p.arm('R', 0.4, 2.4, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.08, -0.15, 0.15); p.look(-0.25, 0.3); }, 'in'],
+    [1.5, (p) => { p.foot('R', 0.13, 0, 0.04); p.foot('L', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.02); p.arm('R', 0.5, 0.8, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
+    [2, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.15, 0, -0.08, 0.5); p.hips(0.05, -0.08, 0, 0.12); p.arm('R', 0.9, -0.2, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.05, -0.1, -0.15); p.look(0.1, -0.2); }, 'in'],
+    [2.5, (p) => { p.foot('L', 0.13, 0, 0.04); p.foot('R', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.02); p.arm('R', 0.5, 0.8, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
+    [3, (p) => { p.foot('R', 0.13, 0, 0.14); p.foot('L', 0.15, 0, -0.08, 0.5); p.hips(-0.08, -0.1, 0, -0.18); p.arm('R', 0.4, 2.5, 0.05); hipHand(p, 'L'); p.lean(-0.1, -0.2, 0.2, 0.12); p.look(-0.3, 0.35); }, 'snap'],
+  ], { groove: 0.7, hits: 0.9 }),
+
+  // Elvis: knees wobbling in and out on the 8ths, hips swivelling.
+  elvisSwivel(p, b, B, s) {
+    groove(p, B, s, 0.5);
+    const w = Math.sin(TAU * b * 2);
+    p.foot('L', 0.2, 0, 0, 0.5 * Math.max(0, w)); p.foot('R', 0.2, 0, 0, 0.5 * Math.max(0, -w));
+    p.hips(0.06 * w, -0.14, 0, 0.18 * w);
+    p.add('hips', 0, 0, 0.12 * w);
+    const up = (Math.floor(b) % 4) === 3;
+    p.arm('L', up ? 0.3 : 0.9, up ? 2.5 : 0.4, up ? 0.05 : 1.6, -0.4);
+    p.arm('R', 0.8, 0.3, 1.7, -0.5);
+    p.lean(0.05, -0.12, 0.15 * w); p.look(-0.1, 0.15 * w, 0.1 * w);
+  },
+
+  // Elvis legs, bigger: leg shake, hip thrust on 3, point at the crowd.
+  elvisLegs(p, b, B, s) {
+    groove(p, B, s, 0.4);
+    const w = Math.sin(TAU * b * 4), beat = Math.floor(b);
+    p.foot('L', 0.22, 0, 0, beat % 2 ? 0.6 * Math.max(0, w) : 0); p.foot('R', 0.22, 0, 0, beat % 2 ? 0 : 0.6 * Math.max(0, w));
+    p.hips(0.05 * w, -0.16, beat === 2 ? 0.08 : 0, 0.15 * w);
+    if (beat < 2) { p.arm('L', 0.7, 1.0, 0.2); p.arm('R', 0.8, 0.3, 1.7, -0.5); p.look(-0.1, 0.3); }
+    else if (beat === 2) { p.arms(-0.5, 0.6, 0.4); p.lean(-0.2, -0.25); p.look(-0.3); }
+    else { p.arm('L', 0.4, 2.5, 0.05); hipHand(p, 'R'); p.look(-0.3, 0.4); p.lean(-0.05, -0.15, 0.2); }
+  },
+
+  // Funky chicken: elbows flapping, head pecking, a kick out.
+  funkyChicken(p, b, B, s) {
+    groove(p, B, s, 0.6);
+    const flap = 0.5 + 0.5 * Math.sin(TAU * b * 2), peck = Math.sin(TAU * b);
+    const beat = Math.floor(b);
+    p.foot('L', 0.16); p.foot('R', 0.16, beat === 3 ? 0.2 * Math.sin(Math.PI * frac(b)) : 0, beat === 3 ? 0.25 : 0);
+    p.hips(0, -0.14, 0, 0.1 * peck);
+    p.arms(-0.25, 0.35 + 0.8 * flap, 2.2, 0.6);
+    p.lean(0.15, 0.1); p.look(0.15 * peck, 0.2 * peck);
+    p.add('neck', 0, 0, 0); p.root(0, 0, 0.04 * peck);
+  },
+
+  // Finger guns: pew pew on the beat, blow the smoke off on 4.
+  fingerGuns(p, b, B, s) {
+    groove(p, B, s, 0.6);
+    const beat = Math.floor(b), ph = frac(b), kick = Math.exp(-ph * 8);
+    p.foot('L', 0.15, 0, 0.06); p.foot('R', 0.18, 0, -0.04, 0.3);
+    if (beat < 3) {
+      const side = beat % 2 ? -1 : 1;
+      p.hips(0.06 * side, -0.1, 0, 0.25 * side);
+      p.arm('L', 1.45 - 0.3 * kick, 0.25 + (side > 0 ? 0.6 : -0.2), 0.05 + 0.4 * kick);
+      p.arm('R', 1.45 - 0.3 * kick, 0.25 + (side < 0 ? 0.6 : -0.2), 0.05 + 0.4 * kick);
+      p.lean(-0.05 - 0.08 * kick, -0.1); p.look(-0.05, 0.3 * side);
+    } else {
+      p.hips(0, -0.06, 0, 0);
+      p.arm('L', 1.3, -0.1, 2.3, -0.6); hipHand(p, 'R');
+      p.look(0.05, 0.2, 0.15); p.lean(0, -0.1);
+    }
+  },
+
+  // Air guitar: rock stance, strumming, headbanging, windmill strum on 4.
+  airGuitar(p, b, B, s) {
+    groove(p, B, s, 0.5);
+    const beat = Math.floor(b), strum = Math.sin(TAU * b * 4);
+    wideStance(p, 0.28);
+    p.hips(0, -0.2, 0, 0.35);
+    p.arm('L', 1.3, 0.9, 0.3, -0.2);
+    if (beat < 3) p.arm('R', 0.5 + 0.25 * strum, 0.2, 1.6, -0.9);
+    else { const a = TAU * frac(b); p.arm('R', a + 0.5, 0.45, 0.05); }
+    p.lean(0.2 + 0.25 * Math.max(0, Math.cos(TAU * b)), 0.15); p.look(0.35 * Math.max(0, Math.cos(TAU * b)), 0.2);
+  },
+
+  // Split drop: down into a full split, point it out, spring back up.
+  splitDrop(p, b, B, s) {
+    if (b < 1) {
+      const t = smooth(b);
+      p.foot('L', 0.15 + 0.72 * t, 0, 0, 0.3 * t); p.foot('R', 0.15 + 0.72 * t, 0, 0, 0.3 * t);
+      p.hips(0, -0.04 - 0.8 * t, 0);
+      p.arms(0.2, 0.3 + 1.3 * t, 0.1);
+    } else if (b < 3) {
+      const beat = Math.floor(b), up = beat % 2 === 1;
+      p.foot('L', 0.87, 0, 0, 0.3); p.foot('R', 0.87, 0, 0, 0.3);
+      p.hips(0, -0.84, 0);
+      p.arm('L', up ? 0.4 : 0.9, up ? 2.5 : -0.3, 0.05); hipHand(p, 'R');
+      p.look(up ? -0.3 : 0.2, up ? 0.35 : -0.3); p.lean(-0.1, -0.15);
+    } else {
+      groove(p, B, s, 0.5);
+      const t = smooth((b - 3) / 0.4);
+      p.foot('L', 0.87 - 0.7 * t, 0, 0, 0.3); p.foot('R', 0.87 - 0.7 * t, 0, 0, 0.3);
+      p.hips(0, -0.84 + 0.76 * t, 0);
+      p.arms(0.3, 2.4 * t, 0.1);
+    }
+  },
+
+  // Pompadour comb-back, side smooth, double thumbs "ayyy".
+  combBack: seq(4, [
+    [0, (p) => { p.foot('L', 0.14); p.foot('R', 0.16, 0, 0.04, 0.3); p.hips(0, -0.06); p.arm('R', 2.5, 0.6, 2.4, -0.9); p.arm('L', 0.3, 0.4, 1.4); p.look(-0.2, 0.2); p.lean(-0.05, -0.12); }],
+    [0.75, (p) => { p.foot('L', 0.14); p.foot('R', 0.16, 0, 0.04, 0.3); p.hips(0, -0.06); p.arm('R', 2.8, 0.3, 1.6, -0.6); p.arm('L', 0.3, 0.4, 1.4); p.look(-0.35, 0.2); p.lean(-0.1, -0.15); }],
+    [1.5, (p) => { p.foot('L', 0.14); p.foot('R', 0.16, 0, 0.04, 0.3); p.hips(0, -0.06); p.arm('R', 2.5, 0.6, 2.4, -0.9); p.arm('L', 2.5, 0.6, 2.4, -0.9); p.look(-0.25); }],
+    [2.25, (p) => { p.foot('L', 0.14); p.foot('R', 0.16, 0, 0.04, 0.3); p.hips(0, -0.08); p.arm('R', 1.6, 1.2, 2.6, -0.9); p.arm('L', 1.6, 1.2, 2.6, -0.9); p.look(-0.1); p.shrug(0.15); }],
+    [3, (p) => { wideStance(p, 0.22); p.hips(0, -0.16, 0, 0.2); p.arms(1.3, 0.7, 1.3, 0.6); p.lean(-0.12, -0.25); p.look(-0.25, 0.25, 0.15); }, 'snap'],
+  ], { groove: 0.5, hits: 0.5 }),
+
+  // Rock-star knee slide with air guitar, then up.
+  kneeSlide(p, b, B, s) {
+    if (b < 1) {
+      const t = smooth(b);
+      p.foot('L', 0.14, 0.1 * Math.sin(Math.PI * t * 2), -0.2 * t); p.foot('R', 0.14, 0.1 * Math.sin(Math.PI * t * 2 + 1), -0.2 * t);
+      p.hips(0, -0.05 - 0.15 * t, -0.15 * t);
+      p.arms(0.6, 0.4, 1.4);
+      p.lean(0.2 * t);
+    } else if (b < 2.6) {
+      const t = smooth((b - 1) / 1.6), strum = Math.sin(TAU * b * 4);
+      const z = -0.2 + 0.55 * t;
+      p.foot('L', 0.16, 0.02, z - 0.42, 0.9); p.foot('R', 0.16, 0.02, z - 0.42, 0.9);
+      p.hips(0, -0.5, z);
+      p.lean(-0.5 * smooth((b - 1) / 0.4), -0.2);
+      p.arm('L', 1.5, 0.8, 0.3); p.arm('R', 0.6 + 0.2 * strum, 0.2, 1.6, -0.9);
+      p.look(-0.45);
+    } else {
+      groove(p, B, s, 0.5 * smooth((b - 2.6) / 0.6));
+      const t = smooth((b - 2.6) / 0.6);
+      p.foot('L', 0.16, 0, 0.35 * (1 - t), 0.9 * (1 - t)); p.foot('R', 0.16, 0, 0.35 * (1 - t) - 0.1, 0.9 * (1 - t));
+      p.hips(0, -0.5 + 0.44 * t, 0.35 * (1 - t));
+      p.arm('L', 0.4, 0.8 + 1.7 * t, 0.05); p.arm('R', 0.4, 0.8 + 1.7 * t, 0.05);
+      p.look(-0.3 * t);
+    }
+  },
+
+  // Disco spin: three fast spins, then the Travolta point with a lean.
+  discoSpin(p, b, B, s) {
+    if (b < 2.25) {
+      const t = smooth(b / 2.25);
+      p.foot('L', 0.08); p.foot('R', 0.08, 0.06 * Math.abs(Math.sin(TAU * 3 * t)), 0.04, 0.5);
+      p.hips(0, -0.02, 0, TAU * 3 * t);
+      p.arm('R', 0.3, 2.6, 0.05); p.arm('L', 0.6, 0.5, 1.8);
+    } else {
+      groove(p, B, s, 0.5);
+      const k = smooth((b - 2.25) / 0.25);
+      p.foot('L', 0.12); p.foot('R', 0.28, 0, 0.1, 0.5 * k);
+      p.hips(0.1 * k, -0.12, 0, -0.2 * k);
+      p.arm('R', 0.4, 0.3 + 2.25 * k, 0.03); hipHand(p, 'L');
+      p.lean(-0.08, -0.2 * k, 0.15, 0.2 * k); p.look(-0.35 * k, -0.4 * k);
+    }
+  },
+
+  // ★★ SOLO — disco inferno: double spin, drop into the splits, points,
+  // spring up into the pose.
+  discoInferno(p, b, B, s) {
+    if (b < 1) {
+      const t = smooth(b);
+      p.foot('L', 0.08); p.foot('R', 0.08, 0.06, 0.04, 0.5);
+      p.hips(0, -0.02, 0, TAU * 2 * t);
+      p.arm('R', 0.3, 2.6, 0.05); p.arm('L', 0.6, 0.5, 1.8);
+    } else if (b < 3.2) {
+      MOVES.splitDrop(p, (b - 1) / 2.2 * 3, B, s);
+    } else {
+      MOVES.discoSpin(p, 2.25 + (b - 3.2) * 1.5, B, s);
+      p.root(0, 0.15 * Math.sin(Math.PI * clamp01((b - 3.2) / 0.3)), 0);
+    }
+  },
+
+  // ════════════════════════════════════════════════════════════════
+  // YOU — b-boy freeze
+  // ════════════════════════════════════════════════════════════════
+  // Air chair: drop to one hand, body tilted, knees up, hold the freeze.
+  airChair(p, b, B, s) {
+    if (b < 0.75) {
+      const t = smooth(b / 0.75);
+      wideStance(p, 0.16 + 0.1 * t);
+      p.hips(0, -0.03 - 0.53 * t, 0);
+      p.tumble(0, 1.0 * t);
+      p.arm('R', 0.2, 1.3 * t + 0.1, 0.1); p.arm('L', 0.6, 0.6, 1.4);
+      p.lean(0.2 * t);
+    } else if (b < 3.3) {
+      const shake = 0.006 * Math.sin(B * 40);
+      p.hips(0, -0.56, 0);
+      p.tumble(0.15, 1.15 + shake);
+      p.foot('L', 0.1, 0.45, 0.25, 0.6); p.foot('R', 0.18, 0.55, 0.2, 0.6);
+      p.arm('R', 0.2, 2.2, 0.05); p.arm('L', 1.2, 0.4, 1.8, -0.4);
+      p.look(-0.3, 0.3, -0.4);
+    } else {
+      groove(p, B, s, 0.5);
+      const t = smooth((b - 3.3) / 0.5);
+      wideStance(p, 0.22);
+      p.hips(0, -0.56 + 0.5 * t, 0);
+      p.tumble(0, 1.15 * (1 - t));
+      crossArms(p);
+    }
+  },
+
   // Walk-on: arms folded, nodding to the beat, then snap into a stance.
   intro(p, b, B, s) {
     groove(p, B, s, 0.6);
@@ -787,7 +1279,14 @@ const EXPRESSIONS = {
   taunt: 'smirk', dodge: 'o', stunned: 'dizzy', fumble: 'o', whiff: 'o', hitReact: 'o',
   reactOoh: 'o', cheer: 'shout', victory: 'shout', defeat: 'sad', intro: 'focus',
   entrance: 'smirk', introWatch: 'focus', introTaunt: 'smirk', introAnswer: 'grin', ready: 'focus',
-  lockAndPop: 'shout', breakWindmill: 'focus', backflip: 'shout', headspin: 'focus',
+  lockAndPop: 'shout', breakWindmill: 'focus', backflip: 'shout', headspin: 'focus', airChair: 'focus',
+  // Tina
+  sassyStrut: 'smirk', shimmyBounce: 'joy', purseGroove: 'smile', hairFlip: 'smirk', tacoHop: 'joy',
+  vogueHands: 'smirk', purseTwirl: 'grin', twirlSpin: 'joy', heartHands: 'wink', catwalkPose: 'smirk',
+  dropItLow: 'grin', kissBlow: 'kiss', cartwheel: 'joy', toeTouch: 'joy', superstar: 'joy', tinaTaunt: 'wink',
+  // Alfred
+  discoStrut: 'smirk', elvisSwivel: 'smirk', elvisLegs: 'grin', funkyChicken: 'joy', fingerGuns: 'wink',
+  airGuitar: 'shout', splitDrop: 'shout', combBack: 'smirk', kneeSlide: 'shout', discoSpin: 'grin', discoInferno: 'shout',
 };
 
 // How hard each function move rides the drum-hit layer (seq moves carry
@@ -796,7 +1295,11 @@ const HITS = {
   hustle: 1, cabbagePatch: 0.8, moonwalk: 0.5, spinPoint: 0.5, jumpSplit: 0.3, windmillFreeze: 0.4,
   taunt: 0.5, dodge: 0.2, stunned: 0.2, fumble: 0.2, whiff: 0.2, hitReact: 0.1, reactOoh: 0.4, cheer: 0.8,
   victory: 0.5, defeat: 0.1, intro: 0.6, introWatch: 0.7, introTaunt: 0.5, introAnswer: 0.6, ready: 1,
-  breakWindmill: 0, backflip: 0, headspin: 0,
+  breakWindmill: 0, backflip: 0, headspin: 0, airChair: 0.1,
+  shimmyBounce: 1, purseGroove: 1, tacoHop: 0.7, purseTwirl: 0.5, twirlSpin: 0.3, catwalkPose: 0.5, dropItLow: 0.7,
+  cartwheel: 0, toeTouch: 0.2, superstar: 0, tinaTaunt: 0.5,
+  elvisSwivel: 1, elvisLegs: 0.8, funkyChicken: 0.9, fingerGuns: 0.8, airGuitar: 0.9, splitDrop: 0.3,
+  kneeSlide: 0.2, discoSpin: 0.3, discoInferno: 0.1,
 };
 const hitsFor = (name) => { const m = MOVES[name]; return m && typeof m !== 'function' ? m.hits : (HITS[name] ?? 0.6); };
 
@@ -806,7 +1309,12 @@ export const MOVE_LABELS = {
   runningMan: 'RUNNING MAN', rogerRabbit: 'ROGER RABBIT', cabbagePatch: 'CABBAGE PATCH',
   robot: 'THE ROBOT', moonwalk: 'MOONWALK', spinPoint: 'SPIN & POINT',
   jumpSplit: 'JUMP SPLIT', windmillFreeze: 'WINDMILL FREEZE',
-  lockAndPop: 'LOCK & POP', breakWindmill: 'WINDMILL', backflip: 'BACKFLIP', headspin: 'HEADSPIN',
+  lockAndPop: 'LOCK & POP', breakWindmill: 'WINDMILL', backflip: 'BACKFLIP', headspin: 'HEADSPIN', airChair: 'AIR CHAIR',
+  hairFlip: 'HAIR FLIP', tacoHop: 'TACO HOP', vogueHands: 'VOGUE', purseTwirl: 'PURSE TWIRL', twirlSpin: 'TWIRL',
+  heartHands: 'HEART HANDS', catwalkPose: 'CATWALK', dropItLow: 'DROP IT LOW', kissBlow: 'KISS BLOW',
+  cartwheel: 'CARTWHEEL', toeTouch: 'TOE TOUCH', superstar: 'SUPERSTAR',
+  elvisLegs: 'ELVIS LEGS', funkyChicken: 'FUNKY CHICKEN', fingerGuns: 'FINGER GUNS', airGuitar: 'AIR GUITAR',
+  splitDrop: 'SPLIT DROP', combBack: 'COMB BACK', kneeSlide: 'KNEE SLIDE', discoSpin: 'DISCO SPIN', discoInferno: 'DISCO INFERNO',
 };
 
 const _ka = new Pose(), _kb = new Pose();

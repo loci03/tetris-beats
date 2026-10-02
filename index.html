@@ -842,8 +842,8 @@
     border: 1px solid rgba(255,255,255,0.1);
     color: #fff;
   }
+  .story-level { cursor: pointer; }
   .story-level-active {
-    cursor: default;
     background: linear-gradient(135deg, rgba(255,160,40,0.22), rgba(255,60,120,0.18));
     border-color: rgba(255,190,90,0.55);
     box-shadow: 0 8px 28px rgba(255,120,40,0.18);
@@ -2073,33 +2073,39 @@
        into a rhythm dance battle (story/*.js). -->
   <div id="story-panel" style="display:none;">
     <div class="story-kicker">STORY MODE</div>
-    <button class="story-level story-level-active" type="button" data-story-level="taco">
+    <button class="story-level story-level-active" type="button" data-story-level="underground">
       <span class="sl-num">01</span>
       <span class="sl-body">
-        <b>TACO TOWN</b>
+        <b>THE UNDERGROUND</b>
         <small>Clear a line with the golden piece to enter the dance battle vs ALFRED.</small>
       </span>
     </button>
-    <div class="story-level story-level-locked">
+    <button class="story-level" type="button" data-story-level="taco">
       <span class="sl-num">02</span>
-      <span class="sl-body"><b>COMING SOON</b><small>More worlds on the way.</small></span>
-    </div>
+      <span class="sl-body">
+        <b>TACO TOWN</b>
+        <small>Clear a line with the golden piece to enter the dance battle vs TINA.</small>
+      </span>
+    </button>
   </div>
   <!-- BUST A BEAT: the Story Mode dance battle by itself — no Tetris.
        Same levels / music / rival; ALFRED'S DIFFICULTY applies. -->
   <div id="beat-panel" style="display:none;">
     <div class="story-kicker">BUST A BEAT</div>
-    <button class="story-level story-level-active" type="button" data-beat-level="taco">
+    <button class="story-level story-level-active" type="button" data-beat-level="underground">
       <span class="sl-num">01</span>
       <span class="sl-body">
-        <b>TACO TOWN</b>
-        <small>Dance battle vs ALFRED. Enter the arrows, hit GROOVE on beat 4 — no Tetris, just the groove.</small>
+        <b>THE UNDERGROUND</b>
+        <small>Dance battle vs ALFRED in the warehouse. Enter the arrows, GROOVE on beat 4.</small>
       </span>
     </button>
-    <div class="story-level story-level-locked">
+    <button class="story-level" type="button" data-beat-level="taco">
       <span class="sl-num">02</span>
-      <span class="sl-body"><b>COMING SOON</b><small>More stages on the way.</small></span>
-    </div>
+      <span class="sl-body">
+        <b>TACO TOWN</b>
+        <small>Dance battle vs TINA, the glam taco queen. The whole song, start to finish.</small>
+      </span>
+    </button>
   </div>
   <!-- Difficulty picker - visible only when "VS ALFRED" mode is selected.
        Three tiers wired to AI_DIFFICULTIES presets in JS. Persists across
@@ -2806,9 +2812,10 @@ const LEVEL_THEMES = [
   null, // index 0 unused
   { // Level 1 - Underground (Suno track + warehouse aesthetic)
     name: 'Underground',
-    // BPM is needed for visual beat-pulse + bg-particle sync. Estimated from
-    // the track via onset autocorrelation; nudge if the visuals drift.
-    bpm: 103,
+    // BPM is needed for visual beat-pulse + bg-particle sync. Measured from
+    // the track (snare/hat comb fit: a 156.98 BPM pulse, felt in half time) —
+    // Story Mode's Underground battle is charted against this grid.
+    bpm: 78.49,
     // When `track` is set, audioEngine plays the MP3 instead of the procedural
     // drums/bass/synth. Other levels without `track` keep their procedural
     // sound - lets us add Suno tracks one level at a time.
@@ -3176,9 +3183,9 @@ const LEVEL_THEMES = [
   },
   { // Level 16 - Tacos (massive food fight at a taco restaurant)
     name: 'Tacos',
-    // Measured from the track (kick/snare comb-fit over 120-208 s) —
+    // Measured from the track (kick/snare comb-fit over the whole song) —
     // Story Mode's rhythm battle is charted against this grid.
-    bpm: 101.07,
+    bpm: 101.03,
     track: 'extra-cheese-taco.mp3',
     colors: { bg1: '#2a1000', bg2: '#180800', accent: '#ffb830', glow: '#ff6010' },
     particleHue: 30,
@@ -19920,13 +19927,14 @@ function startGame() {
     if (!window.StoryMode) { loadStoryMode().then(ok => { if (ok) startGame(); }); return; }
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('game-over-screen').style.display = 'none';
-    window.StoryMode.startBeat('taco');
+    window.StoryMode.startBeat(_beatLevelId);
     return;
   }
   // Any story event from a previous run (restart mid-battle) is torn down.
   if (window.StoryMode) window.StoryMode.teardown();
   storyFreeze = false;
   storyHide2D = false;
+  if (gameMode === 'storymode') window.StoryMode.selectLevel(_storyLevelId);
   _storyThemeIdx = (gameMode === 'storymode') ? window.StoryMode.themeIndex() : 0;
   // Daily Challenge: re-seed the piece RNG with today's UTC date BEFORE
   // any player.bag/nextQueue is filled. Everyone playing today's daily
@@ -20523,6 +20531,17 @@ window.TetrisBridge = {
 };
 
 let _storyLoading = null;
+// Level picked on the STORY / BEAT tabs (cards in #story-panel / #beat-panel).
+let _storyLevelId = 'underground', _beatLevelId = 'underground';
+document.querySelectorAll('[data-story-level], [data-beat-level]').forEach(card => {
+  card.addEventListener('click', () => {
+    const story = card.hasAttribute('data-story-level');
+    const id = story ? card.dataset.storyLevel : card.dataset.beatLevel;
+    if (story) _storyLevelId = id; else _beatLevelId = id;
+    card.parentElement.querySelectorAll('.story-level').forEach(c => c.classList.toggle('story-level-active', c === card));
+  });
+});
+
 function loadStoryMode(quiet) {
   if (window.StoryMode) return Promise.resolve(true);
   const btn = document.getElementById('start-btn');

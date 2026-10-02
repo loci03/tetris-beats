@@ -17,9 +17,12 @@ import { CameraDirector } from './camera.js';
 import { BoardTransition, cameraAlongPath, START_POSE } from './transition.js';
 import { BattleHUD } from './hud.js';
 import { StorySfx } from './sfx.js';
+import { AnimeFx } from './anime-fx.js';
 import { buildTacoWorld } from './worlds/taco-world.js';
+import { buildUndergroundWorld } from './worlds/underground-world.js';
+import { battleMusic } from './levels.js';
 
-const WORLDS = { taco: buildTacoWorld };
+const WORLDS = { taco: buildTacoWorld, underground: buildUndergroundWorld };
 
 const IN_DUR = 2.35;      // seconds, board → world
 const DROP_AT = 1.3;      // the music drop lands as the camera passes the board
@@ -36,6 +39,8 @@ export class BattleSession {
     this.onDone = onDone;
     this.standalone = standalone;
     this.onPause = onPause;
+    // Song grid + this mode's section (story drop vs full-song Bust a Beat).
+    this.mcfg = battleMusic(level, standalone);
     this.phase = 'init';       // battle phase: init → intro → battle → result → out → done
     this.trans = null;         // camera transition running: 'in' | 'out' | null
     this.paused = false;
@@ -72,9 +77,11 @@ export class BattleSession {
     this.pRig.baseYaw = 0.32;
     this.rRig.baseYaw = -0.32;
     this.scene.add(this.pRig.root, this.rRig.root);
-    this.pDance = new DanceController(this.pRig, pDef.style, +1);
-    this.rDance = new DanceController(this.rRig, rDef.style, -1);
+    const bounceRate = this.mcfg.bounce || 1;
+    this.pDance = new DanceController(this.pRig, { ...pDef.style, bounceRate }, +1);
+    this.rDance = new DanceController(this.rRig, { ...rDef.style, bounceRate }, -1);
     this.pDef = pDef; this.rDef = rDef;
+    this.fx = new AnimeFx(this.scene);
     this.director = new CameraDirector(this.camera, this.world.anchors);
     this.director.motion = this.motion;
 
@@ -90,11 +97,11 @@ export class BattleSession {
     // ── Audio + rules ──
     this.audio = bridge.audio;
     this.ctx = this.audio.ctx;
-    this.clock = new MusicClock(this.ctx, level.music);
+    this.clock = new MusicClock(this.ctx, this.mcfg);
     this.clock.userOffsetMs = st.rhythmOffsetMs;
     this.sfx = new StorySfx(this.ctx, this.audio.masterGain);
     const profile = level.ai[st.difficulty] || level.ai.medium;
-    this.battle = new RhythmBattle({ clock: this.clock, music: level.music, seed: level.chart.seed + (Date.now() % 997), aiProfile: profile });
+    this.battle = new RhythmBattle({ clock: this.clock, music: this.mcfg, seed: level.chart.seed + (Date.now() % 997), aiProfile: profile });
     this.battle.on((type, data) => this._onBattle(type, data));
 
     this.hud = new BattleHUD({
@@ -113,7 +120,7 @@ export class BattleSession {
 
   // ── Lifecycle ─────────────────────────────────────────────────────
   async start() {
-    const m = this.level.music;
+    const m = this.mcfg;
     const buffer = this.audio._trackBuffers[m.track] || await this.audio._loadTrack(m.track);
     if (!buffer) throw new Error('battle track unavailable: ' + m.track);
     // Lock the grid phase to the drums in this browser's decode of the song,
@@ -155,18 +162,24 @@ export class BattleSession {
       this.audio._trackSource = null;
       this.audio._trackName = null;
     }
-    const offset = this.clock.barTime(m.battleStartBar - m.introBars);
-    this.music = this.clock.play(buffer, this.audio.trackGain, offset, this.dropTime, 0.01);
+    this.music = this.clock.play(buffer, this.audio.trackGain, this._songOffset(), this.dropTime, 0.01);
 
     this.trans = 'in';
     this._last = performance.now();
     this._raf = requestAnimationFrame((t) => this._frame(t));
   }
 
+  // Where the song starts: the top of the track when the intro is bar 0
+  // (Bust a Beat plays the whole song), else the intro bar's downbeat.
+  _songOffset() {
+    const introStart = this.mcfg.battleStartBar - this.mcfg.introBars;
+    return introStart <= 0 ? 0 : this.clock.barTime(introStart);
+  }
+
   // Bust a Beat: no board transition — open on the two-shot as the lights
   // come up and the song comes in on the intro bar.
   _startStandalone(buffer) {
-    const m = this.level.music;
+    const m = this.mcfg;
     const f = this.director.framing();
     this.camera.position.copy(f.pos); this.camera.fov = f.fov; this.camera.lookAt(f.look);
     this.camera.updateProjectionMatrix();
@@ -190,7 +203,7 @@ export class BattleSession {
     }
     this.sfx.whoosh(0.5, true);
     this.sfx.impact(this.dropTime);
-    this.music = this.clock.play(buffer, this.audio.trackGain, this.clock.barTime(m.battleStartBar - m.introBars), this.dropTime, 0.3);
+    this.music = this.clock.play(buffer, this.audio.trackGain, this._songOffset(), this.dropTime, 0.05);
     this.trans = null;
     this._last = performance.now();
     this._raf = requestAnimationFrame((t) => this._frame(t));
@@ -225,6 +238,7 @@ export class BattleSession {
     this.hud.destroy();
     this.sfx.dispose();
     if (this.transition) this.transition.dispose();
+    this.fx.dispose();
     this.world.dispose();
     this.pRig.dispose(); this.rRig.dispose();
     this.renderer.dispose();
@@ -295,6 +309,15 @@ export class BattleSession {
 
   // ── Battle events → dancers / camera / stage / HUD / audio ────────
   _dc(who) { return who === 'player' ? this.pDance : this.rDance; }
+  // Anime marks over a dancer's head.
+  _fx(who, kind, n) {
+    if (!kind) return;
+    const rig = who === 'player' ? this.pRig : this.rRig;
+    this._fxPos = this._fxPos || new THREE.Vector3();
+    this._fxPos.copy(rig.root.position);
+    this._fxPos.y += 2.05 * rig.def.scale;
+    this.fx.burst(kind, this._fxPos, n);
+  }
   _def(who) { return who === 'player' ? this.pDef : this.rDef; }
 
   _schedule(who, name, startBeat, len, own = true) {
@@ -318,7 +341,7 @@ export class BattleSession {
     const rivalName = this.rDef.name;
     switch (type) {
       case 'barStart': {
-        const m = this.level.music;
+        const m = this.mcfg;
         const i = d.bar - (m.battleStartBar - m.introBars);   // intro bar index (0..introBars-1)
         const B = d.bar * 4;
         if (i === 0) {
@@ -330,15 +353,18 @@ export class BattleSession {
           this.director.cut('two', B, 4);
         } else if (i === 1) {
           // The rival calls the player out: point, smirk, spin, signature pose.
-          this.rDance.play('introTaunt', B, 4, { faceFoe: true });
+          this.rDance.play(this.rDef.introTaunt || 'introTaunt', B, 4, { faceFoe: true });
           this.pDance.play('introWatch', B, 4);
           this.director.cut('close', B, 4, { who: 'rival' });
           this._voice('rival', 'single');
+          this.cues.push({ beat: B + 1, fn: () => this._fx('rival', this.rDef.fx && this.rDef.fx.taunt, 5) });
         } else if (i === 2) {
           // The player answers: head shake, two bounces, "come on".
           this.pDance.play('introAnswer', B, 4, { faceFoe: true });
           this.rDance.play('introWatch', B, 4);
           this.director.cut('close', B, 4, { who: 'player' });
+          this._fx('player', 'anger', 1);
+          this.cues.push({ beat: B + 3, fn: () => this._fx('player', 'note', 4) });
           if (this.bridge.isTouch) this.hud.showCallout('<b>SWIPE</b> the arrows any time · <b>TAP</b> on beat 4', '', 4000);
           else this.hud.showCallout('Enter the <b>arrows</b> any time · <b>SPACE</b> on beat 4', '', 4000);
         } else if (i === 3) {
@@ -393,6 +419,9 @@ export class BattleSession {
         } else if (d.tier >= 3) {
           this.cuts.push({ bar: d.bar, kind: 'close', who: d.who, len: 3 });
         }
+        const fxKind = name === 'kissBlow' || name === 'heartHands' ? 'heart' : (def.fx && def.fx.move);
+        this.cues.push({ beat: d.bar * 4, fn: () => { this._fx(d.who, fxKind, big ? 8 : 4); if (big) this._fx(d.who, 'sparkle', 8); } });
+        this.cues.sort((a, b) => a.beat - b.beat);
         const power = d.kind === 'solo' ? 5 : d.kind === 'branch' ? Math.min(5, d.tier + 1) : d.tier;
         this.world.react('move', { ...d, tier: power, songTime: this.clock.barTime(d.bar) });
         if (d.who === 'player') {
@@ -406,6 +435,7 @@ export class BattleSession {
       }
       case 'fumble':
         this._dc(d.who).react('fumble', beatNow, 1.6);
+        this._fx(d.who, 'sweat', 1);
         if (d.who === 'player') this._voice('rival', 'single', 0.3);
         break;
       case 'hypeFull':
@@ -424,6 +454,8 @@ export class BattleSession {
         break;
       case 'taunt':
         this._dc(d.attacker).react('taunt', beatNow, 4 - (beatNow % 4) + 0.001, { faceFoe: true, fade: 0.15 });
+        this._fx(d.attacker, (this._def(d.attacker).fx || {}).taunt, 5);
+        this._fx(d.attacker === 'player' ? 'rival' : 'player', 'anger', 1);
         this.director.cut('taunt', beatNow, 3, { who: d.attacker });
         this.sfx.taunt();
         this.world.react('taunt', d);
@@ -435,6 +467,7 @@ export class BattleSession {
         break;
       case 'dodge':
         this._dc(d.who).react('dodge', beatNow, 2);
+        this._fx(d.who, 'sparkle', 5); this._fx(d.attacker, 'sweat', 1);
         this._dc(d.attacker).react('whiff', beatNow + 0.2, 2);
         this.hud.showBanner(d.who === 'player' ? 'DODGED!' : `${rivalName} DODGED`, d.who === 'player' ? 'good' : 'bad', 1100);
         this.world.react('dodge', d);
@@ -443,6 +476,7 @@ export class BattleSession {
         break;
       case 'tauntLanded':
         this._dc(d.defender).react('hitReact', beatNow, 1);
+        this._fx(d.defender, 'exclaim', 1); this._fx(d.defender, 'sweat', 2);
         this._schedule(d.defender, 'stunned', d.stunBar * 4, 4, true);
         this._schedule(d.attacker, 'cheer', Math.ceil(beatNow + 0.5), 2, false);
         this.hud.showBanner(d.defender === 'player' ? 'STUNNED!' : `${rivalName} STUNNED!`, d.defender === 'player' ? 'bad' : 'good', 1300);
@@ -466,7 +500,7 @@ export class BattleSession {
   _result(summary) {
     this.phase = 'result';
     this.summary = summary;
-    const m = this.level.music;
+    const m = this.mcfg;
     const r = this.level.rewards;
     const win = summary.winner === 'player';
     this.bonus = Math.round(summary.player.score * r.battleScoreShare) + (win ? r.win : r.lose);
@@ -477,6 +511,9 @@ export class BattleSession {
     this.rDance.play(win ? 'defeat' : 'victory', bar * 4, len);
     this.director.cut('winner', bar * 4, len, { who: summary.winner });
     this.world.react('end', { who: summary.winner });
+    const loser = win ? 'rival' : 'player';
+    this._fx(summary.winner, 'sparkle', 12); this._fx(summary.winner, (this._def(summary.winner).fx || {}).move, 6);
+    this._fx(loser, 'sweat', 2);
     this.sfx.crowd(1.2);
     this.hud.showBanner(
       `${win ? 'YOU WIN!' : `${this.rDef.name} WINS`}<small>${summary.player.score.toLocaleString()} — ${summary.rival.score.toLocaleString()} · GROOVE BONUS +${this.bonus.toLocaleString()}</small>`,
@@ -504,6 +541,7 @@ export class BattleSession {
     this.pDance.update(beatForDance, acc);
     this.rDance.update(beatForDance, acc);
     this.world.update(this.paused ? 0 : dt, { beat: beatForDance, songTime, leader: this.battle.groove });
+    this.fx.update(this.paused ? 0 : dt);
 
     if (this.trans === 'in') {
       // Timed on the audio clock so the drop lands as the camera crosses
@@ -554,7 +592,7 @@ export class BattleSession {
     this.phase = 'done';
     // The song keeps playing: hand it to the Tetris level as its track.
     this._removeFilter();
-    this.bridge.adoptMusic(this.music.node, this.music.gain, this.level.music.track);
+    this.bridge.adoptMusic(this.music.node, this.music.gain, this.mcfg.track);
     this.onDone({ summary: this.summary, bonus: this.bonus || 0 });
   }
 
