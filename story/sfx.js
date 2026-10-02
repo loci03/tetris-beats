@@ -62,6 +62,22 @@ export class StorySfx {
     this._noise(t, 0.12, 'highpass', 5000, 0.7, 0.18);
   }
 
+  // A direction entered: a short blip that climbs with each step of the
+  // sequence; a wrong one buzzes.
+  dir(index, ok) {
+    const t = this.ctx.currentTime;
+    if (!ok) { this._tone(t, 'square', 180, 120, 0.12, 0.06); return; }
+    const f = 700 * Math.pow(2, Math.min(index, 8) / 12 * 2);
+    this._tone(t, 'triangle', f, f * 1.02, 0.06, 0.12);
+  }
+
+  // Count-in blip scheduled on the audio clock (sample-accurate on the beat).
+  count(atTime, last = false) {
+    const t = Math.max(this.ctx.currentTime, atTime);
+    this._tone(t, 'square', last ? 1320 : 880, null, 0.09, 0.09);
+    this._noise(t, 0.04, 'highpass', 6000, 0.7, 0.12);
+  }
+
   taunt() {
     const t = this.ctx.currentTime;
     this._tone(t, 'sawtooth', 440, 880, 0.18, 0.12);

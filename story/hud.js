@@ -1,7 +1,9 @@
 // BattleHUD — the rhythm battle's 2D overlay: both dancers' score, combo,
-// move tier and hype gauge, the groove tug-of-war meter and timer, the note
-// lane (notes scroll into the hit ring on the beat), judgment pops, banners
-// and — on touch screens — the input pads.
+// level, enthusiasm and hype gauges, the groove tug-of-war meter and timer,
+// the command panel (the direction sequence to enter, with a ★ branch row
+// when the command tree offers one), the beat lane (counts 1-2-3 into the
+// GROOVE hit on beat 4), judgment pops, banners and — on touch screens —
+// swipe input plus GROOVE / TAUNT buttons.
 
 import { LOOKAHEAD } from './rhythm-battle.js';
 
@@ -38,8 +40,10 @@ export class BattleHUD {
 
     const bottom = el('div', 'sh-bottom', this.root);
     this.hint = el('div', 'sh-hint', bottom, isTouch
-      ? 'Swipe the arrows as notes hit the ring · tap for GROOVE'
-      : 'Arrows / WASD on the notes · SPACE = GROOVE / DODGE · T = TAUNT');
+      ? 'Swipe the arrows any time · tap GROOVE on beat 4'
+      : 'Enter the arrows (← ↑ ↓ → / WASD) any time · SPACE on beat 4 · T = TAUNT');
+    this.cmd = el('div', 'sh-cmd', bottom);
+    this._cmdKey = '';
     const laneWrap = el('div', 'sh-lane-wrap', bottom);
     this.lane = el('canvas', 'sh-lane', laneWrap);
     this.judgeEl = el('div', 'sh-judge', laneWrap);
@@ -52,7 +56,7 @@ export class BattleHUD {
       this.swipeZone = el('div', 'sh-swipe', this.root);
       this._initSwipe(this.swipeZone, onPad);
       const pads = el('div', 'sh-pads', this.root);
-      el('div', 'sh-swipe-hint', pads, 'SWIPE <b>←&#8202;↑&#8202;↓&#8202;→</b> ON THE NOTES<br>TAP ANYWHERE = GROOVE');
+      el('div', 'sh-swipe-hint', pads, 'SWIPE <b>←&#8202;↑&#8202;↓&#8202;→</b> ANY TIME<br>TAP = GROOVE ON BEAT 4');
       const right = el('div', 'sh-pad-acts', pads);
       this.tauntPad = this._pad(right, 'sh-pad sh-pad-taunt', 'TAUNT', (ts) => onPad('taunt', null, ts));
       this._pad(right, 'sh-pad sh-pad-groove', 'GROOVE', (ts) => onPad('groove', null, ts));
@@ -71,11 +75,15 @@ export class BattleHUD {
     const row = el('div', 'sh-row', p);
     const tier = el('div', 'sh-tier', row);
     const pips = [1, 2, 3, 4].map(() => el('i', '', tier));
+    const lv = el('div', 'sh-lv', row, 'LV 1');
     const combo = el('div', 'sh-combo', row, '');
+    const enth = el('div', 'sh-enth', p);
+    const enthFill = el('i', '', enth);
+    el('span', '', enth, 'ENTHUSIASM');
     const hype = el('div', 'sh-hype', p);
     const fill = el('i', '', hype);
     const label = el('span', '', hype, 'HYPE');
-    return { p, score, pips, combo, hype, fill, label };
+    return { p, score, pips, lv, combo, enth, enthFill, hype, fill, label };
   }
 
   _pad(parent, cls, label, fn, color) {
@@ -180,8 +188,11 @@ export class BattleHUD {
   update(battle, clock, songTime) {
     for (const [ui, d] of [[this.p, battle.player], [this.r, battle.rival]]) {
       ui.score.textContent = d.score.toLocaleString();
-      ui.pips.forEach((pip, i) => pip.classList.toggle('on', i < d.tier));
-      ui.combo.textContent = d.noteCombo >= 3 ? `${d.noteCombo} COMBO` : '';
+      ui.pips.forEach((pip, i) => pip.classList.toggle('on', i < d.level));
+      ui.lv.textContent = `LV ${d.level}`;
+      ui.combo.textContent = d.combo >= 2 ? `${d.combo} COMBO` : '';
+      ui.enthFill.style.width = d.enthusiasm + '%';
+      ui.enth.classList.toggle('branch', d.enthusiasm >= 50);
       ui.fill.style.width = d.hype + '%';
       const full = d.hype >= 100;
       ui.hype.classList.toggle('full', full);
@@ -193,7 +204,56 @@ export class BattleHUD {
     // Timer: time left in the battle.
     const left = Math.max(0, clock.barTime(battle.endBar) - Math.max(songTime, clock.barTime(battle.startBar)));
     this.timer.textContent = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
+    this._drawCommand(battle, songTime);
     this._drawLane(battle, clock, songTime);
+  }
+
+  // The command panel: one row per option on offer (standard, plus the ★
+  // branch or SOLO when the tree offers it). Entered directions light up;
+  // a complete row glows — then it's GROOVE on beat 4.
+  _drawCommand(battle, now) {
+    const b = battle.commandFor('player', now);
+    const key = !b ? 'none' : `${b.bar}:${b.type}:` + (b.type === 'command' ? b.options.map(o => o.id + o.seq.join('')).join('|') : '');
+    if (key !== this._cmdKey) {
+      this._cmdKey = key;
+      this.cmd.innerHTML = '';
+      this._rows = [];
+      if (b && b.type === 'command') {
+        for (const o of b.options) {
+          const row = el('div', 'sh-cmd-row ' + o.kind, this.cmd);
+          el('span', 'sh-cmd-tag', row, o.kind === 'std' ? `LV ${o.level}` : o.kind === 'branch' ? '★ BRANCH' : '★★ SOLO');
+          const chips = o.seq.map(d => {
+            const c = el('i', 'sh-chip', row, DIR_GLYPH[d]);
+            c.style.setProperty('--c', DIR_COLOR[d]);
+            return c;
+          });
+          el('span', 'sh-cmd-go', row, 'GROOVE ON 4');
+          this._rows.push({ o, row, chips, prog: -1 });
+        }
+      } else if (b) {
+        const label = { taunt: 'TAUNT on beat 1!', dodge: 'DODGE! GROOVE on beat 3', stunned: 'STUNNED…' }[b.type];
+        el('div', 'sh-cmd-row note ' + b.type, this.cmd, label);
+      }
+    }
+    if (!b || b.type !== 'command') return;
+    for (const r of this._rows) {
+      const prog = r.o.progress;
+      if (prog !== r.prog) {
+        r.chips.forEach((c, i) => { c.classList.toggle('done', i < prog); c.classList.toggle('next', i === prog); });
+        r.row.classList.toggle('ready', prog === r.o.seq.length);
+        r.prog = prog;
+      }
+      if (b.resolved) {
+        r.row.classList.toggle('hit', b.success && b.chosen === r.o);
+        r.row.classList.toggle('fail', !b.success || b.chosen !== r.o);
+      }
+    }
+  }
+
+  // A wrong direction clears the sequence: shake the rows.
+  dirFeedback(ok) {
+    if (ok) return;
+    this.cmd.classList.remove('reset'); void this.cmd.offsetWidth; this.cmd.classList.add('reset');
   }
 
   _drawLane(battle, clock, now) {
@@ -206,14 +266,18 @@ export class BattleHUD {
     // Lane body
     g.fillStyle = 'rgba(10,6,24,0.72)';
     g.beginPath(); g.roundRect(4, cy - 34, W - 8, 68, 34); g.fill();
-    // Beat grid
+    // Beat grid, counted 1-2-3 into the finisher on 4.
     const b0 = Math.floor(clock.beatAt(now - 0.5)), b1 = Math.ceil(clock.beatAt(now + LOOKAHEAD));
+    g.font = '800 11px "Exo 2", system-ui, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
     for (let b = b0; b <= b1; b++) {
       const x = xOf(clock.beatTime(b));
       if (x < 8 || x > W - 8) continue;
-      const bar = b % 4 === 0;
-      g.fillStyle = bar ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)';
+      const k = ((b % 4) + 4) % 4;
+      const bar = k === 0;
+      g.fillStyle = bar ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.14)';
       g.fillRect(x - (bar ? 1.5 : 0.75), cy - (bar ? 30 : 20), bar ? 3 : 1.5, bar ? 60 : 40);
+      if (k < 3) { g.fillStyle = 'rgba(255,255,255,0.55)'; g.fillText(String(k + 1), x + 9, cy - 22); }
     }
     // Hit ring, pulsing on the beat
     const ph = ((clock.beatAt(now) % 1) + 1) % 1, pulse = Math.exp(-ph * 6);
@@ -228,8 +292,11 @@ export class BattleHUD {
       const x = xOf(n.time);
       const faded = n.judged === 'miss' || n.judged === 'void';
       g.globalAlpha = faded ? 0.3 : 1;
-      if (n.kind === 'arrow') this._arrowNote(g, x, cy, n.dir);
-      else if (n.kind === 'groove') this._badgeNote(g, x, cy, 24, '#ffc93a', '#fff3c4', 'GROOVE');
+      if (n.kind === 'groove') {
+        const b = battle.player.bars.get(n.bar);
+        const ready = b && b.options && b.options.some(o => o.progress === o.seq.length);
+        this._badgeNote(g, x, cy, ready ? 26 : 23, ready ? '#ffc93a' : '#8a7440', ready ? '#fff3c4' : 'rgba(255,243,196,0.5)', 'GROOVE');
+      }
       else if (n.kind === 'dodge') this._badgeNote(g, x, cy, 25, '#ff3355', '#ffd0d8', 'DODGE', true);
       else if (n.kind === 'taunt') this._badgeNote(g, x, cy, 25, '#b35cff', '#f0dcff', 'TAUNT', true);
       g.globalAlpha = 1;
@@ -240,21 +307,6 @@ export class BattleHUD {
       g.fillStyle = 'rgba(255,40,80,0.18)';
       g.beginPath(); g.roundRect(4, cy - 34, W - 8, 68, 34); g.fill();
     }
-  }
-
-  _arrowNote(g, x, y, dir) {
-    const r = 20;
-    g.fillStyle = DIR_COLOR[dir];
-    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
-    g.lineWidth = 3; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.stroke();
-    g.save();
-    g.translate(x, y);
-    g.rotate({ R: 0, D: Math.PI / 2, L: Math.PI, U: -Math.PI / 2 }[dir]);
-    g.fillStyle = '#fff';
-    g.beginPath();
-    g.moveTo(11, 0); g.lineTo(-2, -10); g.lineTo(-2, -4); g.lineTo(-10, -4); g.lineTo(-10, 4); g.lineTo(-2, 4); g.lineTo(-2, 10);
-    g.closePath(); g.fill();
-    g.restore();
   }
 
   _badgeNote(g, x, y, r, fill, stroke, label, diamond) {
@@ -270,10 +322,10 @@ export class BattleHUD {
     g.fillText(label, x, y + 1);
   }
 
-  judge(judgment, delta, wrong) {
+  judge(judgment, delta, reason) {
     const e = this.judgeEl;
-    const txt = wrong ? 'WRONG' : judgment.toUpperCase();
-    const timing = (!wrong && judgment !== 'perfect' && judgment !== 'miss') ? (delta < 0 ? 'EARLY' : 'LATE') : '';
+    const txt = reason === 'incomplete' ? 'INCOMPLETE' : reason === 'early' ? 'TOO EARLY' : judgment.toUpperCase();
+    const timing = (judgment !== 'perfect' && judgment !== 'miss') ? (delta < 0 ? 'EARLY' : 'LATE') : '';
     e.innerHTML = `${txt}${timing ? `<small>${timing}</small>` : ''}`;
     e.style.color = JUDGE_COLOR[judgment];
     e.classList.remove('pop'); void e.offsetWidth; e.classList.add('pop');

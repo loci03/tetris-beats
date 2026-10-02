@@ -19,10 +19,10 @@ object; the mode never touches game internals directly.
 | `levels.js` | Level registry — **all level-specific data** (theme, special-piece rules, song timing, stage, dancers, AI, rewards). |
 | `story-mode.js` | `StoryModeManager`: special-piece timing, trigger, freeze/resume, battle bonus. Entry point (`createStoryMode(bridge)`). |
 | `battle-session.js` | One trip into the world: renderer, music hand-off, input, and the event wiring between the systems below. |
-| `music-clock.js` | `MusicClock` — the beat/BPM manager. Song position from the AudioContext clock, latency- and user-offset-compensated. **Everything is timed in song time.** |
-| `chart.js` | Command builder (rhythm templates × direction motifs, scaled by move tier). |
-| `rhythm-battle.js` | `RhythmBattle` — pure rules: timing windows, scoring, combos, move tiers, hype, taunt / dodge / stun, battle timer. Emits events. |
-| `opponent-ai.js` | Rival skill profile → hits, taunt decisions, dodges. |
+| `music-clock.js` | `MusicClock` — the beat/BPM manager. Song position from the AudioContext clock, latency- and user-offset-compensated; grid phase check and drum-hit (kick / snare) analysis of the decoded song. **Everything is timed in song time.** |
+| `chart.js` | The command tree: levels 1-4 (3→6 directions), ★ branches (signature moves) unlocked by Enthusiasm, the SOLO at the top. |
+| `rhythm-battle.js` | `RhythmBattle` — pure rules: untimed direction entry + the timed GROOVE finisher on beat 4, scoring, levels, enthusiasm, hype, taunt / dodge / stun, battle timer. Emits events. |
+| `opponent-ai.js` | Rival skill profile → finisher timing, branch choices, taunt decisions, dodges. |
 | `characters.js` | Toon dancer rigs (joint hierarchy + outlined parts + expressive face), each dancer's base routines and move list per tier. |
 | `dance.js` | Choreography: beat-keyframed named moves (two-step, running man, Roger Rabbit, cabbage patch, robot, moonwalk, disco point, jump split…), a groove layer that bounces on every beat (harder on 2 & 4), always-on 8-count base routines, leg IK so planted feet stay planted, and `DanceController` (queue, crossfades, reactions). |
 | `camera.js` | `CameraDirector` — two-shot, push-ins, orbit, taunt and winner shots; aspect-aware. |
@@ -51,12 +51,29 @@ GitHub Pages without a CDN.
    look, style, a move list per tier) or reuse existing ones.
 5. Add a card for it in the STORY tab (`#story-panel` in `index.html`).
 
+## How a battle plays (Bust a Groove rules)
+
+Every 4/4 bar is a command: enter the direction sequence any time from the
+previous bar's finisher until beat 4 — the directions are not timed, and a
+wrong one clears the sequence — then hit **GROOVE on beat 4**. That finisher
+is the one timed event (Perfect / Great / Good). Land it and your dancer
+performs the move through the next bar; each landed command climbs a level
+(longer sequences, bigger moves), a fumble drops one. Landing commands fills
+**Enthusiasm**: from level 2 at half a gauge the tree offers a **★ branch**
+row next to the standard command (longer, more points, signature moves — lock
+& pop, windmill, backflip), and at level 4 with a full gauge the **SOLO**
+(headspin). A solo spends the gauge.
+
+Battle states: INTRO (entrance) → the rival calls the player out → the
+player answers → READY + a 3-2-1 count-in on the beat → GROOVE. Both dancers
+never stop: between moves they loop their own 8-count routines, and a
+drum-hit layer makes them hit the song's actual kicks and snares.
+
 ## Controls (battle)
 
-Arrows / WASD on the notes · Space = GROOVE (and DODGE) · T = taunt ·
-P / Esc = pause. On touch screens: **swipe anywhere** for the arrows (judged
-at the start of the flick; zig-zags chain without lifting), **tap anywhere**
-for GROOVE, plus GROOVE / TAUNT buttons. The **Rhythm timing** slider in
+Arrows / WASD to enter the command · Space = GROOVE on beat 4 (and DODGE) · T = taunt ·
+P / Esc = pause. On touch screens: **swipe anywhere** for the arrows (zig-zags
+chain without lifting), **tap anywhere** for GROOVE (timed at touch-down), plus GROOVE / TAUNT buttons. The **Rhythm timing** slider in
 Settings compensates for audio latency (e.g. Bluetooth headphones).
 
 ## Testing notes

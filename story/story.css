@@ -96,6 +96,22 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
 .sh-tier i { width: 10px; height: 10px; border-radius: 2px; transform: rotate(45deg); background: rgba(255, 255, 255, 0.18); }
 .sh-tier i.on { background: #ffc93a; box-shadow: 0 0 8px #ffb000; }
 .sh-combo { font-weight: 800; font-size: 11px; letter-spacing: 1.5px; color: #ffe45c; }
+.sh-lv { font-weight: 900; font-size: 11px; letter-spacing: 1.5px; color: #ffc93a; }
+.sh-enth {
+  position: relative; height: 9px; border-radius: 5px; overflow: hidden; margin-bottom: 5px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.sh-enth i {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+  background: linear-gradient(90deg, #ff9d2e, #ffe45c);
+  transition: width 0.25s ease;
+}
+.sh-p2 .sh-enth i { left: auto; right: 0; background: linear-gradient(270deg, #ff9d2e, #ffe45c); }
+.sh-enth span {
+  position: relative; display: block; text-align: center;
+  font-size: 7px; font-weight: 900; letter-spacing: 2px; line-height: 9px; color: rgba(0, 0, 0, 0.6);
+}
+.sh-enth.branch { box-shadow: 0 0 10px rgba(255, 210, 70, 0.7); }
 .sh-hype {
   position: relative; height: 16px; border-radius: 8px; overflow: hidden;
   background: rgba(255, 255, 255, 0.1);
@@ -151,6 +167,7 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
 }
 .sh-banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 .sh-banner.go { color: #ffe45c; }
+.sh-banner.count { font-size: clamp(64px, 16vw, 140px); color: #fff; text-shadow: 0 0 30px rgba(255, 201, 58, 0.95), 0 6px 0 rgba(0, 0, 0, 0.45); }
 .sh-banner.good { color: #5dffb0; text-shadow: 0 0 24px rgba(40, 255, 160, 0.8), 0 4px 0 rgba(0, 0, 0, 0.45); }
 .sh-banner.bad { color: #ff6b7e; text-shadow: 0 0 24px rgba(255, 40, 80, 0.8), 0 4px 0 rgba(0, 0, 0, 0.45); }
 .sh-banner.win { color: #ffe45c; }
@@ -185,6 +202,39 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
   display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
 .sh-hint { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: rgba(255, 255, 255, 0.75); text-shadow: 0 1px 3px #000; }
+.sh-cmd { display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 44px; }
+.sh-cmd.reset { animation: shShake 0.3s ease; }
+@keyframes shShake { 0%, 100% { transform: none; } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.sh-cmd-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 26px;
+  background: rgba(10, 6, 24, 0.78); border: 2px solid rgba(255, 255, 255, 0.14);
+  transition: border-color 0.12s, box-shadow 0.12s, opacity 0.2s;
+}
+.sh-cmd-row.branch, .sh-cmd-row.solo { border-color: rgba(255, 201, 58, 0.55); }
+.sh-cmd-row.solo { background: linear-gradient(90deg, rgba(70, 20, 90, 0.85), rgba(110, 30, 60, 0.85)); }
+.sh-cmd-tag { font-weight: 900; font-size: 10px; letter-spacing: 1.5px; color: rgba(255, 255, 255, 0.75); min-width: 40px; }
+.sh-cmd-row.branch .sh-cmd-tag, .sh-cmd-row.solo .sh-cmd-tag { color: #ffd23f; }
+.sh-chip {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  font: 900 19px/1 var(--font-display, system-ui); font-style: normal; color: rgba(255, 255, 255, 0.55);
+  border: 2px solid color-mix(in srgb, var(--c, #fff) 60%, transparent);
+  background: rgba(255, 255, 255, 0.04);
+  transition: transform 0.1s, background 0.1s;
+}
+.sh-chip.next { border-color: #fff; color: #fff; animation: shNext 0.6s ease-in-out infinite alternate; }
+@keyframes shNext { to { box-shadow: 0 0 10px rgba(255, 255, 255, 0.7); } }
+.sh-chip.done { background: var(--c, #fff); color: #fff; border-color: #fff; transform: scale(1.08); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+.sh-cmd-go { font-weight: 900; font-size: 10px; letter-spacing: 1.2px; color: rgba(255, 228, 92, 0.35); white-space: nowrap; }
+.sh-cmd-row.ready { border-color: #ffc93a; box-shadow: 0 0 16px rgba(255, 201, 58, 0.65); }
+.sh-cmd-row.ready .sh-cmd-go { color: #ffe45c; animation: shNext 0.3s ease-in-out infinite alternate; }
+.sh-cmd-row.hit { border-color: #5dffb0; box-shadow: 0 0 18px rgba(80, 255, 170, 0.7); }
+.sh-cmd-row.fail { opacity: 0.35; }
+.sh-cmd-row.note { font-weight: 900; font-size: 13px; letter-spacing: 1.5px; padding: 9px 16px; }
+.sh-cmd-row.note.taunt { border-color: #b35cff; color: #e2c4ff; }
+.sh-cmd-row.note.dodge { border-color: #ff3355; color: #ffc2cc; }
+.sh-cmd-row.note.stunned { border-color: #ff6b7e; color: #ff9aa8; }
 .sh-lane-wrap { position: relative; width: 100%; }
 .sh-lane { display: block; width: 100%; height: 80px; }
 .sh-judge {
@@ -270,6 +320,11 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
   .sh-rjudge { top: 104px; right: 12px; font-size: 13px; }
   .sh-pad { width: 50px; height: 50px; font-size: 20px; }
   .sh-swipe-hint { font-size: 9px; letter-spacing: 0.8px; }
+  .sh-chip { width: 28px; height: 28px; font-size: 15px; }
+  .sh-cmd-row { gap: 4px; padding: 4px 8px; }
+  .sh-cmd-tag { min-width: 0; font-size: 9px; letter-spacing: 0.5px; }
+  .sh-cmd-go { display: none; }
+  .sh-lv { display: none; }
   .sh-pad-groove { width: 84px; font-size: 11px; letter-spacing: 0.5px; }
   .sh-pad-taunt { width: 62px; font-size: 10px; letter-spacing: 0; }
 }

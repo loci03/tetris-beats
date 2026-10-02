@@ -35,7 +35,8 @@ export class BattleSession {
     this.phase = 'init';       // battle phase: init → intro → battle → result → out → done
     this.trans = null;         // camera transition running: 'in' | 'out' | null
     this.paused = false;
-    this.cuts = [];            // camera cuts waiting for their beat
+    this.cuts = [];            // camera cuts waiting for their bar
+    this.cues = [];            // HUD cues waiting for their beat
     this._voiceAt = 0;
     const st = bridge.settings();
     this.low = st.lowGraphics;
@@ -107,9 +108,12 @@ export class BattleSession {
     const m = this.level.music;
     const buffer = this.audio._trackBuffers[m.track] || await this.audio._loadTrack(m.track);
     if (!buffer) throw new Error('battle track unavailable: ' + m.track);
-    // Lock the grid phase to the drums in this browser's decode of the song.
-    this.clock.alignPhase(buffer, this.clock.barTime(m.battleStartBar - m.introBars),
-      Math.min(buffer.duration, this.clock.barTime(m.battleStartBar + m.battleBars + m.resultBars)));
+    // Lock the grid phase to the drums in this browser's decode of the song,
+    // and find the drum hits the dancers will hit.
+    const from = this.clock.barTime(m.battleStartBar - m.introBars);
+    const to = Math.min(buffer.duration, this.clock.barTime(m.battleStartBar + m.battleBars + m.resultBars) + 3);
+    this.clock.alignPhase(buffer, from, to);
+    this.clock.analyzeAccents(buffer, from, to);
 
     // Warm up shaders before the first visible frame.
     this.transition.layout(this._boardRect(), window.innerWidth, window.innerHeight);
@@ -256,17 +260,41 @@ export class BattleSession {
     switch (type) {
       case 'barStart': {
         const m = this.level.music;
-        if (d.bar === m.battleStartBar - m.introBars) {
+        const i = d.bar - (m.battleStartBar - m.introBars);   // intro bar index (0..introBars-1)
+        const B = d.bar * 4;
+        if (i === 0) {
+          // INTRO — both dancers make their entrance, wide shot.
           this.phase = 'intro';
           this.hud.show(true);
-          this.hud.showBanner(`${this.level.title}<small>DANCE BATTLE vs ${rivalName}</small>`, 'big', 2000);
-          if (this.bridge.isTouch) this.hud.showCallout('<b>SWIPE</b> anywhere for the arrows · <b>TAP</b> for GROOVE', '', 4200);
-          this.pDance.play('intro', d.bar * 4, 4); this.rDance.play('intro', d.bar * 4, 4);
-          this.director.cut('wide', d.bar * 4, 4);
-        } else if (d.bar === m.battleStartBar - 1) {
-          this.hud.showBanner('READY?', '', 1900);
+          this.hud.showBanner(`${this.level.title}<small>DANCE BATTLE vs ${rivalName}</small>`, 'big', 2200);
+          this.pDance.play('entrance', B, 4); this.rDance.play('entrance', B, 4);
+          this.director.cut('two', B, 4);
+        } else if (i === 1) {
+          // The rival calls the player out: point, smirk, spin, signature pose.
+          this.rDance.play('introTaunt', B, 4, { faceFoe: true });
+          this.pDance.play('introWatch', B, 4);
+          this.director.cut('close', B, 4, { who: 'rival' });
           this._voice('rival', 'single');
-        } else if (d.bar === m.battleStartBar) {
+        } else if (i === 2) {
+          // The player answers: head shake, two bounces, "come on".
+          this.pDance.play('introAnswer', B, 4, { faceFoe: true });
+          this.rDance.play('introWatch', B, 4);
+          this.director.cut('close', B, 4, { who: 'player' });
+          if (this.bridge.isTouch) this.hud.showCallout('<b>SWIPE</b> the arrows any time · <b>TAP</b> on beat 4', '', 4000);
+          else this.hud.showCallout('Enter the <b>arrows</b> any time · <b>SPACE</b> on beat 4', '', 4000);
+        } else if (i === 3) {
+          // READY + count-in: 3 — 2 — 1 — GROOVE, on the beat.
+          this.pDance.play('ready', B, 4); this.rDance.play('ready', B, 4);
+          this.director.cut('two', B, 4);
+          this.hud.showBanner('READY?', '', this.clock.spb * 1000 * 0.9);
+          ['3', '2', '1'].forEach((n, k) => {
+            const beat = B + 1 + k;
+            this.sfx.count(this.clock.songToCtx(this.clock.beatTime(beat)));
+            this.cues.push({ beat, fn: () => this.hud.showBanner(n, 'count', this.clock.spb * 900) });
+          });
+          this.sfx.count(this.clock.songToCtx(this.clock.barTime(m.battleStartBar)), true);
+        }
+        if (d.bar === m.battleStartBar) {
           this.phase = 'battle';
           this.hud.showBanner('GROOVE!', 'go', 900);
           this.sfx.crowd(0.8);
@@ -277,32 +305,42 @@ export class BattleSession {
         this.cuts = this.cuts.filter(c => c.bar !== d.bar);
         break;
       }
+      case 'dir':
+        this.sfx.dir(this._dirCount = d.ok ? (this._dirCount || 0) + 1 : 0, d.ok);
+        this.hud.dirFeedback(d.ok);
+        if (d.complete) this._dirCount = 0;
+        break;
       case 'judge':
         if (d.who === 'player') {
-          this.hud.judge(d.judgment, d.delta, d.wrong);
-          if (d.note.kind === 'groove' && d.judgment !== 'miss') this.sfx.groove();
+          this.hud.judge(d.judgment, d.delta, d.reason);
+          if (d.note.kind === 'groove' && d.judgment !== 'miss') { this.sfx.groove(); this.sfx.hit(d.judgment); }
           else this.sfx.hit(d.judgment);
         } else if (d.note.kind !== 'dodge' && d.note.kind !== 'taunt') {
           this.hud.rivalJudgment(d.judgment);
         }
         break;
       case 'move': {
-        const list = this._def(d.who).moves[d.tier] || ['groove'];
-        const name = list[d.bar % list.length];
+        const def = this._def(d.who);
+        let name;
+        if (d.kind === 'solo') name = def.solo;
+        else if (d.kind === 'branch') name = def.branchMoves[d.tier];
+        if (!name) { const list = def.moves[d.tier] || ['twoStep']; name = list[d.bar % list.length]; }
         this._schedule(d.who, name, d.bar * 4, 4, true);
         const foe = d.who === 'player' ? 'rival' : 'player';
-        if (d.tier >= 4) {
+        const big = d.kind !== 'std' || d.tier >= 4;
+        if (big) {
           this._schedule(foe, 'reactOoh', d.bar * 4, 2, false);
           this.cuts.push({ bar: d.bar, kind: 'orbit', who: d.who, len: 4 });
         } else if (d.tier >= 3) {
           this.cuts.push({ bar: d.bar, kind: 'close', who: d.who, len: 3 });
         }
-        this.world.react('move', { ...d, songTime: this.clock.barTime(d.bar) });
+        const power = d.kind === 'solo' ? 5 : d.kind === 'branch' ? Math.min(5, d.tier + 1) : d.tier;
+        this.world.react('move', { ...d, tier: power, songTime: this.clock.barTime(d.bar) });
         if (d.who === 'player') {
-          const label = MOVE_LABELS[name] || 'GROOVE';
-          this.hud.showCallout(d.perfect ? `${label} · PERFECT <b>+${d.bonus}</b>` : `${label} <b>+${d.bonus}</b>`, d.perfect ? 'good' : '', 1300);
-          if (d.tier >= 3) this._voice('player', 'combo', 0.45);
-        } else if (d.tier >= 4) {
+          const label = (d.kind === 'solo' ? '★★ ' : d.kind === 'branch' ? '★ ' : '') + (MOVE_LABELS[name] || 'GROOVE');
+          this.hud.showCallout(`${label} · ${d.judgment.toUpperCase()} <b>+${d.bonus}</b>`, d.perfect || big ? 'good' : '', 1400);
+          if (big || d.tier >= 3) this._voice('player', 'combo', 0.5);
+        } else if (big) {
           this._voice('rival', 'combo', 0.5);
         }
         break;
@@ -401,9 +439,11 @@ export class BattleSession {
       this.battle.update(songTime);
       this.hud.update(this.battle, this.clock, songTime);
     }
+    while (this.cues.length && beat >= this.cues[0].beat) this.cues.shift().fn();
     const beatForDance = inWorld ? beat : 0;
-    this.pDance.update(beatForDance);
-    this.rDance.update(beatForDance);
+    const acc = inWorld && !this.paused ? this.clock.accents(songTime) : null;
+    this.pDance.update(beatForDance, acc);
+    this.rDance.update(beatForDance, acc);
     this.world.update(this.paused ? 0 : dt, { beat: beatForDance, songTime, leader: this.battle.groove });
 
     if (this.trans === 'in') {

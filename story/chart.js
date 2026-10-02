@@ -1,31 +1,48 @@
-// Chart system — builds each bar's command (the note sequence a dancer must
-// hit) from rhythm templates + direction motifs, scaled by the dancer's
-// current move tier. Deterministic per seed so a level plays the same way
-// for a given sequence of results.
+// Command system — Bust a Groove rules.
 //
-// Bar layout (beats 0..3 of a 4/4 bar):
-//   arrows on the template's beats, then the GROOVE finisher on beat 3 —
-//   the modern take on Bust a Groove's "enter the command, hit the button
-//   on the fourth beat".
+// Every 4/4 bar is one command:
+//
+//     1 ── 2 ── 3 ── 4
+//     ↓    →    ↑    [GROOVE]
+//
+// The directions are *not* timed notes: enter the sequence any time from
+// the previous bar's finisher up to beat 4 (a wrong direction clears it, so
+// re-enter it). The finisher button is the one timed event — it must land
+// on beat 4. Land it and the dancer performs the move through the next bar.
+//
+// Commands come from a command tree, not a random list. Each landed command
+// climbs a level (longer sequences, bigger moves, more points); a fumble
+// drops one. Landing commands fills the ENTHUSIASM gauge, and once it's high
+// the tree offers a ★ branch next to the standard command — a longer, harder
+// sequence that unlocks a dancer's signature moves for more points. At the
+// top level with a full gauge the branch becomes the SOLO.
 
 export const DIRS = ['L', 'U', 'D', 'R'];
 
-// Beat offsets for the arrow notes, per tier (1 = warm-up, 4 = hardest).
-const RHYTHMS = {
-  1: [[0, 2], [0, 1], [1, 2]],
-  2: [[0, 1, 2], [0, 1.5, 2], [0, 0.5, 2], [0, 1, 1.5]],
-  3: [[0, 0.5, 1, 2], [0, 1, 1.5, 2], [0, 1, 2, 2.5], [0, 0.5, 1.5, 2]],
-  4: [[0, 0.5, 1, 1.5, 2], [0, 0.5, 1, 2, 2.5], [0, 1, 1.5, 2, 2.5], [0, 0.5, 1.5, 2, 2.5]],
+// Standard path.
+export const LEVELS = {
+  1: { len: 3, mult: 1.0 },
+  2: { len: 4, mult: 1.4 },
+  3: { len: 5, mult: 1.9 },
+  4: { len: 6, mult: 2.5 },
 };
+// ★ branches offered from level 2 up once Enthusiasm reaches BRANCH_AT.
+export const BRANCHES = {
+  2: { len: 5, mult: 2.1 },
+  3: { len: 6, mult: 2.8 },
+  4: { len: 7, mult: 3.6 },
+};
+export const SOLO = { len: 8, mult: 5.0 };
+export const BRANCH_AT = 50;
+export const SOLO_AT = 90;
 
 // Direction motifs — short dance "phrases" that read as patterns rather
-// than noise. Cut / repeated to the rhythm's length.
+// than noise; concatenated / cut to the command length.
 const MOTIFS = [
   ['L', 'R'], ['R', 'L'], ['U', 'D'], ['D', 'U'],
-  ['L', 'L', 'R', 'R'], ['U', 'U', 'D', 'D'],
-  ['L', 'U', 'R', 'D'], ['R', 'D', 'L', 'U'],
-  ['L', 'R', 'U', 'U'], ['D', 'D', 'L', 'R'],
-  ['U', 'L', 'U', 'R'], ['D', 'R', 'D', 'L'],
+  ['L', 'L', 'R'], ['U', 'U', 'D'], ['D', 'D', 'U'], ['R', 'R', 'L'],
+  ['L', 'U', 'R'], ['R', 'D', 'L'], ['D', 'L', 'U'], ['U', 'R', 'D'],
+  ['L', 'D', 'R', 'U'], ['U', 'L', 'D', 'R'],
 ];
 
 // Small seeded PRNG (mulberry32).
@@ -41,18 +58,35 @@ export function makeRng(seed) {
 }
 
 const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
+const MIRROR = { L: 'R', R: 'L', U: 'U', D: 'D' };
 
-// A normal command bar for `tier`. Returns note specs in beats (relative to
-// the bar start); the battle converts them to song time.
-export function buildCommand(rng, tier) {
-  const t = Math.max(1, Math.min(4, tier | 0));
-  const beats = pick(rng, RHYTHMS[t]);
-  let motif = pick(rng, MOTIFS);
-  // Mirror half the time for variety.
-  if (rng() < 0.5) motif = motif.map(d => ({ L: 'R', R: 'L', U: 'U', D: 'D' })[d]);
-  const notes = beats.map((beat, i) => ({ beat, kind: 'arrow', dir: motif[i % motif.length] }));
-  notes.push({ beat: 3, kind: 'groove', dir: 'G' });
-  return { type: 'command', tier: t, notes };
+function sequence(rng, len, avoidFirst) {
+  const out = [];
+  while (out.length < len) {
+    let m = pick(rng, MOTIFS);
+    if (rng() < 0.5) m = m.map(d => MIRROR[d]);
+    out.push(...m);
+  }
+  out.length = len;
+  // Options in the same bar start differently, so the first direction the
+  // player enters already says which one they're going for.
+  if (avoidFirst && out[0] === avoidFirst) out[0] = pick(rng, DIRS.filter(d => d !== avoidFirst));
+  return out;
+}
+
+// One command bar for a dancer at `level` with `enthusiasm`. Returns the
+// option(s) on offer plus the timed finisher note on beat 4 (index 3).
+export function buildCommand(rng, level, enthusiasm) {
+  const lv = Math.max(1, Math.min(4, level | 0));
+  const std = LEVELS[lv];
+  const options = [{ id: 'std', kind: 'std', level: lv, mult: std.mult, seq: sequence(rng, std.len) }];
+  if (lv === 4 && enthusiasm >= SOLO_AT) {
+    options.push({ id: 'solo', kind: 'solo', level: lv, mult: SOLO.mult, seq: sequence(rng, SOLO.len, options[0].seq[0]) });
+  } else if (lv >= 2 && enthusiasm >= BRANCH_AT) {
+    const br = BRANCHES[lv];
+    options.push({ id: 'branch', kind: 'branch', level: lv, mult: br.mult, seq: sequence(rng, br.len, options[0].seq[0]) });
+  }
+  return { type: 'command', tier: lv, options, notes: [{ beat: 3, kind: 'groove', dir: 'G' }] };
 }
 
 // The attacker's bar: one TAUNT note on the downbeat.
@@ -60,12 +94,12 @@ export function buildTauntBar() {
   return { type: 'taunt', tier: 0, notes: [{ beat: 0, kind: 'taunt', dir: 'T' }] };
 }
 
-// The defender's bar: the hit lands on beat 2 — dodge it with GROOVE.
+// The defender's bar: the hit lands on beat 3 — dodge it with GROOVE.
 export function buildDodgeBar() {
   return { type: 'dodge', tier: 0, notes: [{ beat: 2, kind: 'dodge', dir: 'G' }] };
 }
 
-// Knocked off-balance: no notes, the dancer just stumbles.
+// Knocked off-balance: no command, the dancer just stumbles.
 export function buildStunnedBar() {
   return { type: 'stunned', tier: 0, notes: [] };
 }

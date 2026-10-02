@@ -19,6 +19,9 @@ export const CHARACTERS = {
     style: { swagger: 1.0, bounce: 1.1, routines: ['twoStep', 'bounceRock', 'kickStep', 'bounceRock'] },
     look: 'player',
     moves: { 1: ['stepClap', 'bodyRoll'], 2: ['runningMan', 'rogerRabbit', 'cabbagePatch'], 3: ['robot', 'moonwalk'], 4: ['jumpSplit', 'windmillFreeze'] },
+    // ★ branch signature moves per level, and the SOLO (command tree, chart.js).
+    branchMoves: { 2: 'lockAndPop', 3: 'breakWindmill', 4: 'backflip' },
+    solo: 'headspin',
   },
   alfred: {
     name: 'ALFRED',
@@ -32,8 +35,12 @@ export const CHARACTERS = {
     style: { swagger: 1.35, bounce: 0.9, routines: ['hustle', 'twoStep', 'hustle', 'bounceRock'] },
     look: 'alfred',
     moves: { 1: ['discoPoint', 'stepClap'], 2: ['cabbagePatch', 'rogerRabbit', 'runningMan'], 3: ['spinPoint', 'moonwalk', 'robot'], 4: ['windmillFreeze', 'jumpSplit'] },
+    branchMoves: { 2: 'lockAndPop', 3: 'breakWindmill', 4: 'backflip' },
+    solo: 'headspin',
   },
 };
+
+const _pivot = new THREE.Vector3(), _tmp = new THREE.Vector3(), _yawOnly = new THREE.Euler();
 
 let _gradient = null;
 function toonGradient() {
@@ -242,12 +249,23 @@ export function createCharacter(def) {
         if (j) j.rotation.set(pose[o], pose[o + 1], pose[o + 2]);
       }
       hips.position.set(pose[ROOT], hipsBaseY + pose[ROOT + 1], pose[ROOT + 2]);
-      body.rotation.y = this.baseYaw + pose[ROOT + 3];
+      const yaw = this.baseYaw + pose[ROOT + 3], pitch = pose[ROOT + 4] || 0, roll = pose[ROOT + 5] || 0;
+      if (pitch || roll) {
+        // Flips / spins pivot about the hips, not the feet.
+        body.rotation.set(pitch, yaw, roll, 'YXZ');
+        _pivot.copy(hips.position).multiplyScalar(def.scale);
+        _tmp.copy(_pivot).applyEuler(_yawOnly.set(0, yaw, 0, 'YXZ'));
+        _pivot.applyEuler(body.rotation);
+        body.position.copy(_tmp).sub(_pivot);
+      } else {
+        body.rotation.set(0, yaw, 0, 'YXZ');
+        body.position.set(0, 0, 0);
+      }
       // Shadow follows the hips on the floor and shrinks when airborne.
       const s = def.scale;
       shadow.position.x = pose[ROOT] * s;
       shadow.position.z = pose[ROOT + 2] * s;
-      const air = Math.max(0, pose[ROOT + 1]);
+      const air = Math.max(0, pose[ROOT + 1]) + Math.max(0, body.position.y);
       shadow.scale.setScalar(1 - Math.min(0.5, air * 0.6));
     },
     setExpression(kind, beat) {

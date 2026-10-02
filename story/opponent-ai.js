@@ -1,7 +1,7 @@
-// Opponent AI — the rival plays the same kind of chart as the player, but
-// its hits are rolled from a skill profile instead of read from input.
-// Pressure matters: a rival that's being out-danced gets flustered, and
-// harder commands (higher tier) are harder for it too.
+// Opponent AI — the rival plays the same command tree as the player, but
+// its finisher timing is rolled from a skill profile instead of read from
+// input. Pressure matters: a rival that's being out-danced gets flustered,
+// and longer commands (higher levels, branches) are harder for it too.
 
 export class OpponentAI {
   constructor(profile, rng) {
@@ -9,10 +9,11 @@ export class OpponentAI {
     this.rng = rng;
   }
 
-  // Judgment for one note. `pressure` is 0..1 (how badly it's losing).
-  judge(note, tier, pressure) {
+  // Finisher judgment for a command option. `pressure` is 0..1 (how badly
+  // it's losing).
+  judge(option, pressure) {
     const p = this.p;
-    const penalty = Math.max(0, tier - 1) * 0.035 + pressure * p.fluster;
+    const penalty = Math.max(0, option.seq.length - 3) * 0.03 + pressure * p.fluster;
     const r = this.rng();
     const perfect = Math.max(0.05, p.perfect - penalty * 0.6);
     const great = p.great;
@@ -26,6 +27,12 @@ export class OpponentAI {
     const spread = { perfect: 0.03, great: 0.075, good: 0.12, miss: 0.2 }[j];
     const delta = (this.rng() * 2 - 1) * spread;
     return { judgment: j, delta };
+  }
+
+  // Go for the ★ branch / solo when the tree offers it?
+  takesBranch(option) {
+    const base = this.p.branch ?? Math.min(0.9, this.p.perfect + 0.25);
+    return this.rng() < (option.kind === 'solo' ? base * 0.85 : base);
   }
 
   // Taunt note on the downbeat of its own taunt bar.

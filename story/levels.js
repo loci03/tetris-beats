@@ -33,7 +33,7 @@ export const STORY_LEVELS = {
       firstBeat: 0.452,     // song seconds of beat 0 (kick on 1 & 3, snare on 2 & 4)
       beatsPerBar: 4,
       battleStartBar: 56,   // first scored bar (high-energy section)
-      introBars: 2,         // READY / GROOVE lead-in before it
+      introBars: 4,         // intro: entrance, rival taunt, answer, 3-2-1 count-in
       battleBars: 24,       // ~57 s of battle
       resultBars: 2,        // result moment before heading back
     },
