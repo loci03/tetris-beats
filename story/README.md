@@ -54,11 +54,12 @@ GitHub Pages without a CDN.
 ## How a battle plays (Bust a Groove rules)
 
 Every 4/4 bar is a command: enter the direction sequence any time from the
-previous bar's finisher until beat 4 — the directions are not timed, and a
-wrong one clears the sequence — then hit **GROOVE on beat 4**. That finisher
+previous bar's finisher until beat 4 — the arrows are drawn on the lane in
+front of the GROOVE note as a guide, they're not timed, and a wrong one is
+simply ignored — then hit **GROOVE on beat 4**. That finisher
 is the one timed event (Perfect / Great / Good). Land it and your dancer
 performs the move through the next bar; each landed command climbs a level
-(longer sequences, bigger moves), a fumble drops one. Landing commands fills
+(2 → 4 arrows, bigger moves), two fumbles in a row drop one. Landing commands fills
 **Enthusiasm**: from level 2 at half a gauge the tree offers a **★ branch**
 row next to the standard command (longer, more points, signature moves — lock
 & pop, windmill, backflip), and at level 4 with a full gauge the **SOLO**
@@ -68,6 +69,15 @@ Battle states: INTRO (entrance) → the rival calls the player out → the
 player answers → READY + a 3-2-1 count-in on the beat → GROOVE. Both dancers
 never stop: between moves they loop their own 8-count routines, and a
 drum-hit layer makes them hit the song's actual kicks and snares.
+
+## BUST A BEAT
+
+The **BEAT** tab on the start screen plays the same battle on its own — no
+Tetris. `StoryModeManager.startBeat(levelId)` runs a `BattleSession` with
+`standalone: true`: no board transition (it opens on the stage), its own
+pause card (Esc / P / the ❚❚ button) and a result screen with PLAY AGAIN /
+MENU. Levels, music, dancers and ALFRED'S DIFFICULTY are shared with Story
+Mode, so every new Story level is a new Bust a Beat stage too.
 
 ## Controls (battle)
 

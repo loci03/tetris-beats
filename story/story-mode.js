@@ -4,6 +4,9 @@
 //        ▲                                                 │
 //        └──────── ReturnTransition ◄── BattleResult ◄─────┘
 //
+// It also runs BUST A BEAT: the same dance battle on its own (no Tetris),
+// with its own pause menu and result screen (startBeat()).
+//
 // It decides when the special tetrimino enters the queue, fires the story
 // event when a line is cleared with it, freezes the match (nothing is
 // reset — board, score, queue, hold and level are preserved), runs a
@@ -19,7 +22,7 @@ class StoryModeManager {
   constructor(bridge) {
     this.bridge = bridge;
     this.level = STORY_LEVELS[DEFAULT_LEVEL];
-    this.phase = 'idle';        // idle | tetris | triggered | battle
+    this.phase = 'idle';        // idle | tetris | triggered | battle | beat
     this.run = null;
     this.session = null;
     this._timers = [];
@@ -77,9 +80,109 @@ class StoryModeManager {
     this._later(() => this._enter(cells, impactRow), 450);
   }
 
-  isActive() { return this.phase === 'triggered' || this.phase === 'battle'; }
+  isActive() { return this.phase === 'triggered' || this.phase === 'battle' || this.phase === 'beat'; }
 
   setPaused(p) { if (this.session) this.session.setPaused(p); }
+
+  // ── BUST A BEAT ───────────────────────────────────────────────────
+  // The dance battle by itself: straight onto the stage, play the battle,
+  // result screen with PLAY AGAIN / MENU.
+  async startBeat(levelId = this.level.id) {
+    this.teardown();
+    this.level = STORY_LEVELS[levelId] || this.level;
+    this.phase = 'beat';
+    this._beatUI();
+    this._onVis = this._onVis || (() => { if (document.hidden && this.phase === 'beat' && this.session && !this.session.paused) this._beatPause(true); });
+    document.addEventListener('visibilitychange', this._onVis);
+    try {
+      this.bridge.ensureAudio();
+      const { BattleSession } = await (this._sessionModule = this._sessionModule || import('./battle-session.js'));
+      if (this.phase !== 'beat') return;
+      this.session = new BattleSession({
+        bridge: this.bridge, level: this.level, standalone: true,
+        onDone: (r) => this._beatResult(r),
+        onPause: () => this._beatPause(!this.session.paused),
+      });
+      await this.session.start();
+    } catch (e) {
+      console.error('[beat] battle failed to start', e);
+      this._toast('The dance floor couldn\'t open on this device.', 3200);
+      this.bridge.quitToMenu();
+    }
+  }
+
+  _beatUI() {
+    if (this.beatUI) return;
+    const root = document.createElement('div');
+    root.className = 'beat-overlay';
+    root.innerHTML = `
+      <div class="beat-card beat-pause">
+        <div class="beat-title">PAUSED</div>
+        <button type="button" data-act="resume" class="beat-btn primary">RESUME</button>
+        <button type="button" data-act="restart" class="beat-btn">RESTART</button>
+        <button type="button" data-act="menu" class="beat-btn">MENU</button>
+      </div>
+      <div class="beat-card beat-result">
+        <div class="beat-kicker">BUST A BEAT · <span data-f="level"></span></div>
+        <div class="beat-title" data-f="title"></div>
+        <div class="beat-scores"><div><small>YOU</small><b data-f="ps"></b></div><div><small data-f="rname"></small><b data-f="rs"></b></div></div>
+        <div class="beat-stats" data-f="stats"></div>
+        <button type="button" data-act="restart" class="beat-btn primary">PLAY AGAIN</button>
+        <button type="button" data-act="menu" class="beat-btn">MENU</button>
+      </div>`;
+    root.addEventListener('click', (e) => {
+      const act = e.target.closest('[data-act]');
+      if (!act) return;
+      if (act.dataset.act === 'resume') this._beatPause(false);
+      else if (act.dataset.act === 'restart') this.startBeat();
+      else if (act.dataset.act === 'menu') this.bridge.quitToMenu();
+    });
+    // While a card is up, Enter = primary action, Esc = resume / menu.
+    this._beatKeys = (e) => {
+      if (!root.classList.contains('show')) return;
+      if (e.key === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); root.querySelector('.beat-card.on .primary').click(); }
+      else if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        if (root.dataset.card === 'pause') this._beatPause(false); else this.bridge.quitToMenu();
+      }
+    };
+    window.addEventListener('keydown', this._beatKeys, true);
+    document.body.appendChild(root);
+    this.beatUI = root;
+  }
+
+  _beatCard(name) {
+    const root = this.beatUI;
+    if (!root) return;
+    root.dataset.card = name || '';
+    root.classList.toggle('show', !!name);
+    root.querySelectorAll('.beat-card').forEach(c => c.classList.toggle('on', !!name && c.classList.contains('beat-' + name)));
+  }
+
+  _beatPause(p) {
+    if (this.phase !== 'beat' || !this.session || this.session.phase === 'done') return;
+    this.session.setPaused(p);
+    this._beatCard(p ? 'pause' : null);
+  }
+
+  _beatResult({ summary }) {
+    const root = this.beatUI;
+    if (!root || !summary) return;
+    const f = (k) => root.querySelector(`[data-f="${k}"]`);
+    const win = summary.winner === 'player';
+    const P = summary.player;
+    f('level').textContent = this.level.title;
+    f('title').textContent = win ? 'YOU WIN!' : `${this.session.rDef.name} WINS`;
+    f('title').className = 'beat-title ' + (win ? 'win' : 'lose');
+    f('ps').textContent = P.score.toLocaleString();
+    f('rname').textContent = this.session.rDef.name;
+    f('rs').textContent = summary.rival.score.toLocaleString();
+    f('stats').innerHTML = [
+      ['PERFECT', P.counts.perfect], ['GREAT', P.counts.great], ['GOOD', P.counts.good], ['MISS', P.counts.miss],
+      ['MOVES', P.moves], ['★ BRANCH', P.branches], ['SOLO', P.solos], ['BEST COMBO', P.maxCombo],
+    ].map(([k, v]) => `<span><small>${k}</small>${v}</span>`).join('');
+    this._beatCard('result');
+  }
 
   teardown() {
     for (const t of this._timers) clearTimeout(t);
@@ -93,6 +196,8 @@ class StoryModeManager {
     }
     document.body.classList.remove('story-charge', 'story-dim');
     this.toast.classList.remove('show');
+    this._beatCard(null);
+    if (this._onVis) document.removeEventListener('visibilitychange', this._onVis);
     this.phase = 'idle';
   }
 

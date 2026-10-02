@@ -28,10 +28,14 @@ const OUT_DUR = 2.4;      // seconds, world → board
 const KEY_DIRS = { ArrowLeft: 'L', ArrowRight: 'R', ArrowUp: 'U', ArrowDown: 'D', a: 'L', d: 'R', w: 'U', s: 'D' };
 
 export class BattleSession {
-  constructor({ bridge, level, specialCells, impactRow, onDone }) {
+  // `standalone`: Bust a Beat — the battle on its own, no Tetris board to
+  // fly through; it fades in on the stage and ends on the result screen.
+  constructor({ bridge, level, specialCells, impactRow, onDone, standalone = false, onPause = null }) {
     this.bridge = bridge;
     this.level = level;
     this.onDone = onDone;
+    this.standalone = standalone;
+    this.onPause = onPause;
     this.phase = 'init';       // battle phase: init → intro → battle → result → out → done
     this.trans = null;         // camera transition running: 'in' | 'out' | null
     this.paused = false;
@@ -75,10 +79,13 @@ export class BattleSession {
     this.director.motion = this.motion;
 
     // ── Board transition ──
-    this.transition = new BoardTransition({
-      canvas: bridge.getBoardCanvas(), cols: 10, rows: 20, specialCells, impactRow,
-    });
-    this.transition.attach(this.scene, this.camera);
+    this.transition = null;
+    if (!standalone) {
+      this.transition = new BoardTransition({
+        canvas: bridge.getBoardCanvas(), cols: 10, rows: 20, specialCells, impactRow,
+      });
+      this.transition.attach(this.scene, this.camera);
+    }
 
     // ── Audio + rules ──
     this.audio = bridge.audio;
@@ -94,6 +101,7 @@ export class BattleSession {
       names: { player: pDef.name, rival: rDef.name },
       isTouch: bridge.isTouch,
       onPad: (kind, dir, ts) => this._input(kind, dir, ts ?? performance.now()),
+      onPause: () => { if (this.phase === 'done' || this.phase === 'dead') return; if (this.standalone) { if (this.onPause) this.onPause(); } else this.bridge.togglePause(); },
     });
 
     this._onKey = (e) => this._key(e);
@@ -114,6 +122,8 @@ export class BattleSession {
     const to = Math.min(buffer.duration, this.clock.barTime(m.battleStartBar + m.battleBars + m.resultBars) + 3);
     this.clock.alignPhase(buffer, from, to);
     this.clock.analyzeAccents(buffer, from, to);
+
+    if (this.standalone) return this._startStandalone(buffer);
 
     // Warm up shaders before the first visible frame.
     this.transition.layout(this._boardRect(), window.innerWidth, window.innerHeight);
@@ -153,6 +163,55 @@ export class BattleSession {
     this._raf = requestAnimationFrame((t) => this._frame(t));
   }
 
+  // Bust a Beat: no board transition — open on the two-shot as the lights
+  // come up and the song comes in on the intro bar.
+  _startStandalone(buffer) {
+    const m = this.level.music;
+    const f = this.director.framing();
+    this.camera.position.copy(f.pos); this.camera.fov = f.fov; this.camera.lookAt(f.look);
+    this.camera.updateProjectionMatrix();
+    this.director.snapTo(f.pos, f.look, f.fov);
+    this.world.setLightLevel(1);
+    this.renderer.compile(this.scene, this.camera);
+    this.renderer.render(this.scene, this.camera);
+    document.body.classList.add('story-dim');
+    this.canvas.classList.add('on');
+    this.bridge.setHide2D(true);
+    const ctx = this.ctx, now = ctx.currentTime;
+    this.dropTime = now + 0.5;
+    const old = this.audio._trackSource;
+    if (old) {
+      old.gain.gain.cancelScheduledValues(now);
+      old.gain.gain.setValueAtTime(old.gain.gain.value, now);
+      old.gain.gain.linearRampToValueAtTime(0.0001, now + 0.3);
+      try { old.node.stop(now + 0.35); } catch {}
+      this.audio._trackSource = null;
+      this.audio._trackName = null;
+    }
+    this.sfx.whoosh(0.5, true);
+    this.sfx.impact(this.dropTime);
+    this.music = this.clock.play(buffer, this.audio.trackGain, this.clock.barTime(m.battleStartBar - m.introBars), this.dropTime, 0.3);
+    this.trans = null;
+    this._last = performance.now();
+    this._raf = requestAnimationFrame((t) => this._frame(t));
+  }
+
+  // Bust a Beat ends here: the music fades out under the result screen
+  // while the dancers keep celebrating / sulking.
+  _finishStandalone() {
+    if (this.phase === 'done') return;
+    this.phase = 'done';
+    this.hud.show(false);
+    const g = this.music && this.music.gain.gain, t = this.ctx.currentTime;
+    if (g) {
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t);
+      g.linearRampToValueAtTime(0.0001, t + 2.5);
+      try { this.music.node.stop(t + 2.6); } catch {}
+    }
+    this.onDone({ summary: this.summary, bonus: this.bonus || 0 });
+  }
+
   setPaused(p) {
     this.paused = !!p;
     try { p ? this.ctx.suspend() : this.ctx.resume(); } catch {}
@@ -165,7 +224,7 @@ export class BattleSession {
     this._removeFilter();
     this.hud.destroy();
     this.sfx.dispose();
-    this.transition.dispose();
+    if (this.transition) this.transition.dispose();
     this.world.dispose();
     this.pRig.dispose(); this.rRig.dispose();
     this.renderer.dispose();
@@ -178,7 +237,7 @@ export class BattleSession {
 
   // Tear-down that also stops the battle music (quit / restart mid-battle).
   abort() {
-    if (this.music && this.phase !== 'done') {
+    if (this.music && (this.phase !== 'done' || this.standalone)) {
       try { this.music.node.stop(); } catch {}
     }
     this.destroy();
@@ -214,7 +273,7 @@ export class BattleSession {
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (k === 'Escape' || k === 'p') {
       e.preventDefault(); e.stopImmediatePropagation();
-      if (!e.repeat) this.bridge.togglePause();
+      if (!e.repeat) { if (this.standalone) { if (this.onPause) this.onPause(); } else this.bridge.togglePause(); }
       return;
     }
     if (this.paused) return;
@@ -471,7 +530,7 @@ export class BattleSession {
       if (t >= OUT_DUR) this._finish();
     } else {
       this.director.update(dt, { beat, leader: this.battle.groove });
-      if (this.phase === 'result' && songTime >= this.outAtSong) this._startOut();
+      if (this.phase === 'result' && songTime >= this.outAtSong) this.standalone ? this._finishStandalone() : this._startOut();
     }
     this.renderer.render(this.scene, this.camera);
   }
@@ -512,6 +571,6 @@ export class BattleSession {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.hud.resize();
-    if (this.trans === 'in' || this.phase === 'init') this.transition.layout(this._boardRect(), w, h);
+    if (this.transition && (this.trans === 'in' || this.phase === 'init')) this.transition.layout(this._boardRect(), w, h);
   }
 }

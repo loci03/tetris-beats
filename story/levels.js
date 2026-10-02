@@ -50,9 +50,9 @@ export const STORY_LEVELS = {
     ai: {
       // Hit-rate split per note; `hypeRate` scales its taunt gauge fill;
       // `fluster` is how much it slips when it's being out-danced.
-      easy:   { perfect: 0.32, great: 0.34, good: 0.22, dodge: 0.30, tauntChance: 0.40, taunt: 0.70, fluster: 0.08, hypeRate: 1.2 },
-      medium: { perfect: 0.52, great: 0.31, good: 0.11, dodge: 0.45, tauntChance: 0.60, taunt: 0.85, fluster: 0.05, hypeRate: 1.5 },
-      hard:   { perfect: 0.68, great: 0.24, good: 0.06, dodge: 0.60, tauntChance: 0.80, taunt: 0.95, fluster: 0.02, hypeRate: 1.7 },
+      easy:   { perfect: 0.26, great: 0.32, good: 0.24, dodge: 0.30, tauntChance: 0.40, taunt: 0.70, fluster: 0.08, hypeRate: 1.2 },
+      medium: { perfect: 0.58, great: 0.3, good: 0.09, dodge: 0.45, tauntChance: 0.60, taunt: 0.85, fluster: 0.05, hypeRate: 1.6, branch: 0.85 },
+      hard:   { perfect: 0.76, great: 0.2, good: 0.03, dodge: 0.60, tauntChance: 0.80, taunt: 0.95, fluster: 0.02, hypeRate: 2.0, branch: 0.95 },
     },
 
     rewards: {

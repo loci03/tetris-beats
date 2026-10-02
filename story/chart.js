@@ -6,13 +6,14 @@
 //     ↓    →    ↑    [GROOVE]
 //
 // The directions are *not* timed notes: enter the sequence any time from
-// the previous bar's finisher up to beat 4 (a wrong direction clears it, so
-// re-enter it). The finisher button is the one timed event — it must land
-// on beat 4. Land it and the dancer performs the move through the next bar.
+// the previous bar's finisher up to beat 4 (they're drawn on the lane in
+// front of the GROOVE note as a guide; a wrong direction is just ignored).
+// The finisher button is the one timed event — it must land on beat 4.
+// Land it and the dancer performs the move through the next bar.
 //
 // Commands come from a command tree, not a random list. Each landed command
-// climbs a level (longer sequences, bigger moves, more points); a fumble
-// drops one. Landing commands fills the ENTHUSIASM gauge, and once it's high
+// climbs a level (longer sequences, bigger moves, more points); two fumbles
+// in a row drop one. Landing commands fills the ENTHUSIASM gauge, and once it's high
 // the tree offers a ★ branch next to the standard command — a longer, harder
 // sequence that unlocks a dancer's signature moves for more points. At the
 // top level with a full gauge the branch becomes the SOLO.
@@ -21,19 +22,19 @@ export const DIRS = ['L', 'U', 'D', 'R'];
 
 // Standard path.
 export const LEVELS = {
-  1: { len: 3, mult: 1.0 },
-  2: { len: 4, mult: 1.4 },
-  3: { len: 5, mult: 1.9 },
-  4: { len: 6, mult: 2.5 },
+  1: { len: 2, mult: 1.0 },
+  2: { len: 3, mult: 1.4 },
+  3: { len: 4, mult: 1.9 },
+  4: { len: 4, mult: 2.5 },
 };
 // ★ branches offered from level 2 up once Enthusiasm reaches BRANCH_AT.
 export const BRANCHES = {
-  2: { len: 5, mult: 2.1 },
-  3: { len: 6, mult: 2.8 },
-  4: { len: 7, mult: 3.6 },
+  2: { len: 4, mult: 2.1 },
+  3: { len: 5, mult: 2.8 },
+  4: { len: 5, mult: 3.6 },
 };
-export const SOLO = { len: 8, mult: 5.0 };
-export const BRANCH_AT = 50;
+export const SOLO = { len: 6, mult: 5.0 };
+export const BRANCH_AT = 40;
 export const SOLO_AT = 90;
 
 // Direction motifs — short dance "phrases" that read as patterns rather

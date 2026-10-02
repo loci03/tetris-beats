@@ -376,7 +376,7 @@
     border-radius: 28px; padding: 4px;
   }
   .mode-tab {
-    padding: 10px 28px; min-width: 110px;
+    padding: 10px 22px; min-width: 96px;
     font-size: 13px; font-weight: 800; letter-spacing: 3px;
     background: transparent; color: rgba(255,255,255,0.6);
     border: none; border-radius: 22px;
@@ -826,7 +826,7 @@
   /* Plain action chips (RESET …) aren't toggles - no state dot. */
   .ov-chip:not([aria-pressed])::before { content: none; }
   /* Story Mode level list (start screen, STORY tab) */
-  #story-panel {
+  #story-panel, #beat-panel {
     flex-direction: column; gap: 8px;
     width: min(380px, 92%);
     margin: 0 auto 18px;
@@ -2054,6 +2054,7 @@
     <button class="mode-tab mode-tab-active" data-tab="arcade">ARCADE</button>
     <button class="mode-tab" data-tab="vs">VS</button>
     <button class="mode-tab" data-tab="story">STORY</button>
+    <button class="mode-tab" data-tab="beat" title="Bust a Beat — the dance battle on its own">BEAT</button>
     <button class="mode-tab" data-tab="more">MORE</button>
   </div>
   <div id="mode-select" data-active-tab="arcade">
@@ -2082,6 +2083,22 @@
     <div class="story-level story-level-locked">
       <span class="sl-num">02</span>
       <span class="sl-body"><b>COMING SOON</b><small>More worlds on the way.</small></span>
+    </div>
+  </div>
+  <!-- BUST A BEAT: the Story Mode dance battle by itself — no Tetris.
+       Same levels / music / rival; ALFRED'S DIFFICULTY applies. -->
+  <div id="beat-panel" style="display:none;">
+    <div class="story-kicker">BUST A BEAT</div>
+    <button class="story-level story-level-active" type="button" data-beat-level="taco">
+      <span class="sl-num">01</span>
+      <span class="sl-body">
+        <b>TACO TOWN</b>
+        <small>Dance battle vs ALFRED. Enter the arrows, hit GROOVE on beat 4 — no Tetris, just the groove.</small>
+      </span>
+    </button>
+    <div class="story-level story-level-locked">
+      <span class="sl-num">02</span>
+      <span class="sl-body"><b>COMING SOON</b><small>More stages on the way.</small></span>
     </div>
   </div>
   <!-- Difficulty picker - visible only when "VS ALFRED" mode is selected.
@@ -19898,6 +19915,14 @@ function startGame() {
     loadStoryMode().then(ok => { if (ok) startGame(); });
     return;
   }
+  // BUST A BEAT skips the Tetris match entirely: straight to the stage.
+  if (gameMode === 'bustabeat') {
+    if (!window.StoryMode) { loadStoryMode().then(ok => { if (ok) startGame(); }); return; }
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('game-over-screen').style.display = 'none';
+    window.StoryMode.startBeat('taco');
+    return;
+  }
   // Any story event from a previous run (restart mid-battle) is torn down.
   if (window.StoryMode) window.StoryMode.teardown();
   storyFreeze = false;
@@ -20484,6 +20509,12 @@ window.TetrisBridge = {
   togglePause() { togglePause(); },
   // True while a modal UI (settings) should swallow gameplay keys.
   uiBlocking() { return _settingsOpen(); },
+  // Bust a Beat: make sure the audio graph exists (no Tetris track starts).
+  ensureAudio() {
+    audioEngine.init();
+    if (audioEngine.ctx.state === 'suspended') audioEngine.ctx.resume().catch(() => {});
+  },
+  quitToMenu() { quitToMenu(); },
   specialCells() {
     const out = [];
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (board[r][c] === SPECIAL_COLOR) out.push([c, r]);
@@ -21159,6 +21190,7 @@ window.addEventListener('resize', () => positionP2Monitor());
     more:   'marathon',
   };
   const storyPanel = document.getElementById('story-panel');
+  const beatPanel = document.getElementById('beat-panel');
   function setTab(tab) {
     if (select) select.dataset.activeTab = tab;
     tabs.forEach(t => t.classList.toggle('mode-tab-active', t.dataset.tab === tab));
@@ -21166,7 +21198,18 @@ window.addEventListener('resize', () => positionP2Monitor());
     // STORY tab: show WIP, hide start button and vibe picker
     const isStory = (tab === 'story');
     if (storyPanel) storyPanel.style.display = isStory ? 'flex' : 'none';
+    if (beatPanel) beatPanel.style.display = tab === 'beat' ? 'flex' : 'none';
     const levelSelect = document.getElementById('level-select');
+    if (tab === 'beat') {
+      // BUST A BEAT: the dance battle only. Rival difficulty applies.
+      gameMode = 'bustabeat';
+      btns.forEach(b => b.classList.remove('mode-active'));
+      if (levelSelect) levelSelect.style.display = 'none';
+      if (diff) diff.style.display = 'flex';
+      refreshLb();
+      loadStoryMode(true);
+      return;
+    }
     if (isStory) {
       gameMode = 'storymode';
       btns.forEach(b => b.classList.remove('mode-active'));

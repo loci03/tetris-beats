@@ -6,12 +6,12 @@
 //   • Each dancer gets a command from the command tree (chart.js): a
 //     direction sequence, entered any time from the previous bar's finisher
 //     until beat 4, then GROOVE exactly on beat 4. Only the finisher is
-//     timed (Perfect/Great/Good); a wrong direction clears the sequence.
+//     timed (Perfect/Great/Good); a wrong direction is simply ignored.
 //   • Land it and the dancer performs the move during the next bar, the
 //     level climbs (longer commands, bigger moves, more points) and the
 //     ENTHUSIASM gauge fills; once it's high a ★ branch is offered next to
 //     the standard command (signature moves), and at level 4 the SOLO.
-//     A fumble drops a level and drains enthusiasm.
+//     A fumble drains enthusiasm; two in a row drop a level.
 //   • Landed commands also fill HYPE. Full hype = a TAUNT: press it, hit
 //     the taunt note on the next downbeat, and the opponent must DODGE
 //     (GROOVE on beat 3) or get stunned for a bar.
@@ -20,10 +20,11 @@
 import { buildCommand, buildTauntBar, buildDodgeBar, buildStunnedBar, makeRng } from './chart.js';
 import { OpponentAI } from './opponent-ai.js';
 
-export const WINDOWS = { perfect: 0.05, great: 0.1, good: 0.15 };
+// Generous: the finisher is the only timed press in a bar.
+export const WINDOWS = { perfect: 0.07, great: 0.125, good: 0.2 };
 const FINISH_POINTS = { perfect: 1000, great: 700, good: 400, miss: 0 };
 const HYPE_GAIN = { perfect: 18, great: 13, good: 6, miss: -15 };
-const ENTH_GAIN = { perfect: 22, great: 15, good: 8, miss: -30 };
+const ENTH_GAIN = { perfect: 22, great: 16, good: 10, miss: -20 };
 const TAUNT_LAND_BONUS = 1500;
 const DODGE_BONUS = 800;
 // Bars are built (and commands shown) this far ahead; the lane shows the
@@ -169,14 +170,8 @@ export class RhythmBattle {
       this._queueTaunt('player', bar);
       return;
     }
-    // GROOVE before beat 4 with the sequence already entered: jumped the
-    // gun, the command is blown. (With the sequence unfinished it's just a
-    // stray press — a stray tap on a phone shouldn't cost a command.)
-    const b = this._openCommand(p, t);
-    if (b && b.options.some(o => o.progress === o.seq.length) && t < b.finisher.time) {
-      this._applyJudgment(p, b.finisher, 'miss', t - b.finisher.time, 'early');
-      return;
-    }
+    // GROOVE well before beat 4 is just a stray press — it doesn't cost
+    // the command (a stray tap on a phone shouldn't).
     this.emit('stray', { kind, dir });
   }
 
@@ -195,12 +190,13 @@ export class RhythmBattle {
   _dirInput(t, dir) {
     const b = this._openCommand(this.player, t, true);
     if (!b) { this.emit('stray', { kind: 'arrow', dir }); return; }
+    // Forgiving entry: a direction that matches the next arrow of any
+    // option advances it; a wrong one is ignored (it doesn't wipe the
+    // sequence). Options that haven't started can still be picked up.
     let advanced = false;
     for (const o of b.options) {
       if (o.seq[o.progress] === dir) { o.progress++; advanced = true; }
-      else o.progress = o.seq[0] === dir ? 1 : 0;
     }
-    if (!advanced && b.options.some(o => o.progress > 0)) advanced = true;   // restarted cleanly
     const done = b.options.find(o => o.progress === o.seq.length) || null;
     this.emit('dir', { who: 'player', bar: b.bar, dir, ok: advanced, complete: done && done.id });
   }
@@ -254,6 +250,7 @@ export class RhythmBattle {
     const level = b.tier;
     if (b.success) {
       d.chain++;
+      d.fumbles = 0;
       d.moves++;
       if (opt.kind === 'branch') d.branches++;
       if (opt.kind === 'solo') d.solos++;
@@ -264,7 +261,8 @@ export class RhythmBattle {
       this.emit('move', { who: d.id, bar: b.bar + 1, tier: level, kind: opt.kind, judgment: j, perfect: j === 'perfect', bonus: pts, chain: d.chain });
     } else {
       d.chain = 0;
-      d.level = Math.max(1, d.level - 1);
+      d.fumbles = (d.fumbles || 0) + 1;
+      if (d.fumbles >= 2) { d.level = Math.max(1, d.level - 1); d.fumbles = 0; }
       d.enthusiasm = clamp(d.enthusiasm + ENTH_GAIN.miss, 0, 100);
       this.emit('fumble', { who: d.id, bar: b.bar, reason });
     }

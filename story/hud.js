@@ -20,13 +20,20 @@ function el(tag, cls, parent, html) {
 }
 
 export class BattleHUD {
-  constructor({ names, isTouch, onPad }) {
+  constructor({ names, isTouch, onPad, onPause }) {
     this.root = el('div', 'story-hud');
     this.root.setAttribute('aria-live', 'polite');
     const top = el('div', 'sh-top', this.root);
     this.p = this._panel(top, 'sh-p1', names.player);
     const mid = el('div', 'sh-mid', top);
-    this.timer = el('div', 'sh-timer', mid, '1:00');
+    const timerRow = el('div', 'sh-timer-row', mid);
+    this.timer = el('div', 'sh-timer', timerRow, '1:00');
+    if (onPause) {
+      const pb = el('button', 'sh-pause', timerRow, '❚❚');
+      pb.type = 'button';
+      pb.setAttribute('aria-label', 'Pause');
+      pb.addEventListener('click', (e) => { e.preventDefault(); onPause(); });
+    }
     const gm = el('div', 'sh-groove', mid);
     el('span', 'sh-groove-l', gm, 'YOU');
     this.grooveBar = el('div', 'sh-groove-bar', gm);
@@ -208,34 +215,44 @@ export class BattleHUD {
     this._drawLane(battle, clock, songTime);
   }
 
-  // The command panel: one row per option on offer (standard, plus the ★
-  // branch or SOLO when the tree offers it). Entered directions light up;
-  // a complete row glows — then it's GROOVE on beat 4.
+  // The option being entered: the one with the most arrows in (ties go to
+  // the standard command, listed first).
+  static activeOption(b) {
+    let best = b.options[0];
+    for (const o of b.options) if (o.progress > best.progress) best = o;
+    return best;
+  }
+
+  // The command panel lists the *other* option(s) on offer — the ★ branch
+  // or SOLO row next to the standard command (the active option's arrows
+  // are drawn on the lane). Entered arrows light up; a ready row glows.
   _drawCommand(battle, now) {
     const b = battle.commandFor('player', now);
-    const key = !b ? 'none' : `${b.bar}:${b.type}:` + (b.type === 'command' ? b.options.map(o => o.id + o.seq.join('')).join('|') : '');
+    const act = b && b.type === 'command' ? BattleHUD.activeOption(b) : null;
+    const key = !b ? 'none' : `${b.bar}:${b.type}:` + (act ? b.options.map(o => o.id + o.seq.join('')).join('|') + ':' + act.id : '');
     if (key !== this._cmdKey) {
       this._cmdKey = key;
       this.cmd.innerHTML = '';
       this._rows = [];
-      if (b && b.type === 'command') {
+      if (act) {
         for (const o of b.options) {
+          if (o === act) continue;
           const row = el('div', 'sh-cmd-row ' + o.kind, this.cmd);
-          el('span', 'sh-cmd-tag', row, o.kind === 'std' ? `LV ${o.level}` : o.kind === 'branch' ? '★ BRANCH' : '★★ SOLO');
+          el('span', 'sh-cmd-tag', row, o.kind === 'std' ? `OR LV ${o.level}` : o.kind === 'branch' ? '★ BRANCH' : '★★ SOLO');
           const chips = o.seq.map(d => {
             const c = el('i', 'sh-chip', row, DIR_GLYPH[d]);
             c.style.setProperty('--c', DIR_COLOR[d]);
             return c;
           });
-          el('span', 'sh-cmd-go', row, 'GROOVE ON 4');
+          if (o.kind !== 'std') el('span', 'sh-cmd-go', row, 'BIGGER MOVE');
           this._rows.push({ o, row, chips, prog: -1 });
         }
       } else if (b) {
         const label = { taunt: 'TAUNT on beat 1!', dodge: 'DODGE! GROOVE on beat 3', stunned: 'STUNNED…' }[b.type];
-        el('div', 'sh-cmd-row note ' + b.type, this.cmd, label);
+        if (label) el('div', 'sh-cmd-row note ' + b.type, this.cmd, label);
       }
     }
-    if (!b || b.type !== 'command') return;
+    if (!act) return;
     for (const r of this._rows) {
       const prog = r.o.progress;
       if (prog !== r.prog) {
@@ -243,17 +260,22 @@ export class BattleHUD {
         r.row.classList.toggle('ready', prog === r.o.seq.length);
         r.prog = prog;
       }
-      if (b.resolved) {
-        r.row.classList.toggle('hit', b.success && b.chosen === r.o);
-        r.row.classList.toggle('fail', !b.success || b.chosen !== r.o);
-      }
     }
   }
 
-  // A wrong direction clears the sequence: shake the rows.
+  // Where the active option's arrows sit on the lane: spread over the
+  // bar, ending half a beat before the GROOVE note on beat 4. They're a
+  // guide — enter them any time before beat 4.
+  static arrowBeats(n) {
+    if (n <= 1) return [2];
+    const step = Math.min(1, 2.5 / (n - 1));
+    return Array.from({ length: n }, (_, i) => 2.5 - step * (n - 1 - i));
+  }
+
+  // A wrong direction is ignored: shake the panel and lane a little.
   dirFeedback(ok) {
     if (ok) return;
-    this.cmd.classList.remove('reset'); void this.cmd.offsetWidth; this.cmd.classList.add('reset');
+    for (const e of [this.cmd, this.lane]) { e.classList.remove('reset'); void e.offsetWidth; e.classList.add('reset'); }
   }
 
   _drawLane(battle, clock, now) {
@@ -284,6 +306,23 @@ export class BattleHUD {
     g.lineWidth = 3 + pulse * 2;
     g.strokeStyle = `rgba(255,255,255,${0.55 + 0.4 * pulse})`;
     g.beginPath(); g.arc(hitX, cy, 25 + pulse * 3, 0, Math.PI * 2); g.stroke();
+    // The command's arrows, on the same line, leading into GROOVE.
+    for (const b of battle.player.bars.values()) {
+      if (b.type !== 'command') continue;
+      const t0 = clock.barTime(b.bar);
+      if (b.finisher.time < now - 0.4 || t0 > now + LOOKAHEAD + 0.1) continue;
+      const o = BattleHUD.activeOption(b);
+      const beats = BattleHUD.arrowBeats(o.seq.length);
+      const failed = b.resolved && !b.success;
+      for (let i = o.seq.length - 1; i >= 0; i--) {
+        const x = xOf(t0 + beats[i] * clock.spb);
+        if (x < -30 || x > W + 30) continue;
+        const done = i < o.progress;
+        g.globalAlpha = failed ? 0.25 : done ? 1 : 0.55;
+        this._arrowNote(g, x, cy, o.seq[i], done, !done && i === o.progress && !b.resolved);
+      }
+      g.globalAlpha = 1;
+    }
     // Notes
     const notes = battle.visibleNotes('player', now - 0.35, now + LOOKAHEAD + 0.1);
     notes.sort((a, b) => b.time - a.time);
@@ -307,6 +346,23 @@ export class BattleHUD {
       g.fillStyle = 'rgba(255,40,80,0.18)';
       g.beginPath(); g.roundRect(4, cy - 34, W - 8, 68, 34); g.fill();
     }
+  }
+
+  _arrowNote(g, x, y, dir, done, next) {
+    const r = done ? 19 : 17;
+    g.fillStyle = done ? DIR_COLOR[dir] : 'rgba(20,12,36,0.9)';
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    g.lineWidth = next ? 4 : 3;
+    g.strokeStyle = done ? '#fff' : next ? '#fff' : DIR_COLOR[dir];
+    g.stroke();
+    g.save();
+    g.translate(x, y);
+    g.rotate({ R: 0, D: Math.PI / 2, L: Math.PI, U: -Math.PI / 2 }[dir]);
+    g.fillStyle = done ? '#fff' : DIR_COLOR[dir];
+    g.beginPath();
+    g.moveTo(10, 0); g.lineTo(-2, -9); g.lineTo(-2, -4); g.lineTo(-9, -4); g.lineTo(-9, 4); g.lineTo(-2, 4); g.lineTo(-2, 9);
+    g.closePath(); g.fill();
+    g.restore();
   }
 
   _badgeNote(g, x, y, r, fill, stroke, label, diamond) {
