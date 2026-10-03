@@ -1,0 +1,3 @@
+Announcer voice lines generated with Piper TTS (https://github.com/rhasspy/piper)
+using the en-us LibriTTS (high) voice, speaker 42.
+LibriTTS dataset: CC BY 4.0 — http://www.openslr.org/60/

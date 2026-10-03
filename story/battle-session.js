@@ -18,6 +18,7 @@ import { BoardTransition, cameraAlongPath, START_POSE } from './transition.js';
 import { BattleHUD } from './hud.js';
 import { StorySfx } from './sfx.js';
 import { AnimeFx } from './anime-fx.js';
+import { Announcer } from './announcer.js';
 import { buildTacoWorld } from './worlds/taco-world.js';
 import { buildUndergroundWorld } from './worlds/underground-world.js';
 import { battleMusic } from './levels.js';
@@ -100,6 +101,10 @@ export class BattleSession {
     this.clock = new MusicClock(this.ctx, this.mcfg);
     this.clock.userOffsetMs = st.rhythmOffsetMs;
     this.sfx = new StorySfx(this.ctx, this.audio.masterGain);
+    // The battle music runs through its own gain so the announcer can duck it.
+    this.duckGain = this.ctx.createGain();
+    this.duckGain.connect(this.audio.trackGain);
+    this.ann = new Announcer(this.ctx, this.audio.masterGain, this.duckGain, { enabled: bridge.voiceEnabled !== false });
     const profile = level.ai[st.difficulty] || level.ai.medium;
     this.battle = new RhythmBattle({ clock: this.clock, music: this.mcfg, seed: level.chart.seed + (Date.now() % 997), aiProfile: profile });
     this.battle.on((type, data) => this._onBattle(type, data));
@@ -162,7 +167,8 @@ export class BattleSession {
       this.audio._trackSource = null;
       this.audio._trackName = null;
     }
-    this.music = this.clock.play(buffer, this.audio.trackGain, this._songOffset(), this.dropTime, 0.01);
+    this.music = this.clock.play(buffer, this.duckGain, this._songOffset(), this.dropTime, 0.01);
+    this.sfx.murmur(true);
 
     this.trans = 'in';
     this._last = performance.now();
@@ -203,7 +209,8 @@ export class BattleSession {
     }
     this.sfx.whoosh(0.5, true);
     this.sfx.impact(this.dropTime);
-    this.music = this.clock.play(buffer, this.audio.trackGain, this._songOffset(), this.dropTime, 0.05);
+    this.music = this.clock.play(buffer, this.duckGain, this._songOffset(), this.dropTime, 0.05);
+    this.sfx.murmur(true);
     this.trans = null;
     this._last = performance.now();
     this._raf = requestAnimationFrame((t) => this._frame(t));
@@ -239,6 +246,8 @@ export class BattleSession {
     this.sfx.dispose();
     if (this.transition) this.transition.dispose();
     this.fx.dispose();
+    this.ann.dispose();
+    if (this.standalone) { try { this.duckGain.disconnect(); } catch {} }
     this.world.dispose();
     this.pRig.dispose(); this.rRig.dispose();
     this.renderer.dispose();
@@ -327,14 +336,21 @@ export class BattleSession {
     dc.play(name, startBeat, len, { faceFoe: name === 'taunt' }).reaction = !own;
   }
 
+  // Character voice lines: only Alfred has a recorded voice; the player's
+  // side is covered by the announcer. Never over the announcer.
   _voice(who, pool, chance = 1) {
     if (!this.bridge.voiceEnabled || Math.random() > chance) return;
+    if (who !== 'rival' || this.rDef.look !== 'alfred') return;
+    if (this.ctx.currentTime < this.ann.busyUntil + 0.3) return;
     const now = performance.now();
     if (now - this._voiceAt < 2200) return;
     this._voiceAt = now;
     const v = who === 'player' ? this.bridge.voices.player : this.bridge.voices.rival;
     try { v.speakOneOf(pool); } catch {}
   }
+
+  // AudioContext time of a song beat (for sample-accurate voice / crowd).
+  _at(beat) { return this.clock.songToCtx(this.clock.beatTime(beat)); }
 
   _onBattle(type, d) {
     const beatNow = this.clock.beatAt(this.battle.songTime);
@@ -351,12 +367,16 @@ export class BattleSession {
           this.hud.showBanner(`${this.level.title}<small>DANCE BATTLE vs ${rivalName}</small>`, 'big', 2200);
           this.pDance.play('entrance', B, 4); this.rDance.play('entrance', B, 4);
           this.director.cut('two', B, 4);
+          this.ann.say('dance-battle', this._at(B), { force: true });
+          this.sfx.crowdCheer(1, this._at(B));
         } else if (i === 1) {
           // The rival calls the player out: point, smirk, spin, signature pose.
           this.rDance.play(this.rDef.introTaunt || 'introTaunt', B, 4, { faceFoe: true });
           this.pDance.play('introWatch', B, 4);
           this.director.cut('close', B, 4, { who: 'rival' });
-          this._voice('rival', 'single');
+          this.ann.say('vs-' + this.level.dancers.rival, this._at(B), { force: true });
+          this.sfx.crowdOoh(0.8, this._at(B + 1.5));
+          this.cues.push({ beat: B + 2.5, fn: () => this._voice('rival', 'single') });
           this.cues.push({ beat: B + 1, fn: () => this._fx('rival', this.rDef.fx && this.rDef.fx.taunt, 5) });
         } else if (i === 2) {
           // The player answers: head shake, two bounces, "come on".
@@ -364,6 +384,8 @@ export class BattleSession {
           this.rDance.play('introWatch', B, 4);
           this.director.cut('close', B, 4, { who: 'player' });
           this._fx('player', 'anger', 1);
+          this.ann.say('show-em', this._at(B), { force: true });
+          this.sfx.crowdCheer(0.6, this._at(B + 3));
           this.cues.push({ beat: B + 3, fn: () => this._fx('player', 'note', 4) });
           if (this.bridge.isTouch) this.hud.showCallout('<b>SWIPE</b> the arrows any time · <b>TAP</b> on beat 4', '', 4000);
           else this.hud.showCallout('Enter the <b>arrows</b> any time · <b>SPACE</b> on beat 4', '', 4000);
@@ -372,17 +394,22 @@ export class BattleSession {
           this.pDance.play('ready', B, 4); this.rDance.play('ready', B, 4);
           this.director.cut('two', B, 4);
           this.hud.showBanner('READY?', '', this.clock.spb * 1000 * 0.9);
+          // The announcer counts it in, sample-accurate on the beat.
+          const voice = this.ann.enabled;
+          this.ann.say('ready', this._at(B), { force: true });
           ['3', '2', '1'].forEach((n, k) => {
             const beat = B + 1 + k;
-            this.sfx.count(this.clock.songToCtx(this.clock.beatTime(beat)));
+            if (voice) this.ann.say(['three', 'two', 'one'][k], this._at(beat), { force: true });
+            else this.sfx.count(this._at(beat));
             this.cues.push({ beat, fn: () => this.hud.showBanner(n, 'count', this.clock.spb * 900) });
           });
-          this.sfx.count(this.clock.songToCtx(this.clock.barTime(m.battleStartBar)), true);
+          const go = this._at(m.battleStartBar * 4);
+          if (voice) this.ann.say('go', go, { force: true }); else this.sfx.count(go, true);
+          this.sfx.crowdCheer(1.2, go);
         }
         if (d.bar === m.battleStartBar) {
           this.phase = 'battle';
-          this.hud.showBanner('GROOVE!', 'go', 900);
-          this.sfx.crowd(0.8);
+          this.hud.showBanner('GO!', 'go', 900);
           this.world.react('drop', {});
         }
         const cut = this.cuts.filter(c => c.bar === d.bar);
@@ -400,6 +427,7 @@ export class BattleSession {
           this.hud.judge(d.judgment, d.delta, d.reason);
           if (d.note.kind === 'groove' && d.judgment !== 'miss') { this.sfx.groove(); this.sfx.hit(d.judgment); }
           else this.sfx.hit(d.judgment);
+          if (d.combo && d.combo % 8 === 0) { this.ann.say('unstoppable'); this.sfx.crowdCheer(0.8); }
         } else if (d.note.kind !== 'dodge' && d.note.kind !== 'taunt') {
           this.hud.rivalJudgment(d.judgment);
         }
@@ -427,9 +455,19 @@ export class BattleSession {
         if (d.who === 'player') {
           const label = (d.kind === 'solo' ? '★★ ' : d.kind === 'branch' ? '★ ' : '') + (MOVE_LABELS[name] || 'GROOVE');
           this.hud.showCallout(`${label} · ${d.judgment.toUpperCase()} <b>+${d.bonus}</b>`, d.perfect || big ? 'good' : '', 1400);
-          if (big || d.tier >= 3) this._voice('player', 'combo', 0.5);
+          // Announcer + crowd land on the downbeat the move starts.
+          const at = this._at(d.bar * 4);
+          if (d.kind === 'solo') this.ann.say('solo', at, { force: true });
+          else if (d.kind === 'branch') this.ann.say('fever', at);
+          else if (d.tier >= 3 || d.perfect) this.ann.praise(at);
         } else if (big) {
           this._voice('rival', 'combo', 0.5);
+        }
+        if (big) {
+          if (d.who === 'player') this.sfx.crowdCheer(d.kind === 'solo' ? 1.4 : 1, this._at(d.bar * 4));
+          else this.sfx.crowdOoh(0.7, this._at(d.bar * 4));
+        } else if (d.tier >= 3 && d.who === 'player') {
+          this.sfx.crowdCheer(0.45, this._at(d.bar * 4));
         }
         break;
       }
@@ -456,6 +494,7 @@ export class BattleSession {
         this._dc(d.attacker).react('taunt', beatNow, 4 - (beatNow % 4) + 0.001, { faceFoe: true, fade: 0.15 });
         this._fx(d.attacker, (this._def(d.attacker).fx || {}).taunt, 5);
         this._fx(d.attacker === 'player' ? 'rival' : 'player', 'anger', 1);
+        this.sfx.crowdOoh(0.5);
         this.director.cut('taunt', beatNow, 3, { who: d.attacker });
         this.sfx.taunt();
         this.world.react('taunt', d);
@@ -471,7 +510,8 @@ export class BattleSession {
         this._dc(d.attacker).react('whiff', beatNow + 0.2, 2);
         this.hud.showBanner(d.who === 'player' ? 'DODGED!' : `${rivalName} DODGED`, d.who === 'player' ? 'good' : 'bad', 1100);
         this.world.react('dodge', d);
-        this.sfx.crowd(0.7);
+        this.sfx.crowdCheer(0.8);
+        if (d.who === 'player') this.ann.say('nice-dodge');
         if (d.who === 'player') this._voice('player', 'single');
         break;
       case 'tauntLanded':
@@ -482,7 +522,8 @@ export class BattleSession {
         this.hud.showBanner(d.defender === 'player' ? 'STUNNED!' : `${rivalName} STUNNED!`, d.defender === 'player' ? 'bad' : 'good', 1300);
         this.director.cut('close', beatNow, 2, { who: d.attacker });
         this.world.react('tauntLanded', d);
-        this.sfx.crowd(1);
+        this.sfx.crowdOoh(1.1);
+        this.ann.say('stunned', 0, { force: true });
         this._voice(d.attacker, 'tetris');
         break;
       case 'tauntNotReady':
@@ -490,6 +531,9 @@ export class BattleSession {
         break;
       case 'tauntBlocked':
         this.hud.showCallout('Can\'t taunt right now', '', 800);
+        break;
+      case 'bar':
+        this.sfx.hype(0.3 + Math.abs(d.groove) * 0.7);
         break;
       case 'end':
         this._result(d);
@@ -507,18 +551,21 @@ export class BattleSession {
     const bar = this.battle.endBar;
     const len = m.resultBars * 4;
     this.pDance.clearQueue(); this.rDance.clearQueue();
-    this.pDance.play(win ? 'victory' : 'defeat', bar * 4, len);
-    this.rDance.play(win ? 'defeat' : 'victory', bar * 4, len);
+    this.pDance.play(win ? (this.pDef.victory || 'victory') : 'defeat', bar * 4, len);
+    this.rDance.play(win ? 'defeat' : (this.rDef.victory || 'victory'), bar * 4, len);
     this.director.cut('winner', bar * 4, len, { who: summary.winner });
     this.world.react('end', { who: summary.winner });
     const loser = win ? 'rival' : 'player';
     this._fx(summary.winner, 'sparkle', 12); this._fx(summary.winner, (this._def(summary.winner).fx || {}).move, 6);
     this._fx(loser, 'sweat', 2);
-    this.sfx.crowd(1.2);
+    this.sfx.crowdCheer(1.5);
+    this.sfx.applause(1.2, 5);
+    this.ann.say('finish', 0, { force: true });
+    this.ann.say(win ? 'you-win' : this.level.dancers.rival + '-wins', this.ctx.currentTime + 1.1, { force: true });
     this.hud.showBanner(
       `${win ? 'YOU WIN!' : `${this.rDef.name} WINS`}<small>${summary.player.score.toLocaleString()} — ${summary.rival.score.toLocaleString()} · GROOVE BONUS +${this.bonus.toLocaleString()}</small>`,
       win ? 'big win' : 'big lose', len * this.clock.spb * 1000);
-    this._voice(win ? 'player' : 'rival', win ? 'praise' : 'tetris');
+    if (!win) this.cues.push({ beat: this.clock.beatAt(this.battle.songTime) + 4, fn: () => this._voice('rival', 'tetris') });
     this.outAtSong = this.clock.barTime(bar + m.resultBars);
   }
 

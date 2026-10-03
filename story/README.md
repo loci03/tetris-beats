@@ -29,6 +29,7 @@ object; the mode never touches game internals directly.
 | `transition.js` | Board capture → 3D tiles aligned to the 2D board; shatter/fly-through in, reassemble out. |
 | `hud.js`, `story.css` | Battle HUD, note lane, touch pads, toasts. |
 | `sfx.js` | Synthesized hit / whoosh / riser / impact / crowd / count-in sounds. |
+| `announcer.js` | Arena announcer ("Ready?", "Three! Two! One! Go!", move calls, "Stunned!", "You win!") scheduled on the music clock; ducks the music. |
 | `anime-fx.js` | Manga marks over the dancers: hearts, sparkles, notes, sweat drops, anger veins, "!". |
 | `worlds/underground-world.js` | Level 1 stage: graffiti warehouse, neon, lasers, passing subway train. |
 | `worlds/taco-world.js` | Level 2 stage: sunset taco-shell street party. |
@@ -97,3 +98,12 @@ Settings compensates for audio latency (e.g. Bluetooth headphones).
 (the folder is marked `"type": "module"` for that). The full loop was verified
 headless with an autoplayer asserting that board, queue, hold, piece, lines and
 level are unchanged after the battle and that the score only gains the bonus.
+
+## Credits
+
+Announcer voice lines (`audio/voice/announcer/`) were generated with
+[Piper](https://github.com/rhasspy/piper) using its LibriTTS (high) voice,
+speaker 42. LibriTTS is licensed CC BY 4.0
+(http://www.openslr.org/60/). Crowd, count-in and hit sounds are synthesized
+at runtime (`sfx.js`).
+

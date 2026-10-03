@@ -49,6 +49,7 @@ const EASE = {
   in: (f) => { f = clamp01(f); return f * f; },                       // accelerate into the beat (steps, stomps)
   out: (f) => { f = clamp01(f); return 1 - (1 - f) * (1 - f); },        // burst off the previous beat
   snap: (f) => smooth((f - 0.62) / 0.38),                              // hold, then pop onto the beat
+  hit: (f) => { f = clamp01(f); return Math.pow(f, 2.3); },             // whip into the beat
   hold: (f) => (f >= 1 ? 1 : 0),
 };
 
@@ -162,14 +163,37 @@ function groove(p, B, s, amt = 1) {
   const accent = (Math.floor(Bb) & 1) ? 1.3 : 1;
   const e = s.energy || 1;                       // louder section → bigger bounce
   const d = down * amt * s.bounce * accent * e;
-  p.root(0, -0.11 * d, 0);
-  p.add('head', 0.2 * d * s.swagger);
-  p.add('chest', 0.07 * d);
-  p.shrug(0.09 * (1 - down) * amt * e);
-  const sway = Math.sin(Math.PI * B) * amt * s.swagger * e;
-  p.root(0.04 * sway, 0, 0);
-  p.add('chest', 0, 0.08 * sway, -0.05 * sway);
-  p.add('head', 0, 0, 0.05 * sway);
+  // Each dancer has their own feel, so even grooving they don't move alike.
+  const feel = s.feel || 'down';
+  if (feel === 'up') {
+    // Disco: pops UP on the beat — knees straighten, chest lifts, chin up,
+    // shoulders jive between beats.
+    p.root(0, -0.07 + 0.1 * d, 0);
+    p.add('chest', -0.07 * d); p.add('head', -0.12 * d * s.swagger);
+    p.shrug(0.11 * d, 0.11 * d);
+    const jive = Math.sin(TAU * Bb) * amt * e;
+    p.add('chest', 0, 0.1 * jive, 0);
+    p.add('head', 0, -0.08 * jive, 0);
+  } else if (feel === 'sway') {
+    // Diva: the hips land on alternate sides on every beat, shoulders
+    // counter, head tilts with it — a catwalk sway, not a bounce.
+    const side = Math.cos(Math.PI * Bb) * amt * e * s.swagger;
+    p.root(0.075 * side, -0.04 * d, 0);
+    p.add('hips', 0, 0.12 * side, 0.14 * side);
+    p.add('chest', 0.03 * d, -0.08 * side, -0.1 * side);
+    p.add('head', 0.05 * d, 0, 0.09 * side);
+    p.shrug(0.06 * (1 - down) * amt * e);
+  } else {
+    // Hip-hop: drops DOWN into the beat, head nod, two-beat sway.
+    p.root(0, -0.11 * d, 0);
+    p.add('head', 0.2 * d * s.swagger);
+    p.add('chest', 0.07 * d);
+    p.shrug(0.09 * (1 - down) * amt * e);
+    const sway = Math.sin(Math.PI * B) * amt * s.swagger * e;
+    p.root(0.04 * sway, 0, 0);
+    p.add('chest', 0, 0.08 * sway, -0.05 * sway);
+    p.add('head', 0, 0, 0.05 * sway);
+  }
 }
 
 // Drum-hit layer, driven by the song's actual kick and snare hits (see
@@ -193,7 +217,9 @@ function hitLayer(a, acc, amt, beat) {
 // bounce layer on top.
 const seq = (len, keys, opts = {}) => ({
   len, loop: opts.loop !== false, groove: opts.groove ?? 1, hits: opts.hits ?? 0.8,
-  keys: keys.map(([t, fn, ease]) => ({ t, fn, ease: ease || 'smooth' })),
+  // Keys on a beat default to 'hit' (the body whips into the pose right on
+  // the beat); half-beat keys are passing positions and default to smooth.
+  keys: keys.map(([t, fn, ease]) => ({ t, fn, ease: ease || (Number.isInteger(t) ? 'hit' : 'smooth') })),
 });
 
 // ── Reusable bits of choreography ───────────────────────────────────
@@ -257,7 +283,7 @@ export const MOVES = {
   // Alfred's base: the Hustle — rolling the arms in front of the chest on
   // 1-2, then a disco point up and across on 3-4, side steps underneath.
   hustle(p, b, B, s) {
-    evalMove('twoStep', b, B, s, p);                         // step-touch footwork + bounce
+    evalMove('discoStrut', b, B, s, p);                      // Travolta footwork + bounce
     const ph = b % 4;
     if (ph < 2) {
       const r = TAU * b * 1.5;                               // three rolls over two beats
@@ -795,7 +821,7 @@ export const MOVES = {
 
   // Two-step footwork with the purse swinging round in circles.
   purseGroove(p, b, B, s) {
-    evalMove('twoStep', b, B, s, p);
+    evalMove('sassyStrut', b, B, s, p);
     const a = TAU * b / 2;
     p.arm('R', 0.8 + 0.7 * Math.sin(a), 0.5 + 0.35 * Math.cos(a), 0.35);
     hipHand(p, 'L');
@@ -815,7 +841,7 @@ export const MOVES = {
   // So excited about tacos: little anime hops, fists at the chin, then a
   // jump with both arms up on 3.
   tacoHop(p, b, B, s) {
-    const ph = frac(b), beat = Math.floor(b), hop = Math.sin(Math.PI * Math.min(1, ph * 1.6));
+    const ph = frac(b), beat = Math.floor(b) % 4, hop = Math.sin(Math.PI * Math.min(1, ph * 1.6));
     if (beat < 3) {
       const side = beat % 2 ? -1 : 1;
       p.foot('L', 0.12, 0.1 * hop, 0, 0.5 * hop); p.foot('R', 0.12, 0.1 * hop, 0, 0.5 * hop);
@@ -1095,7 +1121,7 @@ export const MOVES = {
   funkyChicken(p, b, B, s) {
     groove(p, B, s, 0.6);
     const flap = 0.5 + 0.5 * Math.sin(TAU * b * 2), peck = Math.sin(TAU * b);
-    const beat = Math.floor(b);
+    const beat = Math.floor(b) % 4;
     p.foot('L', 0.16); p.foot('R', 0.16, beat === 3 ? 0.2 * Math.sin(Math.PI * frac(b)) : 0, beat === 3 ? 0.25 : 0);
     p.hips(0, -0.14, 0, 0.1 * peck);
     p.arms(-0.25, 0.35 + 0.8 * flap, 2.2, 0.6);
@@ -1252,6 +1278,28 @@ export const MOVES = {
     }
   },
 
+
+  // ── Phrase-accent signature poses (held for a beat) ──────────
+  accentBboy(p, b, B, s) {                      // YOU: b-boy stance, arms folded, chin up
+    wideStance(p, 0.25);
+    p.hips(0, -0.16, 0, 0.25);
+    crossArms(p);
+    p.lean(-0.08, -0.15, 0.1); p.look(-0.22, 0.25, 0.1);
+  },
+  accentDisco(p, b, B, s) {                     // ALFRED: Travolta point to the sky
+    p.foot('L', 0.12); p.foot('R', 0.28, 0, 0.1, 0.5);
+    p.hips(0.1, -0.12, 0, -0.2);
+    p.arm('R', 0.4, 2.55, 0.03); hipHand(p, 'L');
+    p.lean(-0.08, -0.2, 0.15, 0.2); p.look(-0.35, -0.4);
+  },
+  accentDiva(p, b, B, s) {                      // TINA: hip pop, hand in the hair, purse up
+    p.foot('L', 0.12); p.foot('R', 0.24, 0, 0.08, 0.55);
+    p.hips(0.14, -0.1, 0, -0.3);
+    p.arm('L', 2.4, 0.9, 2.1, -0.4);
+    p.arm('R', 0.5, 0.6, 1.9);
+    p.lean(-0.05, -0.18, 0.2, 0.2); p.look(-0.25, 0.4, 0.2);
+  },
+
   // Walk-on: arms folded, nodding to the beat, then snap into a stance.
   intro(p, b, B, s) {
     groove(p, B, s, 0.6);
@@ -1295,7 +1343,7 @@ const HITS = {
   hustle: 1, cabbagePatch: 0.8, moonwalk: 0.5, spinPoint: 0.5, jumpSplit: 0.3, windmillFreeze: 0.4,
   taunt: 0.5, dodge: 0.2, stunned: 0.2, fumble: 0.2, whiff: 0.2, hitReact: 0.1, reactOoh: 0.4, cheer: 0.8,
   victory: 0.5, defeat: 0.1, intro: 0.6, introWatch: 0.7, introTaunt: 0.5, introAnswer: 0.6, ready: 1,
-  breakWindmill: 0, backflip: 0, headspin: 0, airChair: 0.1,
+  breakWindmill: 0, backflip: 0, headspin: 0, airChair: 0.1, accentBboy: 0.4, accentDisco: 0.4, accentDiva: 0.4,
   shimmyBounce: 1, purseGroove: 1, tacoHop: 0.7, purseTwirl: 0.5, twirlSpin: 0.3, catwalkPose: 0.5, dropItLow: 0.7,
   cartwheel: 0, toeTouch: 0.2, superstar: 0, tinaTaunt: 0.5,
   elvisSwivel: 1, elvisLegs: 0.8, funkyChicken: 0.9, fingerGuns: 0.8, airGuitar: 0.9, splitDrop: 0.3,
@@ -1360,7 +1408,9 @@ export class DanceController {
     this.fadeStart = -Infinity;
     this.fadeLen = 0.3;
     this.queue = [];
-    this._pa = new Pose(); this._pb = new Pose(); this._pc = new Pose();
+    this._pa = new Pose(); this._pb = new Pose(); this._pc = new Pose(); this._pd = new Pose();
+    this._phrases = new Map();
+    this._energy = 1;
     this.out = new Float32Array(POSE_SIZE);
   }
 
@@ -1380,10 +1430,23 @@ export class DanceController {
 
   clearQueue() { this.queue.length = 0; }
 
-  // The base routine playing at absolute beat `beat` (changes every 8).
+  // The base routine for the 8-count containing `beat`. `style.routines`
+  // is either a list or { chill, hype }: each phrase picks from the hype
+  // list when the song is loud there, so the dancing follows the song's
+  // sections. Picked once per phrase.
   routineAt(beat) {
     const r = this.style.routines;
-    return r[((Math.floor(beat / 8) % r.length) + r.length) % r.length];
+    const phrase = Math.floor(beat / 8);
+    const mod = (a, n) => ((a % n) + n) % n;
+    if (Array.isArray(r)) return r[mod(phrase, r.length)];
+    let name = this._phrases.get(phrase);
+    if (!name) {
+      const list = (this._energy || 1) >= (this.style.hypeAt || 0.9) ? r.hype : r.chill;
+      name = list[mod(phrase + (this.style.phraseOffset || 0), list.length)];
+      this._phrases.set(phrase, name);
+      if (this._phrases.size > 8) this._phrases.delete(this._phrases.keys().next().value);
+    }
+    return name;
   }
 
   _switch(entry, beat) {
@@ -1399,14 +1462,30 @@ export class DanceController {
       // Base routines run on the absolute beat, so they're always in phase
       // with the music; the last half beat of each 8-count blends into the
       // next routine.
+      const lb = ((beat % 4) + 4) % 4;                    // position in the bar
       const name = this.routineAt(beat);
-      a = evalMove(name, beat, beat, this.style, pose);
-      const into = (beat % 8 + 8) % 8 - 7.5;
+      a = evalMove(name, lb, beat, this.style, pose);
+      const local = ((beat % 8) + 8) % 8;
+      const into = local - 7.5;
       const next = this.routineAt(beat + 1);
       if (into > 0 && next !== name) {
-        const b2 = evalMove(next, beat, beat, this.style, this._pc);
+        const b2 = evalMove(next, lb, beat, this.style, this._pc);
         const w = smooth(into / 0.5);
         for (let i = 0; i < POSE_SIZE; i++) a[i] += (b2[i] - a[i]) * w;
+      }
+      // Phrase accent: once per 8-count each dancer whips into their
+      // signature pose right on their count and holds it — the player on
+      // 7, the rival on 3, so they answer each other like a routine.
+      const ac = this.style.accent;
+      if (ac) {
+        let w = 0;
+        if (local >= ac.at - 0.3 && local < ac.at) w = EASE.hit((local - ac.at + 0.3) / 0.3);
+        else if (local >= ac.at && local < ac.at + 0.6) w = 1;
+        else if (local >= ac.at + 0.6 && local < ac.at + 1) w = 1 - smooth((local - ac.at - 0.6) / 0.4);
+        if (w > 0) {
+          const pz = evalMove(ac.pose, local - ac.at, beat, this.style, this._pd);
+          for (let i = 0; i < POSE_SIZE; i++) a[i] += (pz[i] - a[i]) * w;
+        }
       }
     } else {
       a = evalMove(entry.name, beat - entry.start, beat, this.style, pose);
@@ -1420,6 +1499,7 @@ export class DanceController {
   // MusicClock.accents) — optional.
   update(beat, acc = null) {
     this.style.energy = acc ? acc.energy : 1;
+    this._energy += ((acc ? acc.energy : 1) - this._energy) * 0.03;
     while (this.queue.length && this.queue[0].start <= beat) this._switch(this.queue.shift(), beat);
     if (this.cur.name !== 'groove' && beat >= this.cur.start + this.cur.len) {
       this._switch({ name: 'groove', start: beat, len: Infinity, faceFoe: false, fade: 0.35 }, beat);

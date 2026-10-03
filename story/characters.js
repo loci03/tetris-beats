@@ -16,7 +16,14 @@ export const CHARACTERS = {
       hair: 0x1b1016, cap: 0x00c8ff, capBrim: 0x0a2a5c, extra: 0x151515,
     },
     // Hip-hop: base routines cycle one 8-count each; moves are earned per tier.
-    style: { swagger: 1.0, bounce: 1.1, routines: ['twoStep', 'bounceRock', 'kickStep', 'bounceRock'] },
+    // Feel 'down' = drops into the beat. Chill routines in quiet parts of
+    // the song, hype routines in loud ones; signature pose on count 7.
+    style: {
+      swagger: 1.0, bounce: 1.1, feel: 'down',
+      routines: { chill: ['twoStep', 'bounceRock'], hype: ['kickStep', 'runningMan', 'bounceRock'] },
+      accent: { pose: 'accentBboy', at: 7 },
+    },
+    victory: 'victory',
     look: 'player',
     moves: { 1: ['stepClap', 'bodyRoll'], 2: ['runningMan', 'rogerRabbit', 'cabbagePatch'], 3: ['robot', 'moonwalk'], 4: ['windmillFreeze', 'airChair'] },
     // ★ branch signature moves per level, and the SOLO (command tree, chart.js).
@@ -33,7 +40,13 @@ export const CHARACTERS = {
       hair: 0x3a2213, stripe: 0xe01830, gold: 0xffc43a, shades: 0x0b0b12,
     },
     // Old-school disco + rock'n'roll swagger: Travolta, Elvis, air guitar.
-    style: { swagger: 1.35, bounce: 0.9, routines: ['hustle', 'discoStrut', 'elvisSwivel', 'discoStrut'] },
+    // Feel 'up' = pops up on the beat; answers the player on count 3.
+    style: {
+      swagger: 1.35, bounce: 0.9, feel: 'up', phraseOffset: 1,
+      routines: { chill: ['discoStrut', 'elvisSwivel'], hype: ['hustle', 'funkyChicken', 'discoStrut'] },
+      accent: { pose: 'accentDisco', at: 3 },
+    },
+    victory: 'discoSpin',
     look: 'alfred',
     moves: { 1: ['discoPoint', 'elvisLegs'], 2: ['funkyChicken', 'fingerGuns'], 3: ['spinPoint', 'airGuitar'], 4: ['jumpSplit', 'splitDrop'] },
     branchMoves: { 2: 'combBack', 3: 'kneeSlide', 4: 'discoSpin' },
@@ -53,7 +66,13 @@ export const CHARACTERS = {
     },
     bareForearms: true,
     // Diva: big swagger, purse in the right hand at all times.
-    style: { swagger: 1.4, bounce: 1.0, routines: ['sassyStrut', 'shimmyBounce', 'purseGroove', 'sassyStrut'] },
+    // Feel 'sway' = hips land side to side on the beat; poses on count 3.
+    style: {
+      swagger: 1.4, bounce: 1.0, feel: 'sway', phraseOffset: 1,
+      routines: { chill: ['sassyStrut', 'purseGroove'], hype: ['shimmyBounce', 'tacoHop', 'sassyStrut'] },
+      accent: { pose: 'accentDiva', at: 3 },
+    },
+    victory: 'kissBlow',
     look: 'tina',
     moves: { 1: ['hairFlip', 'tacoHop'], 2: ['vogueHands', 'purseTwirl'], 3: ['twirlSpin', 'heartHands'], 4: ['catwalkPose', 'dropItLow'] },
     branchMoves: { 2: 'kissBlow', 3: 'cartwheel', 4: 'toeTouch' },
