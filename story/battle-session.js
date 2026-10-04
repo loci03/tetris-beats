@@ -373,7 +373,7 @@ export class BattleSession {
           this.rDance.play(this.rDef.introTaunt || 'introTaunt', B, 4, { faceFoe: true });
           this.pDance.play('introWatch', B, 4);
           this.director.cut('close', B, 4, { who: 'rival' });
-          this.ann.say('vs-' + this.level.dancers.rival, this._at(B), { force: true });
+          this.ann.say('vs-' + this.level.dancers.rival, this._at(B + 0.5), { force: true });
           this.sfx.crowdOoh(0.8, this._at(B + 1.5));
           this.cues.push({ beat: B + 2.5, fn: () => this._voice('rival', 'single') });
           this.cues.push({ beat: B + 1, fn: () => this._fx('rival', this.rDef.fx && this.rDef.fx.taunt, 5) });
@@ -392,21 +392,21 @@ export class BattleSession {
           this.pDance.play('ready', B, 4); this.rDance.play('ready', B, 4);
           this.director.cut('two', B, 4);
           this.hud.showBanner('READY?', '', this.clock.spb * 1000 * 0.9);
-          // "Are you ready?" — count-in blips on 3-2-1 — "Let's GO!" with
-          // the "go" landing on the downbeat.
-          this.ann.say('ready', this._at(B) - 0.15, { force: true });
+          // "Ready?" — count-in blips on 3-2-1 — "DANCE!" landing on the
+          // downbeat, fighting-game style.
+          this.ann.say('ready', this._at(B), { force: true });
           ['3', '2', '1'].forEach((n, k) => {
             const beat = B + 1 + k;
             this.sfx.count(this._at(beat));
             this.cues.push({ beat, fn: () => this.hud.showBanner(n, 'count', this.clock.spb * 900) });
           });
           const go = this._at(m.battleStartBar * 4);
-          if (this.ann.enabled) this.ann.say('go', go - 0.32, { force: true }); else this.sfx.count(go, true);
+          if (this.ann.enabled) this.ann.say('go', go, { force: true }); else this.sfx.count(go, true);
           this.sfx.crowdCheer(1.2, go);
         }
         if (d.bar === m.battleStartBar) {
           this.phase = 'battle';
-          this.hud.showBanner('GO!', 'go', 900);
+          this.hud.showBanner('DANCE!', 'go', 900);
           this.world.react('drop', {});
         }
         const cut = this.cuts.filter(c => c.bar === d.bar);
@@ -544,7 +544,7 @@ export class BattleSession {
         this.cuts = this.cuts.filter(c => c.bar < d.bar || c.bar >= d.bar + d.bars);
         this.cuts.push({ bar: d.bar, kind: 'solo', who, len });
         this.world.react('solo', { who, songTime: this.clock.barTime(d.bar), until: this.clock.barTime(d.bar + d.bars) });
-        this.ann.say('solo', this._at(B) - 0.25, { force: true });
+        this.ann.say('solo', this._at(B), { force: true });
         this.sfx.crowdCheer(1.3, this._at(B));
         this.sfx.crowdCheer(0.9, this._at(B + 4));
         this.cues.push({ beat: B, fn: () => {

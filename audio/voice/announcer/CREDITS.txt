@@ -1,4 +1,6 @@
-Announcer voice lines generated with Piper TTS (https://github.com/rhasspy/piper)
-using the en-us LibriTTS (high) voice, speaker 90, then pitched down and
-processed (EQ, compression, arena reverb) for a game-show host sound.
-LibriTTS dataset: CC BY 4.0 — http://www.openslr.org/60/
+Announcer voice lines generated with Kokoro-82M TTS (https://github.com/hexgrad/kokoro,
+model weights Apache-2.0) via kokoro-onnx, voice "am_fenrir". Each line was then
+re-pitched into a shouted delivery (higher, wider pitch contour, lowered formants,
+held syllables — Praat via parselmouth), EQ'd, compressed, saturated, given a
+sub-octave double and an arena slapback/echo tail for a fighting-game announcer sound.
+To replace with real recordings, keep the same file names.

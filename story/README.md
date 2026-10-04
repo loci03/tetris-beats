@@ -29,7 +29,7 @@ object; the mode never touches game internals directly.
 | `transition.js` | Board capture → 3D tiles aligned to the 2D board; shatter/fly-through in, reassemble out. |
 | `hud.js`, `story.css` | Battle HUD, note lane, touch pads, toasts. |
 | `sfx.js` | Synthesized hit / whoosh / riser / impact / crowd / count-in sounds. |
-| `announcer.js` | Game-show announcer — a few big lines ("Here comes… Tina!", "Are you ready?", "Let's go!", "Solo time!", "Fever!", winner) scheduled on the music clock; ducks the music. |
+| `announcer.js` | Versus-game announcer — a few shouted lines ("A new challenger… Tina!", "Ready?", "DANCE!", "Solo time!", "Fever!", winner) scheduled so the stressed word lands on the beat; ducks the music. |
 | `anime-fx.js` | Manga marks over the dancers: hearts, sparkles, notes, sweat drops, anger veins, "!". |
 | `worlds/underground-world.js` | Level 1 stage: graffiti warehouse, neon, lasers, passing subway train. |
 | `worlds/taco-world.js` | Level 2 stage: sunset taco-shell street party. |
@@ -105,8 +105,6 @@ level are unchanged after the battle and that the score only gains the bonus.
 ## Credits
 
 Announcer voice lines (`audio/voice/announcer/`) were generated with
-[Piper](https://github.com/rhasspy/piper) using its LibriTTS (high) voice,
-speaker 90 (pitched down and processed for a game-show host). LibriTTS is licensed CC BY 4.0
-(http://www.openslr.org/60/). Crowd, count-in and hit sounds are synthesized
-at runtime (`sfx.js`).
+[Kokoro-82M](https://github.com/hexgrad/kokoro) (Apache-2.0), voice `am_fenrir`, then
+processed into a shouted fighting-game delivery (see `CREDITS.txt` there).
 
