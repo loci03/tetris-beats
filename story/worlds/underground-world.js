@@ -314,7 +314,7 @@ export function buildUndergroundWorld({ lowGraphics = false } = {}) {
   const base = { hemi: hemi.intensity, key: key.intensity, rimL: rimL.intensity, rimR: rimR.intensity, wash: wash.intensity };
 
   // ── Update ───────────────────────────────────────────────────────
-  const state = { lightLevel: 1, flash: 0, cheer: 0, focus: 0, lastBeat: -1, barColor: 0, ripple: null };
+  const state = { lightLevel: 1, flash: 0, cheer: 0, focus: 0, lastBeat: -1, barColor: 0, ripple: null, solo: null };
   const dummy = new THREE.Object3D();
 
   function update(dt, info) {
@@ -325,6 +325,14 @@ export function buildUndergroundWorld({ lowGraphics = false } = {}) {
     state.flash = Math.max(0, state.flash - dt * 2.4);
     state.cheer = Math.max(0, state.cheer - dt * 0.5);
     state.focus += ((info.leader || 0) - state.focus) * Math.min(1, dt * 2);
+    // SOLO TIME: house lights down, lasers and the floor converge on the soloist.
+    let soloK = 0, soloX = 0;
+    if (state.solo) {
+      const st = info.songTime, so = state.solo;
+      soloK = Math.min(1, Math.max(0, (st - so.t0) / 0.35)) * Math.min(1, Math.max(0, (so.t1 - st) / 0.5));
+      soloX = so.x;
+      if (st > so.t1) state.solo = null;
+    }
     if (whole !== state.lastBeat) {
       state.lastBeat = whole;
       if (whole % 4 === 0) state.barColor = (state.barColor + 1) % NEON.length;
@@ -342,6 +350,10 @@ export function buildUndergroundWorld({ lowGraphics = false } = {}) {
         const d = Math.hypot(t.x - state.ripple.x, t.z);
         k = Math.max(k, Math.exp(-Math.pow((d - rr) * 1.8, 2)) * (1 - Math.min(1, rr / 10)) * L);
       }
+      if (soloK > 0) {
+        const near = Math.exp(-Math.pow(Math.hypot(t.x - soloX, t.z) / 1.3, 2));
+        k = k * (1 - 0.75 * soloK) + soloK * near * (0.6 + 0.4 * onBeat);
+      }
       tmp.copy(dim).lerp(wave > 0.3 ? cA : cB, Math.min(1, k)).multiplyScalar(0.6 + 0.8 * k + state.flash * 0.5);
       tileMesh.setColorAt(i, tmp);
     });
@@ -350,7 +362,8 @@ export function buildUndergroundWorld({ lowGraphics = false } = {}) {
 
     // Lasers sweep, strobe on the beat; neon tubes pulse and flicker.
     lasers.forEach((l, i) => {
-      l.mesh.rotation.z = l.side * (0.55 + 0.35 * Math.sin(info.songTime * 1.3 + l.phase));
+      const aim = Math.atan2(soloX - l.mesh.position.x, 6.0);
+      l.mesh.rotation.z = l.side * (0.55 + 0.35 * Math.sin(info.songTime * 1.3 + l.phase)) * (1 - soloK) + aim * soloK;
       l.mesh.rotation.x = 0.35 + 0.25 * Math.sin(info.songTime * 0.9 + l.phase * 2);
       l.mat.opacity = (0.12 + 0.45 * onBeat + state.flash * 0.4) * L * ((whole + i) % 2 ? 1 : 0.5);
       l.mat.color.set(NEON[(state.barColor + i) % NEON.length]);
@@ -411,8 +424,8 @@ export function buildUndergroundWorld({ lowGraphics = false } = {}) {
     spkGeo.attributes.position.needsUpdate = true;
 
     // Lights
-    hemi.intensity = base.hemi * (0.15 + 0.85 * L);
-    key.intensity = base.key * L;
+    hemi.intensity = base.hemi * (0.15 + 0.85 * L) * (1 - 0.55 * soloK);
+    key.intensity = base.key * L * (1 - 0.45 * soloK);
     rimL.intensity = base.rimL * L * (0.7 + 0.6 * onBeat + 0.6 * Math.max(0, state.focus) + state.flash);
     rimR.intensity = base.rimR * L * (0.7 + 0.6 * onBeat + 0.6 * Math.max(0, -state.focus) + state.flash);
     wash.intensity = base.wash * L * (0.6 + 0.6 * onBeat + state.flash);
@@ -440,6 +453,11 @@ export function buildUndergroundWorld({ lowGraphics = false } = {}) {
         break;
       case 'drop':
         state.flash = 1; burstSparks(120, 0, 6.2);
+        break;
+      case 'solo':
+        state.solo = { x, t0: data.songTime, t1: data.until };
+        state.flash = 0.8; state.cheer = 1;
+        burstSparks(120, x, 0.3, true);
         break;
     }
   }

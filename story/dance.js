@@ -1300,6 +1300,23 @@ export const MOVES = {
     p.lean(-0.05, -0.18, 0.2, 0.2); p.look(-0.25, 0.4, 0.2);
   },
 
+  // Watching the other dancer's solo: arms folded and nodding, then
+  // grudging respect — clapping on the beat.
+  soloWatch(p, b, B, s) {
+    groove(p, B, s, 0.5);
+    p.foot('L', 0.16); p.foot('R', 0.16, 0, 0.04, 0.3 * (Math.floor(b) & 1));
+    if (b < 4) {
+      crossArms(p);
+      p.hips(0.03 * Math.sin(Math.PI * b), -0.06, -0.05);
+      p.lean(0, -0.1); p.look(0.05, 0, 0.08 * Math.sin(Math.PI * b));
+    } else {
+      const c = Math.exp(-frac(b) * 7);
+      clapFront(p, 0.45 * (1 - c));
+      p.hips(0, -0.08, -0.05);
+      p.look(-0.1, 0, 0);
+    }
+  },
+
   // Walk-on: arms folded, nodding to the beat, then snap into a stance.
   intro(p, b, B, s) {
     groove(p, B, s, 0.6);
@@ -1326,7 +1343,7 @@ const EXPRESSIONS = {
   robot: 'focus', moonwalk: 'focus', spinPoint: 'grin', jumpSplit: 'shout', windmillFreeze: 'shout',
   taunt: 'smirk', dodge: 'o', stunned: 'dizzy', fumble: 'o', whiff: 'o', hitReact: 'o',
   reactOoh: 'o', cheer: 'shout', victory: 'shout', defeat: 'sad', intro: 'focus',
-  entrance: 'smirk', introWatch: 'focus', introTaunt: 'smirk', introAnswer: 'grin', ready: 'focus',
+  entrance: 'smirk', introWatch: 'focus', soloWatch: 'o', introTaunt: 'smirk', introAnswer: 'grin', ready: 'focus',
   lockAndPop: 'shout', breakWindmill: 'focus', backflip: 'shout', headspin: 'focus', airChair: 'focus',
   // Tina
   sassyStrut: 'smirk', shimmyBounce: 'joy', purseGroove: 'smile', hairFlip: 'smirk', tacoHop: 'joy',
@@ -1343,7 +1360,7 @@ const HITS = {
   hustle: 1, cabbagePatch: 0.8, moonwalk: 0.5, spinPoint: 0.5, jumpSplit: 0.3, windmillFreeze: 0.4,
   taunt: 0.5, dodge: 0.2, stunned: 0.2, fumble: 0.2, whiff: 0.2, hitReact: 0.1, reactOoh: 0.4, cheer: 0.8,
   victory: 0.5, defeat: 0.1, intro: 0.6, introWatch: 0.7, introTaunt: 0.5, introAnswer: 0.6, ready: 1,
-  breakWindmill: 0, backflip: 0, headspin: 0, airChair: 0.1, accentBboy: 0.4, accentDisco: 0.4, accentDiva: 0.4,
+  breakWindmill: 0, backflip: 0, headspin: 0, airChair: 0.1, soloWatch: 0.6, accentBboy: 0.4, accentDisco: 0.4, accentDiva: 0.4,
   shimmyBounce: 1, purseGroove: 1, tacoHop: 0.7, purseTwirl: 0.5, twirlSpin: 0.3, catwalkPose: 0.5, dropItLow: 0.7,
   cartwheel: 0, toeTouch: 0.2, superstar: 0, tinaTaunt: 0.5,
   elvisSwivel: 1, elvisLegs: 0.8, funkyChicken: 0.9, fingerGuns: 0.8, airGuitar: 0.9, splitDrop: 0.3,

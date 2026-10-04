@@ -1,16 +1,11 @@
-// Announcer — the arena voice: "Dance battle!", "Here comes Tina!",
-// "Ready?", "Three! Two! One! Go!", move calls, "Stunned!", "You win!".
+// Announcer — the game-show host. Says little, says it big: "Here comes…
+// Tina!", "Are you ready?", "Let's go!", "Solo time!", "Fever!", "You win!".
 // Lines are short MP3s (audio/voice/announcer/, generated with the Piper
 // TTS LibriTTS voice — CC BY 4.0) decoded into the game's AudioContext, so
 // they can be scheduled sample-accurately on the music clock (the count-in
 // lands on the beat). Music ducks a little under the voice.
 
-const LINES = [
-  'ready', 'go', 'three', 'two', 'one', 'dance-battle', 'vs-alfred', 'vs-tina', 'show-em',
-  'cool', 'awesome', 'groovy', 'fantastic', 'excellent', 'fever', 'solo', 'unstoppable',
-  'stunned', 'nice-dodge', 'finish', 'you-win', 'alfred-wins', 'tina-wins',
-];
-const PRAISE = ['cool', 'awesome', 'groovy', 'fantastic', 'excellent'];
+const LINES = ['vs-alfred', 'vs-tina', 'ready', 'go', 'solo', 'fever', 'you-win', 'alfred-wins', 'tina-wins'];
 const _cache = new Map();          // name → Promise<AudioBuffer|null>, shared across battles
 
 export class Announcer {
@@ -24,7 +19,6 @@ export class Announcer {
     this.base = new URL('../audio/voice/announcer/', import.meta.url).href;
     this.busyUntil = 0;
     this.sources = new Set();
-    this._praise = 0;
     for (const n of LINES) this._load(n);
   }
 
@@ -60,9 +54,6 @@ export class Announcer {
       g.setTargetAtTime(1, t + buf.duration, 0.15);
     }
   }
-
-  // A praise call for a landed move, rotating so it doesn't repeat.
-  praise(at) { return this.say(PRAISE[this._praise++ % PRAISE.length], at); }
 
   dispose() {
     this.disposed = true;

@@ -53,6 +53,18 @@ export class CameraDirector {
         fov = 44;
         break;
       }
+      case 'solo': {                        // SOLO TIME: low sweep around the soloist, pushing in
+        const a = s.who === 'rival' ? R : P;
+        const t = Math.max(0, Math.min(1, (beat - s.start) / (s.until - s.start)));
+        const side = s.who === 'rival' ? 1 : -1;
+        const ang = side * (-0.85 + 1.7 * t);
+        const r = 5.6 - 0.9 * Math.sin(Math.PI * t);
+        tp.set(a.x + Math.sin(ang) * r, 1.15 + 0.8 * t, a.z + Math.cos(ang) * r);
+        tl.set(a.x, 1.1 + 0.15 * t, a.z);
+        fov = 44 - 3 * t;
+        roll = side * 0.07 * Math.sin(Math.PI * 2 * t);
+        break;
+      }
       case 'taunt': {                       // low dutch angle over the taunter
         const a = s.who === 'rival' ? R : P, b = s.who === 'rival' ? P : R;
         tp.set(a.x + (a.x - b.x) * 0.45, 1.0, 5.2);
@@ -88,9 +100,9 @@ export class CameraDirector {
     const aspect = this.cam.aspect || 1.6;
     if (aspect < 1.3) fov += 8;
     const fit = this.fitFactor(fov);
-    if (fit > 1) { tp.sub(tl).multiplyScalar(fit).add(tl); tp.y += (fit - 1) * 1.1; }
+    if (fit > 1 && s.kind !== 'solo') { tp.sub(tl).multiplyScalar(fit).add(tl); tp.y += (fit - 1) * 1.1; }
 
-    const k = 1 - Math.exp(-dt * (s.kind === 'orbit' ? 10 : 4.5));
+    const k = 1 - Math.exp(-dt * (s.kind === 'orbit' || s.kind === 'solo' ? 8 : 4.5));
     this.pos.lerp(tp, k);
     this.look.lerp(tl, k);
     this.fov = lerp(this.fov, fov, k);

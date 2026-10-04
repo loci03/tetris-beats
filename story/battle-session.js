@@ -367,7 +367,6 @@ export class BattleSession {
           this.hud.showBanner(`${this.level.title}<small>DANCE BATTLE vs ${rivalName}</small>`, 'big', 2200);
           this.pDance.play('entrance', B, 4); this.rDance.play('entrance', B, 4);
           this.director.cut('two', B, 4);
-          this.ann.say('dance-battle', this._at(B), { force: true });
           this.sfx.crowdCheer(1, this._at(B));
         } else if (i === 1) {
           // The rival calls the player out: point, smirk, spin, signature pose.
@@ -384,7 +383,6 @@ export class BattleSession {
           this.rDance.play('introWatch', B, 4);
           this.director.cut('close', B, 4, { who: 'player' });
           this._fx('player', 'anger', 1);
-          this.ann.say('show-em', this._at(B), { force: true });
           this.sfx.crowdCheer(0.6, this._at(B + 3));
           this.cues.push({ beat: B + 3, fn: () => this._fx('player', 'note', 4) });
           if (this.bridge.isTouch) this.hud.showCallout('<b>SWIPE</b> the arrows any time · <b>TAP</b> on beat 4', '', 4000);
@@ -394,17 +392,16 @@ export class BattleSession {
           this.pDance.play('ready', B, 4); this.rDance.play('ready', B, 4);
           this.director.cut('two', B, 4);
           this.hud.showBanner('READY?', '', this.clock.spb * 1000 * 0.9);
-          // The announcer counts it in, sample-accurate on the beat.
-          const voice = this.ann.enabled;
-          this.ann.say('ready', this._at(B), { force: true });
+          // "Are you ready?" — count-in blips on 3-2-1 — "Let's GO!" with
+          // the "go" landing on the downbeat.
+          this.ann.say('ready', this._at(B) - 0.15, { force: true });
           ['3', '2', '1'].forEach((n, k) => {
             const beat = B + 1 + k;
-            if (voice) this.ann.say(['three', 'two', 'one'][k], this._at(beat), { force: true });
-            else this.sfx.count(this._at(beat));
+            this.sfx.count(this._at(beat));
             this.cues.push({ beat, fn: () => this.hud.showBanner(n, 'count', this.clock.spb * 900) });
           });
           const go = this._at(m.battleStartBar * 4);
-          if (voice) this.ann.say('go', go, { force: true }); else this.sfx.count(go, true);
+          if (this.ann.enabled) this.ann.say('go', go - 0.32, { force: true }); else this.sfx.count(go, true);
           this.sfx.crowdCheer(1.2, go);
         }
         if (d.bar === m.battleStartBar) {
@@ -427,7 +424,7 @@ export class BattleSession {
           this.hud.judge(d.judgment, d.delta, d.reason);
           if (d.note.kind === 'groove' && d.judgment !== 'miss') { this.sfx.groove(); this.sfx.hit(d.judgment); }
           else this.sfx.hit(d.judgment);
-          if (d.combo && d.combo % 8 === 0) { this.ann.say('unstoppable'); this.sfx.crowdCheer(0.8); }
+          if (d.combo && d.combo % 8 === 0) this.sfx.crowdCheer(0.8);
         } else if (d.note.kind !== 'dodge' && d.note.kind !== 'taunt') {
           this.hud.rivalJudgment(d.judgment);
         }
@@ -438,10 +435,13 @@ export class BattleSession {
         if (d.kind === 'solo') name = def.solo;
         else if (d.kind === 'branch') name = def.branchMoves[d.tier];
         if (!name) { const list = def.moves[d.tier] || ['twoStep']; name = list[d.bar % list.length]; }
-        this._schedule(d.who, name, d.bar * 4, 4, true);
+        const inSolo = this._soloUntil && d.bar < this._soloUntil;
+        if (!d.soloTime && !inSolo) this._schedule(d.who, name, d.bar * 4, 4, true);
         const foe = d.who === 'player' ? 'rival' : 'player';
         const big = d.kind !== 'std' || d.tier >= 4;
-        if (big) {
+        if (d.soloTime) {
+          // Solo Time stages itself (soloStart).
+        } else if (big) {
           this._schedule(foe, 'reactOoh', d.bar * 4, 2, false);
           this.cuts.push({ bar: d.bar, kind: 'orbit', who: d.who, len: 4 });
         } else if (d.tier >= 3) {
@@ -455,11 +455,9 @@ export class BattleSession {
         if (d.who === 'player') {
           const label = (d.kind === 'solo' ? '★★ ' : d.kind === 'branch' ? '★ ' : '') + (MOVE_LABELS[name] || 'GROOVE');
           this.hud.showCallout(`${label} · ${d.judgment.toUpperCase()} <b>+${d.bonus}</b>`, d.perfect || big ? 'good' : '', 1400);
-          // Announcer + crowd land on the downbeat the move starts.
-          const at = this._at(d.bar * 4);
-          if (d.kind === 'solo') this.ann.say('solo', at, { force: true });
-          else if (d.kind === 'branch') this.ann.say('fever', at);
-          else if (d.tier >= 3 || d.perfect) this.ann.praise(at);
+          // The host only calls the first ★ branch of the battle ("Fever!");
+          // the solo gets its own call when Solo Time starts.
+          if (d.kind === 'branch' && !this._feverCalled) { this._feverCalled = true; this.ann.say('fever', this._at(d.bar * 4)); }
         } else if (big) {
           this._voice('rival', 'combo', 0.5);
         }
@@ -511,7 +509,6 @@ export class BattleSession {
         this.hud.showBanner(d.who === 'player' ? 'DODGED!' : `${rivalName} DODGED`, d.who === 'player' ? 'good' : 'bad', 1100);
         this.world.react('dodge', d);
         this.sfx.crowdCheer(0.8);
-        if (d.who === 'player') this.ann.say('nice-dodge');
         if (d.who === 'player') this._voice('player', 'single');
         break;
       case 'tauntLanded':
@@ -523,7 +520,6 @@ export class BattleSession {
         this.director.cut('close', beatNow, 2, { who: d.attacker });
         this.world.react('tauntLanded', d);
         this.sfx.crowdOoh(1.1);
-        this.ann.say('stunned', 0, { force: true });
         this._voice(d.attacker, 'tetris');
         break;
       case 'tauntNotReady':
@@ -534,6 +530,36 @@ export class BattleSession {
         break;
       case 'bar':
         this.sfx.hype(0.3 + Math.abs(d.groove) * 0.7);
+        break;
+      case 'soloStart': {
+        // SOLO TIME — the stage is theirs for two bars: solo, then encore,
+        // the camera circles them, the lights close in, the rival watches.
+        const who = d.who, foe = who === 'player' ? 'rival' : 'player';
+        const def = this._def(who), B = d.bar * 4, len = d.bars * 4;
+        this._soloUntil = d.bar + d.bars;
+        this._dc(who).queue = []; this._dc(foe).queue = [];
+        this._schedule(who, def.solo, B, 4, true);
+        this._schedule(who, def.branchMoves[4] || def.solo, B + 4, len - 4, true);
+        this._schedule(foe, 'soloWatch', B, len, true);
+        this.cuts = this.cuts.filter(c => c.bar < d.bar || c.bar >= d.bar + d.bars);
+        this.cuts.push({ bar: d.bar, kind: 'solo', who, len });
+        this.world.react('solo', { who, songTime: this.clock.barTime(d.bar), until: this.clock.barTime(d.bar + d.bars) });
+        this.ann.say('solo', this._at(B) - 0.25, { force: true });
+        this.sfx.crowdCheer(1.3, this._at(B));
+        this.sfx.crowdCheer(0.9, this._at(B + 4));
+        this.cues.push({ beat: B, fn: () => {
+          this.hud.showBanner(who === 'player' ? 'SOLO TIME!' : `${this.rDef.name}'S SOLO!`, 'big', 1600);
+          this._fx(who, 'sparkle', 12); this._fx(who, (def.fx || {}).move, 8);
+        } });
+        this.cues.push({ beat: B + 4, fn: () => this._fx(who, (def.fx || {}).move, 8) });
+        this.cues.sort((a, b) => a.beat - b.beat);
+        break;
+      }
+      case 'soloEnd':
+        this.sfx.crowdCheer(1.4);
+        this.sfx.applause(1, 3);
+        this._fx(d.who, 'sparkle', 10);
+        if (d.who === 'player') this.hud.showCallout('SOLO TIME <b>+5000</b>', 'good', 1500);
         break;
       case 'end':
         this._result(d);
@@ -560,8 +586,7 @@ export class BattleSession {
     this._fx(loser, 'sweat', 2);
     this.sfx.crowdCheer(1.5);
     this.sfx.applause(1.2, 5);
-    this.ann.say('finish', 0, { force: true });
-    this.ann.say(win ? 'you-win' : this.level.dancers.rival + '-wins', this.ctx.currentTime + 1.1, { force: true });
+    this.ann.say(win ? 'you-win' : this.level.dancers.rival + '-wins', this.ctx.currentTime + 0.4, { force: true });
     this.hud.showBanner(
       `${win ? 'YOU WIN!' : `${this.rDef.name} WINS`}<small>${summary.player.score.toLocaleString()} — ${summary.rival.score.toLocaleString()} · GROOVE BONUS +${this.bonus.toLocaleString()}</small>`,
       win ? 'big win' : 'big lose', len * this.clock.spb * 1000);

@@ -21,6 +21,7 @@ function el(tag, cls, parent, html) {
 
 export class BattleHUD {
   constructor({ names, isTouch, onPad, onPause }) {
+    this.names = names;
     this.root = el('div', 'story-hud');
     this.root.setAttribute('aria-live', 'polite');
     const top = el('div', 'sh-top', this.root);
@@ -248,7 +249,8 @@ export class BattleHUD {
           this._rows.push({ o, row, chips, prog: -1 });
         }
       } else if (b) {
-        const label = { taunt: 'TAUNT on beat 1!', dodge: 'DODGE! GROOVE on beat 3', stunned: 'STUNNED…' }[b.type];
+        const label = { taunt: 'TAUNT on beat 1!', dodge: 'DODGE! GROOVE on beat 3', stunned: 'STUNNED…',
+          solo: '★★ SOLO TIME — the stage is yours! ★★', watch: `${this.names.rival}'s SOLO — watch the show` }[b.type];
         if (label) el('div', 'sh-cmd-row note ' + b.type, this.cmd, label);
       }
     }

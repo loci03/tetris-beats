@@ -1,3 +1,4 @@
 Announcer voice lines generated with Piper TTS (https://github.com/rhasspy/piper)
-using the en-us LibriTTS (high) voice, speaker 42.
+using the en-us LibriTTS (high) voice, speaker 90, then pitched down and
+processed (EQ, compression, arena reverb) for a game-show host sound.
 LibriTTS dataset: CC BY 4.0 — http://www.openslr.org/60/

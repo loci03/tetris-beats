@@ -242,6 +242,8 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
 .sh-cmd-row.note.taunt { border-color: #b35cff; color: #e2c4ff; }
 .sh-cmd-row.note.dodge { border-color: #ff3355; color: #ffc2cc; }
 .sh-cmd-row.note.stunned { border-color: #ff6b7e; color: #ff9aa8; }
+.sh-cmd-row.note.solo { border-color: #ffd23f; color: #fff3b0; background: linear-gradient(90deg, rgba(90, 30, 110, 0.9), rgba(140, 40, 70, 0.9)); box-shadow: 0 0 22px rgba(255, 200, 60, 0.6); }
+.sh-cmd-row.note.watch { border-color: rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.8); }
 .sh-lane-wrap { position: relative; width: 100%; }
 .sh-lane { display: block; width: 100%; height: 80px; }
 .sh-judge {

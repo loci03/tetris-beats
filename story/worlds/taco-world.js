@@ -345,7 +345,7 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
   const baseIntensity = { hemi: hemi.intensity, key: key.intensity, rimL: rimL.intensity, rimR: rimR.intensity, arch: archGlow.intensity };
 
   // ── State + update ──────────────────────────────────────────────
-  const state = { lightLevel: 1, flash: 0, cheer: 0, ripple: null, focus: 0, lastBeat: -1, barColor: 0 };
+  const state = { lightLevel: 1, flash: 0, cheer: 0, ripple: null, focus: 0, lastBeat: -1, barColor: 0, solo: null };
   const dummy = new THREE.Object3D();
 
   function update(dt, info) {
@@ -357,6 +357,14 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
     state.flash = Math.max(0, state.flash - dt * 2.2);
     state.cheer = Math.max(0, state.cheer - dt * 0.5);
     state.focus += ((info.leader || 0) - state.focus) * Math.min(1, dt * 2);
+    // SOLO TIME: the house lights drop and every spotlight lands on the soloist.
+    let soloK = 0, soloX = 0;
+    if (state.solo) {
+      const st = info.songTime, so = state.solo;
+      soloK = Math.min(1, Math.max(0, (st - so.t0) / 0.35)) * Math.min(1, Math.max(0, (so.t1 - st) / 0.5));
+      soloX = so.x;
+      if (st > so.t1) state.solo = null;
+    }
     if (whole !== state.lastBeat) {
       state.lastBeat = whole;
       if (whole % 4 === 0) state.barColor = (state.barColor + 1) % PALETTE.length;
@@ -374,6 +382,10 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
         const band = Math.exp(-Math.pow((d - r) * 1.8, 2));
         k = Math.max(k, band * (1 - Math.min(1, r / 10)) * L);
       }
+      if (soloK > 0) {
+        const near = Math.exp(-Math.pow(Math.hypot(t.x - soloX, t.z) / 1.3, 2));
+        k = k * (1 - 0.75 * soloK) + soloK * near * (0.6 + 0.4 * onBeat);
+      }
       col.copy(dim).lerp(checker ? cA : cB, Math.min(1, k)).multiplyScalar(0.6 + 0.8 * k + state.flash * 0.4);
       tileMesh.setColorAt(i, col);
     });
@@ -383,11 +395,11 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
     cones.forEach((c, i) => {
       const lead = c.side === 'player' ? Math.max(0, state.focus) : Math.max(0, -state.focus);
       const sway = Math.sin(info.songTime * 0.9 + i * 1.7) * 0.25;
-      const dx = c.targetX + sway - c.baseX;
+      const dx = c.targetX + (soloX - c.targetX) * soloK + sway * (1 - soloK) - c.baseX;
       c.cone.rotation.z = Math.atan2(dx, 7.0);
       c.cone.rotation.x = -0.12;
       coneMats[i].color.set(PALETTE[(state.barColor + i) % PALETTE.length]);
-      coneMats[i].opacity = (0.025 + 0.045 * onBeat + 0.05 * lead + 0.1 * state.flash) * L;
+      coneMats[i].opacity = (0.025 + 0.045 * onBeat + 0.05 * lead + 0.1 * state.flash) * L * (1 - 0.35 * soloK);
     });
 
     // Flags sway, bulbs twinkle, cheese drips, speakers pump.
@@ -444,10 +456,11 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
     }
 
     // Lights
-    hemi.intensity = baseIntensity.hemi * (0.15 + 0.85 * L);
-    key.intensity = baseIntensity.key * L;
-    rimL.intensity = baseIntensity.rimL * L * (0.7 + 0.6 * onBeat + 0.6 * Math.max(0, state.focus));
-    rimR.intensity = baseIntensity.rimR * L * (0.7 + 0.6 * onBeat + 0.6 * Math.max(0, -state.focus));
+    const soloL = soloX < 0 ? 1 : -1;
+    hemi.intensity = baseIntensity.hemi * (0.15 + 0.85 * L) * (1 - 0.55 * soloK);
+    key.intensity = baseIntensity.key * L * (1 - 0.45 * soloK);
+    rimL.intensity = baseIntensity.rimL * L * (0.7 + 0.6 * onBeat + 0.6 * Math.max(0, state.focus)) * (1 + 1.6 * soloK * Math.max(0, soloL) - 0.6 * soloK * Math.max(0, -soloL));
+    rimR.intensity = baseIntensity.rimR * L * (0.7 + 0.6 * onBeat + 0.6 * Math.max(0, -state.focus)) * (1 + 1.6 * soloK * Math.max(0, -soloL) - 0.6 * soloK * Math.max(0, soloL));
     archGlow.intensity = baseIntensity.arch * L * (0.8 + 0.5 * onBeat + state.flash);
     shellMat.emissive.setRGB(0.23 * (0.4 + onBeat * 0.6) * L, 0.1 * L, 0);
   }
@@ -477,6 +490,11 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
         break;
       case 'drop':
         state.flash = 1; burstConfetti(80, 0, 8);
+        break;
+      case 'solo':
+        state.solo = { x, t0: data.songTime, t1: data.until };
+        state.flash = 0.8; state.cheer = 1;
+        burstConfetti(90, x, 3);
         break;
     }
   }

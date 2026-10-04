@@ -26,6 +26,11 @@ const FINISH_POINTS = { perfect: 1000, great: 700, good: 400, miss: 0 };
 const HYPE_GAIN = { perfect: 18, great: 13, good: 6, miss: -15 };
 const ENTH_GAIN = { perfect: 22, great: 16, good: 10, miss: -20 };
 const TAUNT_LAND_BONUS = 1500;
+// SOLO TIME: landing the SOLO gives the dancer two bars of freestyle — no
+// commands, the camera and spotlights are theirs — and the opponent
+// watches. Each solo bar scores this much.
+const SOLO_BARS = 2;
+const SOLO_BAR_POINTS = 2500;
 const DODGE_BONUS = 800;
 // Bars are built (and commands shown) this far ahead; the lane shows the
 // finisher this far ahead. Also the last moment a taunt can claim a bar.
@@ -98,7 +103,8 @@ export class RhythmBattle {
     for (const who of ['player', 'rival']) {
       const d = this.dancer(who);
       let spec;
-      if (taunt) spec = taunt.attacker === who ? buildTauntBar() : buildDodgeBar();
+      if (bar < (d.soloUntil || 0)) spec = { type: d.soloRole, tier: 0, notes: [] };
+      else if (taunt) spec = taunt.attacker === who ? buildTauntBar() : buildDodgeBar();
       else if (d.stunNext) { spec = buildStunnedBar(); d.stunNext = false; }
       else spec = buildCommand(this.rng, d.level, d.enthusiasm);
       const b = this._materialize(spec, bar, who);
@@ -111,7 +117,7 @@ export class RhythmBattle {
     // player sees it coming a full bar ahead.
     const r = this.rival;
     if (!this.pendingTaunt && r.hype >= 100 && bar >= this.startBar + 1 && bar + 1 <= this.endBar - 2
-        && this.ai.wantsTaunt(this.groove < 0)) {
+        && bar + 1 >= (r.soloUntil || 0) && this.ai.wantsTaunt(this.groove < 0)) {
       this._queueTaunt('rival', bar + 1);
     }
   }
@@ -166,7 +172,7 @@ export class RhythmBattle {
       if (this.pendingTaunt) { this.emit('tauntBlocked', { who: 'player' }); return; }
       if (p.hype < 100) { this.emit('tauntNotReady', { who: 'player', hype: p.hype }); return; }
       const bar = this.nextBuild;
-      if (bar < this.startBar || bar > this.endBar - 2) { this.emit('tauntBlocked', { who: 'player' }); return; }
+      if (bar < this.startBar || bar > this.endBar - 2 || bar < (p.soloUntil || 0)) { this.emit('tauntBlocked', { who: 'player' }); return; }
       this._queueTaunt('player', bar);
       return;
     }
@@ -258,7 +264,9 @@ export class RhythmBattle {
       d.enthusiasm = opt.kind === 'solo' ? 25 : clamp(d.enthusiasm + ENTH_GAIN[j] + (opt.kind === 'branch' ? 6 : 0), 0, 100);
       d.bestLevel = Math.max(d.bestLevel, level + (opt.kind === 'branch' ? 0.5 : opt.kind === 'solo' ? 1 : 0));
       d.level = Math.min(4, d.level + 1);
-      this.emit('move', { who: d.id, bar: b.bar + 1, tier: level, kind: opt.kind, judgment: j, perfect: j === 'perfect', bonus: pts, chain: d.chain });
+      const soloTime = opt.kind === 'solo' && b.bar + 1 + SOLO_BARS <= this.endBar;
+      this.emit('move', { who: d.id, bar: b.bar + 1, tier: level, kind: opt.kind, judgment: j, perfect: j === 'perfect', bonus: pts, chain: d.chain, soloTime });
+      if (soloTime) this._startSolo(d, b.bar + 1);
     } else {
       d.chain = 0;
       d.fumbles = (d.fumbles || 0) + 1;
@@ -267,6 +275,29 @@ export class RhythmBattle {
       this.emit('fumble', { who: d.id, bar: b.bar, reason });
     }
     this._barDone(b.bar);
+  }
+
+  // SOLO TIME: the next SOLO_BARS bars become 'solo' for the dancer and
+  // 'watch' for the opponent (bars already built are swapped out).
+  _startSolo(d, startBar) {
+    const foe = this.dancer(this.other(d.id));
+    const until = startBar + SOLO_BARS;
+    d.soloUntil = foe.soloUntil = until;
+    d.soloRole = 'solo'; foe.soloRole = 'watch';
+    for (let bar = startBar; bar < until; bar++) {
+      for (const dd of [d, foe]) {
+        const prev = dd.bars.get(bar);
+        if (prev && prev.resolved) continue;
+        if (prev) this.emit('barReplaced', { who: dd.id, bar });
+        dd.bars.set(bar, this._materialize({ type: dd.soloRole, tier: 0, notes: [] }, bar, dd.id));
+      }
+    }
+    // A taunt aimed into the solo is called off (the hype is refunded).
+    if (this.pendingTaunt && this.pendingTaunt.bar >= startBar && this.pendingTaunt.bar < until) {
+      this.dancer(this.pendingTaunt.attacker).hype = 100;
+      this.pendingTaunt = null;
+    }
+    this.emit('soloStart', { who: d.id, bar: startBar, bars: SOLO_BARS });
   }
 
   _resolveTaunt(d, b, n, j) {
@@ -391,11 +422,17 @@ export class RhythmBattle {
       }
     }
 
-    // Note-less bars (stunned) resolve when they end.
+    // Note-less bars (stunned / solo / watch) resolve when they end; solo
+    // bars pay out.
     for (const d of [this.player, this.rival]) {
       for (const b of d.bars.values()) {
         if (!b.resolved && b.notes.length === 0 && songTime >= clock.barTime(b.bar + 1)) {
           b.resolved = true;
+          if (b.type === 'solo') {
+            b.success = true;
+            this._addPoints(d, b.bar, SOLO_BAR_POINTS);
+            if (b.bar + 1 >= d.soloUntil) this.emit('soloEnd', { who: d.id, bar: b.bar });
+          }
           this._barDone(b.bar);
         }
       }
@@ -423,7 +460,7 @@ export class RhythmBattle {
   commandFor(who, t) {
     let best = null;
     for (const b of this.dancer(who).bars.values()) {
-      if (b.type !== 'command' && b.type !== 'taunt' && b.type !== 'dodge' && b.type !== 'stunned') continue;
+      if (!['command', 'taunt', 'dodge', 'stunned', 'solo', 'watch'].includes(b.type)) continue;
       const end = b.type === 'command' ? b.finisher.time + 0.3 : this.clock.barTime(b.bar + 1) - this.clock.spb + 0.3;
       if (end < t) continue;
       if (!best || b.bar < best.bar) best = b;

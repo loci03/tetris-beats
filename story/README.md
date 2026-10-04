@@ -29,7 +29,7 @@ object; the mode never touches game internals directly.
 | `transition.js` | Board capture → 3D tiles aligned to the 2D board; shatter/fly-through in, reassemble out. |
 | `hud.js`, `story.css` | Battle HUD, note lane, touch pads, toasts. |
 | `sfx.js` | Synthesized hit / whoosh / riser / impact / crowd / count-in sounds. |
-| `announcer.js` | Arena announcer ("Ready?", "Three! Two! One! Go!", move calls, "Stunned!", "You win!") scheduled on the music clock; ducks the music. |
+| `announcer.js` | Game-show announcer — a few big lines ("Here comes… Tina!", "Are you ready?", "Let's go!", "Solo time!", "Fever!", winner) scheduled on the music clock; ducks the music. |
 | `anime-fx.js` | Manga marks over the dancers: hearts, sparkles, notes, sweat drops, anger veins, "!". |
 | `worlds/underground-world.js` | Level 1 stage: graffiti warehouse, neon, lasers, passing subway train. |
 | `worlds/taco-world.js` | Level 2 stage: sunset taco-shell street party. |
@@ -68,7 +68,10 @@ performs the move through the next bar; each landed command climbs a level
 **Enthusiasm**: from level 2 at half a gauge the tree offers a **★ branch**
 row next to the standard command (longer, more points, signature moves — lock
 & pop, windmill, backflip), and at level 4 with a full gauge the **SOLO**
-(headspin). A solo spends the gauge.
+(headspin). Landing it starts **SOLO TIME**: two bars where the stage is
+theirs — no commands, solo then encore, the camera sweeps around them, the
+house lights drop and the spotlights close in, the opponent watches (then
+claps), +2500 per bar. A solo spends the gauge.
 
 Battle states: INTRO (entrance) → the rival calls the player out → the
 player answers → READY + a 3-2-1 count-in on the beat → GROOVE. Both dancers
@@ -103,7 +106,7 @@ level are unchanged after the battle and that the score only gains the bonus.
 
 Announcer voice lines (`audio/voice/announcer/`) were generated with
 [Piper](https://github.com/rhasspy/piper) using its LibriTTS (high) voice,
-speaker 42. LibriTTS is licensed CC BY 4.0
+speaker 90 (pitched down and processed for a game-show host). LibriTTS is licensed CC BY 4.0
 (http://www.openslr.org/60/). Crowd, count-in and hit sounds are synthesized
 at runtime (`sfx.js`).
 
