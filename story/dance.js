@@ -68,7 +68,10 @@ class Pose {
   set(j, x, y, z) { const o = J[j]; this.a[o] = x; this.a[o + 1] = y; this.a[o + 2] = z; return this; }
   add(j, x = 0, y = 0, z = 0) { const o = J[j]; this.a[o] += x; this.a[o + 1] += y; this.a[o + 2] += z; return this; }
   root(x = 0, y = 0, z = 0, yaw = 0) { const a = this.a; a[ROOT] += x; a[ROOT + 1] += y; a[ROOT + 2] += z; a[ROOT + 3] += yaw; return this; }
-  hips(x = 0, y = -0.03, z = 0, yaw = 0) { const a = this.a; a[ROOT] = x; a[ROOT + 1] = y; a[ROOT + 2] = z; a[ROOT + 3] = yaw; return this; }
+  // Hip position, and `yaw` = a twist of the pelvis (and everything above
+  // it) with the feet staying planted. Whole-body turns / spins go through
+  // root(…, yaw).
+  hips(x = 0, y = -0.03, z = 0, yaw = 0) { const a = this.a; a[ROOT] = x; a[ROOT + 1] = y; a[ROOT + 2] = z; a[ROOT + 3] = 0; a[J.hips + 1] = yaw; return this; }
   // Whole-body pitch (> 0 tips forward, -2π is a backflip) and roll, about
   // the hips — for flips, windmills and headspins.
   tumble(pitch, roll = 0) { this.a[ROOT + 4] = pitch; this.a[ROOT + 5] = roll; return this; }
@@ -126,7 +129,7 @@ export function mirrorPose(src, out = new Float32Array(POSE_SIZE)) {
 
 // Two-bone leg IK: foot targets → thigh / shin / foot rotations. Thighs use
 // Euler order ZXY (set in characters.js) so the solve is exact.
-function solveLegs(a) {
+function solveLegs(a, prevZ) {
   const hx = a[J.hips], hy = a[J.hips + 1], hz = a[J.hips + 2];
   const px = a[ROOT], py = HIP_Y + a[ROOT + 1], pz = a[ROOT + 2];
   for (let side = 0; side < 2; side++) {
@@ -145,7 +148,9 @@ function solveLegs(a) {
     const d = Math.max(0.12, Math.min(len, 2 * LEG * 0.999));
     const alpha = Math.acos(d / (2 * LEG));
     const tx = -Math.asin(Math.max(-1, Math.min(1, uz)));
-    const tz = Math.atan2(ux, -uy);
+    let tz = Math.atan2(ux, -uy);
+    // Feet above the hips flip atan2's branch: stay continuous instead.
+    if (prevZ) { tz = prevZ[side] + wrapAngle(tz - prevZ[side]); prevZ[side] = tz; }
     const th = J[side === 0 ? 'thighL' : 'thighR'], sh = J[side === 0 ? 'shinL' : 'shinR'], ft = J[side === 0 ? 'footL' : 'footR'];
     a[th] = tx - alpha; a[th + 1] = 0; a[th + 2] = tz;
     a[sh] = 2 * alpha; a[sh + 1] = 0; a[sh + 2] = 0;
@@ -204,10 +209,11 @@ function groove(p, B, s, amt = 1) {
 // MusicClock.accents): the body drops into every kick, and every snare/clap
 // pops the chest back, snaps the head, flares the arms and twists the torso
 // — so the dancers hit the drums, syncopations included, not just a metronome.
-function hitLayer(a, acc, amt, beat) {
+function hitLayer(a, acc, amt, beat, feel) {
   if (!acc || amt <= 0) return;
   const k = acc.kick * amt, s = acc.snare * amt;
-  a[ROOT + 1] -= 0.07 * k;
+  // Hip-hop drops into the kick; disco pops up off it.
+  a[ROOT + 1] += (feel === 'up' ? 0.035 : feel === 'sway' ? -0.035 : -0.07) * k;
   a[J.chest] += 0.12 * k - 0.2 * s;
   a[J.head] += 0.14 * k - 0.18 * s;
   a[J.shL + 2] += 0.16 * s; a[J.shR + 2] -= 0.16 * s;
@@ -428,7 +434,7 @@ export const MOVES = {
       const t = smooth((b - 2.5) / 0.75);
       const z0 = -0.35 * (1 - t);
       p.foot('L', 0.1, 0, z0); p.foot('R', 0.1, 0, z0 + 0.06, 0.5 * Math.sin(Math.PI * t));
-      p.hips(0, -0.04, z0, TAU * t);
+      p.hips(0, -0.04, z0); p.root(0, 0, 0, TAU * t);
       p.arms(0.6, 0.6, 1.8);
     } else {
       const k = smooth((b - 3.25) / 0.2);
@@ -445,7 +451,7 @@ export const MOVES = {
     if (b < 1.5) {
       const t = smooth(b / 1.5);
       p.foot('L', 0.11); p.foot('R', 0.11, 0.12 * Math.sin(Math.PI * t), 0.05, 0.3);
-      p.hips(0, -0.02 + 0.04 * Math.sin(Math.PI * t), 0, TAU * t);
+      p.hips(0, -0.02 + 0.04 * Math.sin(Math.PI * t), 0); p.root(0, 0, 0, TAU * t);
       p.arm('L', 0.6, 0.5, 1.9); p.arm('R', 0.6, 0.5, 1.9);
     } else {
       groove(p, B, s, 0.6);
@@ -498,7 +504,7 @@ export const MOVES = {
     } else if (b < 2.5) {
       const t = smooth((b - 2) / 0.5);
       p.foot('L', 0.14, 0, 0.1 * t); p.foot('R', 0.14, 0.05 * Math.sin(Math.PI * t), -0.2 * t);
-      p.hips(0, -0.03 - 0.3 * t, 0, TAU * t);
+      p.hips(0, -0.03 - 0.3 * t, 0); p.root(0, 0, 0, TAU * t);
       p.arms(0.5, 0.9, 1.0);
     } else {
       const k = smooth((b - 2.5) / 0.25);
@@ -564,7 +570,7 @@ export const MOVES = {
 
   fumble(p, b, B, s) {
     const t = clamp01(b / 1.5), w = Math.sin(TAU * t * 1.5) * (1 - t);
-    p.foot('L', 0.14, 0.1 * Math.max(0, w)); p.foot('R', 0.14, 0.1 * Math.max(0, -w));
+    p.foot('L', 0.14, 0.05 * (w + Math.abs(w))); p.foot('R', 0.14, 0.05 * (Math.abs(w) - w));
     p.add('spine', 0.1, 0, 0.45 * w); p.add('chest', 0, 0, 0.25 * w);
     p.arm('L', 0, 1.1 + 0.8 * w, 0.3); p.arm('R', 0, 1.1 - 0.8 * w, 0.3);
     p.look(0.2, 0.3 * w, 0.2 * w);
@@ -614,7 +620,7 @@ export const MOVES = {
     p.root(0, 0.3 * jump - 0.12 * (1 - jump), 0, 0);
     p.foot('L', 0.15, 0.25 * jump, 0, 0.5 * jump); p.foot('R', 0.15, 0.25 * jump, 0, 0.5 * jump);
     if (b >= 6) { p.arms(0.2, 2.6, 0.02); }
-    else { p.arm('L', 0.2, alt ? 2.8 : 1.2, alt ? 0 : 1.4); p.arm('R', 0.2, alt ? 1.2 : 2.8, alt ? 1.4 : 0); }
+    else { const k = 0.5 + 0.5 * Math.cos(Math.PI * b); p.arm('L', 0.2, lerp(1.2, 2.8, k), lerp(1.4, 0, k)); p.arm('R', 0.2, lerp(2.8, 1.2, k), lerp(0, 1.4, k)); }
     p.look(-0.35); p.lean(0, -0.2);
   },
 
@@ -644,7 +650,7 @@ export const MOVES = {
   introWatch(p, b, B, s) {
     groove(p, B, s, 0.6);
     crossArms(p);
-    p.foot('L', 0.17); p.foot('R', 0.17, 0, 0.04, 0.3 * (Math.floor(b) & 1));
+    p.foot('L', 0.17); p.foot('R', 0.17, 0, 0.04, 0.15 * (1 - Math.cos(Math.PI * b)));
     p.hips(0.04 * Math.sin(Math.PI * b), -0.06);
     p.lean(0, -0.1);
     if (b > 1.75 && b < 3.5) p.look(0.05, 0.38 * Math.sin(TAU * (b - 1.75) * 2), 0.05);
@@ -670,7 +676,7 @@ export const MOVES = {
     } else if (b < 2.75) {
       const t = smooth((b - 1.5) / 1.25);
       p.foot('L', 0.12); p.foot('R', 0.12, 0.14 * Math.sin(Math.PI * t), 0.05, 0.4);
-      p.hips(0, -0.02 + 0.05 * Math.sin(Math.PI * t), 0, 0.5 + TAU * t);
+      p.hips(0, -0.02 + 0.05 * Math.sin(Math.PI * t), 0); p.root(0, 0, 0, 0.5 + TAU * t);
       p.arms(0.7, 0.45, 2.0, -0.6);
     } else {
       const k = smooth((b - 2.75) / 0.25);
@@ -744,7 +750,7 @@ export const MOVES = {
     } else if (b < 3.25) {
       const u = (b - 0.75) / 2.5, ang = TAU * 2 * u;
       const sc = Math.sin(ang * 2);
-      p.hips(0, -0.63, 0, ang);
+      p.hips(0, -0.63, 0); p.root(0, 0, 0, ang);
       p.tumble(Math.PI / 2 + 0.2 * Math.sin(ang), 0.45 * Math.sin(ang));
       p.foot('L', 0.58 + 0.12 * sc, 0.05, -0.55); p.foot('R', 0.58 - 0.12 * sc, 0.05, -0.55);
       p.arm('L', 1.57, 0.35 + 0.3 * Math.max(0, Math.sin(ang)), 0.15);
@@ -771,17 +777,21 @@ export const MOVES = {
       p.lean(0.35 * k, 0.15 * k); p.look(0.1 * k);
     } else if (b < 2.1) {
       const t = (b - 1) / 1.1, air = Math.sin(Math.PI * t), tuck = Math.sin(Math.PI * Math.min(1, t * 1.1));
-      p.hips(0, lerp(-0.35, -0.02, smooth(t / 0.15)) + 1.05 * air, 0);
+      const hy = lerp(-0.35, -0.02, smooth(t / 0.15)) + 1.05 * air;
+      p.hips(0, hy, 0);
       p.tumble(-TAU * smooth(t), 0);
-      p.foot('L', 0.14, 0.5 * tuck, 0.2 * tuck, 0.3 * tuck); p.foot('R', 0.14, 0.5 * tuck, 0.2 * tuck, 0.3 * tuck);
+      // Feet travel with the body in the air, knees tucked up to the chest.
+      const fl = Math.max(0, hy + 0.03) + 0.45 * tuck;
+      p.foot('L', 0.14, fl, 0.2 * tuck, 0.3 * tuck); p.foot('R', 0.14, fl, 0.2 * tuck, 0.3 * tuck);
       p.arms(0.6 + 1.4 * tuck, 0.25, 0.4 + 0.8 * tuck);
       p.look(-0.3 * tuck);
-    } else if (b < 2.5) {
-      const k = smooth((b - 2.1) / 0.4);
+    } else if (b < 2.8) {
+      // Land and absorb: knees give, then push back up.
+      const u = (b - 2.1) / 0.7, k = smooth(u), give = Math.sin(Math.PI * u);
       wideStance(p, 0.2);
-      p.hips(0, -0.34 * (1 - k) - 0.06, 0);
+      p.hips(0, -0.04 - 0.3 * give, 0);
       p.arms(0.4, 1.4 + 1.0 * k, 0.2);
-      p.lean(0.25 * (1 - k));
+      p.lean(0.25 * give);
     } else {
       groove(p, B, s, 0.6);
       wideStance(p, 0.22);
@@ -802,7 +812,7 @@ export const MOVES = {
       p.arms(0.4, 0.3 + 2.3 * t, 0.2);
     } else if (b < 3.25) {
       const u = (b - 0.75) / 2.5, spin = TAU * 4 * smooth(u * 0.9 + 0.05);
-      p.hips(0, -0.1, 0, spin);
+      p.hips(0, -0.1, 0); p.root(0, 0, 0, spin);
       p.tumble(Math.PI, 0.08 * Math.sin(spin * 2));
       p.foot('L', 0.5 + 0.08 * Math.sin(spin), 0.06, 0.05); p.foot('R', 0.5 - 0.08 * Math.sin(spin), 0.06, 0.05);
       p.arms(0.3, 2.65, 0.25);
@@ -908,7 +918,7 @@ export const MOVES = {
     if (b < 1.5) {
       const t = smooth(b / 1.5);
       p.foot('L', 0.1); p.foot('R', 0.1, 0.1 * Math.sin(Math.PI * t), 0.05, 0.6);
-      p.hips(0, -0.03, 0, TAU * t);
+      p.hips(0, -0.03, 0); p.root(0, 0, 0, TAU * t);
       p.arm('R', 0.3, 1.5, 0.1); p.arm('L', 0.4, 1.2, 0.6);
     } else if (b < 3) {
       groove(p, B, s, 0.8);
@@ -934,7 +944,7 @@ export const MOVES = {
     if (b < 2) {
       const t = smooth(b / 2);
       p.foot('L', 0.06, 0, 0, 0.9); p.foot('R', 0.06, 0.02, 0.03, 0.9);
-      p.hips(0, 0.06, 0, TAU * 2 * t);
+      p.hips(0, 0.06, 0); p.root(0, 0, 0, TAU * 2 * t);
       p.arm('L', 0.6, 2.6, 0.7, -0.4); p.arm('R', 0.4, 1.2, 0.4);
       p.look(-0.2);
     } else if (b < 2.5) {
@@ -1049,9 +1059,9 @@ export const MOVES = {
       p.lean(0.15 * air); p.look(-0.3 * air);
     } else {
       groove(p, B, s, 0.6);
-      const k = smooth((b - 2) / 0.4);
+      const k = smooth((b - 2) / 0.4), give = Math.sin(Math.PI * clamp01((b - 2) / 0.6));
       wideStance(p, 0.18);
-      p.hips(0, -0.3 * (1 - k) - 0.06);
+      p.hips(0, -0.04 - 0.28 * give);
       p.arm('L', 0.3, 2.5 * k + 0.2, 0.1); p.arm('R', 0.3, 0.6, 1.3);
       p.look(-0.3 * k, 0.2); p.lean(-0.05, -0.15 * k);
     }
@@ -1062,7 +1072,7 @@ export const MOVES = {
     if (b < 1) {
       const t = smooth(b);
       p.foot('L', 0.06, 0, 0, 0.9); p.foot('R', 0.06, 0.02, 0.03, 0.9);
-      p.hips(0, 0.05, 0, TAU * 2 * t);
+      p.hips(0, 0.05, 0); p.root(0, 0, 0, TAU * 2 * t);
       p.arm('L', 0.6, 2.6, 0.7, -0.4); p.arm('R', 0.4, 1.4, 0.3);
     } else if (b < 2.4) {
       MOVES.cartwheel(p, 0.5 + (b - 1) / 1.4 * 2, B, s);
@@ -1117,20 +1127,21 @@ export const MOVES = {
   // ════════════════════════════════════════════════════════════════
   // Travolta strut in place: step on each beat, pointing down across.
   discoStrut: seq(4, [
-    [0, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.15, 0, -0.08, 0.5); p.hips(0.05, -0.08, 0, 0.12); p.arm('R', 0.9, -0.2, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.05, -0.1, -0.15); p.look(0.1, -0.2); }, 'in'],
-    [0.5, (p) => { p.foot('L', 0.13, 0, 0.04); p.foot('R', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.02, 0, 0); p.arm('R', 0.5, 0.3, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
-    [1, (p) => { p.foot('R', 0.13, 0, 0.14); p.foot('L', 0.15, 0, -0.08, 0.5); p.hips(-0.05, -0.08, 0, -0.12); p.arm('R', 0.4, 2.4, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.08, -0.15, 0.15); p.look(-0.25, 0.3); }, 'in'],
-    [1.5, (p) => { p.foot('R', 0.13, 0, 0.04); p.foot('L', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.02); p.arm('R', 0.5, 0.8, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
-    [2, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.15, 0, -0.08, 0.5); p.hips(0.05, -0.08, 0, 0.12); p.arm('R', 0.9, -0.2, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.05, -0.1, -0.15); p.look(0.1, -0.2); }, 'in'],
-    [2.5, (p) => { p.foot('L', 0.13, 0, 0.04); p.foot('R', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.02); p.arm('R', 0.5, 0.8, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
-    [3, (p) => { p.foot('R', 0.13, 0, 0.14); p.foot('L', 0.15, 0, -0.08, 0.5); p.hips(-0.08, -0.1, 0, -0.18); p.arm('R', 0.4, 2.5, 0.05); hipHand(p, 'L'); p.lean(-0.1, -0.2, 0.2, 0.12); p.look(-0.3, 0.35); }, 'snap'],
+    [0, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.15, 0, -0.08, 0.5); p.hips(0.05, -0.04, 0, 0.12); p.arm('R', 0.9, -0.2, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.05, -0.1, -0.15); p.look(0.1, -0.2); }, 'in'],
+    [0.5, (p) => { p.foot('L', 0.13, 0, 0.04); p.foot('R', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.09, 0, 0); p.arm('R', 0.5, 0.3, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
+    [1, (p) => { p.foot('R', 0.13, 0, 0.14); p.foot('L', 0.15, 0, -0.08, 0.5); p.hips(-0.05, -0.04, 0, -0.12); p.arm('R', 0.4, 2.4, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.08, -0.15, 0.15); p.look(-0.25, 0.3); }, 'in'],
+    [1.5, (p) => { p.foot('R', 0.13, 0, 0.04); p.foot('L', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.09); p.arm('R', 0.5, 0.8, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
+    [2, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.15, 0, -0.08, 0.5); p.hips(0.05, -0.04, 0, 0.12); p.arm('R', 0.9, -0.2, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.05, -0.1, -0.15); p.look(0.1, -0.2); }, 'in'],
+    [2.5, (p) => { p.foot('L', 0.13, 0, 0.04); p.foot('R', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.09); p.arm('R', 0.5, 0.8, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
+    [3, (p) => { p.foot('R', 0.13, 0, 0.14); p.foot('L', 0.15, 0, -0.08, 0.5); p.hips(-0.08, -0.05, 0, -0.18); p.arm('R', 0.4, 2.5, 0.05); hipHand(p, 'L'); p.lean(-0.1, -0.2, 0.2, 0.12); p.look(-0.3, 0.35); }, 'snap'],
   ], { groove: 0.7, hits: 0.9 }),
 
   // Elvis: knees wobbling in and out on the 8ths, hips swivelling.
   elvisSwivel(p, b, B, s) {
     groove(p, B, s, 0.5);
     const w = Math.sin(TAU * b * 2);
-    p.foot('L', 0.2, 0, 0, 0.5 * Math.max(0, w)); p.foot('R', 0.2, 0, 0, 0.5 * Math.max(0, -w));
+    const wl = 0.5 - 0.5 * Math.cos(TAU * b * 2 - Math.PI / 2);
+    p.foot('L', 0.2, 0, 0, 0.5 * wl * (0.5 + 0.5 * w)); p.foot('R', 0.2, 0, 0, 0.5 * wl * (0.5 - 0.5 * w));
     p.hips(0.06 * w, -0.14, 0, 0.18 * w);
     p.add('hips', 0, 0, 0.12 * w);
     // Hands low and loose in front, snapping fingers; the left goes up to
@@ -1148,7 +1159,8 @@ export const MOVES = {
     const w = Math.sin(TAU * b * 4), ph = b % 4;
     // Shake one knee, then the other (heel up, knee rolling in).
     const side = 0.5 + 0.5 * Math.cos(Math.PI * b);
-    p.foot('L', 0.22, 0, 0, 0.6 * Math.max(0, w) * side); p.foot('R', 0.22, 0, 0, 0.6 * Math.max(0, w) * (1 - side));
+    const lift = 0.3 + 0.3 * w;
+    p.foot('L', 0.22, 0, 0, lift * side); p.foot('R', 0.22, 0, 0, lift * (1 - side));
     const th = win(ph, 1.8, 3.1, 0.3), pt = win(ph, 2.8, 4, 0.3), sh = 1 - th - pt;
     p.hips(0.05 * w, -0.16, 0.09 * th, 0.15 * w);
     p.arm('L', 0.7 * sh - 0.5 * th + 0.4 * pt, 1.0 * sh + 0.6 * th + 2.5 * pt, 0.2 * sh + 0.4 * th + 0.05 * pt);
@@ -1260,7 +1272,7 @@ export const MOVES = {
     if (b < 2.25) {
       const t = smooth(b / 2.25);
       p.foot('L', 0.08); p.foot('R', 0.08, 0.06 * Math.abs(Math.sin(TAU * 3 * t)), 0.04, 0.5);
-      p.hips(0, -0.02, 0, TAU * 3 * t);
+      p.hips(0, -0.02, 0); p.root(0, 0, 0, TAU * 3 * t);
       p.arm('R', 0.3, 2.6, 0.05); p.arm('L', 0.6, 0.5, 1.8);
     } else {
       groove(p, B, s, 0.5);
@@ -1278,7 +1290,7 @@ export const MOVES = {
     if (b < 1) {
       const t = smooth(b);
       p.foot('L', 0.08); p.foot('R', 0.08, 0.06, 0.04, 0.5);
-      p.hips(0, -0.02, 0, TAU * 2 * t);
+      p.hips(0, -0.02, 0); p.root(0, 0, 0, TAU * 2 * t);
       p.arm('R', 0.3, 2.6, 0.05); p.arm('L', 0.6, 0.5, 1.8);
     } else if (b < 3.2) {
       MOVES.splitDrop(p, (b - 1) / 2.2 * 3, B, s);
@@ -1304,7 +1316,8 @@ export const MOVES = {
       const shake = 0.006 * Math.sin(B * 40);
       p.hips(0, -0.56, 0);
       p.tumble(0.15, 1.15 + shake);
-      p.foot('L', 0.1, 0.45, 0.25, 0.6); p.foot('R', 0.18, 0.55, 0.2, 0.6);
+      // Knees up, feet kept below hip height (keeps the leg solve stable).
+      p.foot('L', 0.2, 0.18, 0.3, 0.6); p.foot('R', 0.26, 0.22, 0.25, 0.6);
       p.arm('R', 0.2, 2.2, 0.05); p.arm('L', 1.2, 0.4, 1.8, -0.4);
       p.look(-0.3, 0.3, -0.4);
     } else {
@@ -1346,7 +1359,7 @@ export const MOVES = {
   // grudging respect — clapping on the beat.
   soloWatch(p, b, B, s) {
     groove(p, B, s, 0.5);
-    p.foot('L', 0.16); p.foot('R', 0.16, 0, 0.04, 0.3 * (Math.floor(b) & 1));
+    p.foot('L', 0.16); p.foot('R', 0.16, 0, 0.04, 0.15 * (1 - Math.cos(Math.PI * b)));
     if (b < 4) {
       crossArms(p);
       p.hips(0.03 * Math.sin(Math.PI * b), -0.06, -0.05);
@@ -1364,7 +1377,7 @@ export const MOVES = {
     groove(p, B, s, 0.6);
     if (b < 3) {
       crossArms(p);
-      p.foot('L', 0.15); p.foot('R', 0.15, 0, 0.04, 0.3 * (Math.floor(b) & 1));
+      p.foot('L', 0.15); p.foot('R', 0.15, 0, 0.04, 0.15 * (1 - Math.cos(Math.PI * b)));
       p.look(0.1); p.lean(0, -0.08);
     } else {
       const k = smooth((b - 3) / 0.2);
@@ -1428,6 +1441,13 @@ export const MOVE_LABELS = {
 
 const _ka = new Pose(), _kb = new Pose(), _kc = new Pose(), _kd = new Pose();
 const _mirror = new Float32Array(POSE_SIZE);
+// Extra bounce laid under function moves (they bring their own on top).
+const FN_GROOVE = {
+  breakWindmill: 0, backflip: 0, headspin: 0, airChair: 0, cartwheel: 0, toeTouch: 0, superstar: 0, jumpSplit: 0,
+  splitDrop: 0, kneeSlide: 0, discoInferno: 0, windmillFreeze: 0, twirlSpin: 0, discoSpin: 0, stunned: 0, hitReact: 0,
+  shimmyBounce: 0, ready: 0, cheer: 0, cabbagePatch: 0.1, purseTwirl: 0.1, bodyRoll: 0.1, victory: 0, defeat: 0,
+  introAnswer: 0.15, purseGroove: 0, hustle: 0, intro: 0.1, introWatch: 0.1, soloWatch: 0.2,
+};
 // Keys that keep the old hold-then-pop timing (popping / locking hits);
 // every other key is passed through on a smooth curve.
 const POP = { snap: 1, hold: 1 };
@@ -1435,7 +1455,13 @@ const POP = { snap: 1, hold: 1 };
 function evalMove(name, b, B, style, pose) {
   pose.rest();
   const m = MOVES[name] || MOVES.twoStep;
-  if (typeof m === 'function') { m(pose, Math.max(0, b), B, style); return pose.a; }
+  if (typeof m === 'function') {
+    m(pose, Math.max(0, b), B, style);
+    // Keep the pulse under every move (flips and freezes opt out).
+    const g = FN_GROOVE[name] ?? 0.35;
+    if (g > 0) groove(pose, B, style, g);
+    return pose.a;
+  }
   const keys = m.keys, n = keys.length;
   let t = Math.max(0, b);
   if (m.loop) t %= m.len;
@@ -1529,6 +1555,8 @@ export class DanceController {
     this.spb = style.spb || 0.6;                 // seconds per beat (set by the session)
     this._sx = new Float32Array(POSE_SIZE); this._sv = new Float32Array(POSE_SIZE);
     this._lastBeat = null; this._tight = 1;
+    this._blend = new Float32Array(POSE_SIZE);
+    this._thighZ = [0, 0];
     this._pa = new Pose(); this._pb = new Pose(); this._pc = new Pose(); this._pd = new Pose();
     this._phrases = new Map();
     this._energy = 1;
@@ -1546,7 +1574,7 @@ export class DanceController {
   // Cut in immediately (reactions).
   react(name, nowBeat, len = 2, opts = {}) {
     this.queue = this.queue.filter(q => q.start > nowBeat + len);
-    this._switch({ name, start: nowBeat, len, faceFoe: !!opts.faceFoe, fade: opts.fade ?? 0.12 }, nowBeat);
+    this._switch({ name, start: nowBeat, len, faceFoe: !!opts.faceFoe, fade: Math.max(0.25, opts.fade ?? 0.3) }, nowBeat);
   }
 
   clearQueue() { this.queue.length = 0; }
@@ -1589,16 +1617,29 @@ export class DanceController {
       for (let k = 0; k < steps; k++) { vc += h * (w * w * (T - xc) - 2 * z * w * vc); xc += h * vc; }
       x[c] = xc; v[c] = vc; out[c] = xc;
     }
+    // Feet: a stiff spring just takes the corners off sudden target
+    // changes; planted feet don't move so they can't skate.
+    const wf = TAU * 11;
+    for (let c = FEET; c < POSE_SIZE; c++) {
+      let xc = x[c], vc = v[c];
+      for (let k = 0; k < steps; k++) { vc += h * (wf * wf * (out[c] - xc) - 2 * 0.9 * wf * vc); xc += h * vc; }
+      x[c] = xc; v[c] = vc; out[c] = xc;
+    }
+    for (let f = FEET; f < FEET + 8; f += 4) out[f + 1] = Math.max(out[f + 1], ANK);
   }
 
   _switch(entry, beat) {
-    this.prev = this.cur;
+    // Cutting into a blend that's still running: blend on from where the
+    // body actually is, not from the old move.
+    if (this.prev && beat - this.fadeStart < this.fadeLen) this.prev = { name: '_frozen', pose: Float32Array.from(this._blend) };
+    else this.prev = this.cur;
     this.cur = entry;
     this.fadeStart = beat;
     this.fadeLen = entry.fade ?? 0.5;
   }
 
   _eval(entry, beat, pose) {
+    if (entry.name === '_frozen') return entry.pose;
     let a;
     if (entry.name === 'groove') {
       // Base routines run on the absolute beat, so they're always in phase
@@ -1622,7 +1663,7 @@ export class DanceController {
       if (ac) {
         let w = 0;
         const x = local - ac.at;
-        if (x >= -0.35 && x < 0) w = smooth((x + 0.35) / 0.35);
+        if (x >= -0.6 && x < 0) w = smooth((x + 0.6) / 0.6);
         else if (x >= 0 && x < 0.4) w = 1;
         else if (x >= 0.4 && x < 1) w = 1 - smooth((x - 0.4) / 0.6);
         if (w > 0) {
@@ -1656,10 +1697,11 @@ export class DanceController {
       this.prev = null;
       this.out.set(a);
     }
+    this._blend.set(this.out);
     const name = this.cur.name === 'groove' ? this.routineAt(beat) : this.cur.name;
-    hitLayer(this.out, acc, hitsFor(name) * (this.prev ? Math.min(1, w + 0.3) : 1), beat);
+    hitLayer(this.out, acc, hitsFor(name) * (this.prev ? Math.min(1, w + 0.3) : 1), beat, this.style.feel);
     this._follow(beat, STIFF[name] || 1);
-    solveLegs(this.out);
+    solveLegs(this.out, this._thighZ);
     this.rig.applyPose(this.out, J, ROOT);
     this.rig.setExpression(EXPRESSIONS[this.cur.name === 'groove' ? this.routineAt(beat) : this.cur.name] || 'smile', beat);
     return this.cur.name;
