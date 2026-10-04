@@ -71,7 +71,14 @@ class Pose {
   // Hip position, and `yaw` = a twist of the pelvis (and everything above
   // it) with the feet staying planted. Whole-body turns / spins go through
   // root(…, yaw).
-  hips(x = 0, y = -0.03, z = 0, yaw = 0) { const a = this.a; a[ROOT] = x; a[ROOT + 1] = y; a[ROOT + 2] = z; a[ROOT + 3] = 0; a[J.hips + 1] = yaw; return this; }
+  // The pelvis turns at most ±0.3 rad; the rest of the twist goes into the
+  // spine.
+  hips(x = 0, y = -0.03, z = 0, yaw = 0) {
+    const a = this.a, tw = Math.max(-0.3, Math.min(0.3, yaw));
+    a[ROOT] = x; a[ROOT + 1] = y; a[ROOT + 2] = z; a[ROOT + 3] = 0;
+    a[J.hips + 1] = tw; a[J.spine + 1] = yaw - tw;
+    return this;
+  }
   // Whole-body pitch (> 0 tips forward, -2π is a backflip) and roll, about
   // the hips — for flips, windmills and headspins.
   tumble(pitch, roll = 0) { this.a[ROOT + 4] = pitch; this.a[ROOT + 5] = roll; return this; }
@@ -145,7 +152,10 @@ function solveLegs(a, prevZ) {
     vx -= HIP_W * sx; vy += HIP_DROP;
     const len = Math.hypot(vx, vy, vz) || 1e-6;
     const ux = vx / len, uy = vy / len, uz = vz / len;
-    const d = Math.max(0.12, Math.min(len, 2 * LEG * 0.999));
+    // Soft reach: ease into full extension instead of snapping the knee
+    // straight when a target is just out of reach.
+    const R = 2 * LEG, k0 = 0.94 * R;
+    const d = Math.max(0.12, len < k0 ? len : k0 + (0.999 * R - k0) * (1 - Math.exp(-(len - k0) / (0.999 * R - k0))));
     const alpha = Math.acos(d / (2 * LEG));
     const tx = -Math.asin(Math.max(-1, Math.min(1, uz)));
     let tz = Math.atan2(ux, -uy);
@@ -154,14 +164,18 @@ function solveLegs(a, prevZ) {
     const th = J[side === 0 ? 'thighL' : 'thighR'], sh = J[side === 0 ? 'shinL' : 'shinR'], ft = J[side === 0 ? 'footL' : 'footR'];
     a[th] = tx - alpha; a[th + 1] = 0; a[th + 2] = tz;
     a[sh] = 2 * alpha; a[sh + 1] = 0; a[sh + 2] = 0;
-    a[ft] = -(tx + alpha) + a[f + 3]; a[ft + 1] = 0; a[ft + 2] = -tz;
+    a[ft] = -(tx + alpha) + a[f + 3]; a[ft + 1] = -hy; a[ft + 2] = -tz;   // shoes keep facing front
   }
 }
 
 // ── Groove layer ────────────────────────────────────────────────────
 // The bounce every move rides on: down on each beat, harder on the 2 and
 // 4, a head nod, shoulders that come up between beats, a two-beat sway.
+let _grooveRec = null;      // while a function move runs: collects its groove amount
 function groove(p, B, s, amt = 1) {
+  // Function moves set the hips after asking for their bounce, which would
+  // wipe it out: record the request and lay it down after the move.
+  if (_grooveRec) { _grooveRec.amt = Math.max(_grooveRec.amt, amt); return; }
   if (amt <= 0) return;
   // Half-time songs bounce at double rate (style.bounceRate), so the
   // body still hits every snare.
@@ -177,7 +191,7 @@ function groove(p, B, s, amt = 1) {
     // Disco: pops UP on the beat — knees straighten, chest lifts, chin up,
     // shoulders jive between beats.
     // Knees stay soft (never locked): the lift is mostly chest and chin.
-    p.root(0, -0.09 + 0.06 * d, 0);
+    p.root(0, -0.11 + 0.1 * d, 0);
     p.add('spine', -0.04 * d); p.add('chest', -0.1 * d); p.add('head', -0.12 * d * s.swagger);
     p.shrug(0.11 * d, 0.11 * d);
     const jive = Math.sin(TAU * Bb) * amt * e;
@@ -226,7 +240,7 @@ function hitLayer(a, acc, amt, beat, feel) {
 // unless `loop: false` (then the last key holds). `groove` scales the
 // bounce layer on top.
 const seq = (len, keys, opts = {}) => ({
-  len, loop: opts.loop !== false, groove: opts.groove ?? 1, hits: opts.hits ?? 0.8,
+  len, loop: opts.loop !== false, groove: opts.groove ?? 1, hits: opts.hits ?? 0.8, slide: !!opts.slide,
   // Keys on a beat default to 'hit' (the body whips into the pose right on
   // the beat); half-beat keys are passing positions and default to smooth.
   keys: keys.map(([t, fn, ease]) => ({ t, fn, ease: ease || (Number.isInteger(t) ? 'hit' : 'smooth') })),
@@ -260,34 +274,38 @@ const twoStepFeet = {
 export const MOVES = {
   // ── Base routines (the always-on dancing) ──────────────
   twoStep: seq(4, [
-    [0, (p) => { twoStepFeet.c1(p); p.arm('L', 0.3, 0.95, 1.3); p.arm('R', 0.3, 0.95, 1.3); p.lean(-0.04, -0.08, 0.2); p.look(-0.08, 0.2); }, 'in'],
-    [0.5, (p) => { twoStepFeet.a1(p); p.arm('L', 0.6, 0.5, 1.4); p.arm('R', 0.6, 0.5, 1.4); p.lean(0.05, 0, -0.05); }],
-    [1, (p) => { twoStepFeet.c2(p); p.arm('L', 1.0, -0.15, 1.1, -0.5); p.arm('R', 0.9, -0.05, 1.2, -0.5); p.wrist('L', 0.4); p.wrist('R', 0.4); p.lean(0.18, 0.12, -0.35, -0.12); p.look(0.12, -0.35); }, 'in'],
-    [1.5, (p) => { twoStepFeet.a2(p); p.arm('L', 0.6, 0.5, 1.4); p.arm('R', 0.6, 0.5, 1.4); p.lean(0.05, 0, -0.1); }],
-    [2, (p) => { twoStepFeet.c1(p); p.arm('L', 0.3, 0.95, 1.3); p.arm('R', 0.3, 0.95, 1.3); p.lean(-0.04, -0.08, -0.2); p.look(-0.08, -0.2); }, 'in'],
-    [2.5, (p) => { twoStepFeet.a3(p); p.arm('L', 0.6, 0.5, 1.4); p.arm('R', 0.6, 0.5, 1.4); p.lean(0.05, 0, 0.05); }],
-    [3, (p) => { twoStepFeet.c4(p); p.arm('R', 1.0, -0.15, 1.1, -0.5); p.arm('L', 0.9, -0.05, 1.2, -0.5); p.wrist('L', 0.4); p.wrist('R', 0.4); p.lean(0.18, 0.12, 0.35, 0.12); p.look(0.12, 0.35); }, 'in'],
-    [3.5, (p) => { twoStepFeet.a4(p); p.arm('L', 0.6, 0.5, 1.4); p.arm('R', 0.6, 0.5, 1.4); p.lean(0.05, 0, 0.1); }],
+    // Step out, touch in on the snare; relaxed arms swing opposite the
+    // stepping leg with a wrist flick on the touch, chest and head riding it.
+    [0, (p) => { twoStepFeet.c1(p); p.arms(0.15, 0.45, 1.0); p.lean(0.02, -0.04, 0.12); p.look(-0.03, 0.15); }],
+    [0.5, (p) => { twoStepFeet.a1(p); p.arm('L', 0.05, 0.38, 0.95); p.arm('R', 0.4, 0.35, 1.15); p.lean(0.03, 0, -0.05); }],
+    [1, (p) => { twoStepFeet.c2(p); p.arm('R', 0.7, 0.25, 1.3, -0.3); p.arm('L', -0.35, 0.3, 0.8); p.wrist('R', 0.45); p.lean(0.07, 0.06, -0.22, -0.06); p.look(0.06, -0.2); }],
+    [1.5, (p) => { twoStepFeet.a2(p); p.arm('L', 0.05, 0.38, 0.95); p.arm('R', 0.4, 0.35, 1.15); p.lean(0.03, 0, -0.1); }],
+    [2, (p) => { twoStepFeet.c1(p); p.arms(0.15, 0.45, 1.0); p.lean(0.02, -0.04, -0.12); p.look(-0.03, -0.15); }],
+    [2.5, (p) => { twoStepFeet.a3(p); p.arm('R', 0.05, 0.38, 0.95); p.arm('L', 0.4, 0.35, 1.15); p.lean(0.03, 0, 0.05); }],
+    [3, (p) => { twoStepFeet.c4(p); p.arm('L', 0.7, 0.25, 1.3, -0.3); p.arm('R', -0.35, 0.3, 0.8); p.wrist('L', 0.45); p.lean(0.07, 0.06, 0.22, 0.06); p.look(0.06, 0.2); }],
+    [3.5, (p) => { twoStepFeet.a4(p); p.arm('R', 0.05, 0.38, 0.95); p.arm('L', 0.4, 0.35, 1.15); p.lean(0.03, 0, 0.1); }],
   ]),
 
   // Planted wide, rocking the chest into the beat, fists pumping down on
   // 1 and 3, shoulders popping back on the 2 and 4.
   bounceRock: seq(4, [
-    [0, (p) => { wideStance(p, 0.24); p.hips(0, -0.17, 0.05); p.lean(0.3, 0.2, 0.2); p.arms(0.75, 0.35, 0.35); p.look(0.2, 0.15); }, 'in'],
-    [1, (p) => { wideStance(p, 0.24); p.hips(0, -0.05, -0.04); p.lean(-0.08, -0.18, 0.05); p.arms(-0.45, 0.6, 2.1); p.shrug(0.25); p.look(-0.15); }, 'snap'],
-    [2, (p) => { wideStance(p, 0.24); p.hips(0, -0.17, 0.05); p.lean(0.3, 0.2, -0.2); p.arms(0.75, 0.35, 0.35); p.look(0.2, -0.15); }, 'in'],
-    [3, (p) => { wideStance(p, 0.24); p.hips(0.04, -0.06, -0.04); p.lean(-0.1, -0.2, -0.1); p.arm('L', 1.0, 0.2, 2.0, -0.8); p.arm('R', 0.1, 1.2, 2.2); p.shrug(0.25); p.look(-0.2, 0.3); }, 'snap'],
+    [0, (p) => { wideStance(p, 0.24); p.hips(0, -0.17, 0.05); p.lean(0.12, 0.1, 0.2); p.arms(0.75, 0.35, 0.35); p.look(0.08, 0.15); }],
+    [1, (p) => { wideStance(p, 0.24); p.hips(0, -0.05, -0.04); p.lean(-0.08, -0.18, 0.05); p.arms(-0.45, 0.6, 2.1); p.shrug(0.25); p.look(-0.15); }],
+    [2, (p) => { wideStance(p, 0.24); p.hips(0, -0.17, 0.05); p.lean(0.12, 0.1, -0.2); p.arms(0.75, 0.35, 0.35); p.look(0.08, -0.15); }],
+    [3, (p) => { wideStance(p, 0.24); p.hips(0.04, -0.06, -0.04); p.lean(-0.1, -0.2, -0.1); p.arm('L', 1.0, 0.2, 2.0, -0.8); p.arm('R', 0.1, 1.2, 2.2); p.shrug(0.25); p.look(-0.2, 0.3); }],
   ]),
 
   // Kick-step: low kick on 1 and 3, step it down on 2 and 4, arms swinging
   // opposite like a strut.
   kickStep: seq(4, [
-    [0, (p) => { p.foot('L', 0.12); p.foot('R', 0.2, 0.24, 0.32, -0.25); p.hips(0, -0.04, -0.04); fists(p, 'L', 0.55, 0.15, 1.3); fists(p, 'R', -0.35, 0.2, 1.1); p.lean(-0.05); }, 'out'],
+    [0, (p) => { p.foot('L', 0.12); p.foot('R', 0.2, 0.4, 0.45, -0.3); p.hips(0, -0.04, -0.04); fists(p, 'L', 0.55, 0.15, 1.3); fists(p, 'R', -0.35, 0.2, 1.1); p.lean(-0.05); }, 'out'],
     [0.5, (p) => { p.foot('L', 0.12); p.foot('R', 0.14, 0.06, 0.08); p.hips(0, -0.02); fists(p, 'L', 0.2, 0.2, 1.3); fists(p, 'R', 0.1, 0.2, 1.3); }],
     [1, (p) => { p.foot('L', 0.13, 0, 0, 0.3); p.foot('R', 0.14); p.hips(-0.04, -0.08); fists(p, 'L', -0.2, 0.25, 1.2); fists(p, 'R', 0.3, 0.25, 1.5); p.lean(0.1, 0.05, -0.15); p.look(0.08, -0.15); }, 'in'],
-    [2, (p) => { p.foot('R', 0.12); p.foot('L', 0.2, 0.24, 0.32, -0.25); p.hips(0, -0.04, -0.04); fists(p, 'R', 0.55, 0.15, 1.3); fists(p, 'L', -0.35, 0.2, 1.1); p.lean(-0.05); }, 'out'],
+    [1.75, (p) => { p.foot('R', 0.13); p.foot('L', 0.15, 0.32, 0.08, 0.2); p.hips(0, -0.06, -0.02); fists(p, 'R', 0.3, 0.2, 1.3); fists(p, 'L', -0.1, 0.2, 1.3); p.lean(0.05); }],
+    [2, (p) => { p.foot('R', 0.12); p.foot('L', 0.2, 0.4, 0.45, -0.3); p.hips(0, -0.04, -0.04); fists(p, 'R', 0.55, 0.15, 1.3); fists(p, 'L', -0.35, 0.2, 1.1); p.lean(-0.05); }, 'out'],
     [2.5, (p) => { p.foot('R', 0.12); p.foot('L', 0.14, 0.06, 0.08); p.hips(0, -0.02); fists(p, 'L', 0.1, 0.2, 1.3); fists(p, 'R', 0.2, 0.2, 1.3); }],
     [3, (p) => { p.foot('R', 0.13, 0, 0, 0.3); p.foot('L', 0.14); p.hips(0.04, -0.08); fists(p, 'R', -0.2, 0.25, 1.2); fists(p, 'L', 0.3, 0.25, 1.5); p.lean(0.1, 0.05, 0.15); p.look(0.08, 0.15); }, 'in'],
+    [3.75, (p) => { p.foot('L', 0.13); p.foot('R', 0.15, 0.32, 0.08, 0.2); p.hips(0, -0.06, -0.02); fists(p, 'L', 0.3, 0.2, 1.3); fists(p, 'R', -0.1, 0.2, 1.3); p.lean(0.05); }],
   ]),
 
   // Alfred's base: the Hustle — rolling the arms in front of the chest on
@@ -304,7 +322,8 @@ export const MOVES = {
     p.arm('R', 0.75 - 0.5 * Math.sin(r), 0.15, 1.1 - 0.5 * Math.cos(r), -1.0);
     const L = J.armL, F = J.foreL, R = J.armR, FR = J.foreR, a = p.a;
     // Point arm: up-and-across on 3, down-and-across on 4.
-    const pf = 0.5 * upK + 0.9 * dnK, po = 2.4 * upK - 0.1 * dnK;
+    const pump = 0.15 * Math.sin(TAU * b);
+    const pf = (0.5 + pump) * upK + (0.9 + pump) * dnK, po = (2.4 - pump) * upK - 0.1 * dnK;
     a[L] = lerp(a[L], -pf, 1 - roll); a[L + 1] = lerp(a[L + 1], 0, 1 - roll); a[L + 2] = lerp(a[L + 2], po + 0.2, 1 - roll);
     a[F] = lerp(a[F], -0.05, 1 - roll);
     // Other hand to the hip.
@@ -312,7 +331,7 @@ export const MOVES = {
     a[FR] = lerp(a[FR], -1.65, 1 - roll);
     p.look(-0.25 * upK + 0.25 * dnK, 0.35 * upK - 0.2 * dnK);
     p.lean(0.06 * roll + 0.1 * dnK - 0.05 * upK, 0.04 * roll - 0.1 * upK + 0.1 * dnK);
-    p.root(0, 0, 0, 0.25 * upK - 0.15 * dnK);
+    p.add('hips', 0, 0.25 * upK - 0.15 * dnK, 0);
   },
 
 
@@ -323,11 +342,11 @@ export const MOVES = {
     // with a clap at chest height (the snare), and back the other way.
     [0, (p) => { twoStepFeet.c1(p); p.arm('L', -0.35, 0.35, 0.5); p.arm('R', 0.45, 0.3, 0.9); p.lean(0.06, 0.04, 0.15); p.look(0.05, -0.15); }],
     [0.5, (p) => { twoStepFeet.a1(p); p.arms(0.6, 0.45, 1.0); p.lean(0.02, -0.02); }],
-    [1, (p) => { twoStepFeet.c2(p); clapFront(p); p.lean(0.14, 0.1, -0.25, -0.08); p.look(0.1, -0.3); }],
+    [1, (p) => { twoStepFeet.c2(p); clapFront(p, 0.05); p.lean(0.03, -0.02, -0.25, -0.08); p.look(-0.02, -0.3); }],
     [1.5, (p) => { twoStepFeet.a2(p); p.arms(0.6, 0.45, 1.0); p.lean(0.02, -0.02); }],
     [2, (p) => { twoStepFeet.c1(p); p.arm('R', -0.35, 0.35, 0.5); p.arm('L', 0.45, 0.3, 0.9); p.lean(0.06, 0.04, -0.15); p.look(0.05, 0.15); }],
     [2.5, (p) => { twoStepFeet.a3(p); p.arms(0.6, 0.45, 1.0); p.lean(0.02, -0.02); }],
-    [3, (p) => { twoStepFeet.c4(p); clapFront(p); p.lean(0.14, 0.1, 0.25, 0.08); p.look(0.1, 0.3); }],
+    [3, (p) => { twoStepFeet.c4(p); clapFront(p, 0.05); p.lean(0.03, -0.02, 0.25, 0.08); p.look(-0.02, 0.3); }],
     [3.5, (p) => { twoStepFeet.a4(p); p.arms(0.6, 0.45, 1.0); p.lean(0.02, -0.02); }],
   ], { groove: 0.9 }),
 
@@ -377,7 +396,7 @@ export const MOVES = {
     [0.5, (p) => { p.foot('L', 0.12, 0.03, -0.04, 0.3); p.foot('R', 0.12, 0.42, 0.1); p.hips(0, 0.02, -0.04); fists(p, 'L', 0.35, 0.2, 1.6); fists(p, 'R', -0.1, 0.2, 1.6); p.lean(0.3, 0.06); }],
     [1, (p) => { p.foot('R', 0.12, 0, 0.12); p.foot('L', 0.12, 0.02, -0.2, 0.55); p.hips(0, -0.14, -0.02); fists(p, 'R', -0.35, 0.2, 1.5); fists(p, 'L', 0.75, 0.2, 1.6); p.lean(0.28, 0.08, -0.15); p.look(0.05, -0.1); }],
     [1.5, (p) => { p.foot('R', 0.12, 0.03, -0.04, 0.3); p.foot('L', 0.12, 0.42, 0.1); p.hips(0, 0.02, -0.04); fists(p, 'R', 0.35, 0.2, 1.6); fists(p, 'L', -0.1, 0.2, 1.6); p.lean(0.3, 0.06); }],
-  ], { groove: 0.7 }),
+  ], { groove: 0.7, slide: true }),
 
   // Roger Rabbit: the running man in reverse — skipping backwards, kicking
   // the free foot back, elbows flapping.
@@ -386,7 +405,7 @@ export const MOVES = {
     [0.5, (p) => { p.foot('L', 0.12, 0.03, 0.1); p.foot('R', 0.12, 0.05, -0.05); p.hips(0, 0.07, 0.0); p.arms(0.1, 0.45, 1.7); p.lean(0.22, 0.08); }, 'in'],
     [1, (p) => { p.foot('R', 0.12, 0, -0.05); p.foot('L', 0.14, 0.34, -0.34, 0.5); p.hips(0, -0.1, 0.02); p.arms(-0.25, 0.95, 2.1); p.lean(0.3, 0.12, -0.1); p.look(-0.15); }, 'out'],
     [1.5, (p) => { p.foot('R', 0.12, 0.03, 0.1); p.foot('L', 0.12, 0.05, -0.05); p.hips(0, 0.07, 0.0); p.arms(0.1, 0.45, 1.7); p.lean(0.22, 0.08); }, 'in'],
-  ], { groove: 0.4 }),
+  ], { groove: 0.4, slide: true }),
 
   // Cabbage patch: fists stirring a big circle in front of the chest while
   // the hips circle the other way.
@@ -450,7 +469,7 @@ export const MOVES = {
   spinPoint(p, b, B, s) {
     if (b < 1.5) {
       const t = smooth(b / 1.5);
-      p.foot('L', 0.11); p.foot('R', 0.11, 0.12 * Math.sin(Math.PI * t), 0.05, 0.3);
+      p.foot('L', 0.01, 0, 0, 0.4); p.foot('R', 0.08, 0.05 + 0.12 * Math.sin(Math.PI * t), 0.05, 0.4);
       p.hips(0, -0.02 + 0.04 * Math.sin(Math.PI * t), 0); p.root(0, 0, 0, TAU * t);
       p.arm('L', 0.6, 0.5, 1.9); p.arm('R', 0.6, 0.5, 1.9);
     } else {
@@ -675,7 +694,7 @@ export const MOVES = {
       p.look(0.12, -0.25, 0.18); p.lean(0, -0.1);
     } else if (b < 2.75) {
       const t = smooth((b - 1.5) / 1.25);
-      p.foot('L', 0.12); p.foot('R', 0.12, 0.14 * Math.sin(Math.PI * t), 0.05, 0.4);
+      p.foot('L', 0.01, 0, 0, 0.4); p.foot('R', 0.08, 0.06 + 0.12 * Math.sin(Math.PI * t), 0.05, 0.5);
       p.hips(0, -0.02 + 0.05 * Math.sin(Math.PI * t), 0); p.root(0, 0, 0, 0.5 + TAU * t);
       p.arms(0.7, 0.45, 2.0, -0.6);
     } else {
@@ -898,7 +917,7 @@ export const MOVES = {
     p.arm('L', lerp(0.7, 0.3, big), lerp(0.05, 2.7, big), lerp(2.3 + 0.2 * Math.sin(TAU * b * 4), 0.15, big), -0.7 * (1 - big));
     p.arm('R', lerp(0.2 + 0.25 * hop, 0.3, big), lerp(0.35, 2.7, big), lerp(0.6, 0.15, big));
     p.lean(0.1 * (1 - big) - 0.1 * big, 0.05 - 0.2 * big, 0, 0.12 * side * (1 - big));
-    p.look(-0.1 - 0.25 * big, 0.25 * side * (1 - big), 0.2 * side * (1 - big));
+    p.look(0.05 - 0.35 * big, 0.25 * side * (1 - big), 0.2 * side * (1 - big));
   },
 
   // Vogue: hands frame the face in sharp boxes on every half beat.
@@ -917,7 +936,7 @@ export const MOVES = {
   purseTwirl(p, b, B, s) {
     if (b < 1.5) {
       const t = smooth(b / 1.5);
-      p.foot('L', 0.1); p.foot('R', 0.1, 0.1 * Math.sin(Math.PI * t), 0.05, 0.6);
+      p.foot('L', 0.01, 0, 0, 0.4); p.foot('R', 0.08, 0.05 + 0.1 * Math.sin(Math.PI * t), 0.05, 0.6);
       p.hips(0, -0.03, 0); p.root(0, 0, 0, TAU * t);
       p.arm('R', 0.3, 1.5, 0.1); p.arm('L', 0.4, 1.2, 0.6);
     } else if (b < 3) {
@@ -943,7 +962,7 @@ export const MOVES = {
   twirlSpin(p, b, B, s) {
     if (b < 2) {
       const t = smooth(b / 2);
-      p.foot('L', 0.06, 0, 0, 0.9); p.foot('R', 0.06, 0.02, 0.03, 0.9);
+      p.foot('L', 0.01, 0, 0, 0.9); p.foot('R', 0.07, 0.17, 0.03, 0.7);
       p.hips(0, 0.06, 0); p.root(0, 0, 0, TAU * 2 * t);
       p.arm('L', 0.6, 2.6, 0.7, -0.4); p.arm('R', 0.4, 1.2, 0.4);
       p.look(-0.2);
@@ -1071,7 +1090,7 @@ export const MOVES = {
   superstar(p, b, B, s) {
     if (b < 1) {
       const t = smooth(b);
-      p.foot('L', 0.06, 0, 0, 0.9); p.foot('R', 0.06, 0.02, 0.03, 0.9);
+      p.foot('L', 0.01, 0, 0, 0.9); p.foot('R', 0.07, 0.17, 0.03, 0.7);
       p.hips(0, 0.05, 0); p.root(0, 0, 0, TAU * 2 * t);
       p.arm('L', 0.6, 2.6, 0.7, -0.4); p.arm('R', 0.4, 1.4, 0.3);
     } else if (b < 2.4) {
@@ -1127,13 +1146,13 @@ export const MOVES = {
   // ════════════════════════════════════════════════════════════════
   // Travolta strut in place: step on each beat, pointing down across.
   discoStrut: seq(4, [
-    [0, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.15, 0, -0.08, 0.5); p.hips(0.05, -0.04, 0, 0.12); p.arm('R', 0.9, -0.2, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.05, -0.1, -0.15); p.look(0.1, -0.2); }, 'in'],
-    [0.5, (p) => { p.foot('L', 0.13, 0, 0.04); p.foot('R', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.09, 0, 0); p.arm('R', 0.5, 0.3, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
-    [1, (p) => { p.foot('R', 0.13, 0, 0.14); p.foot('L', 0.15, 0, -0.08, 0.5); p.hips(-0.05, -0.04, 0, -0.12); p.arm('R', 0.4, 2.4, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.08, -0.15, 0.15); p.look(-0.25, 0.3); }, 'in'],
-    [1.5, (p) => { p.foot('R', 0.13, 0, 0.04); p.foot('L', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.09); p.arm('R', 0.5, 0.8, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
-    [2, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.15, 0, -0.08, 0.5); p.hips(0.05, -0.04, 0, 0.12); p.arm('R', 0.9, -0.2, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.05, -0.1, -0.15); p.look(0.1, -0.2); }, 'in'],
-    [2.5, (p) => { p.foot('L', 0.13, 0, 0.04); p.foot('R', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.09); p.arm('R', 0.5, 0.8, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
-    [3, (p) => { p.foot('R', 0.13, 0, 0.14); p.foot('L', 0.15, 0, -0.08, 0.5); p.hips(-0.08, -0.05, 0, -0.18); p.arm('R', 0.4, 2.5, 0.05); hipHand(p, 'L'); p.lean(-0.1, -0.2, 0.2, 0.12); p.look(-0.3, 0.35); }, 'snap'],
+    [0, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.15, 0, -0.08, 0.5); p.hips(0.05, -0.09, 0, 0.12); p.arm('R', 0.9, -0.2, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.05, -0.1, -0.15); p.look(0.1, -0.2); }, 'in'],
+    [0.5, (p) => { p.foot('L', 0.13, 0, 0.04); p.foot('R', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.14, 0, 0); p.arm('R', 0.5, 0.3, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
+    [1, (p) => { p.foot('R', 0.13, 0, 0.14); p.foot('L', 0.15, 0, -0.08, 0.5); p.hips(-0.05, -0.09, 0, -0.12); p.arm('R', 0.4, 2.4, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.08, -0.15, 0.15); p.look(-0.25, 0.3); }, 'in'],
+    [1.5, (p) => { p.foot('R', 0.13, 0, 0.04); p.foot('L', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.14); p.arm('R', 0.5, 0.8, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
+    [2, (p) => { p.foot('L', 0.13, 0, 0.14); p.foot('R', 0.15, 0, -0.08, 0.5); p.hips(0.05, -0.09, 0, 0.12); p.arm('R', 0.9, -0.2, 0.05); p.arm('L', 0.2, 0.4, 1.2); p.lean(-0.05, -0.1, -0.15); p.look(0.1, -0.2); }, 'in'],
+    [2.5, (p) => { p.foot('L', 0.13, 0, 0.04); p.foot('R', 0.13, 0.12, 0.06, 0.3); p.hips(0, -0.14); p.arm('R', 0.5, 0.8, 0.6); p.arm('L', 0.3, 0.3, 0.9); }],
+    [3, (p) => { p.foot('R', 0.13, 0, 0.14); p.foot('L', 0.15, 0, -0.08, 0.5); p.hips(-0.08, -0.1, 0, -0.18); p.arm('R', 0.4, 2.5, 0.05); hipHand(p, 'L'); p.lean(-0.1, -0.2, 0.2, 0.12); p.look(-0.3, 0.35); }, 'snap'],
   ], { groove: 0.7, hits: 0.9 }),
 
   // Elvis: knees wobbling in and out on the 8ths, hips swivelling.
@@ -1162,7 +1181,7 @@ export const MOVES = {
     const lift = 0.3 + 0.3 * w;
     p.foot('L', 0.22, 0, 0, lift * side); p.foot('R', 0.22, 0, 0, lift * (1 - side));
     const th = win(ph, 1.8, 3.1, 0.3), pt = win(ph, 2.8, 4, 0.3), sh = 1 - th - pt;
-    p.hips(0.05 * w, -0.16, 0.09 * th, 0.15 * w);
+    p.hips(0.05 * w, -0.16, 0.09 * th, 0.15 * Math.sin(Math.PI * b));
     p.arm('L', 0.7 * sh - 0.5 * th + 0.4 * pt, 1.0 * sh + 0.6 * th + 2.5 * pt, 0.2 * sh + 0.4 * th + 0.05 * pt);
     p.arm('R', 0.8 * sh - 0.5 * th - 0.25 * pt, 0.3 * sh + 0.6 * th + 0.62 * pt, 1.7 * sh + 0.4 * th + 1.65 * pt, -0.5 * sh - 1.45 * pt);
     p.lean(-0.2 * th - 0.05 * pt, -0.25 * th - 0.15 * pt, 0.2 * pt);
@@ -1185,7 +1204,7 @@ export const MOVES = {
   // Finger guns: pew pew on the beat, blow the smoke off on 4.
   fingerGuns(p, b, B, s) {
     groove(p, B, s, 0.6);
-    const ph = ((b % 4) + 4) % 4, kick = Math.exp(-frac(b) * 6) * (1 - smooth((ph - 2.75) / 0.25));
+    const ph = ((b % 4) + 4) % 4, kick = Math.exp(-frac(b) * 3) * (1 - smooth((ph - 2.75) / 0.25));
     p.foot('L', 0.15, 0, 0.06); p.foot('R', 0.18, 0, -0.04, 0.3 * (0.5 + 0.5 * Math.cos(TAU * b)));
     // Swing from one side to the other just before each beat, recoil on it,
     // hips pumping with each shot.
@@ -1271,7 +1290,7 @@ export const MOVES = {
   discoSpin(p, b, B, s) {
     if (b < 2.25) {
       const t = smooth(b / 2.25);
-      p.foot('L', 0.08); p.foot('R', 0.08, 0.06 * Math.abs(Math.sin(TAU * 3 * t)), 0.04, 0.5);
+      p.foot('L', 0.01, 0, 0, 0.5); p.foot('R', 0.07, 0.16, 0.04, 0.6);
       p.hips(0, -0.02, 0); p.root(0, 0, 0, TAU * 3 * t);
       p.arm('R', 0.3, 2.6, 0.05); p.arm('L', 0.6, 0.5, 1.8);
     } else {
@@ -1289,7 +1308,7 @@ export const MOVES = {
   discoInferno(p, b, B, s) {
     if (b < 1) {
       const t = smooth(b);
-      p.foot('L', 0.08); p.foot('R', 0.08, 0.06, 0.04, 0.5);
+      p.foot('L', 0.01, 0, 0, 0.5); p.foot('R', 0.07, 0.16, 0.04, 0.6);
       p.hips(0, -0.02, 0); p.root(0, 0, 0, TAU * 2 * t);
       p.arm('R', 0.3, 2.6, 0.05); p.arm('L', 0.6, 0.5, 1.8);
     } else if (b < 3.2) {
@@ -1316,8 +1335,10 @@ export const MOVES = {
       const shake = 0.006 * Math.sin(B * 40);
       p.hips(0, -0.56, 0);
       p.tumble(0.15, 1.15 + shake);
-      // Knees up, feet kept below hip height (keeps the leg solve stable).
-      p.foot('L', 0.2, 0.18, 0.3, 0.6); p.foot('R', 0.26, 0.22, 0.25, 0.6);
+      // Knees up, feet kept below hip height (keeps the leg solve stable),
+      // drawn up over the first half beat.
+      const up = smooth((b - 0.75) / 0.5);
+      p.foot('L', 0.26 - 0.06 * up, 0.18 * up, 0.3 * up, 0.6 * up); p.foot('R', 0.26, 0.22 * up, 0.25 * up, 0.6 * up);
       p.arm('R', 0.2, 2.2, 0.05); p.arm('L', 1.2, 0.4, 1.8, -0.4);
       p.look(-0.3, 0.3, -0.4);
     } else {
@@ -1422,7 +1443,7 @@ const HITS = {
   kneeSlide: 0.2, discoSpin: 0.3, discoInferno: 0.1,
 };
 // Popping / robot moves run stiffer springs so their hits stay sharp.
-const STIFF = { robot: 1.7, lockAndPop: 1.5, vogueHands: 1.3 };
+const STIFF = { robot: 1.7, lockAndPop: 1.5, vogueHands: 1.3, shimmyBounce: 1.6, dropItLow: 1.6 };
 const hitsFor = (name) => { const m = MOVES[name]; return m && typeof m !== 'function' ? m.hits : (HITS[name] ?? 0.6); };
 
 // Display names for the HUD.
@@ -1441,12 +1462,32 @@ export const MOVE_LABELS = {
 
 const _ka = new Pose(), _kb = new Pose(), _kc = new Pose(), _kd = new Pose();
 const _mirror = new Float32Array(POSE_SIZE);
+// A move made of phases [[untilBeat, fn(p, b, B, s)], …]: each seam is
+// blended across ±r beats (from where one phase ends into where the next
+// starts) so phase changes flow instead of jumping. Runs after anything
+// the move already set on `p` (shared feet / groove).
+const _ph0 = new Pose(), _ph1 = new Pose();
+function phased(p, b, B, s, list, r = 0.15) {
+  const n = list.length;
+  let i = 0;
+  while (i < n - 1 && b >= list[i][0]) i++;
+  const run = (k, t, out) => { out.a.set(p.a); list[k][1](out, t, B, s); return out.a; };
+  const start = i > 0 ? list[i - 1][0] : -Infinity, end = list[i][0];
+  if (i > 0 && b < start + r) {
+    blendPoses(p.a, run(i - 1, start - 1e-4, _ph0), run(i, b, _ph1), smooth((b - start + r) / (2 * r)));
+  } else if (i < n - 1 && b > end - r) {
+    blendPoses(p.a, run(i, b, _ph0), run(i + 1, end + 1e-4, _ph1), smooth((b - end + r) / (2 * r)));
+  } else {
+    list[i][1](p, b, B, s);
+  }
+}
+
 // Extra bounce laid under function moves (they bring their own on top).
 const FN_GROOVE = {
   breakWindmill: 0, backflip: 0, headspin: 0, airChair: 0, cartwheel: 0, toeTouch: 0, superstar: 0, jumpSplit: 0,
   splitDrop: 0, kneeSlide: 0, discoInferno: 0, windmillFreeze: 0, twirlSpin: 0, discoSpin: 0, stunned: 0, hitReact: 0,
   shimmyBounce: 0, ready: 0, cheer: 0, cabbagePatch: 0.1, purseTwirl: 0.1, bodyRoll: 0.1, victory: 0, defeat: 0,
-  introAnswer: 0.15, purseGroove: 0, hustle: 0, intro: 0.1, introWatch: 0.1, soloWatch: 0.2,
+  introAnswer: 0.15, intro: 0.1, introWatch: 0.1, soloWatch: 0.2, dodge: 0, fumble: 0, whiff: 0,
 };
 // Keys that keep the old hold-then-pop timing (popping / locking hits);
 // every other key is passed through on a smooth curve.
@@ -1456,10 +1497,12 @@ function evalMove(name, b, B, style, pose) {
   pose.rest();
   const m = MOVES[name] || MOVES.twoStep;
   if (typeof m === 'function') {
-    m(pose, Math.max(0, b), B, style);
+    const outer = _grooveRec, rec = (_grooveRec = { amt: 0 });
+    try { m(pose, Math.max(0, b), B, style); } finally { _grooveRec = outer; }
     // Keep the pulse under every move (flips and freezes opt out).
-    const g = FN_GROOVE[name] ?? 0.35;
-    if (g > 0) groove(pose, B, style, g);
+    const g = rec.amt > 0 ? rec.amt : (FN_GROOVE[name] ?? 0.35);
+    if (outer) outer.amt = Math.max(outer.amt, g);
+    else if (g > 0) groove(pose, B, style, g);
     return pose.a;
   }
   const keys = m.keys, n = keys.length;
@@ -1501,11 +1544,17 @@ function evalMove(name, b, B, style, pose) {
         const m0 = (Bk[q] - M[q]) * s0 * c0, m1 = (N[q] - A[q]) * s1 * c1;
         a[q] = h00 * A[q] + h10 * m0 + h01 * Bk[q] + h11 * m1;
       }
-      // Curves can dip a foot through the floor between steps.
-      for (let f = FEET; f < FEET + 8; f += 4) a[f + 1] = Math.max(a[f + 1], ANK);
+      for (let f = FEET; f < FEET + 8; f += 4) {
+        // A foot travelling between two planted keys steps there (lifts in
+        // an arc) instead of sliding — unless the move slides on purpose.
+        const d = Math.hypot(Bk[f] - A[f], Bk[f + 2] - A[f + 2]);
+        if (!m.slide && d > 0.04 && A[f + 1] < ANK + 0.03 && Bk[f + 1] < ANK + 0.03) a[f + 1] += Math.sin(Math.PI * u) * Math.min(0.1, 0.03 + d * 0.35);
+        // Curves can dip a foot through the floor between steps.
+        a[f + 1] = Math.max(a[f + 1], ANK);
+      }
     }
   }
-  groove(pose, B, style, Math.max(m.groove, 0.6));
+  groove(pose, B, style, Math.max(m.groove, 0.6));     // (recorded, if inside a function move)
   return pose.a;
 }
 
@@ -1681,7 +1730,10 @@ export class DanceController {
 
   // `acc` = the song's drum accents now ({ kick, snare, energy }, see
   // MusicClock.accents) — optional.
-  update(beat, acc = null) {
+  update(beatNow, acc = null) {
+    // The follow-through springs trail their target by ~20 ms: evaluate the
+    // choreography that far ahead so the body still lands on the beat.
+    const beat = beatNow + 0.02 / this.spb;
     this.style.energy = acc ? acc.energy : 1;
     this._energy += ((acc ? acc.energy : 1) - this._energy) * 0.03;
     while (this.queue.length && this.queue[0].start <= beat) this._switch(this.queue.shift(), beat);
@@ -1700,7 +1752,7 @@ export class DanceController {
     this._blend.set(this.out);
     const name = this.cur.name === 'groove' ? this.routineAt(beat) : this.cur.name;
     hitLayer(this.out, acc, hitsFor(name) * (this.prev ? Math.min(1, w + 0.3) : 1), beat, this.style.feel);
-    this._follow(beat, STIFF[name] || 1);
+    this._follow(beatNow, STIFF[name] || 1);
     solveLegs(this.out, this._thighZ);
     this.rig.applyPose(this.out, J, ROOT);
     this.rig.setExpression(EXPRESSIONS[this.cur.name === 'groove' ? this.routineAt(beat) : this.cur.name] || 'smile', beat);

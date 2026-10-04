@@ -66,11 +66,11 @@ export const CHARACTERS = {
     },
     bareForearms: true,
     // Diva: big swagger, purse in the right hand at all times.
-    // Feel 'sway' = hips land side to side on the beat; poses on count 3.
+    // Feel 'sway' = hips land side to side on the beat; poses on count 5.
     style: {
       swagger: 1.4, bounce: 1.0, feel: 'sway', phraseOffset: 1,
       routines: { chill: ['sassyStrut', 'purseGroove'], hype: ['shimmyBounce', 'tacoHop', 'sassyStrut'] },
-      accent: { pose: 'accentDiva', at: 3 },
+      accent: { pose: 'accentDiva', at: 5 },
     },
     victory: 'kissBlow',
     look: 'tina',
