@@ -1088,25 +1088,27 @@ export const MOVES = {
 
   // ★★ SOLO — superstar: double spin, cartwheel, toe-touch, purse to the sky.
   superstar(p, b, B, s) {
-    if (b < 1) {
-      const t = smooth(b);
-      p.foot('L', 0.01, 0, 0, 0.9); p.foot('R', 0.07, 0.17, 0.03, 0.7);
-      p.hips(0, 0.05, 0); p.root(0, 0, 0, TAU * 2 * t);
-      p.arm('L', 0.6, 2.6, 0.7, -0.4); p.arm('R', 0.4, 1.4, 0.3);
-    } else if (b < 2.4) {
-      MOVES.cartwheel(p, 0.5 + (b - 1) / 1.4 * 2, B, s);
-    } else if (b < 3.2) {
-      MOVES.toeTouch(p, 1 + (b - 2.4) / 0.8, B, s);
-    } else {
-      groove(p, B, s, 0.5);
-      const k = smooth((b - 3.2) / 0.25);
-      p.foot('L', 0.14); p.foot('R', 0.24, 0, 0.08, 0.5 * k);
-      p.hips(0.1 * k, -0.08, 0, -0.25 * k);
-      p.arm('R', 0.4, 2.7 * k + 0.1, 0.05);
-      hipHand(p, 'L');
-      p.lean(-0.05, -0.2 * k, 0, 0.18 * k); p.look(-0.35 * k, 0.4 * k);
-    }
+    phased(p, b, B, s, [
+      [1, (p, b) => {
+        const t = smooth(b);
+        p.foot('L', 0.01, 0, 0, 0.9); p.foot('R', 0.07, 0.17, 0.03, 0.7);
+        p.hips(0, 0.05, 0); p.root(0, 0, 0, TAU * 2 * t);
+        p.arm('L', 0.6, 2.6, 0.7, -0.4); p.arm('R', 0.4, 1.4, 0.3);
+      }],
+      [2.4, (p, b, B, s) => MOVES.cartwheel(p, 0.5 + (b - 1) / 1.4 * 2, B, s)],
+      [3.2, (p, b, B, s) => MOVES.toeTouch(p, 1 + (b - 2.4) / 0.8, B, s)],
+      [Infinity, (p, b, B, s) => {
+        groove(p, B, s, 0.5);
+        const k = smooth((b - 3.2) / 0.25);
+        p.foot('L', 0.14); p.foot('R', 0.24, 0, 0.08, 0.5 * k);
+        p.hips(0.1 * k, -0.08, 0, -0.25 * k);
+        p.arm('R', 0.4, 2.7 * k + 0.1, 0.05);
+        hipHand(p, 'L');
+        p.lean(-0.05, -0.2 * k, 0, 0.18 * k); p.look(-0.35 * k, 0.4 * k);
+      }],
+    ]);
   },
+
 
   // Intro: points the player out with a finger wag, hair flip, "bye-bye"
   // finger wave, blows a kiss, purse-on-shoulder pose.
@@ -1306,18 +1308,21 @@ export const MOVES = {
   // ★★ SOLO — disco inferno: double spin, drop into the splits, points,
   // spring up into the pose.
   discoInferno(p, b, B, s) {
-    if (b < 1) {
-      const t = smooth(b);
-      p.foot('L', 0.01, 0, 0, 0.5); p.foot('R', 0.07, 0.16, 0.04, 0.6);
-      p.hips(0, -0.02, 0); p.root(0, 0, 0, TAU * 2 * t);
-      p.arm('R', 0.3, 2.6, 0.05); p.arm('L', 0.6, 0.5, 1.8);
-    } else if (b < 3.2) {
-      MOVES.splitDrop(p, (b - 1) / 2.2 * 3, B, s);
-    } else {
-      MOVES.discoSpin(p, 2.25 + (b - 3.2) * 1.5, B, s);
-      p.root(0, 0.15 * Math.sin(Math.PI * clamp01((b - 3.2) / 0.3)), 0);
-    }
+    phased(p, b, B, s, [
+      [1, (p, b) => {
+        const t = smooth(b);
+        p.foot('L', 0.01, 0, 0, 0.5); p.foot('R', 0.07, 0.16, 0.04, 0.6);
+        p.hips(0, -0.02, 0); p.root(0, 0, 0, TAU * 2 * t);
+        p.arm('R', 0.3, 2.6, 0.05); p.arm('L', 0.6, 0.5, 1.8);
+      }],
+      [3.2, (p, b, B, s) => MOVES.splitDrop(p, (b - 1) / 2.2 * 3, B, s)],
+      [Infinity, (p, b, B, s) => {
+        MOVES.discoSpin(p, 2.25 + (b - 3.2) * 1.5, B, s);
+        p.root(0, 0.15 * Math.sin(Math.PI * clamp01((b - 3.2) / 0.3)), 0);
+      }],
+    ]);
   },
+
 
   // ════════════════════════════════════════════════════════════════
   // YOU — b-boy freeze
