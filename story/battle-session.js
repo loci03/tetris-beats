@@ -79,8 +79,9 @@ export class BattleSession {
     this.rRig.baseYaw = -0.32;
     this.scene.add(this.pRig.root, this.rRig.root);
     const bounceRate = this.mcfg.bounce || 1;
-    this.pDance = new DanceController(this.pRig, { ...pDef.style, bounceRate }, +1);
-    this.rDance = new DanceController(this.rRig, { ...rDef.style, bounceRate }, -1);
+    const spb = 60 / this.mcfg.bpm;
+    this.pDance = new DanceController(this.pRig, { ...pDef.style, bounceRate, spb }, +1);
+    this.rDance = new DanceController(this.rRig, { ...rDef.style, bounceRate, spb }, -1);
     this.pDef = pDef; this.rDef = rDef;
     this.fx = new AnimeFx(this.scene);
     this.director = new CameraDirector(this.camera, this.world.anchors);
