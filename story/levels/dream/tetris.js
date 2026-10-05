@@ -34,28 +34,29 @@ const MAGENTA = 0xff2dd0, CYAN = 0x22e8ff, VIOLET = 0x8a4dff, RED = 0xff2030;
 
 const SKY_FS = `varying vec3 vP; uniform float uTime, uPulse, uMood, uLight, uPower;
   float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5); }
+  float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
   void main(){
     vec3 d = normalize(vP); float h = d.y;
     vec3 top = vec3(0.02, 0.012, 0.09), mid = vec3(0.09, 0.035, 0.22), hor = vec3(0.42, 0.07, 0.36);
     vec3 c = mix(mid, top, smoothstep(0.1, 0.65, h));
     c = mix(hor, c, smoothstep(-0.03, 0.2, h));
     // mood: dream = cyan wash, nightmare = blood red
-    vec3 dream = vec3(0.05, 0.22, 0.32), night = vec3(0.38, 0.02, 0.05);
+    vec3 dream = vec3(0.05, 0.2, 0.3), night = vec3(0.3, 0.0, 0.03);
     float m = clamp(uMood, -1.0, 1.0);
     c += (m > 0.0 ? dream * m : night * -m) * (0.35 + 0.65 * smoothstep(0.5, 0.0, h)) * 0.55;
     c += vec3(0.25, 0.05, 0.25) * uPulse * smoothstep(0.25, 0.0, abs(h - 0.04));
     // stars
-    vec2 g = floor(vec2(atan(d.x, d.z) * 120.0, h * 120.0));
-    float s = step(0.988, hash(g)) * smoothstep(0.12, 0.4, h);
+    vec2 sg = vec2(atan(d.x, d.z) * 170.0, h * 170.0), g = floor(sg);
+    float s = step(0.99, hash12(g)) * smoothstep(0.38, 0.0, length(fract(sg) - 0.5)) * smoothstep(0.12, 0.4, h);
     c += vec3(0.9, 0.85, 1.0) * s * (0.5 + 0.5 * sin(uTime * 2.3 + hash(g + 4.0) * 40.0));
     // the over-large dream moon (upper right)
     vec3 md = normalize(vec3(0.428, 0.469, -0.772));
     float mm = dot(d, md);
-    float disc = smoothstep(0.9965, 0.9972, mm);
+    float disc = smoothstep(0.9984, 0.9988, mm);
     vec3 moon = vec3(1.0, 0.86, 0.97) * (0.85 + 0.15 * hash(floor(d.xy * 300.0)));
     c = mix(c, moon * mix(1.0, 0.75, smoothstep(0.0, -1.0, m)) + vec3(0.25, 0.0, 0.0) * max(0.0, -m), disc);
-    c += vec3(1.0, 0.55, 0.9) * pow(max(mm, 0.0), 160.0) * 0.55;
-    c += vec3(0.6, 0.2, 0.55) * pow(max(mm, 0.0), 18.0) * 0.18;
+    c += vec3(1.0, 0.55, 0.9) * pow(max(mm, 0.0), 700.0) * 0.4;
+    c += vec3(0.6, 0.2, 0.55) * pow(max(mm, 0.0), 40.0) * 0.12;
     c += vec3(0.9, 0.75, 1.0) * uLight * (0.35 + 0.65 * smoothstep(0.0, 0.5, h));
     c *= 0.35 + 0.65 * uPower;
     gl_FragColor = vec4(c, 1.0);
@@ -285,7 +286,7 @@ export function createTetrisWorld(ctx) {
     half(h / 2, 'NIGHTMARE', '#ff2a3a', '#ffd0d0');
   });
   const holos = [];
-  for (const [x, y, z, ry] of [[-27, 30.5, -29.8, 0.12]]) {
+  for (const [x, y, z, ry] of [[-25, 26, -29.8, 0.12]]) {
     for (const half of [0, 1]) {
       const geo = keep(new THREE.PlaneGeometry(11, 5.5));
       const uv = geo.attributes.uv;
@@ -524,7 +525,8 @@ export function createTetrisWorld(ctx) {
   const cBody = new THREE.InstancedMesh(keep(new THREE.CapsuleGeometry(0.32, 0.8, 2, 6)), crowdMat, CN);
   const cHead = new THREE.InstancedMesh(keep(new THREE.SphereGeometry(0.26, 8, 6)), crowdMat, CN);
   const cArm = new THREE.InstancedMesh(keep(new THREE.CapsuleGeometry(0.08, 0.62, 2, 4).translate(0, 0.38, 0)), crowdMat, CN * 2);
-  for (const m of [cBody, cHead, cArm]) { m.frustumCulled = false; root.add(m); disposables.push(m); }
+  const crowdG = new THREE.Group(); root.add(crowdG);
+  for (const m of [cBody, cHead, cArm]) { m.frustumCulled = false; crowdG.add(m); disposables.push(m); }
   const crowd = Array.from({ length: CN }, (_, i) => ({
     x: -9 + 18 * (i + 0.2 + rnd() * 0.6) / CN, z: 6.2 + rnd() * 2.4, s: 0.7 + rnd() * 0.3, ph: rnd() * 6.28, hue: rnd() < 0.5 ? 0.8 : 0.53, hype: 0.6 + rnd() * 0.6,
   }));
@@ -597,14 +599,15 @@ export function createTetrisWorld(ctx) {
 
     // ── Layout (keep the giants in the visible strips either side of the board) ──
     const aspect = camera.aspect || 1.6, portrait = aspect < 0.9;
-    const baseFov = portrait ? 58 : 50;
+    const baseFov = portrait ? 66 : 50;
     const tanH = Math.tan(baseFov * Math.PI / 360);
     const covered = Math.min(0.86, 0.56 * 1.6 / aspect);
-    const camZ = 15, gz = portrait ? -1 : -8;
+    const camZ = 15, gz = portrait ? -5 : -8;
     const halfW = (camZ - gz) * tanH * aspect;
-    const gx = portrait ? Math.max(3.4, halfW * 0.9) : clamp(((covered + 1) / 2) * halfW, 7, 22);
+    const gx = portrait ? Math.max(3.2, halfW * 0.82) : clamp(((covered + 1) / 2) * halfW, 7, 22);
     robL.x = -gx; robL.z = gz; robR.x = gx; robR.z = gz - 0.6;
     robL.baseYaw = 0.32; robR.baseYaw = -0.32;
+    crowdG.position.z = portrait ? 0.8 : 0;
     robFar.x = 36 + 4 * st.danger; robFar.z = -62 + 14 * st.danger; robFar.baseYaw = -0.5;
 
     // ── Robots ──
@@ -630,8 +633,8 @@ export function createTetrisWorld(ctx) {
           rb.stompHit = true; rb.imp.v -= 2.2;
           rb.legs[rb.stompLeg].ankle.getWorldPosition(rb.footW);
           shock(rb.footW.x, rb.footW.z);
-          st.shake = Math.max(st.shake, 0.5 + 0.5 * rb.stompPow); st.flash = Math.max(st.flash, 0.5);
-          flashL.position.set(rb.footW.x, 2, rb.footW.z + 2); flashL.intensity = 700;
+          st.shake = Math.max(st.shake, 0.5 + 0.5 * rb.stompPow); st.flash = Math.max(st.flash, 0.3);
+          flashL.position.set(rb.footW.x, 2, rb.footW.z + 2); flashL.intensity = 260;
         }
         if (s > 0.9) rb.stomp = -1;
       }
@@ -764,9 +767,9 @@ export function createTetrisWorld(ctx) {
       V.copy(h.aim).sub(h.pos); const len = V.length(); V.divideScalar(len);
       h.cone.position.copy(h.pos); h.cone.position.y -= 0.8 * h.s;
       h.cone.quaternion.setFromUnitVectors(DOWN, V);
-      const rad = (2.2 + 1.0 * Math.sin(t * 1.3 + h.ph) + 2.2 * cheerIn);
+      const rad = (1.8 + 0.7 * Math.sin(t * 1.3 + h.ph) + 1.1 * cheerIn);
       h.cone.scale.set(rad, len, rad);
-      const lk = power * (0.05 + 0.03 * (info.energy ?? 1) + 0.06 * cheerIn);
+      const lk = power * (0.045 + 0.02 * (info.energy ?? 1) + 0.035 * cheerIn);
       if (st.sirens > 0.05) h.sm.color.set(sirenRed === (i % 2 === 0) ? 0xff2a2a : 0x2a5aff).lerp(cWhite, 1 - st.sirens);
       else h.sm.color.set(i === 2 ? 0xa8e8ff : 0xfff2d8);
       h.sm.opacity = lk;
@@ -823,7 +826,7 @@ export function createTetrisWorld(ctx) {
       const ang = up, hx = c.x + 0.3 * c.s + Math.sin(ang) * 0.75 * c.s, hy2 = 1.15 * c.s + jump - Math.cos(ang) * 0.75 * c.s;
       if (cheerIn > 0.15 || Math.sin(beat * Math.PI * 2 + c.ph) > 0.4) {
         if (st.combo > 1) tmpC2.setHSL((st.hueT * 2 + i * 0.07) % 1, 1, 0.6); else tmpC2.setHSL(c.hue, 0.9, 0.6);
-        glowC(hx, hy2 + 0.15, c.z + 0.1, 0.9 + cheerIn * 0.5, 0.9 + cheerIn * 0.5, tmpC2, 0.7 + cheerIn * 0.4);
+        glowC(hx, hy2 + 0.15, c.z + 0.1 + crowdG.position.z, 0.55 + cheerIn * 0.25, 0.55 + cheerIn * 0.25, tmpC2, 0.6 + cheerIn * 0.3);
       }
     });
     cBody.instanceMatrix.needsUpdate = cHead.instanceMatrix.needsUpdate = cArm.instanceMatrix.needsUpdate = true;
@@ -843,7 +846,7 @@ export function createTetrisWorld(ctx) {
     const gu = groundMat.uniforms;
     gu.uTime.value = t; gu.uBeat.value = onBeat; gu.uMood.value = st.mood; gu.uFlash.value = st.flash; gu.uSoft.value = st.soft; gu.uPower.value = power; gu.uLight.value = st.light;
     skyMat.uniforms.uTime.value = t; skyMat.uniforms.uPulse.value = onBeat * 0.6 + st.flash; skyMat.uniforms.uMood.value = st.mood; skyMat.uniforms.uLight.value = st.light; skyMat.uniforms.uPower.value = 0.6 + 0.4 * power;
-    scene.fog.color.copy(fogBase).lerp(fogDream, dream * 0.7).lerp(fogNight, night);
+    scene.fog.color.copy(fogBase).lerp(fogDream, dream * 0.7).lerp(fogNight, night * 0.7);
     // Holo billboards: DREAM lit when the mood is up, NIGHTMARE when it's down.
     for (const H of holos) {
       const want = H.half === 0 ? smooth(st.mood * 2 + 0.5) : smooth(-st.mood * 2 + 0.2);
@@ -862,16 +865,16 @@ export function createTetrisWorld(ctx) {
     // Wash: flash (pink-white) + mood haze.
     const hazeA = 0.04 + Math.abs(st.mood) * 0.05;
     washMat.color.setRGB(1, 0.78, 1).multiplyScalar(st.flash * 0.2 + st.light * 0.25)
-      .add(tmpC2.copy(st.mood >= 0 ? cCyan : cRed).multiplyScalar(hazeA * (st.mood >= 0 ? 0.35 : 0.8)));
+      .add(tmpC2.copy(st.mood >= 0 ? cCyan : cRed).multiplyScalar(hazeA * (st.mood >= 0 ? 0.3 : 0.4)));
 
     // ── Camera ──
     springStep(st.camX, 0, dt, 2.2, 0.4); springStep(st.roll, 0, dt, 2.0, 0.3); springStep(st.dip, 0, dt, 2.6, 0.45);
     st.follow += (st.pieceX * 1.2 - st.follow) * Math.min(1, dt * 2);
     const sh = st.shake * st.shake;
     const sx = (rnd() - 0.5) * sh * 0.9, sy = (rnd() - 0.5) * sh * 0.7;
-    const cy = portrait ? 5.2 : 3.4;
+    const cy = portrait ? 4.6 : 3.4;
     camera.position.set(Math.sin(t * 0.11) * 1.2 + st.follow + st.camX.x + sx, cy + Math.sin(t * 0.17) * 0.3 + st.dip.x + sy, camZ + Math.sin(t * 0.07) * 0.8);
-    camera.lookAt(st.follow * 0.6 + st.camX.x * 0.4 + Math.sin(t * 0.09) * 0.8, (portrait ? 8.4 : 7.6) + st.dip.x * 0.4, -12);
+    camera.lookAt(st.follow * 0.6 + st.camX.x * 0.4 + Math.sin(t * 0.09) * 0.8, (portrait ? 5.4 : 7.6) + st.dip.x * 0.4, -12);
     camera.rotateZ(st.roll.x + Math.sin(t * 0.13) * 0.01);
     const fov = baseFov - st.fov;
     if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
@@ -923,7 +926,7 @@ export function createTetrisWorld(ctx) {
       st.cheer = Math.min(1.2, st.cheer + 0.35 + 0.18 * n);
       st.mood = Math.min(1, st.mood + 0.3 + 0.15 * n);
       st.punch = n >= 2 ? 1.3 : 0.7;
-      st.fov = Math.max(st.fov, 3 + 2 * n);
+      st.fov = Math.max(st.fov, 1.5 + 1.1 * n);
       st.flash = Math.max(st.flash, 0.15 * n);
       // eye lasers into the sky: 1 beam per eye per line (more with combos)
       const per = Math.min(4, n + (combo >= 3 ? 1 : 0));
@@ -934,7 +937,7 @@ export function createTetrisWorld(ctx) {
       }
       if (n >= 3) blast(0, 34, -70, 22 + 6 * n, 290);
       if (n >= 4) {
-        st.vpose = 1.6; st.blaze = 1.1; st.flash = 1; st.light = 0.4;
+        st.vpose = 1.6; st.blaze = 0.7; st.flash = 1; st.light = 0.4;
         blast(-26, 40, -80, 30, 200, 0.25); blast(26, 40, -80, 30, 320, 0.45); blast(0, 38, -70, 46, 280, 0.6);
         for (const rb of giants) rb.wave = 1;
       }

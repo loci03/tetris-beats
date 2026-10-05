@@ -12,10 +12,11 @@ import boss from './trumpets/boss.js';
 import mv from './trumpets/moves.js';
 import { buildWorld } from './trumpets/world.js';
 import sprites from './trumpets/sprites.js';
+import { createTetrisWorld } from './trumpets/tetris.js';
 
 export default {
   boss, moves: mv.moves, moveMeta: mv.moveMeta, sprites,
   buildWorld,
-  backdrop: { camera: { pos: [0, 2.1, 8.6], look: [0, 1.5, 0], fov: 50 }, spread: 3.5, forward: 0.9 },
+  backdrop: { camera: { pos: [0, 2.1, 8.6], look: [0, 1.5, 0], fov: 50 }, spread: 3.5, forward: 0.9, create: createTetrisWorld },
   music: { bpm: 117.99, firstBeat: 0.548, bounce: 1 },
 };

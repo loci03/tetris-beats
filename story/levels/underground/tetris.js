@@ -141,12 +141,12 @@ export function createTetrisWorld(ctx) {
   // Front truss (over the crowd, frames the top of a portrait screen).
   B.box(30, 0.26, 0.26, 0, 6.5, 6.2, 0x3a3846).box(30, 0.26, 0.26, 0, 7.0, 6.2, 0x3a3846);
   for (let x = -14; x <= 14; x += 1) B.box(0.05, 0.5, 0.05, x, 6.75, 6.2, 0x4a4856);
-  B.cyl(0.02, 0.02, 0.9, 4, 0, 6.05, 6.2, 0x222222);
+  B.cyl(0.02, 0.02, 3.2, 4, 0, 8.0, 3.5, 0x222222);
   root.add(new THREE.Mesh(B.build(), lam()));
   // Mirror ball + par cans on the front truss.
   const ballTex = K.canvasTex(128, 64, (g, w, h) => { for (let y = 0; y < h; y += 4) for (let x = 0; x < w; x += 4) { const v = 120 + Math.random() * 135; g.fillStyle = `rgb(${v},${v},${v + 10})`; g.fillRect(x, y, 3, 3); } });
-  const ball = new THREE.Mesh(keep(new THREE.SphereGeometry(0.55, 18, 12)), keep(new THREE.MeshBasicMaterial({ map: ballTex })));
-  ball.position.set(0, 5.5, 6.2); root.add(ball);
+  const ball = new THREE.Mesh(keep(new THREE.SphereGeometry(0.5, 18, 12)), keep(new THREE.MeshBasicMaterial({ map: ballTex })));
+  ball.position.set(0, 6.3, 3.5); root.add(ball);
   const parGeo = keep(new THREE.CircleGeometry(0.2, 12));
   const pars = new THREE.InstancedMesh(parGeo, basic(0xffffff, { fog: false, side: THREE.DoubleSide }), 10);
   for (let i = 0; i < 10; i++) { dummy.position.set(-6.75 + i * 1.5, 6.28, 6.3); dummy.rotation.set(Math.PI / 2 + 0.5, 0, 0); dummy.scale.setScalar(1); dummy.updateMatrix(); pars.setMatrixAt(i, dummy.matrix); pars.setColorAt(i, col.set(NEON[i % 5])); }
@@ -241,7 +241,7 @@ export function createTetrisWorld(ctx) {
   for (let i = 0; i < 8; i++) { dummy.position.set(-10.5 + i * 3, 7.3, -3); dummy.rotation.set(0, 0, 0); dummy.scale.setScalar(1); dummy.updateMatrix(); strobes.setMatrixAt(i, dummy.matrix); }
   root.add(strobes);
   // Alarm beacons (danger) on the pillars.
-  const beaconMat = addMat(0xff1010, 0);
+  const beaconMat = addMat(0xff1010, 0, K.glowTex);
   const beaconGeo = keep(new THREE.PlaneGeometry(1, 1));
   const beacons = [[-13, 6.5, -7.6], [13, 6.5, -7.6], [-13, 6.5, 4.6], [13, 6.5, 4.6]].map(p => { const m = new THREE.Mesh(beaconGeo, beaconMat); m.position.set(...p); m.scale.setScalar(2.2); root.add(m); return m; });
 
@@ -403,7 +403,7 @@ export function createTetrisWorld(ctx) {
     // Mirror ball spins (faster when hyped), glints on the beat; par cans chase.
     ball.rotation.y += dt * (0.6 + cheer * 2 + (st.rainbow > 0 ? 2 : 0));
     ball.material.color.setScalar((0.5 + 0.5 * onBeat + strobeOn) * lit);
-    if (lit > 0.5 && Math.random() < dt * (3 + cheer * 20 + onBeat * 6)) glows.spawn((Math.random() - 0.5) * 1, 5.5 + (Math.random() - 0.5), 6.6, 0, 0, 0, { life: 0.2, size: 0.5, size1: 0.1, color: 0xffffff });
+    if (lit > 0.5 && Math.random() < dt * (3 + cheer * 20 + onBeat * 6)) glows.spawn((Math.random() - 0.5) * 0.9, 6.3 + (Math.random() - 0.5) * 0.9, 4.0, 0, 0, 0, { life: 0.2, size: 0.5, size1: 0.1, color: 0xffffff });
     for (let i = 0; i < 10; i++) {
       const on = st.chase > 0 || st.rainbow > 0 ? ((Math.floor(t * 10) + i) % 5 === 0 ? 1 : 0.15) : ((whole + i) % 2 ? onBeat : 0.3);
       if (red > 0.5) col.set(0xff1010); else col.set(NEON[(pal + i) % 5]);

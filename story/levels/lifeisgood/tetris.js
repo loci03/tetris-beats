@@ -95,7 +95,7 @@ export function createTetrisWorld(ctx) {
     cell(15, () => { const gr = g.createLinearGradient(0, 0, 128, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 54, 128, 20); });
   });
   atlas.generateMipmaps = true;
-  const glows = K.spritePool(low ? 420 : 700, atlas, { additive: true });
+  const glows = K.spritePool(low ? 800 : 1100, atlas, { additive: true });
   const flats = K.spritePool(low ? 260 : 420, atlas, { additive: false });
   glows.mesh.renderOrder = 6; flats.mesh.renderOrder = 5;
   root.add(flats.mesh, glows.mesh);
@@ -185,19 +185,31 @@ export function createTetrisWorld(ctx) {
         vec3 c = mix(mid, top, smoothstep(0.12, 0.7, h));
         c = mix(hor, c, smoothstep(-0.02, 0.22, h));
         c += vec3(0.35,0.22,0.05) * (0.25 * uPower + uPulse) * smoothstep(0.25, 0.0, abs(h - 0.03));
-        vec2 g = floor(vec2(atan(vP.x, vP.z) * 120.0, h * 120.0));
-        float s = step(0.985, hash(g)) * smoothstep(0.12, 0.35, h);
-        c += vec3(0.9,0.9,1.0) * s * (0.55 + 0.45 * sin(uTime * 2.3 + hash(g + 3.0) * 30.0));
         vec3 md = normalize(vec3(-0.42, 0.34, -0.84));
         float m = dot(vP, md);
         c = mix(c, vec3(1.0, 0.96, 0.82), smoothstep(0.9988, 0.9991, m));
-        c += vec3(0.6, 0.55, 0.45) * pow(max(m, 0.0), 300.0) * 0.5 * uMoon + vec3(0.25,0.22,0.3) * pow(max(m, 0.0), 24.0) * 0.25 * uMoon;
+        c += vec3(0.25,0.22,0.3) * pow(max(m, 0.0), 24.0) * 0.3 * uMoon + vec3(0.6, 0.55, 0.45) * smoothstep(0.985, 0.999, m) * 0.35 * uMoon;
         c += mix(vec3(0.9,0.05,0.05), vec3(0.1,0.2,1.0), step(0.0, sin(uTime * 9.0))) * uSiren * 0.12 * smoothstep(0.4, 0.0, h);
         c *= 1.0 + uFlash * 1.2;
         gl_FragColor = vec4(c, 1.0);
       }`,
   })));
   sky.renderOrder = -10; root.add(sky);
+  // Stars: a point cloud (twinkle in the shader) — cheaper than per-pixel sky stars.
+  const NST = low ? 220 : 420;
+  const stPos = new Float32Array(NST * 3), stPh = new Float32Array(NST);
+  for (let i = 0; i < NST; i++) {
+    const a = R() * Math.PI * 2, y = 0.12 + Math.pow(R(), 0.7) * 0.85, r = 140, q = Math.sqrt(1 - y * y);
+    stPos[i * 3] = Math.cos(a) * r * q; stPos[i * 3 + 1] = y * r; stPos[i * 3 + 2] = Math.sin(a) * r * q; stPh[i] = R() * 30;
+  }
+  const starGeo = keep(new THREE.BufferGeometry());
+  starGeo.setAttribute('position', new THREE.BufferAttribute(stPos, 3)); starGeo.setAttribute('aPh', new THREE.BufferAttribute(stPh, 1));
+  const starMat = keep(new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uK: { value: 1 } }, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
+    vertexShader: 'attribute float aPh; uniform float uTime; varying float vA; void main(){ vA = 0.55 + 0.45 * sin(uTime * 2.3 + aPh); vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; gl_PointSize = 1.5 + fract(aPh) * 1.6; }',
+    fragmentShader: 'uniform float uK; varying float vA; void main(){ vec2 d = gl_PointCoord - 0.5; float a = smoothstep(0.5, 0.1, length(d)); gl_FragColor = vec4(vec3(0.9, 0.92, 1.0) * a * vA * uK, 1.0); }',
+  }));
+  const stars = new THREE.Points(starGeo, starMat); stars.renderOrder = -9.5; stars.frustumCulled = false; root.add(stars);
   const hills = new THREE.Mesh(keep(new THREE.CylinderGeometry(120, 120, 34, 48, 1, true)), keep(new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, fog: false, side: THREE.BackSide })));
   ringTex.repeat.set(3, 1); hills.position.y = 10; hills.renderOrder = -9; root.add(hills);
 
@@ -264,6 +276,7 @@ export function createTetrisWorld(ctx) {
       poles.push({ x, y: 5.85, z, s, i });
     }
   });
+  for (const sx of [-5.2, 5.2]) setB.cyl(0.1, 0.14, 6.6, 6, sx, 3.3, 8.2, 0x5a3a20);
   // Shops along the street (angled a little toward the camera: a curving street).
   const shops = [];
   const shop = (x, z, w, h, d, yaw, cell, wall, roof) => {
@@ -288,8 +301,8 @@ export function createTetrisWorld(ctx) {
   };
   shop(-10.6, -6.0, 4.4, 3.2, 4, 1.05, 3, 0xffc81e, 0x8a5a3a);
   shop(-11.6, -13.0, 4.6, 3.6, 4, 1.25, 1, 0x1faa4f, 0x6a6a72);
-  shop(-12.2, -20.5, 5.0, 3.4, 4, 1.35, 2, 0x2bd4ff, 0x8a4a2a);
-  shop(10.8, -9.0, 4.6, 3.4, 4, -1.1, 0, 0xff3d6e, 0x7a7a80);
+  shop(-12.2, -20.5, 5.0, 3.4, 4, 1.35, 0, 0xff3d6e, 0x8a4a2a);
+  shop(10.8, -9.0, 4.6, 3.4, 4, -1.1, 2, 0x2bd4ff, 0x7a7a80);
   shop(11.8, -16.0, 4.6, 3.2, 4, -1.25, 1, 0x1faa4f, 0x8a5a3a);
   shop(12.4, -23.5, 5.0, 3.6, 4, -1.35, 3, 0xffc81e, 0x6a6a72);
   // Far end of the street: a row of little houses across.
@@ -399,8 +412,8 @@ export function createTetrisWorld(ctx) {
   palm(10.2, -20, 9.4, 0.1, 0);
   if (!low) { palm(-4.6, -30, 9.5, 0.06, 2.6); palm(5.2, -31, 10, 0.07, 0.4); palm(-15, -4, 8.2, 0.12, 3.6); palm(15.5, -2, 8.5, 0.12, -0.5); }
 
-  root.add(new THREE.Mesh(setB.build(), setMat));
-  root.add(new THREE.Mesh(facB.build(), facMat));
+  const setMesh = new THREE.Mesh(setB.build(), setMat), facMesh = new THREE.Mesh(facB.build(), facMat);
+  root.add(setMesh, facMesh);
 
   // Neon signs (additive, each its own material so they can flicker / die).
   const signs = [];
@@ -415,10 +428,9 @@ export function createTetrisWorld(ctx) {
   };
   sign(0, -6.7 + Math.sin(0.8) * 0.0, 3.55, -2.6, 0.8, 2.6, 0.34);       // on the speaker wall
   { const s = signs[0].m; s.position.set(-6.7 + Math.sin(0.8) * 0.5, 3.75, -2.6 + Math.cos(0.8) * 0.5); }
-  sign(1, -10.6 + Math.sin(1.05) * 0.3, 4.3, -6.0 + Math.cos(1.05) * 0.3, 1.05, 4.2, 0.55);
+  sign(1, -10.6 + Math.sin(1.05) * 0.3, 4.75, -6.0 + Math.cos(1.05) * 0.3, 1.05, 4.6, 0.6);
   sign(2, 5.6 + Math.sin(-0.8) * 0.6, 2.75, -1.6 + Math.cos(-0.8) * 0.6, -0.8, 2.6, 0.33);
   sign(3, 11.8 + Math.sin(-1.25) * 0.3, 4.2, -16 + Math.cos(-1.25) * 0.3, -1.25, 3.2, 0.42);
-  sign(4, -11.6 + Math.sin(1.25) * 0.3, 4.5, -13 + Math.cos(1.25) * 0.3, 1.25, 3.2, 0.42);
   sign(5, 10.8 + Math.sin(-1.1) * 0.3, 4.2, -9 + Math.cos(-1.1) * 0.3, -1.1, 3.6, 0.46);
   sign(7, 7.6 + Math.sin(-0.85) * 0.45, 2.45, -6.2 + Math.cos(-0.85) * 0.45, -0.85, 2.0, 0.27);
 
@@ -434,6 +446,11 @@ export function createTetrisWorld(ctx) {
       addWire(P(i, 1), P(i + 1, 1), 0.6, 7);
     }
   }
+  // overhead strings near the camera (they fill the top strip in portrait)
+  const near = [{ x: -5.2, y: 6.2, z: 8.2 }, { x: 5.2, y: 6.2, z: 8.2 }];
+  addWire(near[0], near[1], 1.0, low ? 12 : 16);
+  addWire(near[0], P(0, 1), 1.3, low ? 12 : 18);
+  addWire(near[1], P(0, -1), 1.3, low ? 12 : 18);
   // strings from the speaker wall / stall roof to the nearest poles
   addWire({ x: -6.2, y: 3.9, z: -2.2 }, P(0, -1), 0.5, 6);
   addWire({ x: 5.0, y: 2.5, z: -1.1 }, P(0, 1), 0.5, 6);
@@ -498,7 +515,8 @@ export function createTetrisWorld(ctx) {
   const zones = [
     { x0: -9.5, x1: -2.6, z0: -8, z1: 4.5, n: 0.34 },
     { x0: 2.6, x1: 9.5, z0: -8, z1: 4.5, n: 0.34 },
-    { x0: -2.6, x1: 2.6, z0: 1.5, z1: 5.2, n: 0.12 },
+    { x0: -2.6, x1: 2.6, z0: 1.5, z1: 5.2, n: 0.1 },
+    { x0: -2.3, x1: 2.3, z0: 4.8, z1: 6.0, n: 0.07 },
     { x0: -8, x1: 8, z0: -20, z1: -8, n: 0.2 },
   ];
   for (const zn of zones) {
@@ -533,15 +551,17 @@ export function createTetrisWorld(ctx) {
     scheme: 0, schemeMix: 1, schemePrev: 0, hueShift: 0, waves: [{ t: 9, dir: 1 }, { t: 9, dir: 1 }, { t: 9, dir: 1 }], waveI: 0,
     woof: 0, woofV: 0, dip: 0, ring: 0, ringR: 0, shake: 0, horn: 0, wheel: 0, ragSpin: 0, lean: 0, leanV: 0,
     level: 1, combo: 0, danger: 0, siren: 0, wind: 0, lighters: 0, armsUp: 0, deckSpin: 0, camKick: 0,
-    camX: 0, pieceX: 0, startT: 0, lastBeatI: 0, newBeat: false,
+    camX: 0, pieceX: 0, portrait: false, startT: 0, lastBeatI: 0, newBeat: false,
   };
 
   // ── Particles (pooled; no allocation per event) ───────────────────
-  const PMAX = low ? 360 : 560;
+  const PMAX = low ? 420 : 700;
   const pts = Array.from({ length: PMAX }, () => ({ life: 0, max: 1, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, size: 1, r: 1, g: 1, b: 1, cell: 0, grav: 0, drag: 0, add: true, rot: 0, vr: 0, kind: 0, sx: 1, sy: 1, fade: 1 }));
   let pCur = 0;
   const emit = (o) => {
-    const p = pts[pCur = (pCur + 1) % PMAX];
+    pCur = (pCur + 1) % PMAX;
+    if (pts[pCur].kind === 6 && pts[pCur].life > 0) pCur = (pCur + 1) % PMAX;   // never overwrite a live text pop
+    const p = pts[pCur];
     p.life = p.max = o.life || 1; p.x = o.x; p.y = o.y; p.z = o.z; p.vx = o.vx || 0; p.vy = o.vy || 0; p.vz = o.vz || 0;
     p.size = o.size || 0.2; p.r = o.r ?? 1; p.g = o.g ?? 1; p.b = o.b ?? 1; p.cell = o.cell || 0; p.grav = o.grav || 0; p.drag = o.drag || 0;
     p.add = o.add !== false; p.rot = o.rot || 0; p.vr = o.vr || 0; p.kind = o.kind || 0; p.sx = o.sx || 1; p.sy = o.sy || 1; p.grow = o.grow || 0; p.fade = o.fade ?? 1;
@@ -560,12 +580,14 @@ export function createTetrisWorld(ctx) {
     for (let k = 0; k < n; k++) {
       const d = dancers[Math.floor(Math.random() * ND)];
       const c = rgb(SHIRTS[Math.floor(Math.random() * SHIRTS.length)]);
-      emit({ x: d.x, y: 2.2, z: d.z, vx: (Math.random() - 0.5) * 3, vy: 5 + Math.random() * 4, vz: (Math.random() - 0.5) * 3, life: 2.2, size: 0.1, r: c.r, g: c.g, b: c.b, cell: 1, grav: -6, drag: 0.6, add: false, kind: 2, sy: 9 });
+      emit({ x: d.x, y: 2.2, z: d.z, vx: (Math.random() - 0.5) * 3, vy: 5 + Math.random() * 4, vz: (Math.random() - 0.5) * 3, life: 2.2, size: 0.07, r: c.r, g: c.g, b: c.b, cell: 1, grav: -6, drag: 0.6, add: false, kind: 2, sy: 7 });
     }
   };
-  const FW_SPOTS = [[-9, 11, -16], [9, 12, -18], [-6, 13, -24], [6, 12.5, -22], [-13, 10, -12], [13, 10.5, -13], [0, 14, -26]];
+  const FW_SPOTS = [[-15, 11, -16], [15, 12, -17], [-12, 13.5, -22], [12, 12.5, -21], [-17, 9.5, -12], [17, 10, -13], [-10, 15, -26], [10, 15.5, -27]];
+  const FW_PORTRAIT = [[-2.5, 13, -14], [2.5, 14, -16], [0, 16, -20], [-4, 15, -18], [4, 12.5, -15]];
   const firework = (k, delay = 0) => {
-    const [x, y, z] = FW_SPOTS[k % FW_SPOTS.length];
+    const list = st.portrait ? FW_PORTRAIT : FW_SPOTS;
+    const [x, y, z] = list[k % list.length];
     const c = rgb(BULB_COLS[(k * 7 + st.level) % 6]);
     const p = emit({ x: x * 0.7, y: 1, z, vx: x * 0.3 / 1.2, vy: (y - 1) / 1.2, vz: 0, life: 1.2, size: 0.35, r: 1, g: 0.8, b: 0.5, cell: 0, kind: 3 });
     p.delay = delay; p.cr = c.r; p.cg = c.g; p.cb = c.b; p.tx = x; p.ty = y; p.tz = z;
@@ -573,7 +595,7 @@ export function createTetrisWorld(ctx) {
   const burst = (x, y, z, r, g, b, n) => {
     for (let k = 0; k < n; k++) {
       const a = Math.random() * Math.PI * 2, e = Math.acos(2 * Math.random() - 1), sp = 4 + Math.random() * 2.5;
-      emit({ x, y, z, vx: Math.sin(e) * Math.cos(a) * sp, vy: Math.cos(e) * sp, vz: Math.sin(e) * Math.sin(a) * sp, life: 1.4 + Math.random() * 0.6, size: 0.28, r, g, b, cell: 0, grav: -3, drag: 1.4, kind: 4 });
+      emit({ x, y, z, vx: Math.sin(e) * Math.cos(a) * sp, vy: Math.cos(e) * sp, vz: Math.sin(e) * Math.sin(a) * sp, life: 1.4 + Math.random() * 0.6, size: 0.45, r, g, b, cell: 0, grav: -3, drag: 1.4, kind: 4 });
     }
     emit({ x, y, z, life: 0.5, size: 7, r: r * 0.8, g: g * 0.8, b: b * 0.8, cell: 0, kind: 5, grow: 4 });
   };
@@ -641,7 +663,7 @@ export function createTetrisWorld(ctx) {
       }
     }
     // Cheer (line clears): arms shoot up.
-    const up = Math.min(1, st.armsUp * (d.style >= 6 ? 0.6 : 1)) * live;
+    const up = smooth(0, 0.35, st.armsUp) * (d.style >= 6 ? 0.6 : 1) * live;
     if (up > 0) {
       const wv = Math.sin(st.t * 8 + d.ph * 6) * 0.25;
       lZ += (-2.75 + wv - lZ) * up; rZ += (2.75 + wv - rZ) * up; lX += (-0.15 - lX) * up; rX += (-0.15 - rX) * up; lE += (-0.2 - lE) * up; rE += (-0.2 - rE) * up;
@@ -700,7 +722,7 @@ export function createTetrisWorld(ctx) {
     st.flash = Math.max(0, st.flash - dt * 2.2);
     st.gold = Math.max(0, st.gold - dt * 0.5);
     st.strobe = Math.max(0, st.strobe - dt);
-    st.armsUp = Math.max(0, Math.max(st.armsUp - dt * 0.55, cheerIn > 0.4 ? (cheerIn - 0.4) * 1.6 : 0));
+    st.armsUp = Math.max(0, Math.max(st.armsUp - dt * 0.45, cheerIn > 0.4 ? (cheerIn - 0.4) * 1.6 : 0));
     st.horn = Math.max(0, st.horn - dt);
     st.wheel = Math.max(0, st.wheel - dt);
     st.ragSpin = Math.max(0, st.ragSpin - dt * 1.2);
@@ -815,7 +837,7 @@ export function createTetrisWorld(ctx) {
           k += 1.6 * Math.exp(-((xn - front) ** 2) * 18) * (1 - wv.t / 2);
         }
         k += st.flash * 1.2 + st.cheer * 0.5;
-        if (st.gold > 0) { col.lerp(col2.set(0xffe9a0), Math.min(1, st.gold)); k += st.gold; }
+        if (st.gold > 0) { col.lerp(col2.set(0xffd040), Math.min(1, st.gold) * 0.8); k += st.gold * 0.5; }
         if (strobeOn) { col.set(0xffffff); k += 1; }
         // power cut cascade: bulbs die along the street from the far end
         let pk = power;
@@ -823,9 +845,9 @@ export function createTetrisWorld(ctx) {
         else if (power < 0.999) pk = smooth(0, 1, power * 2.2 - (1 - (V3.z + 30) / 34) * 1.2);
         k *= pk;
         if (k < 0.02) continue;
-        const sz = 0.32 + 0.22 * Math.min(1.6, k);
-        glows.set(V3.x, V3.y - 0.08, V3.z, sz, col.r * k, col.g * k, col.b * k, 1, 0, 1, 1, 0);
-        glows.set(V3.x, V3.y - 0.08, V3.z, 0.09, 1, 1, 0.9, Math.min(1, k), 0, 1, 1, 0);
+        const sz = 0.3 + 0.18 * Math.min(1.4, k);
+        const wk = Math.min(1, k * 0.25);   // hot white-ish core when bright
+        glows.set(V3.x, V3.y - 0.08, V3.z, sz, (col.r + wk) * k, (col.g + wk) * k, (col.b + wk * 0.8) * k, 1, 0, 1, 1, 0);
         bulbs[idx * 4] = V3.x; bulbs[idx * 4 + 1] = V3.y; bulbs[idx * 4 + 2] = V3.z;
       }
     }
@@ -935,14 +957,17 @@ export function createTetrisWorld(ctx) {
 
     // ── Camera ──
     const aspect = camera.aspect || 1.6, portrait = aspect < 0.9;
+    st.portrait = portrait;
     st.shake = Math.max(0, st.shake - dt * 2.5);
     const sh = st.shake * 0.12;
     st.camX += (st.pieceX * 0.6 - st.camX) * Math.min(1, dt * 1.5);
     const swayX = Math.sin(t * 0.13) * 0.5, swayY = Math.sin(t * 0.17) * 0.15;
     if (portrait) {
-      camera.fov = 66;
-      camera.position.set(swayX * 0.5 + st.camX * 0.5 + (Math.random() - 0.5) * sh, 2.5 + swayY + (Math.random() - 0.5) * sh - 0.03 * onBeat - st.camKick * 0.15, 10.5);
-      camera.lookAt(st.camX * 0.4, 3.0, -8);
+      // Portrait: the board covers nearly everything — tilt up so the
+      // string lights fill the top strip and the crowd the bottom one.
+      camera.fov = 70;
+      camera.position.set(swayX * 0.4 + st.camX * 0.5 + (Math.random() - 0.5) * sh, 1.9 + swayY * 0.5 + (Math.random() - 0.5) * sh - 0.03 * onBeat - st.camKick * 0.15, 8.6);
+      camera.lookAt(st.camX * 0.4, 5.6, -8);
     } else {
       // Landscape: the board + panels cover the middle ~56% — keep the
       // speaker wall (left) and stall (right) in the side strips; pull back
@@ -955,7 +980,7 @@ export function createTetrisWorld(ctx) {
     camera.rotateZ(Math.sin(t * 0.11) * 0.01 + st.lean * 0.01);
     if (camera.view && camera.view.enabled) camera.clearViewOffset();
     camera.updateProjectionMatrix();
-    sky.position.copy(camera.position);
+    sky.position.copy(camera.position); stars.position.copy(camera.position); starMat.uniforms.uTime.value = t;
     hills.position.x = camera.position.x; hills.position.z = camera.position.z;
   }
 
@@ -1022,6 +1047,7 @@ export function createTetrisWorld(ctx) {
     }
   }
 
+  if (typeof window !== 'undefined' && window.__lwDebug) window.__lwDebug = { root, sky, hills, setMesh, facMesh, crowns: palms.map(p => p.crown), signs: signs.map(s => s.m), wireLines, coneMesh, ground, glows, flats, parts, pParty, pSound, pStall, hemi };
   return {
     update, react,
     dispose() {
