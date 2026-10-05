@@ -32,14 +32,15 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
   // ── Sky, sun, horizon ───────────────────────────────────────────
   const sky = new THREE.Mesh(keep(new THREE.SphereGeometry(80, 32, 16)), keep(new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false,
-    uniforms: { uPulse: { value: 0 } },
+    uniforms: { uPulse: { value: 0 }, uSauce: { value: 0 } },
     vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `varying vec3 vP; uniform float uPulse;
+    fragmentShader: `varying vec3 vP; uniform float uPulse; uniform float uSauce;
       void main(){
         float h = vP.y;
         vec3 top = vec3(0.10,0.02,0.22), mid = vec3(0.62,0.10,0.42), hor = vec3(1.0,0.52,0.18);
         vec3 c = h > 0.12 ? mix(mid, top, smoothstep(0.12, 0.7, h)) : mix(hor, mid, smoothstep(-0.05, 0.12, h));
         c += vec3(0.25,0.05,0.12) * uPulse * smoothstep(0.4, 0.0, abs(h - 0.08));
+        c = mix(c, vec3(0.95,0.22,0.04) * (0.6 + 0.4 * smoothstep(0.5, 0.0, h)), uSauce);
         gl_FragColor = vec4(c, 1.0);
       }`,
   })));
@@ -150,6 +151,7 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
     if (i % 4 === 0 && Math.sin(a) > 0.5) {
       const ch = new THREE.Mesh(cheeseGeo, cheeseMat);
       ch.position.set(Math.cos(a) * (r - 0.55), Math.sin(a) * (r - 0.55) - 0.4, 0.2);
+      ch.userData.y0 = ch.position.y;
       arch.add(ch);
       cheeseStrands.push(ch);
     }
@@ -327,9 +329,82 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
       t.v.set(-sx * (4 + Math.random() * 3), 5 + Math.random() * 2.5, -2 - Math.random() * 3);
       t.spin = (Math.random() - 0.5) * 12;
       t.life = 2.4;
+      t.splat = false;
       t.obj.visible = true;
     }
   }
+  // Tetris piece reactions: a crowd member lobs a taco onto the stage where
+  // the piece is (it splats on the floor), tortilla chips burst from slams,
+  // hot-sauce shockwave rings + sky flash on clears. All pooled.
+  const SPLAT_COLS = [0xd8231a, 0x6cc23a, 0xf2b02e, 0xc4141a];
+  function lobTaco(fromSide, tx, tz, T = 1.0) {
+    for (const t of tacos) {
+      if (t.life > 0) continue;
+      const sx = fromSide || (Math.random() < 0.5 ? -1 : 1);
+      t.obj.position.set(sx * (6 + Math.random() * 2), 0.6 + Math.random() * 0.6, 2.5 + Math.random() * 2.5);
+      const p = t.obj.position;
+      t.v.set((tx - p.x) / T, (0.05 - p.y) / T + 4.5 * T, (tz - p.z) / T);
+      t.spin = (Math.random() - 0.5) * 14;
+      t.life = T + 0.4;
+      t.splat = true;
+      t.obj.visible = true;
+      return true;
+    }
+    return false;
+  }
+  const SPL = 24;
+  const splatMesh = new THREE.InstancedMesh(keep(new THREE.CircleGeometry(0.34, 12)), basic(0xffffff, { transparent: true, opacity: 0.92, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), SPL);
+  const splats = [];
+  const hideM = new THREE.Matrix4().makeScale(0, 0, 0);
+  for (let i = 0; i < SPL; i++) { splats.push({ x: 0, z: 0, age: 99, size: 1, rot: 0 }); splatMesh.setMatrixAt(i, hideM); splatMesh.setColorAt(i, col.set(SPLAT_COLS[i % SPLAT_COLS.length])); }
+  splatMesh.frustumCulled = false;
+  group.add(splatMesh);
+  let splatCursor = 0, splatsLive = 0;
+  function addSplat(x, z, size = 1) {
+    const sp = splats[splatCursor = (splatCursor + 1) % SPL];
+    if (sp.age >= 99) splatsLive++;
+    sp.x = x; sp.z = z; sp.age = 0; sp.size = size * (0.7 + Math.random() * 0.6); sp.rot = Math.random() * 6;
+  }
+  const CHIP = lowGraphics ? 60 : 110;
+  const chipGeo = keep(new THREE.CircleGeometry(0.16, 3));
+  const chipMesh = new THREE.InstancedMesh(chipGeo, toon(0xffffff, { side: THREE.DoubleSide }), CHIP);
+  const chipP = new Float32Array(CHIP * 3), chipV = new Float32Array(CHIP * 3), chipR = new Float32Array(CHIP * 2), chipLife = new Float32Array(CHIP);
+  for (let i = 0; i < CHIP; i++) { chipMesh.setMatrixAt(i, hideM); chipMesh.setColorAt(i, col.set(i % 4 === 3 ? [0xd8231a, 0x6cc23a, 0xffffff][i % 3] : 0xf2c040)); }
+  chipMesh.frustumCulled = false;
+  group.add(chipMesh);
+  let chipCursor = 0, chipsLive = 0;
+  function burstChips(n, x, z = 0.8, power = 1) {
+    for (let k = 0; k < n; k++) {
+      const i = chipCursor = (chipCursor + 1) % CHIP;
+      if (chipLife[i] <= 0) chipsLive++;
+      chipP[i * 3] = x + (Math.random() - 0.5) * 0.8; chipP[i * 3 + 1] = 0.15; chipP[i * 3 + 2] = z + (Math.random() - 0.5) * 0.8;
+      const a = Math.random() * Math.PI * 2, sp = (1 + Math.random() * 2.5) * power;
+      chipV[i * 3] = Math.cos(a) * sp; chipV[i * 3 + 1] = (3.5 + Math.random() * 4) * power; chipV[i * 3 + 2] = Math.sin(a) * sp * 0.6;
+      chipR[i * 2] = Math.random() * 6; chipR[i * 2 + 1] = (Math.random() - 0.5) * 18;
+      chipLife[i] = 1.3 + Math.random() * 0.6;
+    }
+  }
+  // Hot-sauce shockwave rings round the board (it stands in front of the arch).
+  const ringsFx = [];
+  for (let i = 0; i < 3; i++) {
+    const mat = keep(new THREE.MeshBasicMaterial({ color: i === 1 ? 0xffd23c : 0xff6a10, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    const m = new THREE.Mesh(keep(new THREE.RingGeometry(0.92, 1, 64)), mat);
+    m.position.set(0, 2.6, -0.6); m.visible = false;
+    group.add(m);
+    ringsFx.push({ mesh: m, mat, age: 99, delay: 0, max: 9 });
+  }
+  let ringNext = 0;
+  function shockRing(delay = 0, max = 9) {
+    const r = ringsFx[ringNext = (ringNext + 1) % ringsFx.length];
+    r.age = -delay; r.max = max;
+  }
+  const springsT = { flag: [0, 0], cone: [0, 0], sign: [0, 0], arch: [0, 0] };
+  const springT = (s, dt, hz, damp) => {
+    const w = 2 * Math.PI * hz, n = Math.max(1, Math.ceil(dt * 120)), h = dt / n;
+    for (let i = 0; i < n; i++) { s[1] += (-w * w * s[0] - 2 * damp * w * s[1]) * h; s[0] += s[1] * h; }
+    return s[0];
+  };
+  const colX = (c) => (c == null ? (Math.random() - 0.5) * 4 : (c - 4.5) * 0.8);
 
   // ── Lights ──────────────────────────────────────────────────────
   const hemi = new THREE.HemisphereLight(0xffd9b0, 0x4a1f6a, 1.1);
@@ -345,8 +420,10 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
   const baseIntensity = { hemi: hemi.intensity, key: key.intensity, rimL: rimL.intensity, rimR: rimR.intensity, arch: archGlow.intensity };
 
   // ── State + update ──────────────────────────────────────────────
-  const state = { lightLevel: 1, flash: 0, cheer: 0, ripple: null, focus: 0, lastBeat: -1, barColor: 0, solo: null };
+  const state = { lightLevel: 1, flash: 0, cheer: 0, ripple: null, focus: 0, lastBeat: -1, barColor: 0, solo: null,
+    sauce: 0, gold: 0, boom: 0, cheese: 0, spot: null, bulbs: 0, rainbow: 0, dark: 0, flagSpin: 0 };
   const dummy = new THREE.Object3D();
+  const cA = new THREE.Color(), cB = new THREE.Color(), dim = new THREE.Color(0x1a0d28), sauceC = new THREE.Color(0xff3a0a), goldC = new THREE.Color(0xffd060);
 
   function update(dt, info) {
     const { beat } = info;
@@ -371,8 +448,18 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
     }
 
     // Tiles: checker pulse on the beat + ripple from the last big move.
-    const cA = new THREE.Color(PALETTE[state.barColor]), cB = new THREE.Color(PALETTE[(state.barColor + 2) % PALETTE.length]);
-    const dim = new THREE.Color(0x1a0d28);
+    state.sauce = Math.max(0, state.sauce - dt * 1.4);
+    state.gold = Math.max(0, state.gold - dt * 2.5);
+    state.boom = Math.max(0, state.boom - dt * 3);
+    state.cheese = Math.max(0, state.cheese - dt * 1.5);
+    state.bulbs = Math.max(0, state.bulbs - dt);
+    state.rainbow = Math.max(0, state.rainbow - dt);
+    state.dark = Math.max(0, state.dark - dt * 0.25);
+    const flagK = springT(springsT.flag, dt, 1.1, 0.15), coneK = springT(springsT.cone, dt, 1.4, 0.25), signK = springT(springsT.sign, dt, 2.2, 0.2), archK = springT(springsT.arch, dt, 2.6, 0.25);
+    const spot = state.spot, spAge = spot ? info.songTime - spot.t : 0;
+    if (spot && spAge > 0.7) state.spot = null;
+    const Ld = L * (1 - 0.7 * state.dark);
+    cA.set(PALETTE[state.barColor]); cB.set(PALETTE[(state.barColor + 2) % PALETTE.length]);
     tiles.forEach((t, i) => {
       const checker = ((t.ix + t.iz + whole) & 1) === 0;
       let k = (checker ? 0.25 + 0.65 * onBeat : 0.12) * L;
@@ -386,7 +473,11 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
         const near = Math.exp(-Math.pow(Math.hypot(t.x - soloX, t.z) / 1.3, 2));
         k = k * (1 - 0.75 * soloK) + soloK * near * (0.6 + 0.4 * onBeat);
       }
+      k *= 1 - 0.7 * state.dark;
       col.copy(dim).lerp(checker ? cA : cB, Math.min(1, k)).multiplyScalar(0.6 + 0.8 * k + state.flash * 0.4);
+      if (state.sauce > 0.02) col.lerp(sauceC, state.sauce * 0.55);
+      if (state.gold > 0.02) col.lerp(goldC, state.gold * 0.4);
+      if (spot) { const g = Math.exp(-Math.pow(Math.hypot(t.x - spot.x, t.z - 0.8) * 1.5, 2)) * (1 - spAge / 0.7); if (g > 0.02) col.lerp(goldC, g * 0.8); }
       tileMesh.setColorAt(i, col);
     });
     tileMesh.instanceColor.needsUpdate = true;
@@ -396,20 +487,28 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
       const lead = c.side === 'player' ? Math.max(0, state.focus) : Math.max(0, -state.focus);
       const sway = Math.sin(info.songTime * 0.9 + i * 1.7) * 0.25;
       const dx = c.targetX + (soloX - c.targetX) * soloK + sway * (1 - soloK) - c.baseX;
-      c.cone.rotation.z = Math.atan2(dx, 7.0);
+      c.cone.rotation.z = Math.atan2(dx, 7.0) + coneK * (i < 2 ? 1 : -1) * 0.6;
       c.cone.rotation.x = -0.12;
       coneMats[i].color.set(PALETTE[(state.barColor + i) % PALETTE.length]);
-      coneMats[i].opacity = (0.025 + 0.045 * onBeat + 0.05 * lead + 0.1 * state.flash) * L * (1 - 0.35 * soloK);
+      if (state.rainbow > 0) coneMats[i].color.setHSL((info.songTime * 1.3 + i * 0.25) % 1, 1, 0.6);
+      coneMats[i].opacity = (0.025 + 0.045 * onBeat + 0.05 * lead + 0.1 * state.flash + 0.12 * Math.min(1, Math.abs(coneK)) + 0.08 * state.sauce) * Ld * (1 - 0.35 * soloK);
     });
 
     // Flags sway, bulbs twinkle, cheese drips, speakers pump.
-    for (const f of flags) f.mesh.rotation.x = Math.sin(info.songTime * 2.2 + f.phase) * 0.35;
-    bulbs.forEach((b, i) => { b.visible = L > 0.2 && ((i + whole) % 3 !== 0 || onBeat > 0.5); });
-    cheeseStrands.forEach((c, i) => { c.scale.y = 1 + 0.25 * Math.sin(info.songTime * 3 + i); });
-    const pump = 1 + 0.18 * onBeat * L;
+    state.flagSpin = Math.max(0, state.flagSpin - dt);
+    for (const f of flags) f.mesh.rotation.x = Math.sin(info.songTime * 2.2 + f.phase) * 0.35 + flagK * Math.sin(f.phase * 1.3 + 1) + (state.flagSpin > 0 ? state.flagSpin * 6 + f.phase : 0);
+    const chase = state.bulbs > 0 ? Math.floor(info.songTime * 16) : -1;
+    bulbs.forEach((b, i) => { b.visible = state.dark < 0.6 && L > 0.2 && (chase >= 0 ? (i + chase) % 4 !== 0 : ((i + whole) % 3 !== 0 || onBeat > 0.5)); });
+    cheeseStrands.forEach((c, i) => { c.scale.y = 1 + 0.25 * Math.sin(info.songTime * 3 + i) + state.cheese * (1.5 + (i % 3) * 0.5); c.position.y = c.userData.y0 - state.cheese * 0.4 * (1 + (i % 3) * 0.3); });
+    const pump = 1 + 0.18 * onBeat * L + state.boom * 0.3;
     for (const w of speakers) w.scale.set(pump, 1, pump);
-    sign.material.opacity = L * (0.85 + 0.15 * onBeat) * ((Math.sin(info.songTime * 17) > 0.97) ? 0.4 : 1);
-    sky.material.uniforms.uPulse.value = onBeat * 0.6 * L + state.flash;
+    ringMat.color.set(state.boom > 0.3 ? 0xffe070 : 0xff3d7f);
+    sign.material.opacity = L * (0.85 + 0.15 * onBeat) * ((Math.sin(info.songTime * 17) > 0.97) ? 0.4 : 1) * (1 - 0.7 * state.dark);
+    sign.rotation.z = signK * 0.25;
+    if (state.rainbow > 0) sign.material.color.setHSL((info.songTime * 2) % 1, 1, 0.7); else sign.material.color.setRGB(1, 1, 1);
+    arch.scale.set(1 + archK * 0.06, 1 - archK * 0.08, 1);
+    sky.material.uniforms.uPulse.value = onBeat * 0.6 * L + state.flash + state.gold * 0.8;
+    sky.material.uniforms.uSauce.value = state.sauce * 0.45;
     sun.rotation.z += dt * 0.02;
 
     // Crowd bounce, arms up when hyped, lean toward the leader.
@@ -452,7 +551,55 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
       t.obj.position.addScaledVector(t.v, dt);
       t.obj.rotation.z += t.spin * dt;
       t.obj.rotation.x += t.spin * 0.5 * dt;
+      if (t.splat && t.v.y < 0 && t.obj.position.y < 0.08) {
+        const p = t.obj.position;
+        if (Math.hypot(p.x, p.z) < 4.4) { addSplat(p.x, p.z, 1); burstChips(4, p.x, p.z, 0.5); }
+        t.life = 0;
+      }
       if (t.life <= 0) t.obj.visible = false;
+    }
+    // Splats grow in, sit, then shrink away.
+    if (splatsLive > 0) {
+      splats.forEach((sp, i) => {
+        if (sp.age >= 99) return;
+        sp.age += dt;
+        const k = sp.age < 0.12 ? sp.age / 0.12 * 1.15 : sp.age < 4 ? 1 : Math.max(0, 1 - (sp.age - 4) / 0.8);
+        if (sp.age > 4.8) { sp.age = 99; splatsLive--; splatMesh.setMatrixAt(i, hideM); return; }
+        dummy.position.set(sp.x, 0.045, sp.z); dummy.rotation.set(-Math.PI / 2, 0, sp.rot);
+        dummy.scale.set(sp.size * k, sp.size * k * 0.8, 1); dummy.updateMatrix();
+        splatMesh.setMatrixAt(i, dummy.matrix);
+      });
+      splatMesh.instanceMatrix.needsUpdate = true;
+    }
+    // Tortilla chips: fly, tumble, bounce, fade.
+    if (chipsLive > 0) {
+      for (let i = 0; i < CHIP; i++) {
+        if (chipLife[i] <= 0) continue;
+        chipLife[i] -= dt;
+        const j = i * 3;
+        chipV[j + 1] -= 9 * dt;
+        chipP[j] += chipV[j] * dt; chipP[j + 1] += chipV[j + 1] * dt; chipP[j + 2] += chipV[j + 2] * dt;
+        if (chipP[j + 1] < 0.06) { chipP[j + 1] = 0.06; chipV[j + 1] *= -0.35; chipV[j] *= 0.6; chipV[j + 2] *= 0.6; chipR[i * 2 + 1] *= 0.5; }
+        chipR[i * 2] += chipR[i * 2 + 1] * dt;
+        if (chipLife[i] <= 0) { chipsLive--; chipMesh.setMatrixAt(i, hideM); continue; }
+        dummy.position.set(chipP[j], chipP[j + 1], chipP[j + 2]);
+        dummy.rotation.set(chipR[i * 2], chipR[i * 2] * 0.7, chipR[i * 2] * 0.3);
+        dummy.scale.setScalar(Math.min(1, chipLife[i] * 3));
+        dummy.updateMatrix();
+        chipMesh.setMatrixAt(i, dummy.matrix);
+      }
+      chipMesh.instanceMatrix.needsUpdate = true;
+    }
+    // Shockwave rings.
+    for (const r of ringsFx) {
+      if (r.age >= 99) continue;
+      r.age += dt;
+      if (r.age < 0) continue;
+      const u = r.age / 0.9;
+      if (u >= 1) { r.age = 99; r.mesh.visible = false; continue; }
+      r.mesh.visible = true;
+      r.mesh.scale.setScalar(1.5 + u * r.max);
+      r.mat.opacity = (1 - u) * 0.85 * L;
     }
 
     // Lights
@@ -461,12 +608,74 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
     key.intensity = baseIntensity.key * L * (1 - 0.45 * soloK);
     rimL.intensity = baseIntensity.rimL * L * (0.7 + 0.6 * onBeat + 0.6 * Math.max(0, state.focus)) * (1 + 1.6 * soloK * Math.max(0, soloL) - 0.6 * soloK * Math.max(0, -soloL));
     rimR.intensity = baseIntensity.rimR * L * (0.7 + 0.6 * onBeat + 0.6 * Math.max(0, -state.focus)) * (1 + 1.6 * soloK * Math.max(0, -soloL) - 0.6 * soloK * Math.max(0, soloL));
-    archGlow.intensity = baseIntensity.arch * L * (0.8 + 0.5 * onBeat + state.flash);
-    shellMat.emissive.setRGB(0.23 * (0.4 + onBeat * 0.6) * L, 0.1 * L, 0);
+    archGlow.intensity = baseIntensity.arch * L * (0.8 + 0.5 * onBeat + state.flash + state.gold * 1.5 + state.sauce * 1.5) * (1 - 0.6 * state.dark);
+    shellMat.emissive.setRGB((0.23 * (0.4 + onBeat * 0.6) + state.sauce * 0.35 + state.gold * 0.3) * L, (0.1 + state.gold * 0.2) * L, 0);
+    if (state.dark > 0) { hemi.intensity *= 1 - 0.6 * state.dark; key.intensity *= 1 - 0.6 * state.dark; }
   }
 
   // Stage reactions to battle events.
+  // Tetris backdrop piece actions (the old 2D food fight: customers wind
+  // up and throw on input, chip burst + golden flash + a food volley on
+  // hard drops, hot-sauce flash + shockwave rings + a full salvo on clears).
+  function piece(d) {
+    const x = colX(d.col), t = d.songTime || 0;
+    switch (d.kind) {
+      case 'move':
+        springsT.flag[1] += (d.dir || 1) * 1.6;
+        if (Math.random() < 0.45) lobTaco(d.dir || 1, x + (Math.random() - 0.5), 0.6 + Math.random() * 1.6, 0.9);
+        break;
+      case 'rotate':
+        springsT.cone[1] += (d.dir || 1) * 3;
+        springsT.sign[1] += (d.dir || 1) * 4;
+        break;
+      case 'soft':
+        state.cheese = Math.min(1, state.cheese + 0.35);
+        state.spot = { t, x };
+        break;
+      case 'drop': {
+        const r = d.rows || 0, k = Math.min(1, 0.25 + r / 14);
+        burstChips(Math.round(8 + r * 2.5), x, 0.8, 0.7 + 0.5 * k);
+        state.gold = Math.max(state.gold, 0.4 + 0.6 * k);
+        state.boom = Math.max(state.boom, 0.5 + 0.5 * k);
+        springsT.arch[1] += 1.5 * k;
+        if (r >= 6) for (let i = 0; i < Math.min(5, Math.floor(r / 4)); i++) lobTaco(i % 2 ? 1 : -1, (Math.random() - 0.5) * 6, Math.random() * 2.5, 0.8 + Math.random() * 0.4);
+        break;
+      }
+      case 'hold':
+        springsT.arch[1] += 4;
+        state.bulbs = 1.2;
+        springsT.sign[1] -= 3;
+        break;
+      case 'clear': {
+        const n = Math.max(1, Math.min(4, d.lines || 1)), c = Math.max(0, d.combo || 0);
+        state.sauce = Math.min(1.2, state.sauce + [0, 0.35, 0.55, 0.78, 1][n] + Math.min(0.4, c * 0.12));
+        state.cheer = Math.min(1, state.cheer + 0.3 + n * 0.15);
+        const rings = Math.min(3, n === 4 ? 3 : 1 + (c >= 2 ? 1 : 0) + (n >= 3 ? 1 : 0));
+        for (let i = 0; i < rings; i++) shockRing(i * 0.14, 6 + n * 1.5);
+        const salvo = Math.min(10, n * 2 + c);
+        for (let i = 0; i < salvo; i++) lobTaco(i % 2 ? 1 : -1, (Math.random() - 0.5) * 7, Math.random() * 3, 0.8 + Math.random() * 0.5);
+        springsT.flag[1] += 2 + n;
+        if (n >= 4) { burstChips(40, -2.5, 0.8, 1.3); burstChips(40, 2.5, 0.8, 1.3); burstConfetti(120, 0, 8); state.gold = 1; }
+        else if (c >= 3) burstConfetti(30 + c * 10, x, 4);
+        break;
+      }
+      case 'levelUp':
+        state.rainbow = 3.5; state.flagSpin = 1.2; state.cheer = 1; state.bulbs = 3;
+        burstConfetti(160, 0, 9);
+        shockRing(0, 10); shockRing(0.2, 10);
+        for (let i = 0; i < 6; i++) lobTaco(i % 2 ? 1 : -1, (Math.random() - 0.5) * 6, Math.random() * 2.5, 0.9 + i * 0.12);
+        break;
+      case 'gameOver':
+        state.dark = 1; state.sauce = 0; state.rainbow = 0;
+        break;
+      case 'start':
+        state.dark = 0; state.gold = 1; state.bulbs = 1.5; springsT.arch[1] += 3;
+        break;
+    }
+  }
+
   function react(type, data = {}) {
+    if (type === 'piece') { piece(data); return; }
     const x = data.who === 'rival' ? 1.6 : data.who === 'player' ? -1.6 : 0;
     switch (type) {
       case 'move':

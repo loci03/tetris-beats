@@ -204,7 +204,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     const gl = new THREE.Mesh(gillGeo, gillMat); gl.rotation.x = Math.PI / 2; gl.scale.setScalar(1.5 * s); cap.add(gl);
     g.position.set(x, -0.62, z); g.rotation.z = (x > 0 ? -1 : 1) * 0.06;
     group.add(g);
-    shrooms.push({ cap, s, ph: x * 0.3 });
+    shrooms.push({ cap, s, ph: x * 0.3, side: x < 0 ? 0 : 1, y0: cap.position.y });
   }
 
   // ── Playing-card guards (flip in waves) ─────────────────────────
@@ -357,7 +357,11 @@ export function buildWorld({ lowGraphics = false } = {}) {
   const base = { hemi: hemi.intensity, key: key.intensity, rimL: rimL.intensity, rimR: rimR.intensity, hole: holeGlow.intensity };
 
   // ── State + update ──────────────────────────────────────────────
-  const S = { L: 1, flash: 0, cheer: 0, focus: 0, rip: null, solo: null, tT: 0, spin: 0, wob: 0, lastBeat: -99 };
+  const S = { L: 1, flash: 0, cheer: 0, focus: 0, rip: null, solo: null, tT: 0, spin: 0, wob: 0, lastBeat: -99,
+    // Tetris piece reactions (backdrop only).
+    cardNext: [0, 0], clockOff: 0, clockTo: 0, twist: 0, twistV: 0, pull: 0, rev: 0, shX: 0, shV: 0, bitBoost: 0,
+    laser: 0, laserFan: 0, signK: 0, hop: [0, 0], hopV: [0, 0], lean: [0, 0], capSpin: 0, capTo: 0, glow: 0, glowHz: 0, chaseHead: 0, chaseLeft: 0, chaseRate: 0, pipsOn: false, dustPush: 0 };
+  const pipK = new Float32Array(24);
 
   function flipCards(t, all = true, side = 0) {
     for (const c of cards) if (all || Math.sign(c.piv.position.x) === side) { c.t0 = t + c.delay; }
@@ -382,33 +386,71 @@ export function buildWorld({ lowGraphics = false } = {}) {
 
     // Tunnel spiral: drifts inward with the music; solo = hypnotic rush,
     // landed taunt = it runs backwards.
-    const dir = S.wob > 0.2 ? -1 : 1;
-    S.tT += dt * dir * (0.25 + 0.6 * S.spin + 1.4 * soloK);
+    S.pull = Math.max(0, S.pull - dt * 1.5); S.rev = Math.max(0, S.rev - dt);
+    S.bitBoost = Math.max(0, S.bitBoost - dt * 0.8); S.laser = Math.max(0, S.laser - dt * 1.8);
+    S.laserFan = Math.max(0, S.laserFan - dt * 1.2); S.signK = Math.max(0, S.signK - dt * 1.4);
+    S.twistV += (-S.twist * 40 - S.twistV * 5) * dt; S.twist += S.twistV * dt;
+    S.shV += (-S.shX * 160 - S.shV * 7) * dt; S.shX += S.shV * dt;
+    S.clockOff += (S.clockTo - S.clockOff) * Math.min(1, dt * 7);
+    S.capSpin += (S.capTo - S.capSpin) * Math.min(1, dt * 6);
+    S.glow = Math.max(0, S.glow - dt * 1.1);
+    for (const k of [0, 1]) {
+      S.hopV[k] += (-S.hop[k] * 120 - S.hopV[k] * 6) * dt; S.hop[k] += S.hopV[k] * dt;
+      S.lean[k] *= Math.exp(-dt * 4);
+    }
+    const dir = S.wob > 0.2 || S.rev > 0 ? -1 : 1;
+    S.tT += dt * dir * (0.25 + 0.6 * S.spin + 1.4 * soloK + 3 * S.pull);
     tunnelMat.uniforms.uT.value = S.tT;
     tunnelMat.uniforms.uBeat.value = onBeat + S.flash;
     tunnelMat.uniforms.uLevel.value = L;
     tunnelMat.uniforms.uHue.value = songTime * 0.4;
-    tunnel.rotation.y = 0; tunnel.rotation.z = songTime * 0.05 * dir;
+    tunnel.rotation.y = 0; tunnel.rotation.z = songTime * 0.05 * dir + S.twist;
     sky.material.uniforms.uPulse.value = onBeat * 0.6 * L + S.flash;
 
     // Clock: the minute hand ticks on every beat, the hour hand per bar.
     const tick = whole + smooth01((ph) / 0.12);
-    minHand.rotation.z = -tick * Math.PI / 6;
-    hrHand.rotation.z = -(beat / 4) * Math.PI / 24;
-    clock.scale.setScalar(1 + 0.04 * onBeat + 0.1 * S.flash);
+    minHand.rotation.z = -tick * Math.PI / 6 - S.clockOff;
+    hrHand.rotation.z = -(beat / 4) * Math.PI / 24 - S.clockOff / 12;
+    clock.scale.setScalar(1 + 0.04 * onBeat + 0.1 * S.flash + 0.12 * S.signK);
+    clock.rotation.z = S.twist * 0.25;
+
+    // Suit pips round the mouth: a chase of light runs round on clears.
+    if (S.chaseLeft > 0) {
+      const adv = Math.min(S.chaseLeft, S.chaseRate * dt);
+      const h0 = Math.floor(S.chaseHead); S.chaseHead += adv; S.chaseLeft -= adv;
+      for (let k = h0; k <= Math.floor(S.chaseHead); k++) pipK[((k % 24) + 24) % 24] = 1;
+      S.pipsOn = true;
+    }
+    if (S.pipsOn) {
+      let any = false;
+      for (let i = 0; i < 24; i++) {
+        pipK[i] = Math.max(0, pipK[i] - dt * 1.6); if (pipK[i] > 0) any = true;
+        pips.setColorAt(i, col.set(NEON[i % NEON.length]).multiplyScalar(1 - 0.5 * pipK[i]).addScalar(pipK[i] * 0.9));
+      }
+      pips.instanceColor.needsUpdate = true; S.pipsOn = any || S.chaseLeft > 0;
+    }
 
     // Floor.
     const fu = floorMat.uniforms;
     fu.uBeat.value = onBeat; fu.uFlash.value = S.flash; fu.uLevel.value = L; fu.uTime.value = songTime; fu.uBar.value = whole % 4;
-    if (S.rip) { fu.uRip.value.set(S.rip.x, 0, songTime - S.rip.t, 1); if (songTime - S.rip.t > 2) S.rip = null; } else fu.uRip.value.w = 0;
+    if (S.rip) { fu.uRip.value.set(S.rip.x, 0, songTime - S.rip.t, S.rip.k ?? 1); if (songTime - S.rip.t > 2) S.rip = null; } else fu.uRip.value.w = 0;
     fu.uSolo.value.set(soloX, soloK);
     stageRim.material.color.set(NEON[(whole >> 2) % 3]).multiplyScalar(0.55 + 0.45 * onBeat);
 
     // Mushrooms squash on the beat.
     for (const m of shrooms) {
-      const sq = Math.exp(-ph * 5) * 0.08 * L;
-      m.cap.scale.set(1 + sq, 1 - sq * 1.4, 1 + sq);
-      m.cap.rotation.z = Math.sin(songTime * 0.8 + m.ph) * 0.04;
+      const hp = S.hop[m.side];
+      const sq = Math.exp(-ph * 5) * 0.08 * L + S.shX - hp * 0.5;
+      m.cap.scale.set(1 + sq, Math.max(0.3, 1 - sq * 1.4), 1 + sq);
+      m.cap.position.y = m.y0 + Math.max(0, hp) * 0.9 * m.s;
+      m.cap.rotation.z = Math.sin(songTime * 0.8 + m.ph) * 0.04 + S.lean[m.side] * Math.min(1, Math.abs(hp) * 4 + 0.3);
+      m.cap.rotation.y = S.capSpin * (m.side ? -1 : 1);
+    }
+    // Caps glow (spots light up) on clears: flicker n times.
+    {
+      const gk = S.glow * (0.55 + 0.45 * Math.cos(songTime * S.glowHz * 6.283));
+      capMats[0].emissive.setRGB(0.55 * gk, 0.15 * gk, 0.9 * gk);
+      capMats[1].emissive.setRGB(0.9 * gk, 0.2 * gk, 0.7 * gk);
     }
 
     // Cards: idle sway, flip over a full turn when triggered.
@@ -422,23 +464,26 @@ export function buildWorld({ lowGraphics = false } = {}) {
     for (const z of lasers) {
       const k = z.i / Math.max(1, LN - 1) - 0.5;
       const sweep = Math.sin(songTime * 0.9 + z.i * 0.6);
-      z.l.rotation.set(1.25 + 0.15 * Math.sin(songTime * 1.3 + z.i), 0, k * 1.6 + 0.35 * sweep);
-      z.m.opacity = L * (0.15 + 0.45 * onBeat + 0.4 * S.flash) * (1 - 0.7 * soloK);
-      z.m.color.set(NEON[(z.i + (whole >> 1)) % 3]);
+      z.l.rotation.set(1.25 + 0.15 * Math.sin(songTime * 1.3 + z.i) - 0.25 * S.laserFan, 0, k * (1.6 + 1.2 * S.laserFan) + 0.35 * sweep + S.twist * 0.6);
+      z.m.opacity = L * (0.15 + 0.45 * onBeat + 0.4 * S.flash + 0.6 * S.laser) * (1 - 0.7 * soloK);
+      z.m.color.set(NEON[(z.i + (whole >> 1) + (S.laser > 0.05 ? Math.floor(songTime * 12) : 0)) % 3]);
     }
 
     // Falling clock bits.
     for (const bt of bits) {
+      bt.y0 += bt.sp * 4 * S.bitBoost * dt;
       const y = 14 - ((((songTime * bt.sp + bt.y0) % 16) + 16) % 16);
       bt.m.position.set(bt.x + Math.sin(songTime * 0.5 + bt.y0) * 0.6, y, bt.z);
-      bt.m.rotation.set(songTime * 0.6 * bt.rx + bt.y0, songTime * 0.4, songTime * 0.5 * bt.rz);
+      bt.m.rotation.set(songTime * 0.6 * bt.rx + bt.y0 * 2, songTime * 0.4, songTime * 0.5 * bt.rz + S.clockOff * 0.5);
     }
 
     // Sparkle dust.
     const dv = 1 + 2.5 * dBurst;
+    S.dustPush *= Math.exp(-dt * 3);
     for (let i = 0; i < DN; i++) {
       dPos[i * 3 + 1] -= dSp[i] * dv * dt;
-      dPos[i * 3] += Math.sin(songTime * 1.5 + i) * 0.2 * dt;
+      dPos[i * 3] += (Math.sin(songTime * 1.5 + i) * 0.2 + S.dustPush * (0.6 + (i % 7) * 0.25)) * dt;
+      if (dPos[i * 3] > 11) dPos[i * 3] -= 22; else if (dPos[i * 3] < -11) dPos[i * 3] += 22;
       if (dPos[i * 3 + 1] < -0.3) dPos[i * 3 + 1] += 12.3;
     }
     dGeo.attributes.position.needsUpdate = true;
@@ -476,6 +521,8 @@ export function buildWorld({ lowGraphics = false } = {}) {
     cBody.instanceMatrix.needsUpdate = cHead.instanceMatrix.needsUpdate = cEar.instanceMatrix.needsUpdate = cStick.instanceMatrix.needsUpdate = true;
 
     signMat.opacity = L * (0.85 + 0.15 * onBeat);
+    signMat.color.setScalar(1 + 1.2 * S.signK);
+    sign.scale.setScalar(1 + 0.1 * S.signK * (1 + Math.sin(songTime * 30) * 0.3));
     // Wobble (landed taunt): the whole place sways like a dream.
     group.rotation.z = Math.sin(songTime * 3) * 0.02 * S.wob;
 
@@ -489,7 +536,75 @@ export function buildWorld({ lowGraphics = false } = {}) {
   }
   function smooth01(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
 
+  // Tetris piece actions (the old 2D level was purple code rain that pinged
+  // columns on moves and rushed on clears; here it's Wonderland's take):
+  // each move flips the next playing card on that side and blows the
+  // sparkle dust over, a spin twists the rabbit hole and turns the clock
+  // hands a quarter, soft drops pull you down the hole, a hard drop
+  // bounces the mushrooms and ripples the checkerboard from the piece's
+  // column, a hold runs the clock BACKWARDS (I'm late!), clears run a
+  // chase of light round the hole's pips and flip cards in waves, a
+  // Tetris flips every card and sends the clock spinning.
+  const colX = (c) => ((c ?? 4.5) - 4.5) * 0.34;
+  function chase(n, rate) { S.chaseLeft += n; S.chaseRate = Math.max(S.chaseRate * (S.chaseLeft > n ? 1 : 0), rate); }
+  function flipNext(side, t) {
+    const si = side < 0 ? 0 : 1, c = cards[si * 5 + (S.cardNext[si] % 5)];
+    S.cardNext[si]++; c.t0 = t;
+  }
+  function piece(d) {
+    const t = d.songTime ?? curT;
+    switch (d.kind) {
+      case 'move': {
+        const dir = d.dir || 0;
+        if (dir) { flipNext(dir, t); const k = dir < 0 ? 0 : 1; S.hopV[k] += 2.6; S.lean[k] = -dir * 0.22; }
+        S.dustPush += dir * 2.2;
+        break;
+      }
+      case 'rotate': {
+        const dir = d.dir || 1;
+        S.twistV += dir * 3.2; S.clockTo += dir * Math.PI / 2; S.laser = Math.max(S.laser, 0.35);
+        S.capTo += dir * Math.PI / 2;
+        break;
+      }
+      case 'soft':
+        S.pull = Math.min(1, S.pull + 0.45); S.clockTo += Math.PI / 6; S.bitBoost = Math.max(S.bitBoost, 0.4);
+        break;
+      case 'drop': {
+        const r = d.rows || 0, k = Math.min(1, 0.3 + r / 14);
+        S.shV -= 4.5 * k; S.rip = { t, x: colX(d.col), k: 0.5 + 0.8 * k };
+        S.bitBoost = Math.max(S.bitBoost, k); dBurst = Math.max(dBurst, 0.6 * k);
+        if (r >= 10) { S.flash = Math.max(S.flash, 0.4); S.laserFan = 1; }
+        break;
+      }
+      case 'hold':
+        S.clockTo -= Math.PI * 2; S.rev = 0.7; S.twistV -= 2.5; S.signK = 0.5; S.capTo -= Math.PI;
+        break;
+      case 'clear': {
+        const n = d.lines || 1, combo = d.combo || 0;
+        chase(n >= 4 ? 48 : n * 6 + combo * 3, 30 + 12 * n + 8 * combo);
+        S.laser = Math.min(1.4, 0.4 + 0.2 * n + 0.15 * combo); S.laserFan = Math.min(1, 0.3 * n);
+        dBurst = Math.max(dBurst, 0.3 * n); S.cheer = Math.min(1, S.cheer + 0.2 * n);
+        S.glow = Math.min(1.6, 0.6 + 0.2 * n + 0.15 * combo); S.glowHz = 1.5 + n + combo * 0.8;
+        S.hopV[0] += 1.2 * n; S.hopV[1] += 1.2 * n;
+        S.clockTo += (combo + 1) * Math.PI / 3;
+        if (n >= 4) { flipCards(t, true); S.clockTo += Math.PI * 4; S.pull = 1; S.shV -= 2.5; }
+        else for (const c of cards) { const i = cards.indexOf(c) % 5; if (i < n + Math.min(2, combo)) c.t0 = t + i * 0.09; }
+        break;
+      }
+      case 'levelUp':
+        S.signK = 1.4; S.clockTo += Math.PI * 4; chase(24, 40); S.capTo += Math.PI * 2; S.glow = 1.4; S.glowHz = 3; S.laser = 1; S.laserFan = 1; flipCards(t, true);
+        break;
+      case 'gameOver':
+        S.wob = 2.2; S.clockTo -= Math.PI * 6; S.signK = 0;
+        break;
+      case 'start':
+        S.signK = 1; chase(24, 36);
+        break;
+    }
+  }
+
   function react(type, data = {}) {
+    if (type === 'piece') { piece(data); return; }
     const x = data.who === 'rival' ? 1.6 : data.who === 'player' ? -1.6 : 0;
     const t = data.songTime;
     switch (type) {

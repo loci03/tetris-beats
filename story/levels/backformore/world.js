@@ -56,7 +56,7 @@ function rainTexture(seed = 1) {
 }
 
 const RAIN_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }';
-const RAIN_FS = `uniform sampler2D uMap; uniform float uTime, uBright; uniform vec3 uTint; uniform vec2 uRep;
+const RAIN_FS = `uniform sampler2D uMap; uniform float uTime, uBright, uWhite; uniform vec3 uTint; uniform vec2 uRep, uFlick, uScan;
   varying vec2 vUv;
   float h(float n){ return fract(sin(n * 91.345) * 47453.5453); }
   void main(){
@@ -66,11 +66,19 @@ const RAIN_FS = `uniform sampler2D uMap; uniform float uTime, uBright; uniform v
     float v = texture2D(uMap, vec2(uv.x, uv.y + uTime * sp + h(col + 7.0))).r;
     float fade = smoothstep(0.0, 0.22, vUv.y) * smoothstep(1.0, 0.7, vUv.y);
     vec3 c = uTint * v + vec3(0.75) * pow(v, 8.0);
+    // Piece moves ping random columns (a fresh set each move), spins and
+    // clears sweep a scan band through the rain, holds flash it white.
+    float fl = step(h(col * 1.37 + uFlick.x), uFlick.y);
+    c *= 1.0 + fl * 2.2;
+    c += vec3(0.5, 1.0, 0.7) * fl * v * 0.6;
+    float sb = exp(-pow((vUv.y - uScan.x) * 7.0, 2.0)) * uScan.y;
+    c += (uTint * 0.8 + vec3(0.4)) * sb * (0.45 + 2.6 * v);
+    c = mix(c, vec3(dot(c, vec3(0.7, 1.2, 0.5))) + vec3(0.3) * v + vec3(0.04), uWhite);
     gl_FragColor = vec4(c * uBright * fade, 1.0);
   }`;
 
 const FLOOR_VS = 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }';
-const FLOOR_FS = `uniform float uBeat, uFlash, uLevel, uTime; uniform vec4 uRip; uniform vec2 uSolo; uniform vec3 uTint;
+const FLOOR_FS = `uniform float uBeat, uFlash, uLevel, uTime; uniform vec4 uRip, uRip2; uniform vec2 uSolo, uSweep; uniform vec3 uTint;
   varying vec3 vW;
   void main(){
     vec2 p = vW.xz * 1.6;
@@ -83,6 +91,10 @@ const FLOOR_FS = `uniform float uBeat, uFlash, uLevel, uTime; uniform vec4 uRip;
     float cellPulse = chk * uBeat * 0.35 + 0.06 * sin(uTime * 1.3 + cell.x * 0.7 + cell.y * 1.3);
     float r = (uRip.z) * 7.0, rd = length(vW.xz - vec2(uRip.x, 0.2));
     float rip = exp(-pow((rd - r) * 1.6, 2.0)) * uRip.w * (1.0 - min(1.0, r / 9.0));
+    float r2 = uRip2.z * 9.0, rd2 = length(vW.xz - vec2(uRip2.x, 0.2));
+    rip += exp(-pow((rd2 - r2) * 1.3, 2.0)) * uRip2.w * (1.0 - min(1.0, r2 / 11.0));
+    rip += exp(-pow((rd2 - r2 * 0.6) * 2.0, 2.0)) * uRip2.w * 0.5 * (1.0 - min(1.0, r2 / 11.0)) * step(0.9, uRip2.y);
+    rip += exp(-pow((vW.z - uSweep.x) * 3.0, 2.0)) * uSweep.y * (0.4 + line);
     float pool = exp(-pow(length(vW.xz - vec2(uSolo.x, 0.2)) / 1.2, 2.0)) * uSolo.y;
     float k = (0.25 + 0.75 * uBeat) * line * edge + max(cellPulse, 0.0) * edge * 0.5 + rip * (0.6 + line) + pool * (0.5 + line);
     k *= uLevel * (1.0 - 0.6 * uSolo.y) + pool * uSolo.y;
@@ -126,7 +138,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
   const rainMats = [];
   const rainMat = (rep, bright, side = THREE.BackSide) => {
     const m = keep(new THREE.ShaderMaterial({
-      uniforms: { uMap: { value: rainTex }, uTime: { value: 0 }, uBright: { value: bright }, uTint: { value: new THREE.Color(GREEN) }, uRep: { value: new THREE.Vector2(rep[0], rep[1]) } },
+      uniforms: { uMap: { value: rainTex }, uTime: { value: 0 }, uBright: { value: bright }, uWhite: { value: 0 }, uFlick: { value: new THREE.Vector2(0, 0) }, uScan: { value: new THREE.Vector2(0, 0) }, uTint: { value: new THREE.Color(GREEN) }, uRep: { value: new THREE.Vector2(rep[0], rep[1]) } },
       vertexShader: RAIN_VS, fragmentShader: RAIN_FS, side, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
     }));
     m.userData.base = bright; rainMats.push(m); return m;
@@ -151,7 +163,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     pane.position.set(sx * 5.65, 2.6, -2.3); pane.rotation.y = -sx * 0.55;
     pane.translateZ(0.08);
     group.add(pane);
-    panels.push(pane);
+    panels.push(pane); pm.userData.panel = sx;
     const trim = new THREE.Mesh(keep(new THREE.BoxGeometry(2.82, 0.05, 0.14)), basic(GREEN));
     trim.position.copy(frame.position); trim.position.y = 5.32; trim.rotation.y = frame.rotation.y;
     group.add(trim);
@@ -192,7 +204,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
   const floorMat = keep(new THREE.ShaderMaterial({
     uniforms: {
       uBeat: { value: 0 }, uFlash: { value: 0 }, uLevel: { value: 1 }, uTime: { value: 0 },
-      uRip: { value: new THREE.Vector4(0, 0, 99, 0) }, uSolo: { value: new THREE.Vector2(0, 0) }, uTint: { value: new THREE.Color(GREEN) },
+      uRip: { value: new THREE.Vector4(0, 0, 99, 0) }, uRip2: { value: new THREE.Vector4(0, 0, 99, 0) }, uSweep: { value: new THREE.Vector2(99, 0) }, uSolo: { value: new THREE.Vector2(0, 0) }, uTint: { value: new THREE.Color(GREEN) },
     },
     vertexShader: FLOOR_VS, fragmentShader: FLOOR_FS,
   }));
@@ -312,7 +324,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
 
   // ── Falling code particles round the stage ──────────────────────
   const PN = low ? 160 : 360;
-  const pPos = new Float32Array(PN * 3), pSpd = new Float32Array(PN);
+  const pPos = new Float32Array(PN * 3), pSpd = new Float32Array(PN), pVx = new Float32Array(PN);
   for (let i = 0; i < PN; i++) {
     pPos[i * 3] = (Math.random() - 0.5) * 22; pPos[i * 3 + 1] = Math.random() * 12; pPos[i * 3 + 2] = -8 + Math.random() * 12;
     pSpd[i] = 0.8 + Math.random() * 2.2;
@@ -394,7 +406,10 @@ export function buildWorld({ lowGraphics = false } = {}) {
   const base = { hemi: hemi.intensity, key: key.intensity, rimL: rimL.intensity, rimR: rimR.intensity, top: top.intensity };
 
   // ── State + update ──────────────────────────────────────────────
-  const S = { L: 1, flash: 0, cheer: 0, focus: 0, rip: null, solo: null, glitch: 0, rainT: 0, rainBoost: 0, red: 0 };
+  const S = { L: 1, flash: 0, cheer: 0, focus: 0, rip: null, solo: null, glitch: 0, rainT: 0, rainBoost: 0, red: 0,
+    // Tetris piece reactions (backdrop only).
+    flickSeed: 0, flick: 0, scanY: 0, scanV: 0, scanK: 0, white: 0, panelK: [0, 0], rip2: null, sweep: -1, sweepK: 0,
+    rack: 0, freeze: 0, heat: 0, coneKick: 0, coneV: 0, signK: 0, dead: 0, push: 0 };
   const tint = new THREE.Color(), redC = new THREE.Color(0xff2a3a), greenC = new THREE.Color(GREEN);
 
   function update(dt, info) {
@@ -405,6 +420,18 @@ export function buildWorld({ lowGraphics = false } = {}) {
     S.glitch = Math.max(0, S.glitch - dt);
     S.red = Math.max(0, S.red - dt * 0.6);
     S.rainBoost = Math.max(0, S.rainBoost - dt * 0.8);
+    S.flick = Math.max(0, S.flick - dt * 1.6);
+    S.white = Math.max(0, S.white - dt * 2.2);
+    S.panelK[0] = Math.max(0, S.panelK[0] - dt * 2.5); S.panelK[1] = Math.max(0, S.panelK[1] - dt * 2.5);
+    S.rack = Math.max(0, S.rack - dt * 1.4);
+    S.freeze = Math.max(0, S.freeze - dt);
+    S.heat = Math.max(0, S.heat - dt * 0.12);
+    S.signK = Math.max(0, S.signK - dt * 1.5);
+    S.dead = Math.max(0, S.dead - dt * 0.25);
+    if (S.scanK > 0) { S.scanY += S.scanV * dt; S.scanK = Math.max(0, S.scanK - dt * 0.9); if (S.scanY > 1.3 || S.scanY < -0.3) S.scanK = 0; }
+    if (S.sweepK > 0) { S.sweep += dt * 16; if (S.sweep > 5) S.sweepK = 0; }
+    // Spot cones whip toward a spin (damped spring).
+    S.coneV += (-S.coneKick * 60 - S.coneV * 7) * dt; S.coneKick += S.coneV * dt;
     S.focus += ((info.leader || 0) - S.focus) * Math.min(1, dt * 2);
     let soloK = 0, soloX = 0;
     if (S.solo) {
@@ -418,13 +445,17 @@ export function buildWorld({ lowGraphics = false } = {}) {
     if (scene && scene.fog && !scene.userData.bfmFog) { scene.fog.color.set(0x010a04); scene.userData.bfmFog = true; }
 
     // Code rain: falls with the music; a SOLO drops it into bullet time.
-    const speed = (0.22 + 0.5 * S.rainBoost) * (1 - 0.85 * soloK);
+    const speed = (0.22 + 0.5 * S.rainBoost + 0.08 * S.heat) * (1 - 0.85 * soloK) * (S.freeze > 0 ? 0.04 : 1) * (1 - 0.7 * Math.min(1, S.dead));
     S.rainT += dt * speed;
-    tint.copy(greenC).lerp(redC, Math.min(1, S.red * 1.4));
+    tint.copy(greenC).lerp(col.set(MINT), Math.min(0.7, S.heat * 0.25)).lerp(redC, Math.min(1, S.red * 1.4));
     for (const m of rainMats) {
-      m.uniforms.uTime.value = S.rainT;
-      m.uniforms.uBright.value = m.userData.base * (0.55 + 0.45 * onBeat + 0.6 * S.flash) * (0.25 + 0.75 * L) * (1 - 0.45 * soloK);
-      m.uniforms.uTint.value.copy(tint);
+      const u = m.uniforms, pk = m.userData.panel ? S.panelK[m.userData.panel < 0 ? 0 : 1] : 0;
+      u.uTime.value = S.rainT;
+      u.uBright.value = m.userData.base * (0.55 + 0.45 * onBeat + 0.6 * S.flash + 1.4 * pk) * (0.25 + 0.75 * L) * (1 - 0.45 * soloK);
+      u.uTint.value.copy(tint);
+      u.uFlick.value.set(S.flickSeed, Math.min(0.75, S.flick + pk * 0.5));
+      u.uScan.value.set(S.scanY, S.scanK);
+      u.uWhite.value = Math.min(1, S.white);
     }
     sky.material.uniforms.uPulse.value = onBeat * 0.7 * L + S.flash;
     sky.material.uniforms.uRed.value = Math.min(1, S.red);
@@ -434,6 +465,9 @@ export function buildWorld({ lowGraphics = false } = {}) {
     fu.uBeat.value = onBeat; fu.uFlash.value = S.flash; fu.uLevel.value = L; fu.uTime.value = songTime;
     if (S.rip) { fu.uRip.value.set(S.rip.x, 0, songTime - S.rip.t, S.rip.k); if (songTime - S.rip.t > 2) S.rip = null; }
     else fu.uRip.value.w = 0;
+    if (S.rip2) { fu.uRip2.value.set(S.rip2.x, S.rip2.big, songTime - S.rip2.t, S.rip2.k); if (songTime - S.rip2.t > 1.6) S.rip2 = null; }
+    else fu.uRip2.value.w = 0;
+    fu.uSweep.value.set(S.sweep, S.sweepK);
     fu.uSolo.value.set(soloX, soloK);
     fu.uTint.value.copy(tint);
     edgeMat.color.copy(tint).multiplyScalar(0.5 + 0.5 * onBeat + 0.5 * S.flash);
@@ -441,10 +475,13 @@ export function buildWorld({ lowGraphics = false } = {}) {
     // Racks blink in waves.
     racks.forEach((r, i) => {
       const k = 0.45 + 0.55 * Math.max(0, Math.sin(songTime * 3 + r.ph + beat * Math.PI));
-      ledMesh.setColorAt(i, col.setRGB(k * L, k * L, k * L));
+      const rk = S.rack * (0.6 + 0.4 * Math.sin(songTime * 40 + i * 2.1));
+      ledMesh.setColorAt(i, col.setRGB(k * L + rk * 0.6, k * L + rk * 1.4, k * L + rk * 0.8));
     });
     ledMesh.instanceColor.needsUpdate = true;
     signMat.opacity = L * (0.82 + 0.18 * onBeat) * (S.glitch > 0 && Math.sin(songTime * 60) > 0 ? 0.3 : 1) * (Math.sin(songTime * 13) > 0.985 ? 0.5 : 1);
+    sign.scale.set(1 + 0.08 * S.signK, 1 + 0.08 * S.signK + 0.25 * S.signK * Math.max(0, Math.sin(songTime * 47)), 1);
+    signMat.color.setScalar(1 + 1.5 * S.signK);
     beacon.visible = (Math.floor(songTime * 1.2) % 2) === 0;
 
     // Balloons drift up and wrap; burners flare on big moments.
@@ -459,10 +496,16 @@ export function buildWorld({ lowGraphics = false } = {}) {
     }
 
     // Code particles fall.
-    const pv = (1 + 1.5 * S.rainBoost) * (1 - 0.85 * soloK);
+    const pv = (1 + 1.5 * S.rainBoost + 0.25 * S.heat) * (1 - 0.85 * soloK) * (S.freeze > 0 ? 0.03 : 1);
+    const vd = Math.exp(-dt * 2.5);
     for (let i = 0; i < PN; i++) {
       pPos[i * 3 + 1] -= pSpd[i] * pv * dt;
       if (pPos[i * 3 + 1] < -0.5) pPos[i * 3 + 1] += 12.5;
+      if (pVx[i] !== 0) {
+        pPos[i * 3] += pVx[i] * dt; pVx[i] *= vd;
+        if (Math.abs(pVx[i]) < 0.01) pVx[i] = 0;
+        if (pPos[i * 3] > 11) pPos[i * 3] -= 22; else if (pPos[i * 3] < -11) pPos[i * 3] += 22;
+      }
     }
     pGeo.attributes.position.needsUpdate = true;
     pMat.color.copy(tint);
@@ -483,11 +526,11 @@ export function buildWorld({ lowGraphics = false } = {}) {
     cones.forEach((c, i) => {
       const lead = c.side === 'player' ? Math.max(0, S.focus) : Math.max(0, -S.focus);
       const sway = Math.sin(songTime * 0.9 + i * 1.7) * 0.3;
-      const dx = c.tx + (soloX - c.tx) * soloK + sway * (1 - soloK) - c.baseX;
+      const dx = c.tx + (soloX - c.tx) * soloK + sway * (1 - soloK) - c.baseX + S.coneKick * (i % 2 ? 1 : -0.6);
       c.cone.rotation.z = Math.atan2(dx, 6.6);
       c.cone.rotation.x = -0.1;
       c.mat.color.copy(tint);
-      c.mat.opacity = (0.03 + 0.05 * onBeat + 0.05 * lead + 0.1 * S.flash) * L * (1 + 0.6 * soloK);
+      c.mat.opacity = (0.03 + 0.05 * onBeat + 0.05 * lead + 0.1 * S.flash + 0.12 * Math.min(1, Math.abs(S.coneKick))) * L * (1 + 0.6 * soloK);
     });
 
     // Crowd: bob on the beat, arms up when hyped.
@@ -524,7 +567,73 @@ export function buildWorld({ lowGraphics = false } = {}) {
     top.color.copy(tint).lerp(col.set(0xffffff), 0.5);
   }
 
+  // Tetris piece actions (the old 2D matrix rain pinged random columns on
+  // every move and rushed on clears) — here: a fresh set of rain columns
+  // lights on each move and the data-glass on that side flares, spins
+  // sweep a scan band, soft drops race a scanline down the grid, hard
+  // drops ripple the floor from the piece's column, holds glitch the
+  // rain white (déjà vu), clears flash the racks + burners, a Tetris
+  // freezes the rain in bullet time then lets it rush.
+  const colX = (c) => ((c ?? 4.5) - 4.5) * 0.34;
+  function piece(d) {
+    const t = d.songTime ?? 0;
+    switch (d.kind) {
+      case 'move': {
+        const dir = d.dir || 0;
+        S.flickSeed = Math.random() * 100; S.flick = Math.min(0.55, S.flick + 0.3);
+        if (dir) S.panelK[dir < 0 ? 0 : 1] = 1;
+        for (let i = 0; i < PN; i += 2) pVx[i] += dir * (1.2 + (i % 5) * 0.5);
+        break;
+      }
+      case 'rotate': {
+        const dir = d.dir || 1;
+        S.scanY = dir > 0 ? -0.1 : 1.1; S.scanV = dir > 0 ? 2.6 : -2.6; S.scanK = 0.9;
+        S.coneV += dir * 4; S.flickSeed = Math.random() * 100; S.flick = Math.min(0.55, S.flick + 0.15);
+        break;
+      }
+      case 'soft':
+        S.sweep = -4; S.sweepK = 0.7; S.rainBoost = Math.max(S.rainBoost, 0.35);
+        break;
+      case 'drop': {
+        const r = d.rows || 0, k = Math.min(1, 0.3 + r / 14);
+        S.rip2 = { t, x: colX(d.col), k: 0.5 + 0.9 * k, big: r >= 10 ? 1 : 0 };
+        S.rainBoost = Math.max(S.rainBoost, 0.6 + 1.2 * k); S.flash = Math.max(S.flash, 0.35 * k);
+        S.flickSeed = Math.random() * 100; S.flick = Math.min(0.75, 0.25 + 0.5 * k);
+        for (let i = 1; i < PN; i += 2) pVx[i] += (Math.random() - 0.5) * 6 * k;
+        if (r >= 10) { ring(colX(d.col), 0.1); S.panelK[0] = S.panelK[1] = 1; }
+        break;
+      }
+      case 'hold':
+        S.white = 1; S.glitch = Math.max(S.glitch, 0.35); S.signK = 0.6; ring(-1.6, 1.0);
+        break;
+      case 'clear': {
+        const n = d.lines || 1, combo = d.combo || 0;
+        S.heat = Math.min(4, S.heat + 0.4 * n + 0.3 * combo);
+        S.rack = Math.min(1.5, 0.5 + 0.25 * n + 0.15 * combo);
+        S.scanY = -0.1; S.scanV = 2 + n * 0.6; S.scanK = 0.8 + 0.2 * n;
+        S.flash = Math.max(S.flash, 0.2 + 0.15 * n); S.cheer = Math.min(1, S.cheer + 0.2 * n);
+        balloons.forEach((b, i) => { if (i < n + combo) b.flare = 1; });
+        if (n >= 4) { S.freeze = 0.55; S.rainBoost = 2.4; S.white = 0.8; ring(0, 0.1); ring(-1.6, 1.5); ring(1.6, 1.5); }
+        else if (n === 3) ring(0, 0.1);
+        for (let c = 0; c < Math.min(3, combo - 1); c++) ring((c - 1) * 2.6, 0.4 + c * 0.6);
+        break;
+      }
+      case 'levelUp':
+        S.signK = 1.2; S.rack = 1.5; S.scanY = -0.1; S.scanV = 1.6; S.scanK = 1.2; S.white = 0.5;
+        S.panelK[0] = S.panelK[1] = 1;
+        for (const b of balloons) b.flare = 1.2;
+        break;
+      case 'gameOver':
+        S.red = 3; S.glitch = 1.5; S.dead = 2; S.signK = 0;
+        break;
+      case 'start':
+        S.dead = 0; S.red = 0; S.heat = 0; S.signK = 1; S.scanY = -0.1; S.scanV = 1.4; S.scanK = 1;
+        break;
+    }
+  }
+
   function react(type, data = {}) {
+    if (type === 'piece') { piece(data); return; }
     const x = data.who === 'rival' ? 1.6 : data.who === 'player' ? -1.6 : 0;
     switch (type) {
       case 'move':
