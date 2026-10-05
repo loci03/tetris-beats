@@ -85,8 +85,8 @@ void main() {
 export function createHighway(ctx) {
   const { THREE, scene, camera, world, rigs } = ctx;
   const low = !!ctx.low;
-  world.group.visible = false;
-  for (const r of Object.values(rigs)) r.root.visible = false;
+  if (world) world.group.visible = false;
+  for (const r of Object.values(rigs || {})) r.root.visible = false;
   const prevFog = scene.fog;
   scene.fog = new THREE.Fog(0x140c26, 70, 360);
   camera.far = 700; camera.updateProjectionMatrix();

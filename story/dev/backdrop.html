@@ -9,7 +9,7 @@
 import { createBackdrop } from '../backdrop.js';
 const q = new URLSearchParams(location.search);
 try {
-  const bd = await createBackdrop(q.get('level') || 'taco', { canvas: document.getElementById('bg'), low: q.get('low') === '1' });
+  const bd = await createBackdrop(q.get('level') || 'taco', { canvas: document.getElementById('bg'), low: q.get('low') === '1', stage: q.get('stage') === '1' });
   window.bd = bd;
   window.run = async ({ seconds = 2, from = 20, events = [] } = {}) => {
     const ev = events.slice().sort((a, b) => a[0] - b[0]);

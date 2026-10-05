@@ -26,9 +26,14 @@ import { DanceController } from './dance.js';
 import { AnimeFx } from './anime-fx.js';
 import { STORY_LEVELS, loadLevel } from './levels.js';
 
-export async function createBackdrop(levelId, { canvas, low = false } = {}) {
+export async function createBackdrop(levelId, { canvas, low = false, stage = false } = {}) {
   const mod = await loadLevel(levelId);
   const level = STORY_LEVELS[levelId], m = level.music, spb = 60 / m.bpm;
+  // Behind Tetris a level shows its own living world (backdrop.create);
+  // the dance stage is only for the battle. `stage: true` (dev only) shows
+  // the stage instead.
+  if (!(mod.backdrop && mod.backdrop.create) && !stage) throw new Error('no Tetris world for ' + levelId);
+  if (mod.backdrop && mod.backdrop.create && !stage) return createLiving(mod, level, { canvas, low });
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' });
   renderer.setClearColor(0x000000, 1);
   const scene = new THREE.Scene();
@@ -210,4 +215,43 @@ export async function createBackdrop(levelId, { canvas, low = false } = {}) {
     },
   };
   return api;
+}
+
+// A level's living Tetris world: backdrop.create(ctx) builds everything
+// (no dance stage, no dancers). ctx = { THREE, scene, camera, low, level }.
+// It gets update(dt, { beat, songTime, pieceX, danger, move, cheer, flash })
+// and react(kind, data) for every piece action / clear / level up.
+function createLiving(mod, level, { canvas, low }) {
+  const m = level.music, spb = 60 / m.bpm;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' });
+  renderer.setClearColor(0x000000, 1);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
+  scene.add(camera);
+  const custom = mod.backdrop.create({ THREE, scene, camera, low, level, world: null, rigs: {} });
+  let scale = low ? 0.5 : 0.7, w = 0, h = 0, skip = 0, frame = 0, slow = 0, fast = 0, failed = false, songTime = 0;
+  const resize = () => {
+    const W = canvas.clientWidth || window.innerWidth, H = canvas.clientHeight || window.innerHeight;
+    const nw = Math.max(64, Math.round(W * scale)), nh = Math.max(64, Math.round(H * scale));
+    if (nw !== w || nh !== h) { w = nw; h = nh; renderer.setSize(w, h, false); camera.aspect = W / H; camera.updateProjectionMatrix(); }
+  };
+  return {
+    get failed() { return failed; },
+    update(dt, info = {}) {
+      if (failed) return;
+      songTime = info.songTime != null ? info.songTime : songTime + dt;
+      const beat = (songTime - m.firstBeat) / spb;
+      resize();
+      custom.update(dt, { beat, songTime, energy: info.energy ?? 1, pieceX: info.pieceX || 0, danger: info.danger || 0, move: info.move || 0, cheer: info.cheer || 0, flash: info.flash || 0 });
+      if ((frame++ % (skip + 1)) !== 0) return;
+      const t0 = performance.now();
+      renderer.render(scene, camera);
+      const ms = performance.now() - t0;
+      if (ms > 9) { slow++; fast = 0; } else if (ms < 4) { fast++; slow = Math.max(0, slow - 1); }
+      if (slow > 20) { slow = 0; if (scale > 0.42) scale -= 0.12; else if (skip < 2) skip++; else failed = true; }
+      else if (fast > 240 && scale < (low ? 0.5 : 0.75)) { fast = 0; scale += 0.06; }
+    },
+    react(kind, data = {}) { if (custom.react) custom.react(kind, data); },
+    dispose() { if (custom.dispose) custom.dispose(); renderer.dispose(); },
+  };
 }
