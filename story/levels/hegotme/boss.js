@@ -85,6 +85,8 @@ export default {
     for (const side of ['L', 'R']) {
       const L = limbs[side];
       part(L.sh, sphere(0.1), robe, 0.03 * L.sx, 0.0, 0, 1.1, 0.95, 1.05);
+      // The thighs live entirely inside the robe; hidden so bent knees never poke through it.
+      for (const c of L.thigh.children) if (c.isMesh) c.visible = false;
       const sl = part(L.fore, new THREE.CylinderGeometry(0.072, 0.12, 0.24, 16, 1, true), robe, 0, -0.15, 0);
       sl.material.side = THREE.DoubleSide;
       part(L.fore, new THREE.TorusGeometry(0.118, 0.009, 4, 18), stole, 0, -0.265, 0, 1, 1, 1, false).rotation.x = Math.PI / 2;
