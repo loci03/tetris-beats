@@ -86,9 +86,16 @@ export function buildWorld({ lowGraphics = false } = {}) {
   const tileMesh = new THREE.InstancedMesh(geo(new THREE.BoxGeometry(T * 0.96, 0.05, T * 0.96)), basic(0xffffff), tiles.length);
   tiles.forEach((t, i) => { m4.makeTranslation(t.x, -0.02, t.z); tileMesh.setMatrixAt(i, m4); tileMesh.setColorAt(i, col.set(0x252b3c)); });
   group.add(tileMesh);
-  const floorBase = new THREE.Mesh(geo(new THREE.PlaneGeometry(26, 20)), toon(0x1a1e2c));
-  floorBase.rotation.x = -Math.PI / 2; floorBase.position.set(0, -0.06, -0.5);
+  const floorBase = new THREE.Mesh(geo(new THREE.PlaneGeometry(26, 12)), toon(0x1a1e2c));
+  floorBase.rotation.x = -Math.PI / 2; floorBase.position.set(0, -0.06, -1.8);
   group.add(floorBase);
+  // The office floor ends in a step down to the crowd pit.
+  const edge = new THREE.Mesh(geo(new THREE.BoxGeometry(26, 0.6, 0.3)), toon(0x2e3a55));
+  edge.position.set(0, -0.36, 4.3); group.add(edge);
+  const edgeGlow = new THREE.Mesh(geo(new THREE.BoxGeometry(13, 0.05, 0.05)), basic(0x6db4ff));
+  edgeGlow.position.set(0, -0.02, 4.46); group.add(edgeGlow);
+  const pit = new THREE.Mesh(geo(new THREE.PlaneGeometry(30, 10)), toon(0x121522));
+  pit.rotation.x = -Math.PI / 2; pit.position.set(0, -0.64, 9.2); group.add(pit);
 
   // ── Cubicles: partitions, desks, monitors, chairs ───────────────────
   const cubes = [];
@@ -135,7 +142,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     g.fillStyle = '#d8262e'; g.font = '900 16px "Arial Black", sans-serif'; g.fillText('MONDAY CORP', 128, 172);
   }));
   const clock = new THREE.Group();
-  clock.position.set(0, 5.75, -7.3);
+  clock.position.set(0, 5.35, -7.3);
   group.add(clock);
   const clockFace = new THREE.Mesh(geo(new THREE.CircleGeometry(1.15, 40)), basic(0xffffff, { map: clockTex }));
   clock.add(clockFace);
@@ -153,7 +160,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     g.strokeText('OVERTIME', w / 2, h / 2 + 4); g.shadowBlur = 12; g.fillStyle = '#f2faff'; g.fillText('OVERTIME', w / 2, h / 2 + 4);
   }));
   const sign = new THREE.Mesh(geo(new THREE.PlaneGeometry(4.2, 1.05)), basic(0xffffff, { map: signTex, transparent: true, depthWrite: false }));
-  sign.position.set(-5.4, 5.9, -7.45);
+  sign.position.set(-5.2, 5.6, -7.45);
   group.add(sign);
   const posterTex = keep(canvasTex(128, 160, (g, w, h) => {
     g.fillStyle = '#10141f'; g.fillRect(0, 0, w, h); g.fillStyle = '#ffe066'; g.fillRect(6, 6, w - 12, h - 44);
@@ -162,7 +169,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     g.fillText('HANG IN', 64, h - 24); g.fillText('THERE', 64, h - 8);
   }));
   const poster = new THREE.Mesh(geo(new THREE.PlaneGeometry(1.3, 1.62)), basic(0xffffff, { map: posterTex }));
-  poster.position.set(5.6, 6.0, -7.45);
+  poster.position.set(5.4, 5.6, -7.45);
   group.add(poster);
 
   // ── Water cooler (glugs on the beat) ────────────────────────────────
@@ -225,8 +232,8 @@ export function buildWorld({ lowGraphics = false } = {}) {
   const crowd = [];
   const addRow = (n, x0, x1, z, y, jit = 0.4) => { for (let i = 0; i < n; i++) crowd.push({ x: x0 + (x1 - x0) * (i + Math.random() * jit) / n, z: z + Math.random() * 0.4, y }); };
   const cs = lowGraphics ? 0.6 : 1;
-  addRow(Math.round(14 * cs), -6.8, 6.8, 4.9, -0.35);
-  addRow(Math.round(16 * cs), -7.6, 7.6, 5.9, -0.45);
+  addRow(Math.round(14 * cs), -6.8, 6.8, 5.3, -1.0);
+  addRow(Math.round(16 * cs), -7.6, 7.6, 6.4, -1.15);
   addRow(Math.round(10 * cs), -6.5, 6.5, -6.3, 0.0, 0.6);      // behind the back cubicles
   addRow(Math.round(4 * cs), -8.6, -7.4, -1.5, 0.0);
   addRow(Math.round(4 * cs), 7.4, 8.6, -1.5, 0.0);
@@ -254,7 +261,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
   }));
   const NP = lowGraphics ? 36 : 70;
   const paperMesh = new THREE.InstancedMesh(geo(new THREE.PlaneGeometry(0.32, 0.4)), toon(0xffffff, { map: paperTex, side: THREE.DoubleSide }), NP);
-  const papers = Array.from({ length: NP }, (_, i) => ({ p: new THREE.Vector3(0, -50, 0), v: new THREE.Vector3(), r: new THREE.Vector3(Math.random() * 6, Math.random() * 6, 0), spin: new THREE.Vector3(), life: 0, ambient: i < NP * 0.3 }));
+  const papers = Array.from({ length: NP }, (_, i) => ({ p: new THREE.Vector3(0, -50, 0), v: new THREE.Vector3(), r: new THREE.Vector3(Math.random() * 6, Math.random() * 6, 0), spin: new THREE.Vector3(), life: 0, ambient: i < NP * 0.18 }));
   paperMesh.frustumCulled = false;
   group.add(paperMesh);
   let paperCursor = 0;

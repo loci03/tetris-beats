@@ -362,8 +362,8 @@ export function buildWorld({ lowGraphics = false } = {}) {
   const spots = [];
   const row = (n, x0, x1, z, y) => { for (let i = 0; i < n; i++) spots.push({ x: x0 + (x1 - x0) * (i + 0.2 + Math.random() * 0.6) / n, z: z + Math.random() * 0.5, y }); };
   const cs = low ? 0.6 : 1;
-  row(Math.round(13 * cs), -6.6, 6.6, 5.4, -0.62);
-  row(Math.round(15 * cs), -7.6, 7.6, 6.5, -0.62);
+  row(Math.round(13 * cs), -6.6, 6.6, 5.3, -1.0);
+  row(Math.round(15 * cs), -7.6, 7.6, 6.3, -1.1);
   row(Math.round(5 * cs), -9.4, -6.6, 1.6, -0.62);
   row(Math.round(5 * cs), 6.6, 9.4, 1.6, -0.62);
   const CN = spots.length;
@@ -384,11 +384,11 @@ export function buildWorld({ lowGraphics = false } = {}) {
   group.add(cBody, cHead, cVisor, cArm);
 
   // ── Lights ──────────────────────────────────────────────────────
-  const hemi = new THREE.HemisphereLight(0xa8ffd0, 0x02140a, 1.0);
-  const key = new THREE.DirectionalLight(0xe8fff0, 1.5);
+  const hemi = new THREE.HemisphereLight(0xe4fff0, 0x0c2216, 1.15);
+  const key = new THREE.DirectionalLight(0xffffff, 1.75);
   key.position.set(1.5, 6, 6);
-  const rimL = new THREE.PointLight(0x00ff55, 16, 12, 1.6); rimL.position.set(-3.5, 3, -1.5);
-  const rimR = new THREE.PointLight(0x7dffe0, 14, 12, 1.6); rimR.position.set(3.5, 3, -1.5);
+  const rimL = new THREE.PointLight(0x00ff55, 22, 12, 1.6); rimL.position.set(-3.5, 3, -1.5);
+  const rimR = new THREE.PointLight(0x7dffe0, 20, 12, 1.6); rimR.position.set(3.5, 3, -1.5);
   const top = new THREE.PointLight(0x9dffbe, 10, 14, 1.5); top.position.set(0, 5.2, 1.2);
   group.add(hemi, key, rimL, rimR, top);
   const base = { hemi: hemi.intensity, key: key.intensity, rimL: rimL.intensity, rimR: rimR.intensity, top: top.intensity };
@@ -450,7 +450,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     // Balloons drift up and wrap; burners flare on big moments.
     for (const b of balloons) {
       b.flare = Math.max(0, b.flare - dt * 1.5);
-      const y = b.y0 + ((songTime * 0.25 + b.ph * 3) % 26) - 6;
+      const y = b.y0 + ((((songTime * 0.25 + b.ph * 3) % 26) + 26) % 26) - 8;
       b.obj.position.set(b.x + Math.sin(songTime * 0.2 + b.ph) * 0.8, y + Math.sin(songTime * 0.9 + b.ph) * 0.15, b.z);
       b.obj.rotation.y = songTime * 0.1 + b.ph;
       const f = 0.4 + 0.3 * onBeat + 1.2 * b.flare;
@@ -521,7 +521,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     rimR.intensity = base.rimR * L * (0.7 + 0.6 * onBeat + 0.6 * Math.max(0, -S.focus)) * (1 + 1.6 * soloK * Math.max(0, -soloL) - 0.6 * soloK * Math.max(0, soloL));
     top.intensity = base.top * L * (0.6 + 0.4 * onBeat + S.flash) * (1 + soloK);
     top.position.x = soloX * soloK;
-    rimL.color.copy(tint); top.color.copy(tint).lerp(col.set(0xffffff), 0.5);
+    top.color.copy(tint).lerp(col.set(0xffffff), 0.5);
   }
 
   function react(type, data = {}) {

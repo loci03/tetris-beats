@@ -49,7 +49,10 @@ export default {
   fx: { move: 'goudaMac', big: 'sparkle', taunt: 'goudaSplat' },
 
   build(kit) {
-    const { THREE, C, mats, toon, part, capsule, sphere, limbs, face, brows, hips, spine, chest, neck, head } = kit;
+    const { THREE, C, mats, toon, part, limbs, face, brows, hips, spine, chest, neck, head } = kit;
+    // Low-poly helpers for the outfit (the rig's own are high-res).
+    const sphere = (r) => new THREE.SphereGeometry(r, r > 0.12 ? 16 : 10, r > 0.12 ? 12 : 7);
+    const capsule = (r, len) => new THREE.CapsuleGeometry(r, len, 3, 8);
     const white = mats.top, apron = toon(C.apron), apronShade = toon(C.apronShade, { side: THREE.DoubleSide });
     const wood = toon(C.wood), woodDark = toon(C.woodDark), scarf = toon(C.scarf), black = toon(0x1a1416);
 

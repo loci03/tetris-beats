@@ -10,7 +10,7 @@ export default {
   scale: 1.04,
   skin: 0xc8946c,
   colors: {
-    top: 0x15171a, topShade: 0x0b0c0e, pants: 0x101114, shoe: 0x0c0c0e, shoeAccent: 0x00ff41,
+    top: 0x262a30, topShade: 0x15181c, pants: 0x1a1c21, shoe: 0x0c0c0e, shoeAccent: 0x00ff41,
     hair: 0x0b0a0c, code: 0x00ff41, lens: 0x07120a, glove: 0x16181b, shirt: 0x1d2a22,
   },
   // Popping / tutting: hits land on the pulse, the head stays level while
@@ -30,7 +30,7 @@ export default {
       p.add('head', -0.09 * pop, -0.05 * sway, 0.03 * sway);    // isolation: head counters the hit
       p.shrug(0.08 * pop, 0.08 * pop);
     },
-    routines: { chill: ['nullTutGroove', 'nullLiquid'], hype: ['nullGlitchHit', 'nullBoxStep', 'nullTutGroove'] },
+    routines: { chill: ['nullTutGroove', 'nullLiquid'], hype: ['nullGlitchHit', 'nullRoll', 'nullTutGroove'] },
     accent: { pose: 'nullAccent', at: 3 },
   },
   moves: {
@@ -94,10 +94,13 @@ export default {
       const L = limbs[side];
       // Outer / back panel of the tail, open toward the inside of the leg
       // (theta 0 = front, π/2 = +x).
-      const tail = new THREE.CylinderGeometry(0.15, 0.21, 0.78, 10, 1, true, L.sx > 0 ? Math.PI * 0.25 : Math.PI * 0.75, Math.PI);
-      part(L.thigh, tail, coatIn, 0.02 * L.sx, -0.38, -0.02, 1, 1, 1, false);
+      const tail = new THREE.CylinderGeometry(0.16, 0.24, 0.86, 10, 1, true, L.sx > 0 ? Math.PI * 0.25 : Math.PI * 0.75, Math.PI);
+      part(L.thigh, tail, coatIn, 0.025 * L.sx, -0.36, -0.02, 1, 1, 1, false);
       // Trim down the coat's front edge.
       part(L.thigh, new THREE.BoxGeometry(0.01, 0.74, 0.01), code, 0.128 * L.sx, -0.37, 0.128, 1, 1, 1, false);
+      // Code-green seams down the sleeves so the arms read in the dark.
+      part(L.arm, new THREE.BoxGeometry(0.014, 0.3, 0.02), code, 0.068 * L.sx, -0.15, 0, 1, 1, 1, false);
+      part(L.fore, new THREE.BoxGeometry(0.014, 0.24, 0.02), code, 0.058 * L.sx, -0.12, 0, 1, 1, 1, false);
       // Gloves, cuffs, boots.
       L.hand.children[0].material = glove;
       part(L.fore, new THREE.TorusGeometry(0.062, 0.014, 6, 14), code, 0, -0.25, 0, 1, 1, 1, false).rotation.x = Math.PI / 2;

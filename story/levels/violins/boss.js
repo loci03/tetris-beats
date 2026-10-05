@@ -7,14 +7,12 @@
 //
 // No three.js import here: build(kit) gets THREE through the kit.
 
-// Wrist angle that swings the violin from hanging off the left hand up under
-// the chin (shared with moves.js through the def).
 export default {
   name: 'VIOLETTA',
   scale: 1.0,
   skin: 0xf1c6a4,
   colors: {
-    top: 0x7b2fbf, topShade: 0x55208c, pants: 0xf6d2cc, shoe: 0xf7bccb, shoeAccent: 0xe58aa6,
+    top: 0x7b2fbf, topShade: 0x55208c, pants: 0xeeb3a6, shoe: 0xf7bccb, shoeAccent: 0xe58aa6,
     hair: 0x24121e, gold: 0xffc93a, tutu: 0xc9a2f2, tutuLight: 0xeee0ff, violin: 0xb5521c,
     violinDark: 0x5a240a, ebony: 0x16100e, bowHair: 0xfff6dc, lips: 0xc8183e, gem: 0x9b4dff,
   },
@@ -36,7 +34,7 @@ export default {
     accent: { pose: 'violettaAccent', at: 3 },
   },
   moves: {
-    1: ['violettaTendu', 'violettaAirViolin'],
+    1: ['violettaBattement', 'violettaAirViolin'],
     2: ['violettaPasDeChat', 'violettaTango'],
     3: ['violettaPirouette', 'violettaArabesque'],
     4: ['violettaGrandJete', 'violettaFouette'],

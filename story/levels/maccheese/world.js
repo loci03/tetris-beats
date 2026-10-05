@@ -46,22 +46,30 @@ export function buildWorld({ lowGraphics = false } = {}) {
       g.fillStyle = gg; g.fillRect(x + 2, y + 2, 60, 28);
     }
   }));
-  wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping; wallTex.repeat.set(10, 4);
-  add(new THREE.Mesh(geo(new THREE.PlaneGeometry(44, 16)), toon(0xffffff, { map: wallTex })), 0, 7.4, -10);
-  add(new THREE.Mesh(geo(new THREE.PlaneGeometry(44, 1.2)), toon(0xffb21f)), 0, 2.6, -9.95);
+  wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping; wallTex.repeat.set(28, 4);
+  // A round kitchen: the tiled wall goes all the way round (no void behind
+  // the orbit / solo cameras), the back of it flattened behind the stage.
+  const room = add(new THREE.Mesh(geo(new THREE.CylinderGeometry(17, 17, 16, 40, 1, true)), toon(0xffffff, { map: wallTex, side: THREE.BackSide })), 0, 7.4, 6.5);
+  room.scale.set(1.25, 1, 1);
+  const band = add(new THREE.Mesh(geo(new THREE.CylinderGeometry(16.9, 16.9, 1.2, 40, 1, true)), toon(0xffb21f, { side: THREE.BackSide })), 0, 2.6, 6.5);
+  band.scale.set(1.25, 1, 1);
   // Cheese ooze along the top of the wall (the 2D level's dripping ribbons).
   const ooze = [];
   const oozeMat = toon(0xffc21a, { emissive: 0x4a2a00 });
-  const dripGeo = geo(new THREE.CapsuleGeometry(0.28, 1, 4, 8));
-  add(new THREE.Mesh(geo(new THREE.BoxGeometry(44, 1.0, 0.4)), oozeMat), 0, 12.6, -9.8);
+  const dripGeo = geo(new THREE.CapsuleGeometry(0.28, 1, 2, 7));
+  const wallZ = (x) => 6.5 - 17 * Math.sqrt(Math.max(0, 1 - (x / 21.25) ** 2));
+  add(new THREE.Mesh(geo(new THREE.CylinderGeometry(16.7, 16.7, 1.0, 40, 1, true)), toon(0xffc21a, { emissive: 0x4a2a00, side: THREE.BackSide })), 0, 12.6, 6.5).scale.set(1.25, 1, 1);
   for (let i = 0; i < 26; i++) {
-    const d = add(new THREE.Mesh(dripGeo, oozeMat), -19 + i * 1.52 + Math.sin(i * 7) * 0.3, 12, -9.75);
+    const dx = -17 + i * 1.36 + Math.sin(i * 7) * 0.3;
+    const d = add(new THREE.Mesh(dripGeo, oozeMat), dx, 12, wallZ(dx) + 0.45);
     const len = 0.8 + ((i * 37) % 7) * 0.35;
     ooze.push({ d, len, ph: i * 1.3 });
   }
   const signTex = keep(canvasTex(512, 160, (g, w, h) => {
     g.font = '900 104px "Arial Black", Impact, sans-serif';
     g.textAlign = 'center'; g.textBaseline = 'middle';
+    const fit = Math.min(1, (w - 40) / g.measureText('MAC&CHEESE').width);
+    g.translate(w / 2, 0); g.scale(fit, 1); g.translate(-w / 2, 0);
     g.lineJoin = 'round';
     g.lineWidth = 22; g.strokeStyle = '#6a2e00'; g.strokeText('MAC&CHEESE', w / 2, h / 2 + 6);
     const gr = g.createLinearGradient(0, 20, 0, h - 20);
@@ -70,7 +78,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     g.fillStyle = '#ffc21a';
     for (const x of [70, 150, 260, 345, 430]) { g.beginPath(); g.ellipse(x, h / 2 + 46, 9, 22, 0, 0, Math.PI * 2); g.fill(); }
   }));
-  const sign = add(new THREE.Mesh(geo(new THREE.PlaneGeometry(11, 3.44)), basic(0xffffff, { map: signTex, transparent: true, depthWrite: false })), 0, 8.2, -9.7);
+  const sign = add(new THREE.Mesh(geo(new THREE.PlaneGeometry(11, 3.44)), basic(0xffffff, { map: signTex, transparent: true, depthWrite: false })), 0, 7.6, -9.2);
 
   // ── Floor: red & cream kitchen checker around a giant cheese wheel ──
   const floorTex = keep(canvasTex(128, 128, (g, w, h) => {
@@ -101,9 +109,10 @@ export function buildWorld({ lowGraphics = false } = {}) {
 
   // ── The giant pot on the stove ──────────────────────────────────
   const pot = new THREE.Group();
-  pot.position.set(0, -0.5, -5.8);
+  pot.position.set(0, -0.5, -6.6);
+  pot.scale.setScalar(0.88);
   group.add(pot);
-  const steel = toon(0x464654), copper = toon(0xd2723a, { emissive: 0x2a0c00 });
+  const steel = toon(0x464654), copper = toon(0xb8602e, { emissive: 0x1a0600 });
   add(new THREE.Mesh(geo(new THREE.BoxGeometry(7, 1.1, 3.6)), steel), 0, 0.55, 0, pot);
   add(new THREE.Mesh(geo(new THREE.BoxGeometry(7.1, 0.12, 3.7)), toon(0x22222c)), 0, 1.12, 0, pot);
   for (let i = 0; i < 5; i++) {
@@ -117,14 +126,14 @@ export function buildWorld({ lowGraphics = false } = {}) {
     const a = (i / 14) * Math.PI * 2;
     flames.push(add(new THREE.Mesh(flameGeo, flameMat), Math.cos(a) * 1.7, 1.38, Math.sin(a) * 1.0 + 0.2, pot));
   }
-  const potBody = add(new THREE.Mesh(geo(new THREE.CylinderGeometry(2.55, 2.2, 2.5, 32, 1, true)), toon(0xd2723a, { emissive: 0x2a0c00, side: THREE.DoubleSide })), 0, 2.45, 0, pot);
-  const potRim = add(new THREE.Mesh(geo(new THREE.TorusGeometry(2.55, 0.13, 8, 40)), copper), 0, 3.7, 0, pot);
+  const potBody = add(new THREE.Mesh(geo(new THREE.CylinderGeometry(2.55, 2.2, 2.5, 32, 1, true)), toon(0xaeb4c4, { emissive: 0x0a0a12, side: THREE.DoubleSide })), 0, 2.45, 0, pot);
+  const potRim = add(new THREE.Mesh(geo(new THREE.TorusGeometry(2.55, 0.13, 8, 40)), toon(0xd8dce6)), 0, 3.7, 0, pot);
   potRim.rotation.x = Math.PI / 2;
   for (const sx of [-1, 1]) {
     const h = add(new THREE.Mesh(geo(new THREE.TorusGeometry(0.42, 0.1, 6, 16, Math.PI)), steel), sx * 2.6, 3.0, 0, pot);
     h.rotation.set(0, sx > 0 ? 0 : Math.PI, -sx * Math.PI / 2);
   }
-  add(new THREE.Mesh(geo(new THREE.TorusGeometry(2.43, 0.07, 6, 40)), toon(0x9a4a1c)), 0, 2.2, 0.02, pot).rotation.x = Math.PI / 2;
+  add(new THREE.Mesh(geo(new THREE.TorusGeometry(2.43, 0.07, 6, 40)), toon(0x7a8090)), 0, 2.2, 0.02, pot).rotation.x = Math.PI / 2;
   const cheeseTopMat = toon(0xffc21a, { emissive: 0x5a3000 });
   const cheeseTop = add(new THREE.Mesh(geo(new THREE.CircleGeometry(2.5, 32)), cheeseTopMat), 0, 3.6, 0, pot);
   cheeseTop.rotation.x = -Math.PI / 2;
@@ -239,11 +248,11 @@ export function buildWorld({ lowGraphics = false } = {}) {
   addRow(Math.round(5 * crowdScale), 6.8, 10, -1.2, -0.5);
   const N = spots.length;
   const furMat = toon(0xffffff);
-  const mBody = new THREE.InstancedMesh(geo(new THREE.CapsuleGeometry(0.3, 0.42, 3, 8)), furMat, N);
-  const mHead = new THREE.InstancedMesh(geo(new THREE.SphereGeometry(0.27, 10, 8)), furMat, N);
-  const mEar = new THREE.InstancedMesh(geo(new THREE.SphereGeometry(0.15, 8, 6)), toon(0xffffff), N * 2);
-  const mHat = new THREE.InstancedMesh(geo(new THREE.CylinderGeometry(0.16, 0.13, 0.3, 8)), toon(0xfdfaf2), N);
-  const mArm = new THREE.InstancedMesh(geo(new THREE.CapsuleGeometry(0.06, 0.36, 2, 5)), furMat, N * 2);
+  const mBody = new THREE.InstancedMesh(geo(new THREE.CapsuleGeometry(0.3, 0.42, 2, 7)), furMat, N);
+  const mHead = new THREE.InstancedMesh(geo(new THREE.SphereGeometry(0.27, 9, 6)), furMat, N);
+  const mEar = new THREE.InstancedMesh(geo(new THREE.SphereGeometry(0.15, 6, 4)), toon(0xffffff), N * 2);
+  const mHat = new THREE.InstancedMesh(geo(new THREE.CylinderGeometry(0.12, 0.1, 0.22, 8)), toon(0xfdfaf2), N);
+  const mArm = new THREE.InstancedMesh(geo(new THREE.CapsuleGeometry(0.06, 0.36, 1, 4)), furMat, N * 2);
   const furs = [0x9a9aa8, 0xc8c0b4, 0x7a7068, 0xe8e2da, 0xb0a090];
   spots.forEach((c, i) => {
     c.phase = (i * 2.399) % (Math.PI * 2); c.hype = 0.6 + ((i * 13) % 7) / 10;
@@ -255,8 +264,8 @@ export function buildWorld({ lowGraphics = false } = {}) {
   group.add(mBody, mHead, mEar, mHat, mArm);
 
   // ── Macaroni confetti ───────────────────────────────────────────
-  const MAC = lowGraphics ? 70 : 160;
-  const macMesh = new THREE.InstancedMesh(geo(new THREE.TorusGeometry(0.09, 0.04, 5, 7, Math.PI * 0.75)), toon(0xffd34d, { emissive: 0x3a2000 }), MAC);
+  const MAC = lowGraphics ? 60 : 120;
+  const macMesh = new THREE.InstancedMesh(geo(new THREE.TorusGeometry(0.09, 0.04, 4, 5, Math.PI * 0.75)), toon(0xffd34d, { emissive: 0x3a2000 }), MAC);
   macMesh.frustumCulled = false;
   const macs = Array.from({ length: MAC }, () => ({ life: 0, p: new THREE.Vector3(0, -50, 0), v: new THREE.Vector3(), r: new THREE.Euler(), w: new THREE.Vector3() }));
   let macCursor = 0;
@@ -266,7 +275,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
   function burstMac(n, x, spread, fromPot = false) {
     for (let k = 0; k < n; k++) {
       const m = macs[macCursor = (macCursor + 1) % MAC];
-      if (fromPot) { m.p.set((Math.random() - 0.5) * 1.5, 3.6, -5.8); m.v.set((Math.random() - 0.5) * 5, 7 + Math.random() * 4, 2 + Math.random() * 3.5); }
+      if (fromPot) { m.p.set((Math.random() - 0.5) * 1.5, 3.2, -6.6); m.v.set((Math.random() - 0.5) * 5, 7 + Math.random() * 4, 2 + Math.random() * 3.5); }
       else { m.p.set(x + (Math.random() - 0.5) * spread, 6.8 + Math.random() * 1.5, (Math.random() - 0.5) * 4 + 0.6); m.v.set((Math.random() - 0.5) * 1.2, -1 - Math.random() * 1.3, (Math.random() - 0.5)); }
       m.r.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
       m.w.set((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
@@ -280,7 +289,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
   key.position.set(1.5, 6, 6);
   const rimL = new THREE.PointLight(0xff6a3c, 16, 12, 1.6); rimL.position.set(-3.5, 3, -1.5);
   const rimR = new THREE.PointLight(0xffd23a, 16, 12, 1.6); rimR.position.set(3.5, 3, -1.5);
-  const potGlow = new THREE.PointLight(0xffa020, 16, 14, 1.5); potGlow.position.set(0, 4.6, -4.2);
+  const potGlow = new THREE.PointLight(0xffa020, 16, 14, 1.5); potGlow.position.set(0, 4.4, -4.8);
   group.add(hemi, key, rimL, rimR, potGlow);
   const base = { hemi: hemi.intensity, key: key.intensity, rimL: rimL.intensity, rimR: rimR.intensity, pot: potGlow.intensity };
 
@@ -312,7 +321,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     cA.set(PALETTE[state.barColor]); cB.set(PALETTE[(state.barColor + 3) % PALETTE.length]);
     tiles.forEach((t, i) => {
       const checker = ((t.ix + t.iz + whole) & 1) === 0;
-      let k = (checker ? 0.28 + 0.62 * onBeat : 0.14) * L;
+      let k = (checker ? 0.4 + 0.55 * onBeat : 0.22) * L;
       if (state.ripple) {
         const r = (songTime - state.ripple.t) * 7, d = Math.hypot(t.x - state.ripple.x, t.z);
         k = Math.max(k, Math.exp(-Math.pow((d - r) * 1.8, 2)) * (1 - Math.min(1, r / 10)) * L);
@@ -382,7 +391,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
       dummy.rotation.set(0, yaw, lean); dummy.scale.setScalar(1);
       dummy.position.set(c.x, y + 0.52, c.z); dummy.updateMatrix(); mBody.setMatrixAt(i, dummy.matrix);
       dummy.position.set(c.x, y + 1.08, c.z); dummy.updateMatrix(); mHead.setMatrixAt(i, dummy.matrix);
-      dummy.position.set(c.x, y + 1.42, c.z); dummy.updateMatrix(); mHat.setMatrixAt(i, dummy.matrix);
+      dummy.position.set(c.x, y + 1.38, c.z); dummy.updateMatrix(); mHat.setMatrixAt(i, dummy.matrix);
       const flap = 0.25 * Math.sin(beat * Math.PI * 2 + c.phase);
       for (const s of [-1, 1]) {
         dummy.position.set(c.x + s * 0.22 * Math.cos(yaw), y + 1.3, c.z - s * 0.22 * Math.sin(yaw));

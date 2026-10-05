@@ -75,13 +75,13 @@ const moves = {
   // Glitch hits: popping on every half beat — point, fold, goalpost, X,
   // diagonal — each one a contraction that lands dead on the pulse.
   nullGlitchHit: seq(4, [
-    [0, (p) => { wideStance(p, 0.22); p.hips(0.03, -0.12, 0, 0.2); A(p, 'L', [1.35, 0.9, 0.03]); p.arm('R', 0.9, 0.2, 2.1, -0.4); p.lean(0.06, 0.1, 0.15); p.look(0.05, 0.4); }, 'snap'],
+    [0, (p) => { wideStance(p, 0.22); p.hips(0.03, -0.12, 0, 0.2); A(p, 'L', [1.35, 0.9, 0.03]); p.arm('R', 0.9, 0.2, 2.1, -0.4); p.lean(0.06, 0.1, 0.15); p.look(0.05, 0.4); }, 'hit'],
     [0.5, (p) => { wideStance(p, 0.22); p.hips(0.03, -0.07, 0, 0.2); A(p, 'L', T.fwdUp); p.arm('R', 0.9, 0.2, 2.1, -0.4); p.lean(0.02, -0.05, 0.15); p.look(-0.05, 0.25); }, 'snap'],
-    [1, (p) => { wideStance(p, 0.24); p.hips(-0.04, -0.16, 0, -0.1); A(p, 'R', T.sideUp); A(p, 'L', T.downIn); p.lean(0.08, 0.14, -0.1, -0.08); p.look(0.08, -0.3); }, 'snap'],
+    [1, (p) => { wideStance(p, 0.24); p.hips(-0.04, -0.16, 0, -0.1); A(p, 'R', T.sideUp); A(p, 'L', T.downIn); p.lean(0.08, 0.14, -0.1, -0.08); p.look(0.08, -0.3); }, 'hit'],
     [1.5, (p) => { wideStance(p, 0.24); p.hips(-0.04, -0.09, 0, -0.1); A(p, 'R', T.sideFwd); A(p, 'L', T.sideDown); p.lean(0.02, -0.06); p.look(0, -0.1, 0.12); }, 'snap'],
-    [2, (p) => { wideStance(p, 0.2); p.hips(0, -0.2, 0.03); p.arm('L', 1.5, -0.15, 1.6, -1.45); p.arm('R', 1.3, -0.12, 1.6, -1.45); p.lean(0.14, 0.18); p.look(0.15); }, 'snap'],
+    [2, (p) => { wideStance(p, 0.2); p.hips(0, -0.2, 0.03); p.arm('L', 1.5, -0.15, 1.6, -1.45); p.arm('R', 1.3, -0.12, 1.6, -1.45); p.lean(0.14, 0.18); p.look(0.15); }, 'hit'],
     [2.5, (p) => { wideStance(p, 0.2); p.hips(0, -0.08); A(p, 'L', [0.15, 0.75, 0.05]); A(p, 'R', [0.15, 0.75, 0.05]); p.lean(-0.04, -0.14); p.look(-0.12); p.shrug(0.2); }, 'snap'],
-    [3, (p) => { p.foot('L', 0.24); p.foot('R', 0.16, 0, -0.04, 0.4); p.hips(0.06, -0.14, 0, 0.25); A(p, 'L', [2.6, 0.95, 0.03]); A(p, 'R', [0.3, 0.75, 0.03]); p.lean(-0.04, -0.1, 0.1, 0.18); p.look(-0.2, 0.3, 0.15); }, 'snap'],
+    [3, (p) => { p.foot('L', 0.24); p.foot('R', 0.16, 0, -0.04, 0.4); p.hips(0.06, -0.14, 0, 0.25); A(p, 'L', [2.6, 0.95, 0.03]); A(p, 'R', [0.3, 0.75, 0.03]); p.lean(-0.04, -0.1, 0.1, 0.18); p.look(-0.2, 0.3, 0.15); }, 'hit'],
     [3.5, (p) => { p.foot('L', 0.24); p.foot('R', 0.16, 0, -0.04, 0.4); p.hips(0.06, -0.1, 0, 0.25); A(p, 'L', [2.6, 0.95, 0.03]); A(p, 'R', [0.3, 0.75, 0.03]); p.lean(-0.04, -0.1, 0.1, 0.18); p.look(-0.1, -0.15, -0.1); }, 'snap'],
   ], { groove: 0.6, hits: 0.9 }),
 
@@ -135,11 +135,11 @@ const moves = {
     const k = (u) => bump(u - w, 0.13);
     wideStance(p, 0.21);
     p.hips(0.07 * (1 - 2 * w), -0.12 - 0.04 * k(0.5), 0, 0.12 * (1 - 2 * w));
-    p.arm('L', 0.2 * k(0.26), 1.45 + 0.35 * k(0.26) - 0.25 * k(0.12), 1.1 * k(0.12) + 0.05, 1.57);
-    p.wrist('L', 0, 0.9 * k(0) - 0.3 * k(0.12));
-    p.arm('R', 0.2 * k(0.74), 1.45 + 0.35 * k(0.74) - 0.25 * k(0.88), 1.1 * k(0.88) + 0.05, 1.57);
-    p.wrist('R', 0, 0.9 * k(1) - 0.3 * k(0.88));
-    p.shrug(0.3 * k(0.4), 0.3 * k(0.6));
+    p.arm('L', 0.2 * k(0.26), 1.4 + 0.55 * k(0.26) - 0.35 * k(0.12), 1.6 * k(0.12) + 0.05, 1.57);
+    p.wrist('L', 0, 1.1 * k(0) - 0.4 * k(0.12));
+    p.arm('R', 0.2 * k(0.74), 1.4 + 0.55 * k(0.74) - 0.35 * k(0.88), 1.6 * k(0.88) + 0.05, 1.57);
+    p.wrist('R', 0, 1.1 * k(1) - 0.4 * k(0.88));
+    p.shrug(0.4 * k(0.4), 0.4 * k(0.6));
     p.add('chest', -0.16 * k(0.5), 0, 0.1 * (k(0.4) - k(0.6)));
     p.look(-0.04, 0.4 * (0.5 - w), 0.1 * (k(0.4) - k(0.6)));
   },
@@ -148,13 +148,13 @@ const moves = {
   // King Tut: right-angle boxes around the head and chest on every half
   // beat, knees hitting underneath.
   nullTutBox: seq(4, [
-    [0, (p) => { wideStance(p, 0.22); p.hips(0, -0.14); A(p, 'L', T.fwdUp); A(p, 'R', T.fwdIn); p.look(0.08, 0.15); }, 'snap'],
+    [0, (p) => { wideStance(p, 0.22); p.hips(0, -0.14); A(p, 'L', T.fwdUp); A(p, 'R', T.fwdIn); p.look(0.08, 0.15); }, 'hit'],
     [0.5, (p) => { wideStance(p, 0.22); p.hips(0, -0.08); A(p, 'L', T.upIn); A(p, 'R', T.fwdUp); p.look(-0.1, 0.1); p.lean(0, -0.05, 0, 0.08); }, 'snap'],
-    [1, (p) => { wideStance(p, 0.25); p.hips(0, -0.2); A(p, 'L', T.sideUp); A(p, 'R', T.sideUp); p.lean(0.04, 0.08); p.look(0.05); }, 'snap'],
+    [1, (p) => { wideStance(p, 0.25); p.hips(0, -0.2); A(p, 'L', T.sideUp); A(p, 'R', T.sideUp); p.lean(0.04, 0.08); p.look(0.05); }, 'hit'],
     [1.5, (p) => { wideStance(p, 0.25); p.hips(0, -0.1); A(p, 'L', T.sideDown); A(p, 'R', T.sideUp); p.lean(0, 0, 0, -0.1); p.look(0, -0.2, -0.1); }, 'snap'],
-    [2, (p) => { wideStance(p, 0.22); p.hips(0, -0.14); A(p, 'R', T.fwdUp); A(p, 'L', T.fwdIn); p.look(0.08, -0.15); }, 'snap'],
+    [2, (p) => { wideStance(p, 0.22); p.hips(0, -0.14); A(p, 'R', T.fwdUp); A(p, 'L', T.fwdIn); p.look(0.08, -0.15); }, 'hit'],
     [2.5, (p) => { wideStance(p, 0.22); p.hips(0, -0.08); A(p, 'R', T.upIn); A(p, 'L', T.fwdUp); p.look(-0.1, -0.1); p.lean(0, -0.05, 0, -0.08); }, 'snap'],
-    [3, (p) => { wideStance(p, 0.25); p.hips(0, -0.2); p.arm('L', 1.75, -0.05, 1.57, -1.57); p.arm('R', 1.3, -0.05, 1.57, -1.57); p.lean(0.06, 0.1); p.look(0.1); }, 'snap'],
+    [3, (p) => { wideStance(p, 0.25); p.hips(0, -0.2); p.arm('L', 1.75, -0.05, 1.57, -1.57); p.arm('R', 1.3, -0.05, 1.57, -1.57); p.lean(0.06, 0.1); p.look(0.1); }, 'hit'],
     [3.5, (p) => { wideStance(p, 0.22); p.hips(0, -0.1); A(p, 'L', T.faceUp); A(p, 'R', T.fwdIn); p.look(-0.05, 0.25); }, 'snap'],
   ], { groove: 0.5, hits: 0.6 }),
 
@@ -301,13 +301,13 @@ const moves = {
   // Hit combo: guard, explode, zigzag on one leg, palms out, lean, lean —
   // and a dime-stop point at the rival, hand on the shades.
   nullHitCombo: seq(4, [
-    [0, (p) => { wideStance(p, 0.28); p.hips(0, -0.32, 0.03); A(p, 'L', T.faceUp); A(p, 'R', T.faceUp); p.lean(0.2, 0.15); p.look(0.15); }, 'snap'],
+    [0, (p) => { wideStance(p, 0.28); p.hips(0, -0.32, 0.03); A(p, 'L', T.faceUp); A(p, 'R', T.faceUp); p.lean(0.2, 0.15); p.look(0.15); }, 'hit'],
     [0.5, (p) => { wideStance(p, 0.26); p.hips(0, -0.06); A(p, 'L', T.straightSide); A(p, 'R', T.straightSide); p.lean(-0.08, -0.25); p.look(-0.3); p.shrug(0.15); }, 'snap'],
-    [1, (p) => { p.foot('R', 0.16); p.foot('L', 0.18, 0.32, 0.12, 0.3); p.hips(-0.06, -0.06); A(p, 'L', T.sideDown); A(p, 'R', T.sideUp); p.lean(0, -0.05, 0, -0.08); p.look(0, 0.3); }, 'snap'],
+    [1, (p) => { p.foot('R', 0.16); p.foot('L', 0.18, 0.32, 0.12, 0.3); p.hips(-0.06, -0.06); A(p, 'L', T.sideDown); A(p, 'R', T.sideUp); p.lean(0, -0.05, 0, -0.08); p.look(0, 0.3); }, 'hit'],
     [1.5, (p) => { wideStance(p, 0.26); p.hips(0, -0.16); A(p, 'L', T.straightFwd); A(p, 'R', T.straightFwd); p.wrist('L', -1.2); p.wrist('R', -1.2); p.lean(0.08, 0.05); p.look(0.05); }, 'snap'],
-    [2, (p) => { wideStance(p, 0.26); p.hips(0.1, -0.14); A(p, 'L', [2.7, 0.9, 0.03]); A(p, 'R', T.downIn); p.lean(0, 0, 0.1, 0.32); p.look(0, 0.2, 0.2); }, 'snap'],
-    [2.5, (p) => { wideStance(p, 0.26); p.hips(-0.1, -0.14); A(p, 'R', [2.7, 0.9, 0.03]); A(p, 'L', T.downIn); p.lean(0, 0, -0.1, -0.32); p.look(0, -0.2, -0.2); }, 'snap'],
-    [3, (p) => { p.foot('L', 0.2, 0, 0.12); p.foot('R', 0.22, 0, -0.08, 0.4); p.hips(0.04, -0.22, 0, 0.5); A(p, 'L', [0.4, 1.4, 0.03]); p.arm('R', 1.35, 0.15, 2.55, -1.0); p.lean(0.04, -0.1, 0.2); p.look(-0.05, 0.45); }, 'snap'],
+    [2, (p) => { wideStance(p, 0.26); p.hips(0.1, -0.14); A(p, 'L', [2.7, 0.9, 0.03]); A(p, 'R', T.downIn); p.lean(0, 0, 0.1, 0.32); p.look(0, 0.2, 0.2); }, 'hit'],
+    [2.5, (p) => { wideStance(p, 0.26); p.hips(-0.1, -0.14); A(p, 'R', [2.7, 0.9, 0.03]); A(p, 'L', T.downIn); p.lean(0, 0, -0.1, -0.32); p.look(0, -0.2, -0.2); }, 'hit'],
+    [3, (p) => { p.foot('L', 0.2, 0, 0.12); p.foot('R', 0.22, 0, -0.08, 0.4); p.hips(0.04, -0.22, 0, 0.5); A(p, 'L', [0.4, 1.4, 0.03]); p.arm('R', 1.35, 0.15, 2.55, -1.0); p.lean(0.04, -0.1, 0.2); p.look(-0.05, 0.45); }, 'hit'],
     [3.5, (p) => { p.foot('L', 0.2, 0, 0.12); p.foot('R', 0.22, 0, -0.08, 0.4); p.hips(0.04, -0.2, 0, 0.5); A(p, 'L', [0.4, 1.4, 0.03]); p.arm('R', 1.35, 0.15, 2.55, -1.0); p.lean(0.04, -0.1, 0.2); p.look(-0.12, 0.32, 0.1); }, 'snap'],
   ], { groove: 0.5, hits: 0.5 }),
 
@@ -357,7 +357,7 @@ const moves = {
   nullSystemCrash(p, b, B, s) {
     phased(p, b, B, s, [
       [1, (p, b) => {
-        const g = 0.5 + 0.5 * Math.sin(TAU * b * 5) * Math.sin(TAU * b * 1.3);
+        const g = 0.5 + 0.5 * Math.sin(TAU * b * 1.5) * (0.6 + 0.4 * Math.sin(TAU * b * 0.7));
         wideStance(p, 0.22);
         p.hips(0.04 * (g - 0.5), -0.12 - 0.05 * g, 0, 0.3 * (g - 0.5));
         LA(p, 'L', T.fwdUp, T.sideUp, g); LA(p, 'R', T.fwdIn, T.sideDown, g);
@@ -366,15 +366,15 @@ const moves = {
       }],
       [2.5, (p, b) => {
         const st = (b - 1) * 6, k = Math.floor(st), f = st - k;
-        const yaw = TAU * 1.5 * (k + smooth(f / 0.4)) / 9;
+        const yaw = TAU * 2 * (k + smooth(f / 0.4)) / 9;
         p.foot('L', 0.02, 0, 0, 0.35); p.foot('R', 0.1, 0.1, 0.04, 0.5);
         p.hips(0, -0.06, 0); p.root(0, 0, 0, yaw);
-        LA(p, 'L', T.sideUp, T.straightSide, 0.5 + 0.5 * Math.cos(Math.PI * st)); LA(p, 'R', T.sideDown, T.straightSide, 0.5 + 0.5 * Math.cos(Math.PI * st));
+        A(p, 'L', T.straightSide); A(p, 'R', T.straightSide); p.wrist('L', 0, 0.4 * Math.sin(Math.PI * st)); p.wrist('R', 0, -0.4 * Math.sin(Math.PI * st));
       }],
       [3, (p, b) => {
         const k = smooth((b - 2.5) / 0.25);
         p.foot('L', 0.2, 0, 0.16); p.foot('R', 0.16, 0.02, -0.38 * k, 0.9 * k);
-        p.hips(0, -0.06 - 0.4 * k, -0.04); p.root(0, 0, 0, Math.PI);
+        p.hips(0, -0.06 - 0.4 * k, -0.04);
         A(p, 'L', [0.05, 0.2, 0.1]); A(p, 'R', [0.05, 0.2, 0.1]);
         p.lean(0.35 * k, 0.2 * k); p.look(0.5 * k, 0, 0.2 * k);
       }],
@@ -382,7 +382,7 @@ const moves = {
         groove(p, B, s, 0.4 * clamp01((b - 3.5) / 0.3));
         const st = (b - 3) * 6, k = Math.min(4, Math.floor(st)), u = clamp01((k + smooth((st - k) / 0.3)) / 4);
         p.foot('L', 0.2 - 0.04 * u, 0, 0.16 * (1 - u)); p.foot('R', 0.16, 0.02 * (1 - u), -0.38 * (1 - u), 0.9 * (1 - u));
-        p.hips(0, -0.46 + 0.34 * u, -0.04); p.root(0, 0, 0, Math.PI * (1 - u));
+        p.hips(0, -0.46 + 0.34 * u, -0.04);
         LA(p, 'L', [0.05, 0.2, 0.1], T.straightUp, u); LA(p, 'R', [0.05, 0.2, 0.1], [1.4, 1.0, 0.03], u);
         p.lean(0.35 * (1 - u), 0.2 * (1 - u) - 0.1 * u); p.look(0.5 * (1 - u) - 0.2 * u, 0.3 * u);
       }],

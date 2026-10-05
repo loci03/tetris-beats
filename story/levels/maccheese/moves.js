@@ -17,7 +17,7 @@ const arm3 = (p, side, A, B, C, wb, wc) => {
   p.arm(side, k(0), k(1), k(2), k(3));
 };
 // Hand poses.
-const BELLY_L = [0.42, -0.05, 1.55, -0.9], BELLY_R = [0.42, -0.05, 1.55, -0.9];
+const BELLY_L = [0.28, 0.12, 1.3, -0.75], BELLY_R = [0.28, 0.12, 1.3, -0.75];
 const TASTE = [1.2, 0.05, 2.45, -0.75];          // spoon up to the mouth
 const SPOON_HIGH = [2.75, 0.35, 0.25, 0];        // spoon raised to the sky
 const PRESENT_L = [0.55, 1.35, 0.25, 0.4];       // open hand out to the side: voilà
@@ -31,16 +31,17 @@ const heelWind = (p, b) => {
   const k = smooth(b);
   wideStance(p, 0.17);
   p.hips(0, -0.04 - 0.28 * k, -0.04 * k);
-  p.arms(0.8 - 1.4 * k, 0.3, 0.4);
+  p.arms(0.8 - 1.1 * k, 0.3, 0.4);
   p.lean(0.3 * k, 0.1 * k); p.look(0.1 * k);
 };
-const heelAir = (p, t) => {             // t: 0 → 1 across the jump
+const heelAir = (p, t, a0 = -0.3) => {   // t: 0 → 1 across the jump; a0: where the arms start
   const air = Math.sin(PI * t), click = Math.sin(PI * clamp01((t - 0.15) / 0.7));
-  p.hips(0.05 * air, lerp(-0.32, -0.04, smooth(t / 0.18)) + 0.6 * air, 0);
+  p.hips(0.05 * air, lerp(-0.32, -0.04, smooth(t / 0.3)) + 0.6 * air, 0);
   p.tumble(0, 0.32 * click);
   p.footX('L', lerp(0.17, -0.22, click), 0.5 * air, 0.02, 0.4 * air);
   p.footX('R', lerp(-0.17, -0.3, click), 0.5 * air, -0.02, 0.4 * air);
-  p.arm('R', 2.8, 0.4, 0.15); p.arm('L', 0.4, 1.9 * air + 0.3, 0.2);
+  const up = smooth(t / 0.6);
+  p.arm('R', lerp(a0, 2.8, up), 0.3 + 0.1 * up, 0.4 - 0.25 * up); p.arm('L', lerp(a0, 0.4, up), 1.9 * air + 0.3, 0.2);
   p.look(-0.3 * air, 0, 0.2 * click);
 };
 const heelLand = (p, u) => {            // u: 0 → 1 absorbing the landing
@@ -75,10 +76,10 @@ export const moves = {
     const taste = win(ph, 2.75, 4, 0.4);
     p.foot('L', 0.21, 0, 0, 0.4 * Math.pow(0.5 - 0.5 * shift, 2));
     p.foot('R', 0.21, 0, 0, 0.4 * Math.pow(0.5 + 0.5 * shift, 2));
-    p.hips(0.06 * shift, -0.13, 0.02, 0.14 * Math.sin(a) * (1 - taste));
-    armMix(p, 'R', [0.45 + 0.28 * Math.sin(a), 0.05 + 0.3 * Math.cos(a), 0.75 - 0.25 * Math.sin(a), -0.4], TASTE, taste);
+    p.hips(0.06 * shift + 0.04 * Math.cos(a) * (1 - taste), -0.13, 0.02, 0.22 * Math.cos(a) * (1 - taste));
+    armMix(p, 'R', [0.8 + 0.35 * Math.sin(a), 0.05 + 0.5 * Math.cos(a), 0.85 - 0.35 * Math.sin(a), -0.4], TASTE, taste);
     armMix(p, 'L', [0.5 + 0.06 * Math.sin(a), 0.32, 1.0, -0.3], BELLY_L, taste);
-    p.lean(0.16 * (1 - taste) - 0.06 * taste, 0.04, 0.18 * Math.cos(a) * (1 - taste));
+    p.lean(0.16 * (1 - taste) - 0.06 * taste, 0.04, 0.25 * Math.cos(a) * (1 - taste), 0.08 * Math.sin(a) * (1 - taste));
     p.look(0.22 * (1 - taste) - 0.12 * taste, 0.12 * Math.sin(a) * (1 - taste) - 0.15 * taste, 0.12 * taste);
   },
 
@@ -105,8 +106,8 @@ export const moves = {
     groove(p, B, s, 0.9);
     const ph = mod4(b);
     let out;
-    if (ph < 2) { const st = ph * 4, k = Math.floor(st) + smooth(frac(st) / 0.35); out = 1.45 - (1.75 / 8) * k; }
-    else out = lerp(-0.3, 1.45, smooth((ph - 2) / 2));
+    if (ph < 2) { const st = ph * 4, k = Math.floor(st) + smooth(frac(st) / 0.35); out = 1.45 - (1.5 / 8) * k; }
+    else out = lerp(-0.05, 1.45, smooth((ph - 2) / 2));
     const tick = ph < 2 ? Math.exp(-frac(ph * 4) * 6) : 0;
     p.arm('R', 1.5, out, 0.12, 0); p.wrist('R', -0.25 * tick);
     p.arm('L', 0.25, 2.2, 2.55, 0.9);
@@ -140,8 +141,8 @@ export const moves = {
     wideStance(p, 0.21);
     p.foot('L', 0.21, 0, 0, 0.3 * uL * (1 - crash));
     p.hips(0.03 * Math.sin(PI * b), -0.17 + 0.06 * crash, 0.0, 0.12 * (uR - uL) * (1 - crash));
-    arm3(p, 'R', [0.55 + 0.45 * uR, 0.2, 0.55 + 1.0 * uR, -0.3], [2.4, 1.3, 0.3, 0.2], [2.4, 1.3, 0.3, 0.2], crash, 0);
-    arm3(p, 'L', [0.55 + 0.45 * uL, 0.25, 0.6 + 1.0 * uL, -0.3], [2.3, 1.4, 0.3, 0.2], [2.3, 1.4, 0.3, 0.2], crash, 0);
+    arm3(p, 'R', [0.7 + 0.25 * uR, 0.2, 0.85 + 0.9 * uR, -0.3], [2.4, 1.3, 0.3, 0.2], [2.4, 1.3, 0.3, 0.2], crash, 0);
+    arm3(p, 'L', [0.7 + 0.25 * uL, 0.25, 0.85 + 0.9 * uL, -0.3], [2.3, 1.4, 0.3, 0.2], [2.3, 1.4, 0.3, 0.2], crash, 0);
     p.lean(0.24 * (1 - crash) - 0.1 * crash, 0.06 - 0.12 * crash);
     p.look(0.18 * (1 - crash) - 0.3 * crash + 0.06 * (1 - uR), 0.15 * (uL - uR) * (1 - crash));
   },
@@ -174,8 +175,8 @@ export const moves = {
     p.foot('L', 0.2, 0, 0, 0.35 * Math.pow(0.5 - 0.5 * side, 2));
     p.foot('R', 0.2, 0, 0, 0.35 * Math.pow(0.5 + 0.5 * side, 2));
     p.hips(0.08 * c, -0.17 + 0.03 * sn, 0.04 * sn, 0.12 * c);
-    p.arm('L', 1.05 + 0.32 * sn, 0.08 + 0.32 * c, 1.55, -0.6);
-    p.arm('R', 1.05 + 0.32 * sn, 0.08 - 0.32 * c, 1.55, -0.6);
+    p.arm('L', 0.8 + 0.35 * sn, 0.22 + 0.35 * c, 1.35, -0.5);
+    p.arm('R', 0.8 + 0.35 * sn, 0.22 - 0.35 * c, 1.35, -0.5);
     p.lean(0.1 + 0.08 * sn, 0.1 * sn, -0.2 * c, 0.12 * c);
     p.look(0.05, 0.15 * c, -0.18 * c);
   },
@@ -248,11 +249,11 @@ export const moves = {
   goudaCossack(p, b, B, s) {
     groove(p, B, s, 0.5);
     const ph = mod4(b), side = Math.cos(PI * b);           // +1: left leg kicks
-    const kL = 0.5 + 0.5 * side, kR = 1 - kL;
-    const into = smooth(b / 0.5), hey = win(ph, 2.8, 4.2, 0.35);
-    const hop = Math.pow(Math.sin(PI * frac(b + 0.5)), 6);  // little hop as the legs swap
-    p.foot('L', 0.12 + 0.04 * kL, 0.04 * hop + 0.26 * kL * into, -0.04 + 0.7 * kL * into, -0.2 * kL);
-    p.foot('R', 0.12 + 0.04 * kR, 0.04 * hop + 0.26 * kR * into, -0.04 + 0.7 * kR * into, -0.2 * kR);
+    const kL = Math.pow(0.5 + 0.5 * side, 3), kR = Math.pow(0.5 - 0.5 * side, 3);
+    const into = smooth(b / 0.5), hey = win(ph, 2.7, 4.0, 0.4);
+    const hop = Math.pow(Math.sin(PI * frac(b)), 4);         // little hop as the legs swap
+    p.foot('L', 0.12 + 0.24 * kL * into, 0.04 * hop + 0.34 * kL * into, -0.04 + 0.6 * kL * into, -0.2 * kL);
+    p.foot('R', 0.12 + 0.24 * kR * into, 0.04 * hop + 0.34 * kR * into, -0.04 + 0.6 * kR * into, -0.2 * kR);
     p.hips(0.05 * (kR - kL), -0.03 - 0.44 * into + 0.06 * hop, -0.1 * into);
     const fold = [1.45, 0.1, 1.6, -1.35];
     armMix(p, 'L', fold, [0.7, 2.2, 0.15, 0.3], hey);
@@ -295,19 +296,19 @@ export const moves = {
         p.arm('L', 1.0, 0.9, 1.2, -0.3);
         p.lean(0.2, 0.1, 0.35 * Math.cos(a)); p.look(0.1, 0.2 * Math.cos(a));
       }],
-      [2.25, (p, b, B, s) => moves.goudaCossack(p, (b - 1) * 1.6 + 0.3, B, s)],
-      [3.0, (p, b) => heelAir(p, (b - 2.25) / 0.75)],
+      [2.25, (p, b, B, s) => moves.goudaCossack(p, (b - 1) * 1.76 + 0.3, B, s)],
+      [3.0, (p, b) => heelAir(p, (b - 2.25) / 0.75, 1.4)],
       [3.3, (p, b) => heelLand(p, (b - 3.0) / 0.3)],
       [Infinity, (p, b, B, s) => {
         groove(p, B, s, 0.5);
-        const k = smooth((b - 3.3) / 0.3), kiss = win(b, 3.45, 4.2, 0.25);
+        const k = smooth((b - 3.3) / 0.3), kiss = win(b, 3.35, 4.4, 0.45);
         p.foot('L', 0.14); p.foot('R', 0.22, 0, 0.1, 0.5 * k);
         p.hips(0.06 * k, -0.1 - 0.12 * (1 - k), 0, -0.15 * k);
         armMix(p, 'R', [2.0, 0.6, 0.4], SPOON_HIGH, k);
         armMix(p, 'L', [0.5, 1.6, 0.3], [1.15, -0.05, 2.5, -0.75], kiss);
         p.lean(-0.06, -0.16 * k, 0.1 * k); p.look(-0.25 * k + 0.1 * kiss, 0.2 * k);
       }],
-    ]);
+    ], 0.25);
   },
 
   // Phrase accent (count 3): VOILÀ — spoon up, open hand out, chin up, heel lifted.
@@ -355,7 +356,7 @@ export const moves = {
         p.arm('R', BELLY_R[0], BELLY_R[1], BELLY_R[2] - 0.15 * shake, BELLY_R[3]);
         p.lean(-0.25, -0.15); p.look(-0.35, 0.2); p.shrug(0.06 * shake);
       }],
-    ]);
+    ], 0.3);
   },
 
   // Taunt: scoops a dollop of molten cheese and catapults it at you with
@@ -368,14 +369,14 @@ export const moves = {
         const k = smooth(b / 0.6);
         p.foot('L', 0.15, 0, 0.12); p.foot('R', 0.19, 0, -0.08, 0.3);
         p.hips(0, -0.06 - 0.18 * k, -0.04, 0.4 - 0.5 * k);
-        p.arm('R', lerp(0.5, -0.6, k), 0.4, lerp(0.6, 0.2, k)); p.arm('L', 0.8, 0.6, 0.6);
+        p.arm('R', lerp(0.5, -0.35, k), 0.4, lerp(0.6, 0.2, k)); p.arm('L', 0.8, 0.6, 0.6);
         p.lean(0.3 * k, 0.1 * k, -0.2 * k); p.look(0.15 * k, -0.2 * k);
       }],
       [1.5, (p, b) => {
-        const k = smooth((b - 0.6) / 0.3);
+        const k = smooth((b - 0.45) / 0.55);
         p.foot('L', 0.15, 0, 0.16); p.foot('R', 0.19, 0.06, -0.12, 0.6);
         p.hips(0.03, -0.1, 0.05, 0.6 * k);
-        p.arm('R', lerp(-0.6, 2.2, k), lerp(0.4, -0.3, k), lerp(0.2, 0.1, k)); p.arm('L', 0.4, 0.9, 0.5);
+        p.arm('R', lerp(-0.35, 2.2, k), lerp(0.4, -0.3, k), lerp(0.2, 0.1, k)); p.arm('L', 0.4, 0.9, 0.5);
         p.lean(lerp(0.3, -0.05, k), -0.12 * k, 0.4 * k); p.look(-0.15 * k, 0.4 * k);
       }],
       [2.2, (p, b) => {
@@ -392,14 +393,14 @@ export const moves = {
         p.arm('L', BELLY_L[0], BELLY_L[1], BELLY_L[2] + 0.15 * shake, BELLY_L[3]);
         p.lean(-0.22, -0.18, 0.15); p.look(-0.3, 0.35); p.shrug(0.07 * shake);
       }],
-    ]);
+    ], 0.25);
   },
 
   // Victory: hops with arms wide on 1 and 2, chef's kiss on 3, presents on 4.
   goudaVictory(p, b, B, s) {
     groove(p, B, s, 0.6);
     const ph = mod4(b), u = frac(b), jump = ph < 2 ? Math.sin(PI * clamp01(u * 1.4)) : 0;
-    const kiss = win(ph, 1.8, 3.1, 0.35), pres = win(ph, 2.8, 4.05, 0.35);
+    const kiss = win(ph, 1.55, 3.15, 0.5), pres = win(ph, 2.7, 4.0, 0.45);
     p.root(0, 0.22 * jump, 0, 0);
     p.foot('L', 0.15, 0.2 * jump, 0, 0.4 * jump); p.foot('R', 0.15 + 0.07 * pres, 0.2 * jump, 0.08 * pres, 0.4 * jump + 0.5 * pres);
     p.hips(0.05 * pres, -0.08 - 0.06 * (1 - jump), 0, -0.12 * pres);

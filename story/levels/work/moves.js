@@ -23,27 +23,30 @@ export const moves = {
   mondayJack(p, b, B, s) {
     groove(p, B, s, 0.9);
     const j = Math.cos(TAU * b), sw = Math.sin(Math.PI * b);
-    const heel = 0.5 - 0.5 * j;
-    p.foot('L', 0.16, 0, 0.02, 0.38 * heel * (0.55 + 0.45 * sw));
-    p.foot('R', 0.16, 0, 0.02, 0.38 * heel * (0.55 - 0.45 * sw));
-    p.hips(0.05 * sw, -0.11 - 0.05 * (0.5 + 0.5 * j), -0.05 * j, 0.14 * sw);
-    p.lean(0.06 + 0.1 * j, 0.14 * Math.cos(TAU * b - 0.7), 0.1 * sw, 0.06 * sw);
-    p.look(-0.08 * Math.cos(TAU * b - 1.2), 0.18 * sw, 0.06 * sw);
-    MUG(p, 0.3 + 0.18 * j, 0.32, 1.45 + 0.25 * j);
-    CLIP(p, 0.05 - 0.35 * j * (0.6 + 0.4 * sw), 0.3 + 0.1 * sw, 0.7 + 0.5 * heel);
-    p.wrist('L', 0.3 * j);
+    const heel = 0.5 - 0.5 * j, dn = 0.5 + 0.5 * j;
+    // Weight rocks onto one heel-lifted foot and back every two beats.
+    p.foot('L', 0.2, 0, 0.02, 0.5 * heel * (0.5 + 0.5 * sw));
+    p.foot('R', 0.2, 0, 0.02, 0.5 * heel * (0.5 - 0.5 * sw));
+    p.hips(0.07 * sw, -0.12 - 0.13 * dn, -0.08 * j, 0.2 * sw);
+    // The jack: chest punches forward into the beat and rolls back out.
+    p.lean(0.1 + 0.2 * j, 0.26 * Math.cos(TAU * b - 0.7), 0.15 * sw, 0.08 * sw);
+    p.look(-0.14 * Math.cos(TAU * b - 1.2), 0.2 * sw, 0.08 * sw);
+    p.shrug(0.12 * heel);
+    MUG(p, 0.35 + 0.3 * j, 0.35 + 0.1 * heel, 1.35 + 0.35 * j);
+    CLIP(p, 0.1 - 0.55 * j * (0.6 + 0.4 * sw), 0.35 + 0.2 * heel, 0.6 + 0.7 * heel);
+    p.wrist('L', 0.35 * j);
   },
 
   // Heel-toe: heel dug in front, toe tapped back, step out wide (the jack
   // drops into it), close in — then the other side.
   mondayHeelToe: seq(4, [
-    [0, (p) => { p.footX('L', 0.14); p.footX('R', -0.15, 0, 0.2, -0.5); p.hips(0.06, -0.08, 0.02, -0.15); p.lean(-0.04, -0.06, -0.12); MUG(p, 0.3, 0.3, 1.5); CLIP(p, 0.35, 0.35, 0.9); p.look(0.08, -0.25); }],
+    [0, (p) => { p.footX('L', 0.14); p.footX('R', -0.17, 0.02, 0.26, -0.6); p.hips(0.07, -0.06, 0.02, -0.2); p.lean(-0.1, -0.12, -0.15); MUG(p, 0.3, 0.3, 1.5); CLIP(p, 0.35, 0.35, 0.9); p.look(0.08, -0.25); }],
     [0.5, (p) => { p.footX('L', 0.14); p.footX('R', -0.17, 0.01, -0.1, 0.6); p.hips(0.05, -0.12, 0, -0.08); p.lean(0.08, 0.1); MUG(p, 0.4, 0.3, 1.7); CLIP(p, 0.05, 0.3, 1.1); }],
-    [1, (p) => { p.footX('L', 0.14); p.footX('R', -0.32); p.hips(-0.06, -0.2, -0.02, 0.05); p.lean(0.18, 0.16, 0.1, -0.05); MUG(p, 0.2, 0.5, 1.4); CLIP(p, -0.3, 0.5, 0.6); p.look(0.12, 0.1); }],
+    [1, (p) => { p.footX('L', 0.14); p.footX('R', -0.36); p.hips(-0.08, -0.3, -0.04, 0.1); p.lean(0.28, 0.24, 0.15, -0.06); MUG(p, 0.2, 0.5, 1.4); CLIP(p, -0.3, 0.5, 0.6); p.look(0.12, 0.1); }],
     [1.5, (p) => { p.footX('L', 0.14); p.footX('R', -0.14, 0.11); p.hips(0.05, -0.07, 0, 0); p.lean(0.02, -0.04); MUG(p, 0.3, 0.3, 1.6); CLIP(p, 0.1, 0.3, 0.9); }],
-    [2, (p) => { p.footX('R', -0.14); p.footX('L', 0.15, 0, 0.2, -0.5); p.hips(-0.06, -0.08, 0.02, 0.15); p.lean(-0.04, -0.06, 0.12); MUG(p, 0.5, 0.2, 1.7); CLIP(p, -0.1, 0.35, 0.7); p.look(0.08, 0.25); }],
+    [2, (p) => { p.footX('R', -0.14); p.footX('L', 0.17, 0.02, 0.26, -0.6); p.hips(-0.07, -0.06, 0.02, 0.2); p.lean(-0.1, -0.12, 0.15); MUG(p, 0.5, 0.2, 1.7); CLIP(p, -0.1, 0.35, 0.7); p.look(0.08, 0.25); }],
     [2.5, (p) => { p.footX('R', -0.14); p.footX('L', 0.17, 0.01, -0.1, 0.6); p.hips(-0.05, -0.12, 0, 0.08); p.lean(0.08, 0.1); MUG(p, 0.3, 0.3, 1.5); CLIP(p, 0.3, 0.3, 1.0); }],
-    [3, (p) => { p.footX('R', -0.14); p.footX('L', 0.32); p.hips(0.06, -0.2, -0.02, -0.05); p.lean(0.18, 0.16, -0.1, 0.05); MUG(p, -0.1, 0.45, 1.2); CLIP(p, 0.5, 0.55, 0.8); p.look(0.12, -0.1); }],
+    [3, (p) => { p.footX('R', -0.14); p.footX('L', 0.36); p.hips(0.08, -0.3, -0.04, -0.1); p.lean(0.28, 0.24, -0.15, 0.06); MUG(p, -0.1, 0.45, 1.2); CLIP(p, 0.5, 0.55, 0.8); p.look(0.12, -0.1); }],
     [3.5, (p) => { p.footX('R', -0.14); p.footX('L', 0.14, 0.11); p.hips(-0.05, -0.07, 0, 0); p.lean(0.02, -0.04); MUG(p, 0.3, 0.3, 1.6); CLIP(p, 0.1, 0.3, 0.9); }],
   ], { groove: 0.8, hits: 0.8 }),
 
@@ -63,13 +66,13 @@ export const moves = {
   // Loose legs: a leg flicks out loose on every beat (front, front, side,
   // side), a little hop on the standing leg in between.
   mondayLooseLegs: seq(4, [
-    [0, (p) => { p.foot('L', 0.1); p.foot('R', 0.26, 0.2, 0.3, -0.35); p.hips(0.07, -0.08, 0.02, -0.1); p.lean(-0.06, -0.08, -0.1); MUG(p, 0.55, 0.3, 1.5); CLIP(p, -0.3, 0.55, 0.5); p.look(0.05, -0.2); }],
+    [0, (p) => { p.foot('L', 0.1); p.foot('R', 0.28, 0.3, 0.36, -0.4); p.hips(0.07, -0.08, 0.02, -0.1); p.lean(-0.06, -0.08, -0.1); MUG(p, 0.55, 0.3, 1.5); CLIP(p, -0.3, 0.55, 0.5); p.look(0.05, -0.2); }],
     [0.5, (p) => { p.foot('L', 0.11, 0.02); p.foot('R', 0.15, 0.16, 0.04, 0.2); p.hips(0.05, 0.0, 0, 0); p.lean(0.08, 0.06); MUG(p, 0.35, 0.3, 1.6); CLIP(p, 0.1, 0.35, 0.9); }],
-    [1, (p) => { p.foot('R', 0.1); p.foot('L', 0.26, 0.2, 0.3, -0.35); p.hips(-0.07, -0.08, 0.02, 0.1); p.lean(-0.06, -0.08, 0.1); MUG(p, -0.2, 0.55, 1.1); CLIP(p, 0.55, 0.3, 1.2); p.look(0.05, 0.2); }],
+    [1, (p) => { p.foot('R', 0.1); p.foot('L', 0.28, 0.3, 0.36, -0.4); p.hips(-0.07, -0.08, 0.02, 0.1); p.lean(-0.06, -0.08, 0.1); MUG(p, -0.2, 0.55, 1.1); CLIP(p, 0.55, 0.3, 1.2); p.look(0.05, 0.2); }],
     [1.5, (p) => { p.foot('R', 0.11, 0.02); p.foot('L', 0.15, 0.16, 0.04, 0.2); p.hips(-0.05, 0.0, 0, 0); p.lean(0.08, 0.06); MUG(p, 0.35, 0.3, 1.6); CLIP(p, 0.1, 0.35, 0.9); }],
-    [2, (p) => { p.foot('L', 0.1); p.foot('R', 0.4, 0.18, 0.08, -0.2); p.hips(0.08, -0.1, 0, 0); p.lean(0.04, 0, 0, 0.12); MUG(p, 0.2, 0.75, 1.3); CLIP(p, 0.2, 1.0, 0.4); p.look(0, -0.3, 0.1); }],
+    [2, (p) => { p.foot('L', 0.1); p.foot('R', 0.46, 0.26, 0.08, -0.2); p.hips(0.08, -0.1, 0, 0); p.lean(0.04, 0, 0, 0.12); MUG(p, 0.2, 0.75, 1.3); CLIP(p, 0.2, 1.0, 0.4); p.look(0, -0.3, 0.1); }],
     [2.5, (p) => { p.foot('L', 0.11, 0.02); p.foot('R', 0.16, 0.16, 0.02); p.hips(0.05, 0.0); p.lean(0.08, 0.06); MUG(p, 0.35, 0.3, 1.6); CLIP(p, 0.1, 0.35, 0.9); }],
-    [3, (p) => { p.foot('R', 0.1); p.foot('L', 0.4, 0.18, 0.08, -0.2); p.hips(-0.08, -0.1, 0, 0); p.lean(0.04, 0, 0, -0.12); MUG(p, 0.2, 1.0, 1.0); CLIP(p, 0.2, 0.75, 0.6); p.look(0, 0.3, -0.1); }],
+    [3, (p) => { p.foot('R', 0.1); p.foot('L', 0.46, 0.26, 0.08, -0.2); p.hips(-0.08, -0.1, 0, 0); p.lean(0.04, 0, 0, -0.12); MUG(p, 0.2, 1.0, 1.0); CLIP(p, 0.2, 0.75, 0.6); p.look(0, 0.3, -0.1); }],
     [3.5, (p) => { p.foot('R', 0.11, 0.02); p.foot('L', 0.16, 0.16, 0.02); p.hips(-0.05, 0.0); p.lean(0.08, 0.06); MUG(p, 0.35, 0.3, 1.6); CLIP(p, 0.1, 0.35, 0.9); }],
   ], { groove: 0.7, hits: 0.9 }),
 
@@ -131,33 +134,33 @@ export const moves = {
     groove(p, B, s, 0.7);
     phased(p, b, B, s, [
       [1, (p, b) => {
-        const k = smooth(b / 0.6);
+        const k = smooth(b / 0.6), press = bump((b - 0.55) / 0.45);
         wideStance(p, 0.2);
-        p.hips(0, -0.1 - 0.06 * k, -0.08 * k);
-        p.lean(0.45 * k, 0.2 * k);
-        p.arm('L', 0.9 * k + 0.1, 0.25, 0.4 + 0.6 * bump((b - 0.55) / 0.45), -0.3);
-        MUG(p, 0.5, 0.35, 1.5);
-        p.look(0.2 * k);
+        p.hips(0, -0.1 - 0.08 * k, -0.1 * k, 0.75 * k);
+        p.lean(0.55 * k, 0.25 * k);
+        p.arm('L', 0.2 + 1.3 * k, 0.25, 0.3 + 0.9 * press, -0.3);
+        MUG(p, 0.3 + 0.5 * k, 0.35, 1.5);
+        p.look(0.1 * k, -0.3 * k);
       }],
       [3, (p, b) => {
         const u = (b - 1) / 2, sc = Math.sin(TAU * u * 2);
         wideStance(p, 0.2);
-        p.hips(0.05 * sc, -0.2 - 0.06 * sc, -0.1);
-        p.lean(0.45 + 0.12 * sc, 0.25 + 0.15 * Math.sin(TAU * u * 2 - 0.8));
-        p.arm('L', 0.95 + 0.15 * sc, 0.2, 0.5, -0.3); MUG(p, 0.55, 0.4, 1.5);
-        p.look(0.25 + 0.15 * Math.sin(TAU * u * 2 - 1.4), 0.3 * Math.sin(TAU * u));
         // Hip bump into the lid on 3.
         const hb = bump((b - 2.3) / 0.7);
-        p.root(0.08 * hb, 0, 0); p.add('hips', 0, 0, 0.25 * hb);
+        p.hips(0.05 * sc - 0.1 * hb, -0.2 - 0.06 * sc, -0.12, 0.75);
+        p.add('hips', 0, 0, -0.3 * hb);
+        p.lean(0.55 + 0.15 * sc, 0.25 + 0.2 * Math.sin(TAU * u * 2 - 0.8));
+        p.arm('L', 1.5 + 0.2 * sc, 0.2, 0.3, -0.3); MUG(p, 0.8, 0.4, 1.5);
+        p.look(0.1 + 0.2 * Math.sin(TAU * u * 2 - 1.4), -0.3 + 0.3 * Math.sin(TAU * u));
       }],
       [Infinity, (p, b) => {
         const k = smooth((b - 3) / 0.4);
-        p.foot('L', 0.13); p.foot('R', 0.17, 0, 0.04, 0.3 * k);
-        p.hips(0.03, -0.1, 0, 0.15 * k);
-        p.lean(0.45 * (1 - k), 0.25 * (1 - k) - 0.05 * k);
-        p.arm('L', lerp(0.95, 1.3, k), 0.3, lerp(0.5, 1.6, k), -0.6);
+        p.foot('L', 0.15); p.foot('R', 0.17, 0, 0.04, 0.3 * k);
+        p.hips(0.03, -0.1, -0.12 * (1 - k), 0.75 * (1 - k) + 0.15 * k);
+        p.lean(0.55 * (1 - k), 0.25 * (1 - k) - 0.05 * k);
+        p.arm('L', lerp(1.5, 1.25, k), lerp(0.2, 0.35, k), lerp(0.3, 1.1, k), -0.6);
         MUG(p, 0.3, 0.35, 1.5);
-        p.look(lerp(0.25, 0.25, k), 0.35 * k, 0.1 * k);
+        p.look(0.2 * k, 0.4 * k, 0.12 * k);
       }],
     ]);
   },
@@ -171,7 +174,7 @@ export const moves = {
     p.arm('L', 2.5 + 0.35 * Math.sin(a), 0.6 + 0.35 * Math.cos(a), 0.7 + 0.3 * Math.sin(a + 1), -0.4);
     p.wrist('L', 0.4 * Math.cos(a));
     MUG(p, 0.2, 0.6, 1.2);
-    tie(p, 0.8 * Math.sin(a * 2), 0.35 + 0.3 * Math.cos(a * 2));
+    tie(p, 0.55 * Math.sin(a), 0.3 + 0.2 * Math.cos(a));
     p.lean(-0.04, -0.12, 0.1 * Math.sin(a));
     p.look(-0.15, 0.2 * Math.sin(a), 0);
   },
@@ -180,16 +183,16 @@ export const moves = {
   // slamming like a stapler on every beat — and a jump on 4.
   mondayStapler(p, b, B, s) {
     const ph = ((b % 4) + 4) % 4, f = frac(b), side = Math.cos(Math.PI * Math.round(b - f));
-    const jump = win(ph, 2.75, 4, 0.2);
+    const jump = win(b, 2.7, 5, 0.3);
     const up = bump(f / 0.8);
     const lifted = side > 0 ? 'R' : 'L', stand = side > 0 ? 'L' : 'R';
     const kneeK = Math.pow(Math.sin(Math.PI * f), 0.8) * (1 - jump);
-    const air = Math.sin(Math.PI * clamp01((ph - 3) / 0.85)) * jump;
-    p.foot(stand, 0.14, 0.32 * air); p.foot(lifted, 0.14 + 0.04 * kneeK, 0.36 * kneeK + 0.32 * air, 0.12 * kneeK);
+    const air = Math.pow(Math.sin(Math.PI * clamp01((b - 3) / 0.85)), 1.3) * jump;
+    p.foot(stand, 0.14, 0.32 * air); p.foot(lifted, 0.14 + 0.04 * kneeK, 0.46 * kneeK + 0.32 * air, 0.16 * kneeK);
     p.hips(0.07 * side * kneeK, -0.08 - 0.1 * (1 - up) * (1 - jump) + 0.36 * air - 0.12 * jump * (1 - air), 0, 0.12 * side * kneeK);
     // The stapler: clipboard raised on the "and", slammed down on the beat.
     const slam = 1 - up;
-    p.arm('L', lerp(1.9, 0.8, slam) * (1 - jump) + 2.7 * jump, lerp(0.2, 0.1, slam) * (1 - jump) + 0.5 * jump, lerp(1.4, 0.4, slam) * (1 - jump) + 0.2 * jump, -0.3);
+    p.arm('L', lerp(2.6, 0.7, slam) * (1 - jump) + 2.7 * jump, lerp(0.3, 0.1, slam) * (1 - jump) + 0.5 * jump, lerp(1.5, 0.3, slam) * (1 - jump) + 0.2 * jump, -0.3);
     MUG(p, 0.4 * (1 - jump) + 2.5 * jump, 0.35 + 0.3 * jump, 1.5 * (1 - jump) + 0.4 * jump);
     p.lean(0.2 * slam * (1 - jump) - 0.1 * jump, 0.15 * slam * (1 - jump) - 0.15 * jump, 0.1 * side * kneeK);
     p.look(0.2 * slam * (1 - jump) - 0.3 * jump, 0.15 * side * kneeK);
@@ -213,7 +216,8 @@ export const moves = {
         const t = smooth((b - 1) / 2);
         p.foot('L', 0.01, 0, 0, 0.6); p.foot('R', 0.08, 0.14 + 0.08 * bump(t), 0.05, 0.6);
         p.hips(0, 0.02, 0); p.root(0, 0, 0, TAU * 2 * t);
-        MUG(p, 0.4, 2.55, 0.15, 0); p.arm('L', 0.6, 0.45, 1.9, -0.6);
+        const r = smooth((b - 0.9) / 0.8);
+        p.arm('R', lerp(1.25, 0.4, r), lerp(0.15, 2.55, r), lerp(2.55, 0.15, r), lerp(-0.6, 0, r)); p.arm('L', 0.6, 0.45, lerp(0.6, 1.9, r), -0.6);
         p.look(-0.15);
       }],
       [Infinity, (p, b, B, s) => {
@@ -221,8 +225,8 @@ export const moves = {
         const k = smooth((b - 3) / 0.3);
         p.foot('L', 0.16, 0, 0.26 * k); p.foot('R', 0.15, 0, -0.18 * k, 0.6 * k);
         p.hips(0.02, -0.06 - 0.16 * k, 0.04 * k, 0.25 * k);
-        MUG(p, 1.2 + 1.3 * k, 0.4, 0.3 * (1 - k) + 0.1, 0);
-        p.arm('L', -0.3 * k, 0.4, 0.5);
+        p.arm('R', lerp(0.4, 2.5, k), lerp(2.55, 0.4, k), 0.15, 0);
+        p.arm('L', lerp(0.6, -0.3, k), 0.45, lerp(1.9, 0.5, k), -0.6 * (1 - k));
         p.lean(0.08 * k, -0.2 * k, 0.15 * k); p.look(-0.3 * k, 0.3 * k);
       }],
     ]);
@@ -243,10 +247,11 @@ export const moves = {
       [3, (p, b) => {
         const t = (b - 1) / 2, a = TAU * smooth(t);
         p.foot('L', 0.04, 0, 0.04); p.foot('R', 0.58, 0.03, 0.02);
-        p.hips(0.06, -0.47, -0.05); p.root(0, 0, 0, -a);
-        p.lean(0.4, 0.18, 0, -0.08);
-        p.arm('L', 1.0, 0.45, 0.4); MUG(p, 0.6, 0.9, 1.3);
-        p.look(0.1, -0.2);
+        const bob = Math.sin(TAU * b);
+        p.hips(0.06, -0.47 + 0.03 * bob, -0.05); p.root(0, 0, 0, -a);
+        p.lean(0.4 + 0.08 * bob, 0.18 + 0.1 * Math.sin(TAU * b - 0.8), 0.15 * Math.sin(Math.PI * b), -0.08);
+        p.arm('L', 1.0 + 0.25 * bob, 0.45, 0.4 + 0.3 * Math.sin(TAU * b - 1)); MUG(p, 0.6, 0.9 + 0.2 * bob, 1.3);
+        p.look(0.1 + 0.1 * bob, -0.2);
       }],
       [Infinity, (p, b, B, s) => {
         groove(p, B, s, 0.5);
@@ -265,17 +270,19 @@ export const moves = {
   // the whistle cord — TOOT TOOT.
   mondayJackTrain(p, b, B, s) {
     groove(p, B, s, 0.6);
-    const ph = ((b % 4) + 4) % 4, toot = win(ph, 2.75, 4, 0.25), k = 1 - toot;
-    const w = TAU * b * 2, c = Math.cos(w), sn = Math.sin(w);
+    const ph = b, toot = win(b, 2.6, 5, 0.4), k = 1 - toot;
+    const w = TAU * b, c = Math.cos(w), sn = Math.sin(w);
     const x = 0.06 * Math.sin(Math.PI * b / 2) * k;
     const st = Math.sin(TAU * b);                         // little shuffle steps
     p.footX('L', x + 0.15, 0.08 * Math.pow(0.5 + 0.5 * st, 3) * k, 0.02);
     p.footX('R', x - 0.15, 0.08 * Math.pow(0.5 - 0.5 * st, 3) * k, 0.02);
-    p.hips(x, -0.17 - 0.06 * Math.cos(TAU * b) * k + 0.06 * toot, -0.04 * k, 0.15 * Math.sin(Math.PI * b) * k);
-    p.lean(0.28 * k + 0.12 * Math.cos(TAU * b) * k - 0.08 * toot, 0.12 * k - 0.15 * toot, 0.05 * sn * k);
-    // Pistons: fists turning wheels at the hips, opposite phase.
-    p.arm('L', lerp(0.35 + 0.45 * sn, 2.7, toot), lerp(0.35, 0.35, toot), lerp(1.6 + 0.35 * c, lerp(0.3, 1.4, smooth((ph - 3.1) / 0.5)), toot), -0.3);
-    MUG(p, lerp(0.35 - 0.45 * sn, 0.2, toot), lerp(0.35, 0.5, toot), lerp(1.6 - 0.35 * c, 1.3, toot));
+    p.hips(x, -0.26 - 0.08 * Math.cos(TAU * b) * k + 0.16 * toot, -0.06 * k, 0.15 * Math.sin(Math.PI * b) * k);
+    p.lean(0.38 * k + 0.14 * Math.cos(TAU * b) * k - 0.08 * toot, 0.16 * k - 0.15 * toot, 0.08 * sn * k);
+    // Pistons: fists cranking big wheels at the sides, opposite phase; on 3
+    // the left hand reaches up and yanks the whistle cord twice.
+    const yank = Math.pow(0.5 + 0.5 * Math.cos(TAU * (b - 3) * 2), 1.5);
+    p.arm('L', lerp(0.55 + 0.75 * sn, 2.75 - 0.35 * (1 - yank), toot), lerp(0.3, 0.35, toot), lerp(1.5 + 0.6 * c, 0.3 + 1.2 * (1 - yank), toot), -0.3);
+    MUG(p, lerp(0.55 - 0.75 * sn, 0.2, toot), lerp(0.3, 0.5, toot), lerp(1.5 - 0.6 * c, 1.3, toot));
     p.look(0.1 * k - 0.35 * toot, 0.2 * Math.sin(Math.PI * b / 2) * k + 0.15 * toot);
     tie(p, 0.25 * Math.sin(Math.PI * b), 0.15 * k);
   },
@@ -322,9 +329,11 @@ export const moves = {
         p.lean(0.3 * k, 0.12 * k);
       }],
       [2, (p, b) => {
-        const t = b - 1, air = Math.sin(Math.PI * t);
-        p.hips(0, lerp(-0.32, -0.05, smooth(t / 0.2)) + 0.75 * air, 0);
-        p.foot('L', 0.14 + 0.12 * air, 0.62 * air, 0.42 * air, -0.3 * air); p.foot('R', 0.14 + 0.12 * air, 0.62 * air, 0.42 * air, -0.3 * air);
+        const t = b - 1, air = Math.sin(Math.PI * t), tuck = Math.pow(air, 1.6);
+        const hy = lerp(-0.32, -0.05, smooth(t / 0.3)) + 0.6 * air;
+        p.hips(0, hy, 0);
+        const fl = Math.max(0, hy + 0.03) * 0.9 + 0.3 * tuck;
+        p.foot('L', 0.14 + 0.12 * tuck, fl, 0.38 * tuck, -0.3 * tuck); p.foot('R', 0.14 + 0.12 * tuck, fl, 0.38 * tuck, -0.3 * tuck);
         p.arm('L', 0.3 + 2.4 * air, 0.3, 0.1); MUG(p, 0.3 + 2.2 * air, 0.35, 0.3, 0);
         p.lean(0.35 * air, 0.1 * air); p.look(0.2 * air);
       }],
@@ -356,27 +365,29 @@ export const moves = {
     phased(p, b, B, s, [
       [1, (p, b, B, s) => {
         groove(p, B, s, 0.8);
-        const sh = Math.sin(TAU * b * 4), k = smooth(b / 0.3);
+        const sh = Math.sin(TAU * b * 4), k = smooth(b / 0.6);
         wideStance(p, 0.2);
         p.hips(0, -0.12, 0, 0.15 * sh);
-        p.arm('L', 1.35 * k, 0.15, 2.3 * k, -0.9); MUG(p, 0.3, 0.7, 1.2);
+        p.arm('L', 1.35 * k + 0.15, 0.3 - 0.15 * k, 0.8 + 1.5 * k, -0.9 * k); MUG(p, 0.3, 0.7, 1.2);
         p.shrug(0.16 * sh, -0.16 * sh); p.add('chest', 0, 0.12 * sh, 0);
         tie(p, 0.5 * Math.sin(TAU * b * 2), 0.3 * k);
         p.look(-0.15, 0.2 * sh, 0.15);
       }],
       [2.1, (p, b) => {
         const t = smooth((b - 1) / 1.1);
-        p.foot('L', 0.02, 0, 0, 0.4); p.foot('R', 0.1, 0.12 * bump(t) + 0.02, 0.05, 0.4);
-        p.hips(0, -0.04 - 0.3 * t, 0); p.root(0, 0, 0, TAU * 2 * t);
+        const ext = smooth((b - 1.6) / 0.5);
+        p.foot('L', 0.02 + 0.02 * ext, 0, 0.04 * ext, 0.4 * (1 - ext)); p.foot('R', 0.1 + 0.46 * ext, 0.12 * bump(t) + 0.03, 0.05 - 0.03 * ext, 0.4 * (1 - ext));
+        p.hips(0.06 * ext, -0.04 - 0.42 * t, -0.05 * ext); p.root(0, 0, 0, TAU * 2 * t);
         p.arm('L', 0.6, 1.4, 0.5); MUG(p, 0.4, 1.4, 0.6, 0);
         p.lean(0.2 * t);
       }],
       [3.2, (p, b) => {
         const t = (b - 2.1) / 1.1, a = TAU * smooth(t);
         p.foot('L', 0.04, 0, 0.04); p.foot('R', 0.56, 0.03, 0.02);
-        p.hips(0.06, -0.46, -0.05); p.root(0, 0, 0, -a);
-        p.lean(0.4, 0.18, 0, -0.08);
-        p.arm('L', 1.0, 0.45, 0.4); MUG(p, 0.6, 1.0, 1.2);
+        const bob = Math.sin(TAU * b);
+        p.hips(0.06, -0.46 + 0.03 * bob, -0.05); p.root(0, 0, 0, -a);
+        p.lean(0.4 + 0.08 * bob, 0.18 + 0.1 * Math.sin(TAU * b - 0.8), 0, -0.08);
+        p.arm('L', 1.0 + 0.25 * bob, 0.45, 0.4 + 0.3 * Math.sin(TAU * b - 1)); MUG(p, 0.6, 1.0, 1.2);
         p.look(0.1, -0.2);
       }],
       [Infinity, (p, b, B, s) => {
@@ -393,6 +404,9 @@ export const moves = {
   // ── Battle actions ──────────────────────────────────────────
   // Intro (faces the player, +x): taps the watch, points you out, writes
   // you up on the clipboard, "tsk tsk" and a smug sip.
+  // faceFoe moves are mirrored for the rival, so here the mug is authored on
+  // the LEFT arm and the clipboard on the RIGHT — they land on the right
+  // hands once mirrored.
   mondayIntro(p, b, B, s) {
     groove(p, B, s, 0.4);
     p.foot('L', 0.13, 0, 0.08); p.foot('R', 0.16, 0, -0.05, 0.3);
@@ -400,57 +414,65 @@ export const moves = {
       [1, (p, b) => {
         const tap = Math.sin(TAU * b * 3);
         p.hips(0, -0.06, 0, 0.35);
-        p.arm('L', 1.35, 0.35, 2.05, -1.0);
-        p.arm('R', 1.05, 0.0, 1.9 + 0.12 * tap, -0.8);
-        p.look(0.3, 0.3, 0.1); p.lean(0.03, -0.05);
+        p.arm('R', 1.35, 0.35, 2.05, -1.0);                      // watch (clipboard hand)
+        p.arm('L', 1.05, 0.0, 1.9 + 0.12 * tap, -0.8);           // tapping it
+        p.look(0.3, -0.1, -0.1); p.lean(0.03, -0.05);
       }],
       [2, (p, b) => {
-        const k = smooth((b - 1) / 0.25);
-        p.hips(0.02, -0.07, 0, 0.6);
-        p.arm('L', 0.3, 0.2 + 1.3 * k, 0.15); MUG(p, 0.3, 0.3, 1.5);
-        p.lean(0, -0.12 * k, 0.2 * k); p.look(-0.08, 0.35 * k);
+        const k = smooth((b - 0.9) / 0.5);
+        p.hips(0.02, -0.07, 0, 0.75);
+        // Points you out with the clipboard hand, across the body.
+        p.arm('R', lerp(1.35, 1.45, k), lerp(0.35, -0.55, k), lerp(2.05, 0.1, k), lerp(-1.0, 0, k));
+        p.arm('L', 0.25, 0.3, 1.5, -0.25);
+        p.lean(0, -0.12 * k, 0.25 * k); p.look(-0.08, 0.3 * k);
       }],
       [3, (p, b) => {
         const w = Math.sin(TAU * (b - 2) * 4);
         p.hips(0, -0.06, 0, 0.45);
-        p.arm('L', 1.1, 0.0, 1.6, -0.9);
-        p.arm('R', 1.0, -0.05, 1.7 + 0.15 * w, -0.9);
-        p.look(0.35, 0.05 + 0.08 * w); p.lean(0.06, 0.05);
+        p.arm('R', 1.1, 0.0, 1.6, -0.9);                         // clipboard up
+        p.arm('L', 1.0, -0.05, 1.7 + 0.15 * w, -0.9);            // scribbling
+        p.look(0.35, -0.05 + 0.08 * w); p.lean(0.06, 0.05);
       }],
       [Infinity, (p, b) => {
         const k = smooth((b - 3) / 0.3), shake = Math.sin(TAU * (b - 3) * 3) * (1 - smooth((b - 3.6) / 0.3));
+        const sip = smooth((b - 3.3) / 0.4);
         p.hips(0.03, -0.07, 0, 0.45);
-        CLIP(p, 0.2, 0.3, 0.8); SIP(p, smooth((b - 3.3) / 0.4));
+        p.arm('R', 0.15, 0.3, 0.8, -0.2);
+        p.arm('L', lerp(0.25, 1.25, sip), lerp(0.28, 0.15, sip), lerp(1.55, 2.55, sip), lerp(-0.25, -0.6, sip));
         p.look(-0.1, 0.3 + 0.3 * shake * k, 0.1); p.lean(-0.04, -0.12 * k);
       }],
     ]);
   },
 
-  // TPS REPORTS: rips the papers off the clipboard and flings them (thrown
-  // at +0.75 beats), dusts off, smug sip. Faces the foe (+x).
+  // TPS REPORTS: rips the papers off the clipboard and flings them
+  // backhand across his body at you (thrown at +0.75 beats), dusts off,
+  // smug sip. Faces the foe (+x); props authored mirrored (see above).
   mondayTaunt(p, b, B, s) {
     groove(p, B, s, 0.4);
     p.foot('L', 0.14, 0, 0.12); p.foot('R', 0.16, 0, -0.08, 0.35);
     phased(p, b, B, s, [
       [0.55, (p, b) => {
         const k = smooth(b / 0.5);
-        p.hips(-0.03, -0.08, -0.03, 0.4);
-        p.arm('L', 0.9 + 1.9 * k, 0.4 + 0.3 * k, 0.9 + 0.7 * k, -0.4);
-        MUG(p, 0.35, 0.3, 1.5);
-        p.lean(-0.05 * k, -0.2 * k, -0.15 * k); p.look(-0.1, 0.3);
+        p.hips(-0.03, -0.1, -0.03, 0.3 + 0.3 * k);
+        // Wind up: clipboard hand cocked back over the far shoulder.
+        p.arm('R', 0.6 + 0.9 * k, -0.3 - 0.5 * k, 1.0 + 1.1 * k, -0.6 * k);
+        p.arm('L', 0.3, 0.3, 1.5, -0.25);
+        p.lean(0.05 * k, -0.1 * k, -0.2 * k); p.look(-0.1, 0.35);
       }],
       [1.5, (p, b) => {
         const t = smooth((b - 0.55) / 0.3);
-        p.hips(0.04 * t, -0.1, 0.05 * t, 0.75);
-        p.arm('L', lerp(2.8, 1.35, t), lerp(0.7, 1.25, t), lerp(1.6, 0.05, t), -0.4);
-        MUG(p, 0.35, 0.3, 1.5);
-        p.lean(0.18 * t, 0.1 * t, 0.2 * t); p.look(-0.05, 0.35);
+        p.hips(0.04 * t, -0.1, 0.05 * t, 0.6 + 0.3 * t);
+        // Backhand fling: the arm whips out toward the foe.
+        p.arm('R', lerp(1.5, 1.55, t), lerp(-0.8, 0.2, t), lerp(2.1, 0.05, t), lerp(-0.6, 0, t));
+        p.arm('L', 0.3, 0.3, 1.5, -0.25);
+        p.lean(0.18 * t, 0.1 * t, 0.3 * t); p.look(-0.05, 0.35);
       }],
       [Infinity, (p, b) => {
         const k = smooth((b - 1.5) / 0.4), d = Math.sin(TAU * (b - 1.5) * 3) * (1 - smooth((b - 2.3) / 0.3));
+        const sip = smooth((b - 2.2) / 0.5);
         p.hips(0.02, -0.08, 0.02, 0.6);
-        p.arm('L', 0.5, 0.45 + 0.1 * d, 1.0 + 0.4 * d, -0.4);
-        SIP(p, smooth((b - 2.2) / 0.5));
+        p.arm('R', 0.5, 0.45 + 0.1 * d, 1.0 + 0.4 * d, -0.4);
+        p.arm('L', lerp(0.3, 1.25, sip), lerp(0.3, 0.15, sip), lerp(1.5, 2.55, sip), lerp(-0.25, -0.6, sip));
         p.lean(0.02, -0.15 * k); p.look(-0.2 * k, 0.3, 0.1);
       }],
     ]);
