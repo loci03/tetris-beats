@@ -280,8 +280,8 @@ export const moves = {
     p.lean(0.38 * k + 0.14 * Math.cos(TAU * b) * k - 0.08 * toot, 0.16 * k - 0.15 * toot, 0.08 * sn * k);
     // Pistons: fists cranking big wheels at the sides, opposite phase; on 3
     // the left hand reaches up and yanks the whistle cord twice.
-    const yank = Math.pow(0.5 + 0.5 * Math.cos(TAU * (b - 3) * 2), 1.5);
-    p.arm('L', lerp(0.55 + 0.75 * sn, 2.75 - 0.35 * (1 - yank), toot), lerp(0.3, 0.35, toot), lerp(1.5 + 0.6 * c, 0.3 + 1.2 * (1 - yank), toot), -0.3);
+    const yank = Math.pow(0.5 + 0.5 * Math.cos(TAU * (b - 3) * 1.5), 1.5);
+    p.arm('L', lerp(0.55 + 0.75 * sn, 2.75 - 0.35 * (1 - yank), toot), lerp(0.3, 0.35, toot), lerp(1.5 + 0.6 * c, 0.4 + 0.9 * (1 - yank), toot), -0.3);
     MUG(p, lerp(0.55 - 0.75 * sn, 0.2, toot), lerp(0.3, 0.5, toot), lerp(1.5 - 0.6 * c, 1.3, toot));
     p.look(0.1 * k - 0.35 * toot, 0.2 * Math.sin(Math.PI * b / 2) * k + 0.15 * toot);
     tie(p, 0.25 * Math.sin(Math.PI * b), 0.15 * k);
