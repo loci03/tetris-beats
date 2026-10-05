@@ -215,9 +215,9 @@ export const moves = {
     groove(p, B, s, 0.5);
     const a = PI * b * 2;                                      // one step per pulse
     const sL = Math.sin(a), sR = -sL;
-    p.foot('L', 0.12, 0.06 * (0.5 + 0.5 * Math.cos(a)) ** 3, 0.14 * sL, 0.5 * (0.5 - 0.5 * sL));
-    p.foot('R', 0.12, 0.06 * (0.5 - 0.5 * Math.cos(a)) ** 3, 0.14 * sR, 0.5 * (0.5 - 0.5 * sR));
-    p.hips(0.03 * Math.sin(PI * b), -0.12 - 0.03 * Math.cos(a * 2), 0, 0.15 * Math.sin(PI * b));
+    p.foot('L', 0.14 + 0.07 * sL, 0.08 * (0.5 + 0.5 * Math.cos(a)) ** 3, 0.22 * sL, 0.6 * (0.5 - 0.5 * sL));
+    p.foot('R', 0.14 + 0.07 * sR, 0.08 * (0.5 - 0.5 * Math.cos(a)) ** 3, 0.22 * sR, 0.6 * (0.5 - 0.5 * sR));
+    p.hips(0.05 * Math.sin(PI * b), -0.14 - 0.04 * Math.cos(a * 2), 0, 0.25 * Math.sin(a));
     p.arm('L', 0.7 + 0.5 * Math.sin(PI * b), 0.6 + 0.3 * Math.cos(PI * b), 0.9 - 0.4 * Math.sin(PI * b), -0.2);
     p.arm('R', 0.7 - 0.5 * Math.sin(PI * b), 0.6 - 0.3 * Math.cos(PI * b), 0.9 + 0.4 * Math.sin(PI * b), -0.2);
     p.wrist('L', 0.5 * Math.sin(PI * b - 0.7)); p.wrist('R', -0.5 * Math.sin(PI * b - 0.7));

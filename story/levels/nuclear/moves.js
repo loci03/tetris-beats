@@ -10,9 +10,9 @@ const bump = (x) => Math.sin(Math.PI * clamp01(x));
 // Thriller claws: forearm up, wrist cocked back. `h` 0 → by the hip, 1 → up by the head.
 const claw = (p, side, h = 1, out = 1.25) => { p.arm(side, lerp(0.5, 0.75, h), lerp(0.5, out, h), lerp(1.2, 1.7, h), lerp(-0.3, 0.9, h)); p.wrist(side, -0.7, 0.2); };
 // Zombie reach: arms straight out in front, hands drooping.
-const reach = (p, k = 1, bob = 0) => { p.arm('L', lerp(0.1, 1.45 + bob, k), lerp(0.14, 0.15, k), lerp(0.25, 0.15, k)); p.arm('R', lerp(0.1, 1.4 - bob, k), lerp(0.14, 0.12, k), lerp(0.25, 0.2, k)); p.wrist('L', 0.75 * k); p.wrist('R', 0.75 * k); };
+const reach = (p, k = 1, bob = 0) => { p.arm('L', lerp(0.1, 1.3 + bob, k), lerp(0.14, 0.42, k), lerp(0.25, 0.15, k)); p.arm('R', lerp(0.1, 1.25 - bob, k), lerp(0.14, 0.38, k), lerp(0.25, 0.25, k)); p.wrist('L', 0.75 * k); p.wrist('R', 0.75 * k); };
 // A limb that flops limp: 0 → raised, 1 → fallen, with a damped wobble.
-const flop = (t) => { t = clamp01(t); return 1 - Math.cos(t * Math.PI * 2.5) * Math.exp(-t * 5); };
+const flop = (t) => { t = clamp01(t); return 1 - Math.cos(t * Math.PI * 1.3) * Math.exp(-t * 2.4); };
 // Smooth "jolts": a staircase of quick smoothsteps at each half-beat.
 const stairs = (b, from, n, step = 0.5, w = 0.18) => { let v = 0; for (let i = 0; i < n; i++) v += smooth((b - from - i * step) / w); return v / n; };
 
@@ -40,8 +40,8 @@ export const moves = {
     p.hips(0.1 * sw, -0.12 - 0.08 * buck, 0, 0.12 * sw);
     p.add('hips', 0, 0, -0.12 * sw);
     p.lean(0.12, 0.08, 0.15 * sw, 0.16 * sw);
-    p.arm('L', 0.15 + 0.25 * lag, 0.14 + 0.35 * Math.max(0.0, 0.5 + 0.5 * lag), 0.25 + 0.2 * (0.5 - 0.5 * lag));
-    p.arm('R', 0.15 - 0.25 * lag, 0.14 + 0.35 * Math.max(0.0, 0.5 - 0.5 * lag), 0.25 + 0.2 * (0.5 + 0.5 * lag));
+    p.arm('L', 0.2 + 0.5 * lag, 0.14 + 0.7 * (0.5 + 0.5 * lag), 0.25 + 0.3 * (0.5 - 0.5 * lag));
+    p.arm('R', 0.2 - 0.5 * lag, 0.14 + 0.7 * (0.5 - 0.5 * lag), 0.25 + 0.3 * (0.5 + 0.5 * lag));
     p.wrist('L', 0.5 + 0.2 * lag); p.wrist('R', 0.5 - 0.2 * lag);
     p.look(0.18, -0.15 * lag, -0.25 * lag);
   },
@@ -101,7 +101,7 @@ export const moves = {
   rexLimbFlop(p, b, B, s) {
     groove(p, B, s, 0.6);
     wideStance(p, 0.18);
-    const fl = (a) => flop((b - a) / 0.75) * (1 - smooth((b - a - 0.75) / 0.2));
+    const fl = (a) => flop((b - a) / 0.85) * (1 - smooth((b - a - 0.68) / 0.3));
     const L = Math.max(fl(0.15), fl(3.15)), R = Math.max(fl(1.15), fl(3.15)), H = fl(2.15);
     p.hips(0.05 * (R - L), -0.14 - 0.06 * H, 0, 0.1 * (L - R));
     p.arm('L', lerp(0.5, 0.0, L), lerp(2.6, 0.2, L), lerp(0.3, 0.1, L)); p.wrist('L', 0.8 * L);
@@ -147,16 +147,18 @@ export const moves = {
         groove(p, B, s, 0.25);
         const k = smooth(b / 1.0), wob = Math.sin(TAU * b * 1.5) * k;
         p.foot('L', 0.13, 0, -0.02, 0.15 * k); p.foot('R', 0.13, 0, -0.02, 0.15 * k);
-        p.hips(0.01 * wob, -0.06 - 0.02 * k, 0.3 * k);
-        p.lean(0.32 * k, 0.12 * k, 0.04 * wob);
+        p.root(0, 0, 0, 0.9 * k);
+        p.hips(0.01 * wob, -0.06 - 0.02 * k, 0.32 * k);
+        p.lean(0.36 * k, 0.12 * k, 0.04 * wob);
         reach(p, k, 0.08 * wob); p.look(-0.25 * k, 0.1 * wob, 0.15 * k);
       }],
       [Infinity, (p, b, B, s) => {
         groove(p, B, s, 0.5);
         const k = smooth((b - 2.75) / 0.3);
         wideStance(p, 0.13 + 0.09 * k);
-        p.hips(0, -0.08 - 0.12 * k, 0.3 * (1 - k), 0.2 * k);
-        p.lean(0.32 * (1 - k) - 0.05 * k, 0.12 * (1 - k) - 0.1 * k);
+        p.root(0, 0, 0, 0.9 * (1 - k));
+        p.hips(0, -0.08 - 0.12 * k, 0.32 * (1 - k), 0.2 * k);
+        p.lean(0.36 * (1 - k) - 0.05 * k, 0.12 * (1 - k) - 0.1 * k);
         claw(p, 'L', k, 1.4); claw(p, 'R', k, 1.4); p.look(-0.25 * (1 - k) - 0.1 * k, 0.3 * k, -0.4 * k);
       }],
     ]);
@@ -185,7 +187,7 @@ export const moves = {
     wideStance(p, 0.2 + 0.06 * lvl);
     p.hips(0, -0.06 - 0.5 * lvl, -0.08 * lvl);
     p.lean(0.7 * lvl - 0.12 * roar, 0.3 * lvl - 0.15 * roar);
-    const aL = smooth((b - 1.0) / 0.2), aR = smooth((b - 1.5) / 0.2);
+    const aL = smooth((b - 0.9) / 0.4), aR = smooth((b - 1.4) / 0.4);
     p.arm('L', lerp(lerp(0.6, 0.9, down), 2.9, aL * (1 - roar)) * (1 - roar) + 0.75 * roar, lerp(0.3, 0.3, aL) * (1 - roar) + 1.5 * roar, 0.3 * (1 - roar) + 1.7 * roar, 0.9 * roar);
     p.arm('R', lerp(lerp(0.6, 0.9, down), 2.9, aR * (1 - roar)) * (1 - roar) + 0.75 * roar, lerp(0.3, 0.3, aR) * (1 - roar) + 1.5 * roar, 0.3 * (1 - roar) + 1.7 * roar, 0.9 * roar);
     p.wrist('L', -0.7 * roar + 0.5 * (1 - aL)); p.wrist('R', -0.7 * roar + 0.5 * (1 - aR));
@@ -201,7 +203,7 @@ export const moves = {
       [2.4, (p, b, B, s) => {
         groove(p, B, s, 0.3);
         const arch = smooth(b / 0.9);
-        const c1 = smooth((b - 1.0) / 0.12), c2 = smooth((b - 1.25) / 0.12), c3 = smooth((b - 1.5) / 0.12), c4 = smooth((b - 1.75) / 0.12), c5 = smooth((b - 2.0) / 0.12);
+        const c1 = smooth((b - 1.0) / 0.2), c2 = smooth((b - 1.25) / 0.2), c3 = smooth((b - 1.5) / 0.2), c4 = smooth((b - 1.75) / 0.2), c5 = smooth((b - 2.0) / 0.2);
         wideStance(p, 0.2);
         p.hips(0, -0.12 - 0.06 * c5, 0.08 * arch * (1 - c4));
         p.add('spine', -0.35 * arch * (1 - c4)); p.add('chest', -0.35 * arch * (1 - c3));
@@ -238,7 +240,8 @@ export const moves = {
   // dragging flat, the other rolling off its toes, arms reaching forward.
   rexMoonShamble(p, b, B, s) {
     groove(p, B, s, 0.5);
-    const glide = b < 3 ? b : 3, z0 = -0.12 * glide + 0.36 * smooth((b - 3) / 0.9);
+    const glide = b < 3 ? b : 3, z0 = -0.09 * glide + 0.27 * smooth((b - 3) / 0.9);
+    p.root(0, 0, 0, 1.2 * smooth(b / 0.4) * (1 - smooth((b - 3.2) / 0.6)));      // shown in profile
     const ph = frac(b), sideK = Math.cos(Math.PI * (b - ph));       // which foot is flat this beat
     const flatSlide = smooth(ph), toeUp = 0.7 * (1 - smooth((ph - 0.7) / 0.3));
     const back = b < 3 ? 1 : 1 - smooth((b - 3) / 0.6);
