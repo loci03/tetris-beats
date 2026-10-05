@@ -6,6 +6,7 @@
 // swipe input plus GROOVE / TAUNT buttons.
 
 import { LOOKAHEAD } from './rhythm-battle.js';
+import { DRAW } from './anime-fx.js';
 
 const DIR_GLYPH = { L: '←', U: '↑', D: '↓', R: '→' };
 const DIR_COLOR = { L: '#ff4f9a', U: '#39d0ff', D: '#4be08a', R: '#ffa53a' };
@@ -46,7 +47,7 @@ export class BattleHUD {
     this.callout = el('div', 'sh-callout', this.root);
     this.rivalJudge = el('div', 'sh-rjudge', this.root);
 
-    const bottom = el('div', 'sh-bottom', this.root);
+    const bottom = this.bottom = el('div', 'sh-bottom', this.root);
     this.hint = el('div', 'sh-hint', bottom, isTouch
       ? 'Swipe the arrows any time · tap GROOVE on beat 4'
       : 'Enter the arrows (← ↑ ↓ → / WASD) any time · SPACE on beat 4 · T = TAUNT');
@@ -412,8 +413,61 @@ export class BattleHUD {
     this._calloutTimer = setTimeout(() => { c.className = 'sh-callout ' + kind; }, ms);
   }
 
+  // A landed taunt messes with the victim's controls until the stun ends.
+  // `kind` is one or more effects joined by '+':
+  //   shake · wobble · blur · glitch · flash · darkness · spin   (the panel itself)
+  //   float · fall · swirl · splat · cloud                        (marks of `sprite` over it)
+  disrupt(kind, { sprite = 'note', color = '#ffffff', ms = 2500 } = {}) {
+    const kinds = String(kind || 'shake').split('+');
+    const b = this.bottom;
+    const css = kinds.filter(k => ['shake', 'wobble', 'blur', 'glitch', 'flash', 'darkness', 'spin'].includes(k));
+    for (const k of css) { b.classList.remove('dz-' + k); void b.offsetWidth; b.classList.add('dz-' + k); }
+    b.style.setProperty('--dz-color', color);
+    clearTimeout(this._dzTimer);
+    this._dzTimer = setTimeout(() => { for (const k of css) b.classList.remove('dz-' + k); }, ms);
+    const pattern = kinds.find(k => ['float', 'fall', 'swirl', 'splat', 'cloud'].includes(k));
+    if (!pattern || !DRAW[sprite]) return;
+    // Marks over the command panel + lane, drawn from the same sprite
+    // painters as the 3D anime FX.
+    if (!this._dzCanvas) this._dzCanvas = el('canvas', 'sh-disrupt', b);
+    const cv = this._dzCanvas, r = b.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    const img = document.createElement('canvas'); img.width = img.height = 128;
+    DRAW[sprite](img.getContext('2d'), 128);
+    const W = cv.width, H = cv.height, N = pattern === 'cloud' ? 7 : pattern === 'splat' ? 9 : 16;
+    const parts = Array.from({ length: N }, (_, i) => ({
+      x: Math.random() * W, y: pattern === 'fall' ? -Math.random() * H : pattern === 'float' ? H + Math.random() * H * 0.5 : Math.random() * H,
+      s: (pattern === 'cloud' ? 0.9 : pattern === 'splat' ? 0.55 : 0.32) * H * (0.7 + Math.random() * 0.6),
+      vx: (Math.random() - 0.5) * W * 0.15, vy: (pattern === 'fall' ? 1 : -1) * H * (0.25 + Math.random() * 0.35),
+      a: Math.random() * 6.28, va: (Math.random() - 0.5) * 3, delay: pattern === 'splat' ? i * 0.09 : 0, ph: Math.random() * 6.28,
+    }));
+    const g = cv.getContext('2d'), t0 = performance.now(), dur = ms / 1000;
+    cancelAnimationFrame(this._dzRaf);
+    const step = () => {
+      const t = (performance.now() - t0) / 1000;
+      g.clearRect(0, 0, W, H);
+      if (t > dur) { cv.remove(); this._dzCanvas = null; return; }
+      const fade = Math.min(1, (dur - t) / 0.4);
+      for (const p of parts) {
+        const lt = t - p.delay;
+        if (lt < 0) continue;
+        let x = p.x, y = p.y, s = p.s, a = p.a + p.va * lt, al = fade;
+        if (pattern === 'fall' || pattern === 'float') { x += p.vx * lt + Math.sin(lt * 2 + p.ph) * H * 0.08; y += p.vy * lt; if (pattern === 'fall' && y > H + s) p.y -= H + 2 * s; if (pattern === 'float' && y < -s) p.y += H + 2 * s; }
+        else if (pattern === 'swirl') { const R = Math.min(W, H) * 0.4, ang = p.ph + lt * 2.2; x = W / 2 + Math.cos(ang) * R * (0.4 + 0.6 * ((p.a % 1 + 1) % 1)) * (W / H) * 0.5; y = H / 2 + Math.sin(ang) * R; }
+        else if (pattern === 'splat') { s *= Math.min(1, lt * 8) * (1 + 0.05 * Math.sin(lt * 9)); al *= 0.92; a = p.a; }
+        else if (pattern === 'cloud') { x += Math.sin(lt * 0.7 + p.ph) * W * 0.05; s *= 1 + 0.08 * Math.sin(lt * 1.3 + p.ph); al *= 0.82; a = 0; }
+        g.globalAlpha = al;
+        g.save(); g.translate(x, y); g.rotate(a); g.drawImage(img, -s / 2, -s / 2, s, s); g.restore();
+      }
+      g.globalAlpha = 1;
+      this._dzRaf = requestAnimationFrame(step);
+    };
+    step();
+  }
+
   destroy() {
-    clearTimeout(this._bannerTimer); clearTimeout(this._calloutTimer);
+    clearTimeout(this._bannerTimer); clearTimeout(this._calloutTimer); clearTimeout(this._dzTimer);
+    cancelAnimationFrame(this._dzRaf);
     this.root.remove();
   }
 }

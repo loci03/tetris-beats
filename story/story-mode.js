@@ -12,7 +12,7 @@
 // reset — board, score, queue, hold and level are preserved), runs a
 // BattleSession, then hands the match back with the battle bonus added.
 
-import { STORY_LEVELS, DEFAULT_LEVEL } from './levels.js';
+import { STORY_LEVELS, DEFAULT_LEVEL, loadLevel } from './levels.js';
 
 export function createStoryMode(bridge) {
   return new StoryModeManager(bridge);
@@ -101,10 +101,12 @@ class StoryModeManager {
     document.addEventListener('visibilitychange', this._onVis);
     try {
       this.bridge.ensureAudio();
-      const { BattleSession } = await (this._sessionModule = this._sessionModule || import('./battle-session.js'));
+      const [{ BattleSession }, mod] = await Promise.all([
+        (this._sessionModule = this._sessionModule || import('./battle-session.js')), loadLevel(this.level.id),
+      ]);
       if (this.phase !== 'beat') return;
       this.session = new BattleSession({
-        bridge: this.bridge, level: this.level, standalone: true,
+        bridge: this.bridge, level: this.level, standalone: true, buildWorld: mod.buildWorld,
         onDone: (r) => this._beatResult(r),
         onPause: () => this._beatPause(!this.session.paused),
       });
@@ -215,10 +217,12 @@ class StoryModeManager {
   // ── Event flow ────────────────────────────────────────────────────
   async _enter(cells, impactRow) {
     try {
-      const { BattleSession } = await (this._sessionModule || import('./battle-session.js'));
+      const [{ BattleSession }, mod] = await Promise.all([
+        (this._sessionModule = this._sessionModule || import('./battle-session.js')), loadLevel(this.level.id),
+      ]);
       if (this.phase !== 'triggered') return;       // quit / restarted meanwhile
       this.session = new BattleSession({
-        bridge: this.bridge, level: this.level, specialCells: cells, impactRow,
+        bridge: this.bridge, level: this.level, specialCells: cells, impactRow, buildWorld: mod.buildWorld,
         onDone: (r) => this._return(r),
       });
       await this.session.start();

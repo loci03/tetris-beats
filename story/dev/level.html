@@ -1,0 +1,69 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Level dev</title>
+<style>body{margin:0;background:#111}canvas{display:block}</style></head><body>
+<script type="module">
+// Dev harness for level modules (not shipped in the game UI).
+//   story/dev/level.html?level=ferrari
+// window.shot({ beat, move, at, who, cam, faceFoe, react }) → JPEG data URL
+//   beat : song beat to render (dancers groove on the song's grid)
+//   move : a move name for `who` to perform (default: both groove)
+//   at   : how many beats into `move` to render (default 0)
+//   who  : 'rival' | 'player' | 'both'
+//   cam  : 'two' | 'close' | 'orbit' | 'solo' | 'taunt' | 'wide' | 'backdrop'
+//   react: [kind, data] fired at the start of the warm-up (e.g. ['solo', {who:'rival', songTime:0, until:9}])
+import * as THREE from '../../vendor/three/three.module.min.js';
+import { STORY_LEVELS, loadLevel } from '../levels.js';
+import { createCharacter, CHARACTERS } from '../characters.js';
+import { DanceController, MOVES } from '../dance.js';
+import { CameraDirector } from '../camera.js';
+import { AnimeFx } from '../anime-fx.js';
+const q = new URLSearchParams(location.search);
+const id = q.get('level') || 'taco';
+const W = +(q.get('w') || 1280), H = +(q.get('h') || 720);
+try {
+  const mod = await loadLevel(id);
+  const level = STORY_LEVELS[id], m = level.music, spb = 60 / m.bpm;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(W, H); document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene(); scene.fog = new THREE.Fog(0x2a0f3a, 22, 70);
+  const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 220); scene.add(camera);
+  const world = mod.buildWorld({ lowGraphics: false });
+  scene.add(world.group); world.setLightLevel(1);
+  const pDef = CHARACTERS.player, rDef = CHARACTERS[level.dancers.rival];
+  const pRig = createCharacter(pDef), rRig = createCharacter(rDef);
+  pRig.root.position.copy(world.anchors.player); rRig.root.position.copy(world.anchors.rival);
+  pRig.baseYaw = 0.32; rRig.baseYaw = -0.32; scene.add(pRig.root, rRig.root);
+  const style = (d) => ({ ...d.style, bounceRate: m.bounce || 1, spb });
+  const dp = new DanceController(pRig, style(pDef), +1), dr = new DanceController(rRig, style(rDef), -1);
+  const fx = new AnimeFx(scene);
+  const dir = new CameraDirector(camera, world.anchors);
+  window.info = { id, level, boss: rDef, moves: Object.keys(MOVES), bpm: m.bpm, spb };
+  window.fx = fx; window.world = world; window.rigs = { player: pRig, rival: rRig };
+  window.shot = ({ beat = 8, move = null, at = 0, who = 'rival', cam = 'two', faceFoe = false, react = null, warm = 2, acc = null } = {}) => {
+    const dcs = { player: dp, rival: dr };
+    for (const [k, d] of Object.entries(dcs)) {
+      d.queue = []; d.prev = null; d._lastBeat = null;
+      const mine = move && (who === k || who === 'both');
+      d.cur = mine ? { name: move, start: beat - at, len: 999, faceFoe } : { name: 'groove', start: 0, len: Infinity, faceFoe: false };
+      d.fadeStart = -99;
+    }
+    const whoCam = who === 'player' ? 'player' : 'rival';
+    if (cam === 'backdrop' && mod.backdrop && mod.backdrop.camera) {
+      const c = mod.backdrop.camera; camera.position.set(...c.pos); camera.lookAt(new THREE.Vector3(...c.look)); camera.fov = c.fov || 50; camera.updateProjectionMatrix();
+    } else if (cam === 'backdrop' || cam === 'wide') {
+      camera.position.set(0, 2.6, cam === 'wide' ? 13 : 11.5); camera.lookAt(0, 1.4, 0); camera.fov = 50; camera.updateProjectionMatrix();
+    } else dir.cut(cam, beat - warm, warm + 8, { who: whoCam });
+    if (react) world.react(react[0], react[1] || {});
+    const step = (1 / 60) / spb;
+    for (let b = beat - warm; b <= beat + 1e-6; b += step) {
+      const st = m.firstBeat + b * spb;
+      dp.update(b, acc); dr.update(b, acc);
+      world.update(1 / 60, { beat: b, songTime: st, leader: 0 });
+      fx.update(1 / 60);
+      if (cam !== 'backdrop' && cam !== 'wide') dir.update(1 / 60, { beat: b, leader: 0 });
+    }
+    renderer.render(scene, camera);
+    return renderer.domElement.toDataURL('image/jpeg', 0.85);
+  };
+  window.ready = true;
+} catch (e) { window.__err = String(e && e.stack || e); console.error(e); }
+</script></body></html>

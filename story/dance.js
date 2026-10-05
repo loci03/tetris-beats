@@ -187,6 +187,8 @@ function groove(p, B, s, amt = 1) {
   const d = down * amt * s.bounce * accent * e;
   // Each dancer has their own feel, so even grooving they don't move alike.
   const feel = s.feel || 'down';
+  // A level module can bring its own: feel(p, { B, Bb, down, d, amt, e, s }).
+  if (typeof feel === 'function') { feel(p, { B, Bb, down, d, amt, e, s }); return; }
   if (feel === 'up') {
     // Disco: pops UP on the beat — knees straighten, chest lifts, chin up,
     // shoulders jive between beats.
@@ -308,7 +310,7 @@ export const MOVES = {
     [3.75, (p) => { p.foot('L', 0.13); p.foot('R', 0.15, 0.32, 0.08, 0.2); p.hips(0, -0.06, -0.02); fists(p, 'L', 0.3, 0.2, 1.3); fists(p, 'R', -0.1, 0.2, 1.3); p.lean(0.05); }],
   ]),
 
-  // Alfred's base: the Hustle — rolling the arms in front of the chest on
+  // Cool Toni's base: the Hustle — rolling the arms in front of the chest on
   // 1-2, then a disco point up and across on 3-4, side steps underneath.
   hustle(p, b, B, s) {
     evalMove('discoStrut', b, B, s, p);                      // Travolta footwork + bounce
@@ -1144,7 +1146,7 @@ export const MOVES = {
   },
 
   // ════════════════════════════════════════════════════════════════
-  // ALFRED — disco king / rock'n'roll
+  // COOL TONI — disco king / rock'n'roll
   // ════════════════════════════════════════════════════════════════
   // Travolta strut in place: step on each beat, pointing down across.
   discoStrut: seq(4, [
@@ -1365,7 +1367,7 @@ export const MOVES = {
     crossArms(p);
     p.lean(-0.08, -0.15, 0.1); p.look(-0.22, 0.25, 0.1);
   },
-  accentDisco(p, b, B, s) {                     // ALFRED: Travolta point to the sky
+  accentDisco(p, b, B, s) {                     // COOL TONI: Travolta point to the sky
     groove(p, B, s, 0.7);
     p.foot('L', 0.12); p.foot('R', 0.28, 0, 0.1, 0.5);
     p.hips(0.1, -0.12, 0, -0.2);
@@ -1430,7 +1432,7 @@ const EXPRESSIONS = {
   sassyStrut: 'smirk', shimmyBounce: 'joy', purseGroove: 'smile', hairFlip: 'smirk', tacoHop: 'joy',
   vogueHands: 'smirk', purseTwirl: 'grin', twirlSpin: 'joy', heartHands: 'wink', catwalkPose: 'smirk',
   dropItLow: 'grin', kissBlow: 'kiss', cartwheel: 'joy', toeTouch: 'joy', superstar: 'joy', tinaTaunt: 'wink',
-  // Alfred
+  // Cool Toni
   discoStrut: 'smirk', elvisSwivel: 'smirk', elvisLegs: 'grin', funkyChicken: 'joy', fingerGuns: 'wink',
   airGuitar: 'shout', splitDrop: 'shout', combBack: 'smirk', kneeSlide: 'shout', discoSpin: 'grin', discoInferno: 'shout',
 };
@@ -1591,6 +1593,22 @@ for (const [names, f, z] of [
   [['shL', 'shR'], 6, 0.55], [['armL', 'armR'], 5, 0.55], [['foreL', 'foreR'], 4.5, 0.5], [['handL', 'handR'], 4, 0.45],
 ]) for (const n of names) for (let k = 0; k < 3; k++) { SPRING_F[J[n] + k] = f; SPRING_Z[J[n] + k] = z; }
 for (let k = 0; k < 3; k++) { SPRING_F[ROOT + k] = 9; SPRING_Z[ROOT + k] = 0.8; SPRING_F[ROOT + 3 + k] = 6; SPRING_Z[ROOT + 3 + k] = 0.85; }
+
+// ── Authoring kit for level modules (story/levels/*.js) ─────────────
+// Boss move sets live with their level; they register here at load time.
+export const kit = {
+  seq, groove, win, smooth, lerp, frac, clamp01, TAU, hitAt, EASE, phased, evalMove,
+  fists, hipHand, crossArms, clapFront, clapHigh, wideStance, twoStepFeet, MOVES,
+};
+// `meta`: { labels, expressions, hits, fnGroove, stiff } keyed by move name.
+export function registerMoves(moves, meta = {}) {
+  Object.assign(MOVES, moves);
+  Object.assign(MOVE_LABELS, meta.labels || {});
+  Object.assign(EXPRESSIONS, meta.expressions || {});
+  Object.assign(HITS, meta.hits || {});
+  Object.assign(FN_GROOVE, meta.fnGroove || {});
+  Object.assign(STIFF, meta.stiff || {});
+}
 
 // ── Controller ──────────────────────────────────────────────────────
 export class DanceController {

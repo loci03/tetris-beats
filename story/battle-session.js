@@ -20,10 +20,7 @@ import { StorySfx } from './sfx.js';
 import { AnimeFx } from './anime-fx.js';
 import { Announcer } from './announcer.js';
 import { buildTacoWorld } from './worlds/taco-world.js';
-import { buildUndergroundWorld } from './worlds/underground-world.js';
 import { battleMusic } from './levels.js';
-
-const WORLDS = { taco: buildTacoWorld, underground: buildUndergroundWorld };
 
 const IN_DUR = 2.35;      // seconds, board → world
 const DROP_AT = 1.3;      // the music drop lands as the camera passes the board
@@ -34,7 +31,8 @@ const KEY_DIRS = { ArrowLeft: 'L', ArrowRight: 'R', ArrowUp: 'U', ArrowDown: 'D'
 export class BattleSession {
   // `standalone`: Bust a Beat — the battle on its own, no Tetris board to
   // fly through; it fades in on the stage and ends on the result screen.
-  constructor({ bridge, level, specialCells, impactRow, onDone, standalone = false, onPause = null }) {
+  // `buildWorld`: the level's stage builder (from loadLevel()).
+  constructor({ bridge, level, specialCells, impactRow, onDone, standalone = false, onPause = null, buildWorld = null }) {
     this.bridge = bridge;
     this.level = level;
     this.onDone = onDone;
@@ -65,7 +63,7 @@ export class BattleSession {
     this.camera.position.copy(START_POSE.pos);
     this.scene.add(this.camera);
 
-    this.world = (WORLDS[level.world] || buildTacoWorld)({ lowGraphics: this.low });
+    this.world = (buildWorld || buildTacoWorld)({ lowGraphics: this.low });
     this.scene.add(this.world.group);
     this.world.setLightLevel(0);
 
@@ -329,6 +327,18 @@ export class BattleSession {
     this.fx.burst(kind, this._fxPos, n);
   }
   _def(who) { return who === 'player' ? this.pDef : this.rDef; }
+  // Each dancer's taunt: their own move, the marks they throw across, and
+  // how it messes with the victim's HUD (see BattleHUD.disrupt).
+  _taunt(who) {
+    const def = this._def(who), t = def.tauntFx || {};
+    return { move: def.taunt || 'taunt', projectile: t.projectile || (def.fx || {}).taunt || 'note', disrupt: t.disrupt || 'shake', color: t.color, n: t.n || 7 };
+  }
+  _throw(from, kind, n) {
+    const a = from === 'player' ? this.pRig : this.rRig, b = from === 'player' ? this.rRig : this.pRig;
+    const p0 = a.root.position.clone(), p1 = b.root.position.clone();
+    p0.y += 1.5 * a.def.scale; p1.y += 1.45 * b.def.scale;
+    this.fx.throw(kind, p0, p1, n);
+  }
 
   _schedule(who, name, startBeat, len, own = true) {
     const dc = this._dc(who);
@@ -337,11 +347,11 @@ export class BattleSession {
     dc.play(name, startBeat, len, { faceFoe: name === 'taunt' }).reaction = !own;
   }
 
-  // Character voice lines: only Alfred has a recorded voice; the player's
-  // side is covered by the announcer. Never over the announcer.
+  // Character voice lines: only a boss with a recorded voice pack speaks;
+  // the player's side is covered by the announcer. Never over the announcer.
   _voice(who, pool, chance = 1) {
     if (!this.bridge.voiceEnabled || Math.random() > chance) return;
-    if (who !== 'rival' || this.rDef.look !== 'alfred') return;
+    if (who !== 'rival' || !this.rDef.voicePack) return;
     if (this.ctx.currentTime < this.ann.busyUntil + 0.3) return;
     const now = performance.now();
     if (now - this._voiceAt < 2200) return;
@@ -489,8 +499,11 @@ export class BattleSession {
           this.hud.showCallout(this.bridge.isTouch ? 'Hit <b>TAUNT</b> on the purple note!' : 'Hit <b>T</b> on the purple note!', 'taunt', 2200);
         }
         break;
-      case 'taunt':
-        this._dc(d.attacker).react('taunt', beatNow, 4 - (beatNow % 4) + 0.001, { faceFoe: true, fade: 0.15 });
+      case 'taunt': {
+        const tt = this._taunt(d.attacker);
+        this._dc(d.attacker).react(tt.move, beatNow, 4 - (beatNow % 4) + 0.001, { faceFoe: true, fade: 0.15 });
+        this.cues.push({ beat: beatNow + 0.75, fn: () => this._throw(d.attacker, tt.projectile, tt.n) });
+        this.cues.sort((a, b) => a.beat - b.beat);
         this._fx(d.attacker, (this._def(d.attacker).fx || {}).taunt, 5);
         this._fx(d.attacker === 'player' ? 'rival' : 'player', 'anger', 1);
         this.sfx.crowdOoh(0.5);
@@ -498,6 +511,7 @@ export class BattleSession {
         this.sfx.taunt();
         this.world.react('taunt', d);
         break;
+      }
       case 'tauntWhiff':
         this._dc(d.attacker).react('whiff', beatNow, 2);
         if (d.attacker === 'player') this.hud.showCallout('TAUNT WHIFFED', 'bad', 1200);
@@ -518,6 +532,10 @@ export class BattleSession {
         this._schedule(d.defender, 'stunned', d.stunBar * 4, 4, true);
         this._schedule(d.attacker, 'cheer', Math.ceil(beatNow + 0.5), 2, false);
         this.hud.showBanner(d.defender === 'player' ? 'STUNNED!' : `${rivalName} STUNNED!`, d.defender === 'player' ? 'bad' : 'good', 1300);
+        if (d.defender === 'player') {
+          const tt = this._taunt(d.attacker);
+          this.hud.disrupt(tt.disrupt, { sprite: tt.projectile, color: tt.color, ms: this.clock.spb * 1000 * (4 * (d.stunBar + 1) - beatNow) });
+        }
         this.director.cut('close', beatNow, 2, { who: d.attacker });
         this.world.react('tauntLanded', d);
         this.sfx.crowdOoh(1.1);

@@ -6,7 +6,7 @@
 
 import * as THREE from '../vendor/three/three.module.min.js';
 
-const DRAW = {
+export const DRAW = {
   heart(g, s) {
     g.fillStyle = '#ff4f9a'; g.strokeStyle = '#fff'; g.lineWidth = s * 0.06;
     g.beginPath();
@@ -56,6 +56,10 @@ const DRAW = {
   },
 };
 
+// Level modules add their own marks (lassos, cheese splats, papers …):
+// { name: (ctx2d, size) => draw }.
+export function registerSprites(sprites) { Object.assign(DRAW, sprites); }
+
 export class AnimeFx {
   constructor(scene, size = 48) {
     this.group = new THREE.Group();
@@ -75,17 +79,46 @@ export class AnimeFx {
       const sp = new THREE.Sprite(m);
       sp.visible = false;
       this.group.add(sp);
-      this.pool.push({ sp, life: 0, max: 1, v: new THREE.Vector3(), kind: 'heart', size: 0.3, spin: 0 });
+      this.pool.push({ sp, life: 0, max: 1, v: new THREE.Vector3(), kind: 'heart', size: 0.3, spin: 0, from: new THREE.Vector3(), to: new THREE.Vector3(), arc: 0 });
     }
     this.cursor = 0;
   }
 
-  // Spawn `n` marks of `kind` around world position `pos` (a dancer's head).
-  burst(kind, pos, n = 5) {
-    if (!this.tex[kind]) return;
+  _tex(kind) {
+    if (!this.tex[kind] && DRAW[kind]) {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      DRAW[kind](c.getContext('2d'), 128);
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      this.tex[kind] = t;
+    }
+    return this.tex[kind];
+  }
+
+  // Throw `n` marks of `kind` from `from` to `to` (taunt projectiles): they
+  // fly in an arc over `dur` seconds, staggered, and pop on arrival.
+  throw(kind, from, to, n = 6, dur = 0.55, size = 0.34) {
+    if (!this._tex(kind)) return;
     for (let k = 0; k < n; k++) {
       const p = this.pool[this.cursor = (this.cursor + 1) % this.pool.length];
-      p.kind = kind;
+      p.kind = kind; p.mode = 'throw';
+      p.sp.material.map = this.tex[kind]; p.sp.material.needsUpdate = true;
+      p.from.copy(from); p.from.x += (Math.random() - 0.5) * 0.3; p.from.y += (Math.random() - 0.5) * 0.3;
+      p.to.copy(to); p.to.x += (Math.random() - 0.5) * 0.6; p.to.y += (Math.random() - 0.5) * 0.7;
+      p.arc = 0.6 + Math.random() * 0.8;
+      p.max = dur + k * 0.07; p.life = p.max; p.delay = k * 0.07; p.size = size * (0.8 + Math.random() * 0.4);
+      p.spin = (Math.random() - 0.5) * 6;
+      p.sp.position.copy(p.from); p.sp.visible = false;
+    }
+  }
+
+  // Spawn `n` marks of `kind` around world position `pos` (a dancer's head).
+  burst(kind, pos, n = 5) {
+    if (!this._tex(kind)) return;
+    for (let k = 0; k < n; k++) {
+      const p = this.pool[this.cursor = (this.cursor + 1) % this.pool.length];
+      p.kind = kind; p.mode = 'burst';
       p.sp.material.map = this.tex[kind];
       p.sp.material.needsUpdate = true;
       p.sp.position.copy(pos);
@@ -114,6 +147,19 @@ export class AnimeFx {
       if (p.life <= 0) continue;
       p.life -= dt;
       if (p.life <= 0) { p.sp.visible = false; continue; }
+      if (p.mode === 'throw') {
+        const el = p.max - p.life - p.delay;
+        if (el < 0) continue;
+        const u = Math.min(1, el / (p.max - p.delay));
+        p.sp.visible = true;
+        p.sp.position.lerpVectors(p.from, p.to, u);
+        p.sp.position.y += Math.sin(Math.PI * u) * p.arc;
+        const s = p.size * (u > 0.85 ? 1 + (u - 0.85) * 5 : Math.min(1, u * 5));
+        p.sp.scale.set(s, s, s);
+        p.sp.material.rotation += p.spin * dt;
+        p.sp.material.opacity = u > 0.85 ? 1 - (u - 0.85) / 0.15 : 1;
+        continue;
+      }
       const t = 1 - p.life / p.max;
       p.sp.position.addScaledVector(p.v, dt);
       if (p.kind !== 'anger' && p.kind !== 'exclaim' && p.kind !== 'sweat') p.v.multiplyScalar(1 - dt * 1.2);

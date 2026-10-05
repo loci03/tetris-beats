@@ -380,3 +380,21 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
   background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.2);
 }
 .beat-btn.primary { background: linear-gradient(135deg, #ff9d2e, #ff3d9a); border-color: transparent; box-shadow: 0 6px 22px rgba(255, 80, 140, 0.4); }
+
+/* ── Taunt disruptions (BattleHUD.disrupt) ── */
+.sh-bottom { position: relative; }
+.sh-disrupt { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+.sh-bottom.dz-shake { animation: dz-shake 0.18s linear infinite; }
+.sh-bottom.dz-wobble { animation: dz-wobble 0.9s ease-in-out infinite; }
+.sh-bottom.dz-spin { animation: dz-spin 1.6s ease-in-out infinite; }
+.sh-bottom.dz-blur .sh-cmd, .sh-bottom.dz-blur .sh-lane-wrap { filter: blur(3px); transition: filter 0.2s; }
+.sh-bottom.dz-glitch { animation: dz-glitch 0.35s steps(2) infinite; }
+.sh-bottom.dz-flash::after, .sh-bottom.dz-darkness::after { content: ''; position: absolute; inset: -8px; pointer-events: none; z-index: 4; border-radius: 14px; }
+.sh-bottom.dz-flash::after { background: var(--dz-color, #fff); animation: dz-flash 1.2s ease-out forwards; }
+.sh-bottom.dz-darkness::after { background: radial-gradient(ellipse at 50% 60%, rgba(0,0,0,0.25), rgba(0,0,0,0.85)); animation: dz-dark 0.9s ease-in-out infinite alternate; }
+@keyframes dz-shake { 0%,100% { transform: translate(0,0); } 25% { transform: translate(-5px,2px); } 50% { transform: translate(4px,-2px); } 75% { transform: translate(-3px,-1px); } }
+@keyframes dz-wobble { 0%,100% { transform: rotate(-3deg) translateX(-6px); } 50% { transform: rotate(3deg) translateX(6px); } }
+@keyframes dz-spin { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(8deg) scale(0.94); } 100% { transform: rotate(0deg) scale(1); } }
+@keyframes dz-glitch { 0% { transform: translate(3px,0); filter: hue-rotate(90deg) saturate(2); } 50% { transform: translate(-4px,1px); filter: hue-rotate(-60deg) contrast(1.6); } 100% { transform: translate(0,-1px); filter: none; } }
+@keyframes dz-flash { 0% { opacity: 0.95; } 100% { opacity: 0.25; } }
+@keyframes dz-dark { from { opacity: 0.75; } to { opacity: 0.95; } }

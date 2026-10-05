@@ -30,9 +30,12 @@ export const CHARACTERS = {
     branchMoves: { 2: 'lockAndPop', 3: 'breakWindmill', 4: 'backflip' },
     solo: 'headspin',
     fx: { move: 'note', big: 'sparkle', taunt: 'note' },
+    // Battle taunt: own move, marks thrown at the rival, HUD disruption
+    // (BattleHUD.disrupt) when it lands on the player.
+    taunt: 'taunt', tauntFx: { projectile: 'note', disrupt: 'shake' },
   },
-  alfred: {
-    name: 'ALFRED',
+  toni: {
+    name: 'COOL TONI',
     scale: 1.07,
     skin: 0xf0c9a5,
     colors: {
@@ -47,11 +50,13 @@ export const CHARACTERS = {
       accent: { pose: 'accentDisco', at: 3 },
     },
     victory: 'discoSpin',
-    look: 'alfred',
+    look: 'toni',
     moves: { 1: ['discoPoint', 'elvisLegs'], 2: ['funkyChicken', 'fingerGuns'], 3: ['spinPoint', 'airGuitar'], 4: ['jumpSplit', 'splitDrop'] },
     branchMoves: { 2: 'combBack', 3: 'kneeSlide', 4: 'discoSpin' },
     solo: 'discoInferno',
     introTaunt: 'introTaunt',
+    // Points you out, waves you off, spins: a blast of disco sparkle.
+    taunt: 'introTaunt', tauntFx: { projectile: 'sparkle', disrupt: 'swirl+glitch' },
     fx: { move: 'sparkle', big: 'sparkle', taunt: 'sparkle' },
   },
   // TINA — Taco Town's glam queen: taco tee, pink mini skirt, heels, big
@@ -78,9 +83,14 @@ export const CHARACTERS = {
     branchMoves: { 2: 'kissBlow', 3: 'cartwheel', 4: 'toeTouch' },
     solo: 'superstar',
     introTaunt: 'tinaTaunt',
+    // Finger wag, hair flip, blown kiss: hearts all over your arrows.
+    taunt: 'tinaTaunt', tauntFx: { projectile: 'heart', disrupt: 'float+wobble', color: '#ff4f9a' },
     fx: { move: 'heart', big: 'sparkle', taunt: 'heart' },
   },
 };
+
+// Bosses from level modules (story/levels/*.js) register here at load time.
+export function registerCharacter(id, def) { CHARACTERS[id] = def; }
 
 const _pivot = new THREE.Vector3(), _tmp = new THREE.Vector3(), _yawOnly = new THREE.Euler();
 
@@ -212,7 +222,14 @@ export function createCharacter(def) {
   const mouth = part(face, sphere(0.05), mats.mouth, 0, 0.1, 0.225, 1.2, 0.45, 0.4, false);
 
   // ── Look-specific outfit / accessories ──
-  if (def.look === 'tina') {
+  // Level-module bosses dress themselves: def.build(kit) adds hair, hats,
+  // clothes and props onto the joints with the same helpers used here.
+  if (def.build) {
+    def.build({
+      THREE, def, C, mats, toon, part, capsule, sphere, g, joints, limbs, face, eyes, brows, mouth,
+      hips, spine, chest, neck, head, headMesh, outline,
+    });
+  } else if (def.look === 'tina') {
     const gold = toon(C.gold, { emissive: 0x4a3300 });
     // Big glam hair: volume on top, long hair down the back, side bangs.
     part(head, sphere(0.27), mats.hair, 0, 0.3, -0.1, 1.12, 1.02, 1.0);
