@@ -9,9 +9,10 @@ import boss from './higher/boss.js';
 import mv from './higher/moves.js';
 import { buildWorld } from './higher/world.js';
 import sprites from './higher/sprites.js';
+import { createTetrisWorld } from './higher/tetris.js';
 
 export default {
   boss, moves: mv.moves, moveMeta: mv.moveMeta, sprites,
   buildWorld,
-  backdrop: { camera: { pos: [0, 2.2, 8.6], look: [0, 1.7, 0], fov: 50 }, spread: 3.5, forward: 0.9 },
+  backdrop: { camera: { pos: [0, 2.2, 8.6], look: [0, 1.7, 0], fov: 50 }, spread: 3.5, forward: 0.9, create: createTetrisWorld },
 };

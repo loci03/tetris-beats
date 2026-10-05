@@ -268,15 +268,15 @@ export function createTetrisWorld(ctx) {
   const spots = [];
   const skins = [0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0x5a3a22];
   const shirts = [0x22222c, 0x3a2c4a, 0x1d3540, 0x4a1d2c, 0x2c2c2c, 0xd0d0d8, 0x7a1a3a, 0x1a4a5a];
-  const rows = low ? 5 : 7;
+  const rows = low ? 5 : 6;
   for (let r = 0; r < rows; r++) {
-    const z = -2.5 + r * (9.5 / rows), n = Math.round((low ? 14 : 20) + r * 1.5), half = 9 + r * 0.8;
+    const z = -2.5 + r * (9.5 / rows), n = Math.round((low ? 14 : 18) + r * 1.5), half = 9 + r * 0.8;
     for (let i = 0; i < n; i++) {
       const x = -half + (2 * half) * (i + 0.5 + (Math.random() - 0.5) * 0.6) / n;
       spots.push({ x, z: z + (Math.random() - 0.5) * 0.6, y: 0, s: 0.95 + Math.random() * 0.15, shirt: shirts[(i + r) % shirts.length], skin: skins[(i * 3 + r) % skins.length] });
     }
   }
-  const crowd = K.makeCrowd(spots, { lowPoly: low });
+  const crowd = K.makeCrowd(spots, { lowPoly: true });
   crowd.u.uKey.value.setRGB(0.12, 0.11, 0.15); crowd.u.uAmb.value.setRGB(0.05, 0.04, 0.07);
   root.add(crowd.mesh);
 

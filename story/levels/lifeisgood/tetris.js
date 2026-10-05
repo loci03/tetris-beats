@@ -95,7 +95,7 @@ export function createTetrisWorld(ctx) {
     cell(15, () => { const gr = g.createLinearGradient(0, 0, 128, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 54, 128, 20); });
   });
   atlas.generateMipmaps = true;
-  const glows = K.spritePool(low ? 800 : 1100, atlas, { additive: true });
+  const glows = K.spritePool(low ? 800 : 1100, atlas, { additive: true, cap: 0.07 });
   const flats = K.spritePool(low ? 260 : 420, atlas, { additive: false });
   glows.mesh.renderOrder = 6; flats.mesh.renderOrder = 5;
   root.add(flats.mesh, glows.mesh);
@@ -481,15 +481,15 @@ export function createTetrisWorld(ctx) {
   const limbMat = toon({ vertexColors: true });
   const ragMat = toon({ color: 0xffffff, side: THREE.DoubleSide });
   const partGeo = {
-    torso: (() => { const g = new THREE.CylinderGeometry(0.2, 0.155, 0.52, 8); g.translate(0, 0.26, 0); return keep(g); })(),
-    pelvis: (() => { const g = new THREE.CylinderGeometry(0.165, 0.175, 0.24, 8); g.translate(0, -0.02, 0); return keep(g); })(),
-    head: (() => { const g = new THREE.SphereGeometry(0.13, 10, 8); g.scale(0.92, 1.05, 1); g.translate(0, 0.17, 0); return keep(g); })(),
-    hair: (() => { const g = new THREE.SphereGeometry(0.145, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.55); g.translate(0, 0.19, -0.01); return keep(g); })(),
+    torso: (() => { const g = new THREE.CylinderGeometry(0.2, 0.155, 0.52, 7, 1, true); g.translate(0, 0.26, 0); return keep(g); })(),
+    pelvis: (() => { const g = new THREE.CylinderGeometry(0.165, 0.175, 0.24, 7); g.translate(0, -0.02, 0); return keep(g); })(),
+    head: (() => { const g = new THREE.SphereGeometry(0.13, 8, 6); g.scale(0.92, 1.05, 1); g.translate(0, 0.17, 0); return keep(g); })(),
+    hair: (() => { const g = new THREE.SphereGeometry(0.145, 8, 4, 0, Math.PI * 2, 0, Math.PI * 0.55); g.translate(0, 0.19, -0.01); return keep(g); })(),
     shades: (() => { const g = new THREE.BoxGeometry(0.22, 0.05, 0.04); g.translate(0, 0.19, 0.115); return keep(g); })(),
-    uarm: (() => { const g = new THREE.CylinderGeometry(0.058, 0.05, 0.31, 6); g.translate(0, -0.155, 0); return keep(g); })(),
-    farm: (() => { const b = new Builder(); b.cyl(0.05, 0.042, 0.29, 6, 0, -0.145, 0, 0xffffff); b.sphere(0.058, 0, -0.31, 0, 0xffffff, 6, 5); return b.build(); })(),
-    thigh: (() => { const g = new THREE.CylinderGeometry(0.08, 0.065, 0.42, 6); g.translate(0, -0.21, 0); return keep(g); })(),
-    shin: (() => { const b = new Builder(); b.cyl(0.062, 0.05, 0.42, 6, 0, -0.21, 0, 0xffffff); b.box(0.12, 0.08, 0.26, 0, -0.45, 0.06, 0x303030); return b.build(); })(),
+    uarm: (() => { const g = new THREE.CylinderGeometry(0.058, 0.05, 0.31, 5, 1, true); g.translate(0, -0.155, 0); return keep(g); })(),
+    farm: (() => { const b = new Builder(); b.add(new THREE.CylinderGeometry(0.05, 0.042, 0.29, 5, 1, true), b.m4(0, -0.145, 0), 0xffffff); b.sphere(0.058, 0, -0.31, 0, 0xffffff, 5, 4); return b.build(); })(),
+    thigh: (() => { const g = new THREE.CylinderGeometry(0.08, 0.065, 0.42, 5, 1, true); g.translate(0, -0.21, 0); return keep(g); })(),
+    shin: (() => { const b = new Builder(); b.add(new THREE.CylinderGeometry(0.062, 0.05, 0.42, 5, 1, true), b.m4(0, -0.21, 0), 0xffffff); b.box(0.12, 0.08, 0.26, 0, -0.45, 0.06, 0x303030); return b.build(); })(),
     rag: (() => { const g = new THREE.PlaneGeometry(0.42, 0.3, 2, 1); g.translate(0.21, -0.15, 0); return keep(g); })(),
   };
   const NC = low ? 34 : 56;
@@ -599,7 +599,10 @@ export function createTetrisWorld(ctx) {
     }
     emit({ x, y, z, life: 0.5, size: 7, r: r * 0.8, g: g * 0.8, b: b * 0.8, cell: 0, kind: 5, grow: 4 });
   };
-  const textPop = (cell, x, y, z, size, life = 1.6) => emit({ x, y, z, vy: 0.5, life, size, r: 1, g: 1, b: 1, cell, kind: 6, sx: 2, sy: 1 });
+  const textPop = (cell, x, y, z, size, life = 1.6) => {
+    if (st.portrait) { if (pts.some(q => q.kind === 6 && q.life > 0.3)) return null; x = 0; y = 7.5; z = 2.5; size *= 0.55; }   // portrait: pop in the strip above the board
+    return emit({ x, y, z, vy: 0.5, life, size, r: 1, g: 1, b: 1, cell, kind: 6, sx: 2, sy: 1 });
+  };
   const soundRings = () => { for (const w of woofers) { if (Math.random() < 0.5) continue; V3.set(w.lx, w.ly, w.lz + 0.1); w.g.localToWorld(V3); emit({ x: V3.x, y: V3.y, z: V3.z, life: 0.7, size: 0.5, r: 1, g: 0.85, b: 0.4, cell: 2, kind: 5, grow: 5 }); } };
   const dustRing = (rows) => {
     st.ring = Math.min(1.4, 0.5 + rows / 14); st.ringR = 0.5;
@@ -1047,7 +1050,6 @@ export function createTetrisWorld(ctx) {
     }
   }
 
-  if (typeof window !== 'undefined' && window.__lwDebug) window.__lwDebug = { root, sky, hills, setMesh, facMesh, crowns: palms.map(p => p.crown), signs: signs.map(s => s.m), wireLines, coneMesh, ground, glows, flats, parts, pParty, pSound, pStall, hemi };
   return {
     update, react,
     dispose() {

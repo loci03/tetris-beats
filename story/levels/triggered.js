@@ -9,9 +9,10 @@ import boss from './triggered/boss.js';
 import mv from './triggered/moves.js';
 import { buildWorld } from './triggered/world.js';
 import sprites from './triggered/sprites.js';
+import { createTetrisWorld } from './triggered/tetris.js';
 
 export default {
   boss, moves: mv.moves, moveMeta: mv.moveMeta, sprites,
   buildWorld,
-  backdrop: { camera: { pos: [0, 2.1, 8.6], look: [0, 1.5, 0], fov: 50 }, spread: 3.5, forward: 0.9 },
+  backdrop: { camera: { pos: [0, 2.1, 8.6], look: [0, 1.5, 0], fov: 50 }, spread: 3.5, forward: 0.9, create: createTetrisWorld },
 };

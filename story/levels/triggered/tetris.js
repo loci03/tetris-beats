@@ -120,21 +120,22 @@ export function createTetrisWorld(ctx) {
     a.add(new THREE.CapsuleGeometry(0.08, 0.5, 2, 5), -0.25, -0.05, -0.25, OL, -1.2, 0, 0.3).add(new THREE.CapsuleGeometry(0.08, 0.5, 2, 5), 0.25, -0.1, -0.2, OL, -1.3, 0, -0.3);
     a.box(0.08, 0.12, 1.1, 0.05, -0.05, -0.65, 0x141410).box(0.06, 0.2, 0.25, 0.05, -0.18, -0.35, 0x141410).box(0.05, 0.05, 0.35, 0.05, -0.02, -1.35, 0x0c0c0a);
     arms.add(new THREE.Mesh(a.build(), lamV));
-    const flash = new THREE.Mesh(keep(new THREE.PlaneGeometry(1, 1)), addMat(0xffd060, 0, K.glowTex)); flash.position.set(0.05, 0, -1.6); arms.add(flash);
+    const flash = new THREE.Mesh(keep(new THREE.PlaneGeometry(1, 1)), addMat(0xffd060, 0, K.glowTex)); root.add(flash);
     const s = { g, arms, flash, x, z, side, crouch: crouch ? 1 : 0, baseCrouch: crouch ? 1 : 0, fire: 0, recoil: 0, aim: 0, burst: 0, burstT: 0, duck: 0, ph: Math.random() * 6 };
     soldiers.push(s); return s;
   };
   makeSoldier(-4.3, 2.8, -1, false); makeSoldier(4.4, 2.8, 1, false); makeSoldier(-6.3, 2.3, -1, true); makeSoldier(6.4, 2.4, 1, true);
 
   // ── Searchlights, helicopter, jets, flare, alarm beacons ────────
+  const fadeTex = K.canvasTex(4, 64, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(90,90,90,1)'); gr.addColorStop(1, 'rgba(0,0,0,1)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
   const beamGeo = keep(new THREE.ConeGeometry(2.2, 60, 16, 1, true)); beamGeo.translate(0, -30, 0); beamGeo.rotateX(Math.PI);
-  const searchLs = [-1, 1].map((s, i) => { const m = new THREE.Mesh(beamGeo, addMat(0xfff0c0, 0.06)); m.position.set(s * 16, 0, -26); root.add(m); return { m, s, ph: i * 2.1 }; });
+  const searchLs = [-1, 1].map((s, i) => { const m = new THREE.Mesh(beamGeo, addMat(0xfff0c0, 0.06, fadeTex)); m.position.set(s * 16, 0, -26); root.add(m); return { m, s, ph: i * 2.1 }; });
   const heli = new THREE.Group(); root.add(heli);
   { const h = new K.Builder(); h.sphere(0.9, 0, 0, 0, 0x14140e, 1.6, 0.8, 0.8, 10).box(3, 0.25, 0.25, 2.2, 0.15, 0, 0x14140e).box(0.1, 0.9, 0.12, 3.6, 0.45, 0, 0x14140e).box(1.6, 0.06, 0.08, -0.2, -0.85, 0.5, 0x101010).box(1.6, 0.06, 0.08, -0.2, -0.85, -0.5, 0x101010); heli.add(new THREE.Mesh(h.build(), lamV)); }
   const rotor = new THREE.Mesh(keep(new THREE.BoxGeometry(5.2, 0.04, 0.22)), basic(0x0a0a0a)); rotor.position.y = 0.85; heli.add(rotor);
   const rotor2 = rotor.clone(); rotor2.rotation.y = Math.PI / 2; rotor.add(rotor2);
   const heliBeamGeo = keep(new THREE.ConeGeometry(2.4, 14, 14, 1, true)); heliBeamGeo.translate(0, -7, 0);
-  const heliBeamMat = addMat(0xfff4d0, 0.08);
+  const heliBeamMat = addMat(0xfff4d0, 0.08, fadeTex);
   const heliBeam = new THREE.Mesh(heliBeamGeo, heliBeamMat); heliBeam.position.set(-0.8, -0.5, 0); heli.add(heliBeam);
   const heliLight = new THREE.Mesh(keep(new THREE.PlaneGeometry(1, 1)), addMat(0xff2020, 1, K.glowTex)); heliLight.position.set(3.6, 0.9, 0); heli.add(heliLight);
   const heliSt = { active: false, x: -60, timer: 6, vx: 9, y: 9, z: -14, swoop: 0 };
@@ -143,7 +144,7 @@ export function createTetrisWorld(ctx) {
   const flare = new THREE.Mesh(keep(new THREE.PlaneGeometry(1, 1)), addMat(0xe8ffd0, 1, K.glowTex)); flare.visible = false; root.add(flare);
   const flareSt = { t: -1, x: 0 };
   const beaconMat = addMat(0xff1010, 0, K.glowTex);
-  const beacons = [[-10.5, 4.4, -1], [10.5, 4.4, -1], [-9.6, 2.6, 3.2], [9.6, 2.6, 3.2]].map(p => { const m = new THREE.Mesh(keep(new THREE.PlaneGeometry(1, 1)), beaconMat); m.position.set(...p); m.scale.setScalar(2); root.add(m); return m; });
+  const beacons = [[-5.4, 1.7, 1.7], [5.4, 1.7, 1.7], [-8.6, 2.6, -8.4], [8.8, 3.0, -8]].map(p => { const m = new THREE.Mesh(keep(new THREE.PlaneGeometry(1, 1)), beaconMat); m.position.set(...p); m.scale.setScalar(2); root.add(m); return m; });
 
   // ── Fire columns (flank fires), roof fires ──────────────────────
   const fireTex = K.canvasTex(64, 128, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h * 0.75, 2, w / 2, h * 0.6, h * 0.55); gr.addColorStop(0, 'rgba(255,255,170,1)'); gr.addColorStop(0.3, 'rgba(255,170,30,0.9)'); gr.addColorStop(0.65, 'rgba(255,60,0,0.45)'); gr.addColorStop(1, 'rgba(255,30,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
@@ -179,10 +180,10 @@ export function createTetrisWorld(ctx) {
   const muzzle = (s, k = 1) => { s.fire = Math.max(s.fire, k); s.recoil = 1; };
   const fireTracer = (s, n = 1) => {
     for (let i = 0; i < n; i++) {
-      v3.set(0.05, 0, -1.6).applyEuler(s.arms.rotation).add(s.arms.position).add(s.g.position);
+      v3.set(0.05, 0, -1.6); s.arms.localToWorld(v3);
       const tx = -s.side * (2 + Math.random() * 14) + (Math.random() - 0.5) * 6, ty = 1 + Math.random() * 7, tz = -18 - Math.random() * 20;
       const dx = tx - v3.x, dy = ty - v3.y, dz = tz - v3.z, L = Math.hypot(dx, dy, dz), sp = 45 + Math.random() * 15;
-      tracers.spawn(v3.x, v3.y, v3.z, dx / L * sp, dy / L * sp, dz / L * sp, { life: 0.45 + Math.random() * 0.2, size: 0.12, mode: 2, aspect: 0.045, color: 0xfff0a0, alpha: 1 });
+      tracers.spawn(v3.x, v3.y, v3.z, dx / L * sp, dy / L * sp, dz / L * sp, { life: 0.45 + Math.random() * 0.2, size: 0.2, mode: 2, aspect: 0.06, color: 0xfff0a0, alpha: 1 });
     }
   };
   const ejectCasings = (s, n) => { for (let i = 0; i < n; i++) casings.spawn(s.x + s.side * 0.3, 1.5, s.z, s.side * (1 + Math.random() * 1.5), 1.5 + Math.random() * 2, 0.5 + Math.random(), { life: 1.2, size: 0.05, size1: 0.05, grav: 9, mode: 1, spin: 15, color: 0xc8962a, floor: 0.03 }); };
@@ -217,11 +218,11 @@ export function createTetrisWorld(ctx) {
       else if (st.dark < 0.5 && Math.random() < dt * (0.12 + cheer * 0.8)) { s.burst = 2 + Math.floor(Math.random() * 3); }
       const cr = Math.max(s.baseCrouch, s.duck > 0 ? 1 : 0, cheer > 0.45 && s.side > 0 ? 0.6 : 0) * 0.5 + st.dark * 0.5;
       s.g.position.y = -cr * 0.55; s.g.scale.y = 1 - cr * 0.12;
-      s.g.rotation.set(0, Math.PI + s.side * 0.25 + Math.sin(t * 0.4 + s.ph) * 0.06 + aimK * 0.15 * s.side, st.dark * 0.3 * s.side);
+      s.g.rotation.set(0, s.side * 0.3 + Math.sin(t * 0.4 + s.ph) * 0.06 + aimK * 0.15 * s.side, st.dark * 0.3 * s.side);
       s.arms.rotation.set(0.05 + Math.sin(t * 0.7 + s.ph) * 0.04 - aimK * 0.05 - s.recoil * 0.12 + st.dark * 0.8 + 0.12 - 0.24 * Math.max(0, 1 - cr), aimK * 0.25, 0);
       s.arms.position.z = s.recoil * 0.08;
       s.flash.material.opacity = s.fire; s.flash.scale.setScalar(0.6 + s.fire * (0.8 + Math.random() * 0.6)); s.flash.quaternion.copy(camera.quaternion);
-      s.flash.position.set(0.05, 0, -1.6); // (arms-local, camera facing approximately)
+      s.g.updateMatrixWorld(true); v3.set(0.05, 0, -1.65); s.arms.localToWorld(v3); s.flash.position.copy(v3);
     }
     const shooting = soldiers.reduce((a, s) => Math.max(a, s.fire), 0);
 

@@ -70,7 +70,7 @@ export function createKit(THREE) {
 
   // ── Sprite pool: camera-facing quads, one instanced draw ──
   // set(i, x, y, z, size, r, g, b, a, rot, sx, sy, cell)
-  const spritePool = (max, map, { additive = true, fog = false, depthTest = true } = {}) => {
+  const spritePool = (max, map, { additive = true, depthTest = true, cap = 0 } = {}) => {
     const base = keep(new THREE.PlaneGeometry(1, 1));
     const geo = keep(new THREE.InstancedBufferGeometry());
     geo.index = base.index;
@@ -82,18 +82,17 @@ export function createKit(THREE) {
     geo.setAttribute('iPos', aP); geo.setAttribute('iCol', aC); geo.setAttribute('iExt', aX);
     geo.instanceCount = 0;
     const mat = keep(new THREE.ShaderMaterial({
-      uniforms: { map: { value: map } },
+      uniforms: { map: { value: map }, uCap: { value: cap } },
       transparent: true, depthWrite: false, depthTest,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
-      vertexShader: `attribute vec4 iPos; attribute vec4 iCol; attribute vec4 iExt;
+      vertexShader: `attribute vec4 iPos; attribute vec4 iCol; attribute vec4 iExt; uniform float uCap;
         varying vec2 vUv; varying vec4 vCol;
         void main(){
           vec4 mv = modelViewMatrix * vec4(iPos.xyz, 1.0);
           float c = cos(iExt.x), s = sin(iExt.x);
           vec2 p = position.xy * iExt.yw;
-          // cap the on-screen size of glows (near bulbs) — text cells are exempt
-          bool txt = (iExt.z > 3.5 && iExt.z < 7.5) || (iExt.z > 10.5 && iExt.z < 14.5);
-          float sz = txt ? iPos.w : min(iPos.w, -mv.z * 0.07);
+          // cap the on-screen size of plain glows (cells 0 and 3: near bulbs)
+          float sz = (uCap > 0.0 && (iExt.z < 0.5 || abs(iExt.z - 3.0) < 0.5)) ? min(iPos.w, -mv.z * uCap) : iPos.w;
           mv.xy += vec2(c * p.x - s * p.y, s * p.x + c * p.y) * sz;
           gl_Position = projectionMatrix * mv;
           float cell = iExt.z;
