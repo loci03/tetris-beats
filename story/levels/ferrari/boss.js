@@ -13,9 +13,11 @@
 // leather, Cotton-Eyed Joe kicks — and when he gets serious the lasso
 // comes out.
 //
-// The lasso: whenever his RIGHT hand goes up over his hat, the lariat loop
-// appears in it and spins (see build()); moves trigger it simply by raising
-// that hand — the twirl, the taunt throw and the solo all use it.
+// Props without new framework hooks: the lariat appears (and spins) in a
+// hand raised over his hat while the move flags it with a wrist roll
+// (|handR/L z| ≈ 0.9 — invisible on the round gloves); the air-fiddle and
+// bow scale in when a move twists the hands (|hand y| ≈ 0.5). Both are
+// placed at render time in onBeforeRender (see build()).
 
 let _checker = null;
 function checkerTexture(THREE) {
@@ -91,7 +93,7 @@ export default {
   colors: {
     top: 0xd0142c, topShade: 0x8c0b1d, pants: 0x34558f, shoe: 0x7a4320, shoeAccent: 0x2e1a0e,
     hair: 0x6b3a1c, hat: 0xf1e7d2, band: 0x1a1418, yoke: 0x17141c, piping: 0xf5f0e6, fringe: 0xc9965a,
-    gold: 0xffc43a, silver: 0xd9dee8, lens: 0xff8a4a, glove: 0x1b1a20, rope: 0xd2a05a,
+    gold: 0xffc43a, silver: 0xd9dee8, lens: 0x6a2412, glove: 0x1b1a20, rope: 0xd2a05a,
   },
   bareForearms: false,
   // Country two-step feel: a light knee bounce on every pulse (the song is
@@ -114,8 +116,8 @@ export default {
     accent: { pose: 'rhettAccent', at: 3 },
   },
   moves: {
-    1: ['rhettHatTip', 'rhettHeelDig'],
-    2: ['rhettKickBallChange', 'rhettSlapLeather'],
+    1: ['rhettHatTip', 'rhettHipSway'],
+    2: ['rhettSlapLeather', 'rhettScuffHitch'],
     3: ['rhettLassoTwirl', 'rhettAirFiddle'],
     4: ['rhettCottonEye', 'rhettRollingVine'],
   },
@@ -154,10 +156,10 @@ export default {
     part(hatG, new THREE.CylinderGeometry(0.03, 0.03, 0.012, 10), silver, 0.215, 0.05, 0.06, 1, 1, 1, false).rotation.z = Math.PI / 2;
 
     // ── Tinted aviators + toothpick ──
-    const lens = toon(C.lens, { transparent: true, opacity: 0.55, emissive: 0x401000, depthWrite: false });
+    const lens = toon(C.lens, { transparent: true, opacity: 0.8, emissive: 0x200400, depthWrite: false });
     for (const sx of [1, -1]) {
-      part(face, sphere(0.062), lens, 0.088 * sx, 0.228, 0.222, 1.12, 0.92, 0.3, false);
-      part(face, new THREE.TorusGeometry(0.064, 0.008, 5, 18), gold, 0.088 * sx, 0.228, 0.236, 1.1, 0.9, 1, false);
+      part(face, sphere(0.062), lens, 0.088 * sx, 0.224, 0.238, 1.15, 0.85, 0.28, false).rotation.z = -0.2 * sx;
+      part(face, new THREE.TorusGeometry(0.064, 0.007, 5, 18), gold, 0.088 * sx, 0.224, 0.245, 1.15, 0.85, 1, false).rotation.z = -0.2 * sx;
       part(face, new THREE.BoxGeometry(0.08, 0.01, 0.01), gold, 0.19 * sx, 0.255, 0.17, 1, 1, 1, false).rotation.y = -0.9 * sx;
     }
     part(face, new THREE.BoxGeometry(0.05, 0.01, 0.01), gold, 0, 0.268, 0.245, 1, 1, 1, false);
@@ -171,7 +173,7 @@ export default {
     tri.rotation.set(-0.35, Math.PI, Math.PI);
 
     // ── Western shirt: black yoke, white piping, pearl snaps, fringe ──
-    part(chest, capsule(0.205, 0.04), yoke, 0, 0.3, -0.005, 1.25, 1, 0.83);
+    part(chest, capsule(0.206, 0.04), yoke, 0, 0.215, -0.004, 1.26, 1, 0.83);
     for (const sx of [1, -1]) {
       const pip = part(chest, new THREE.BoxGeometry(0.2, 0.02, 0.012), piping, 0.1 * sx, 0.255, 0.15, 1, 1, 1, false);
       pip.rotation.set(0, -0.35 * sx, -0.42 * sx);
@@ -219,7 +221,42 @@ export default {
       coil.rotation.y = Math.PI / 2;
     }
 
-    // ── The lariat: shows in the right hand whenever it's raised over the hat ──
+    // ── Air-fiddle props: a fiddle along the left forearm and a bow in the
+    // right hand. Moves bring them out by twisting the hands (handL/handR
+    // y-rotation ≈ 0.5, invisible on the round gloves); they scale in with it.
+    const wood = toon(0x8a3a12, { emissive: 0x200800 }), dark = toon(0x1a0e08), hair = toon(0xf4ead0);
+    const props = [];
+    const prop = (parent, joint, geo, mat, x, y, z, rx, ry, rz, sx = 1, sy = 1, sz = 1) => {
+      const m = new THREE.Mesh(g(geo), mat);
+      m.matrixAutoUpdate = false; m.matrixWorldAutoUpdate = false; m.frustumCulled = false;
+      const local = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
+      props.push({ m, local, parent, joint });
+      parent.add(m);
+    };
+    const handL = limbs.L.hand, handR = limbs.R.hand;
+    // Fiddle tucked under the chin on the left collarbone, neck out toward the left hand.
+    const F = new THREE.Matrix4().compose(new THREE.Vector3(0.12, 0.39, 0.15), new THREE.Quaternion().setFromEuler(new THREE.Euler(0.15, 0.85, 0.35, 'YXZ')), new THREE.Vector3(1, 1, 1));
+    const fprop = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1) => {
+      prop(chest, handL, geo, mat, x, y, z, 0, 0, 0, sx, sy, sz);
+      const pr = props[props.length - 1]; pr.local.premultiply(F);
+    };
+    fprop(new THREE.SphereGeometry(0.1, 10, 8), wood, 0, 0, 0.03, 0.8, 0.3, 1.0);
+    fprop(new THREE.SphereGeometry(0.085, 10, 8), wood, 0, 0, 0.15, 0.72, 0.3, 0.8);
+    fprop(new THREE.BoxGeometry(0.035, 0.025, 0.22), dark, 0, 0.015, 0.31);
+    fprop(new THREE.SphereGeometry(0.026, 6, 5), dark, 0, 0.015, 0.44);
+    fprop(new THREE.BoxGeometry(0.03, 0.012, 0.36), hair, 0, 0.035, 0.2);
+    prop(handR, handR, new THREE.CylinderGeometry(0.007, 0.007, 0.62, 5), dark, 0.0, -0.06, 0.05, 0, 0, Math.PI / 2 - 0.15);
+    prop(handR, handR, new THREE.BoxGeometry(0.58, 0.02, 0.006), hair, -0.02, -0.035, 0.05, 0, 0, -0.15);
+    const PM = new THREE.Matrix4(), PS = new THREE.Matrix4();
+    for (const pr of props) {
+      pr.m.onBeforeRender = () => {
+        const k = Math.max(0, Math.min(1, (Math.abs(pr.joint.rotation.y) - 0.2) / 0.25));
+        PS.makeScale(k || 1e-5, k || 1e-5, k || 1e-5);
+        pr.m.matrixWorld.multiplyMatrices(pr.parent.matrixWorld, PM.multiplyMatrices(pr.local, PS));
+      };
+    }
+
+    // ── The lariat: shows in a hand raised over the hat with the lasso flag set ──
     // Each part places itself at render time (onBeforeRender runs after the
     // scene's matrices are updated, before the draw), so it tracks the hand
     // exactly; hidden = collapsed to nothing.
@@ -231,10 +268,10 @@ export default {
       lassoParts.push({ m, local });
       return m;
     };
-    addPart(new THREE.TorusGeometry(loopR, 0.016, 5, 36), loopR * 0.85, 0, 0, Math.PI / 2, 0, 0);
-    addPart(new THREE.SphereGeometry(0.032, 8, 6), 0.06, 0, 0, 0, 0, 0);
-    addPart(new THREE.CylinderGeometry(0.011, 0.011, 0.14, 5), 0.06, 0, 0, 0, 0, Math.PI / 2);
-    const hand = limbs.R.hand, root = kit.joints.hips.parent;
+    addPart(new THREE.TorusGeometry(loopR, 0.024, 5, 36), loopR * 0.85, 0.1, 0, Math.PI / 2, 0, 0);
+    addPart(new THREE.SphereGeometry(0.034, 8, 6), 0.07, 0.1, 0, 0, 0, 0);
+    addPart(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 5), 0.03, 0.05, 0, 0, 0, 0.6);
+    const hands = [limbs.R.hand, limbs.L.hand], root = kit.joints.hips.parent, _hq = new THREE.Vector3();
     const L = new THREE.Matrix4(), _hp = new THREE.Vector3(), _ht = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3();
     let frame = -1, lastT = 0, spin = 0;
     const place = (renderer) => {
@@ -243,10 +280,18 @@ export default {
       frame = f;
       const now = performance.now() / 1000, dt = Math.min(0.1, Math.max(0, now - lastT));
       lastT = now; spin += dt * 11;
-      _hp.setFromMatrixPosition(hand.matrixWorld);
+      // Whichever hand is up over the hat AND flagged by the move (a wrist
+      // roll |z| ≈ 0.9 — mirrored moves flip hands) holds the lariat.
       _ht.setFromMatrixPosition(head.matrixWorld);
       const sc = root.matrixWorld.getMaxScaleOnAxis() || 1;
-      const k = Math.max(0, Math.min(1, ((_hp.y - _ht.y) / sc - 0.32) / 0.22));
+      let k = 0;
+      for (const h of hands) {
+        const sig = Math.max(0, Math.min(1, (Math.abs(h.rotation.z) - 0.4) / 0.35));
+        if (sig <= 0) continue;
+        _hq.setFromMatrixPosition(h.matrixWorld);
+        const kh = sig * Math.max(0, Math.min(1, ((_hq.y - _ht.y) / sc - 0.2) / 0.2));
+        if (kh > k) { k = kh; _hp.copy(_hq); }
+      }
       if (k <= 0.001) { L.makeScale(1e-5, 1e-5, 1e-5).setPosition(_hp); return; }
       _hp.y += 0.03 * sc;
       _q.setFromEuler(_e.set(0.12 * Math.sin(spin * 0.5), spin, 0.18, 'YXZ'));
