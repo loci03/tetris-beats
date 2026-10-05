@@ -135,7 +135,7 @@ export const moves = {
       [Infinity, (p, b, B, s) => {
         scratchPose(p, b, B, s);
         const k = win(b, 3.3, 4.3, 0.5);
-        armMix(p, 'L', [0.85, 0.3, 1.5, -0.6], SKY, k);
+        armMix(p, 'L', [0.6, 0.28, 1.0, -0.5], SKY, k);
         p.look(-0.25 * k, 0.1 * k);
       }],
     ], 0.2);
@@ -367,8 +367,8 @@ function scratchPose(p, b, B, s) {
   const sc = Math.sin(TAU * b * 4), fade = Math.sin(TAU * b * 2 + 0.5);
   p.foot('L', 0.22); p.foot('R', 0.22, 0, 0, 0.2 * (0.5 + 0.5 * Math.sin(TAU * b)));
   p.hips(0, -0.2, -0.04, 0);
-  p.arm('R', 0.9 + 0.12 * sc, 0.35 + 0.18 * sc, 1.45, -0.6); p.wrist('R', 0.3 * sc);
-  p.arm('L', 0.85, 0.3 + 0.12 * fade, 1.5, -0.6);
+  p.arm('R', 0.6 + 0.1 * sc, 0.32 + 0.2 * sc, 0.95, -0.5); p.wrist('R', 0.3 * sc);
+  p.arm('L', 0.6, 0.28 + 0.14 * fade, 1.0, -0.5);
   p.lean(0.3, 0.12); p.look(0.15 + 0.12 * Math.pow(0.5 + 0.5 * Math.cos(TAU * b * 2), 2), 0.05);
 }
 
