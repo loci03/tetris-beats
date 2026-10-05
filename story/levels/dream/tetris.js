@@ -633,8 +633,8 @@ export function createTetrisWorld(ctx) {
           rb.stompHit = true; rb.imp.v -= 2.2;
           rb.legs[rb.stompLeg].ankle.getWorldPosition(rb.footW);
           shock(rb.footW.x, rb.footW.z);
-          st.shake = Math.max(st.shake, 0.5 + 0.5 * rb.stompPow); st.flash = Math.max(st.flash, 0.3);
-          flashL.position.set(rb.footW.x, 2, rb.footW.z + 2); flashL.intensity = 260;
+          st.shake = Math.max(st.shake, 0.5 + 0.5 * rb.stompPow); st.flash = Math.max(st.flash, 0.12);
+          flashL.position.set(rb.footW.x, 2, rb.footW.z + 2); flashL.intensity = 140;
         }
         if (s > 0.9) rb.stomp = -1;
       }
@@ -909,11 +909,11 @@ export function createTetrisWorld(ctx) {
     } else if (kind === 'drop') {
       const rows = data.rows || 0, k = Math.min(1, 0.35 + rows / 16);
       doStomp(sideRobot(data.col), k);
-      st.flash = Math.max(st.flash, 0.35 + 0.4 * k); st.shake = Math.max(st.shake, 0.3 + 0.6 * k);
-      st.mood = Math.max(-1, st.mood - 0.25 - 0.25 * k);
+      st.flash = Math.max(st.flash, 0.1 + 0.15 * k); st.shake = Math.max(st.shake, 0.3 + 0.6 * k);
+      st.mood = Math.max(-1, st.mood - 0.12 - 0.18 * k);
       helis[0].dive = Math.min(1.4, helis[0].dive + 0.6);
-      if (rows >= 6) { strike(0, (rnd() < 0.5 ? -1 : 1) * (22 + rnd() * 40), -45 - rnd() * 40); st.light = Math.max(st.light, 0.8); }
-      if (rows >= 12) { strike(1, (rnd() < 0.5 ? -1 : 1) * (22 + rnd() * 40), -45 - rnd() * 40); st.light = 1; }
+      if (rows >= 6) { strike(0, (rnd() < 0.5 ? -1 : 1) * (22 + rnd() * 40), -45 - rnd() * 40); st.light = Math.max(st.light, 0.2); }
+      if (rows >= 12) { strike(1, (rnd() < 0.5 ? -1 : 1) * (22 + rnd() * 40), -45 - rnd() * 40); st.light = Math.max(st.light, 0.35); }
       st.fov = Math.max(st.fov, 2.5 * k);
       st.lastDropT = st.t;
     } else if (kind === 'hold') {

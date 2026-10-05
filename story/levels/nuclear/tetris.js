@@ -579,7 +579,7 @@ export function createTetrisWorld(ctx) {
     // ── Shocks ──
     shocks.forEach((s, i) => {
       if (s.life > 0) { s.life -= dt * 0.9; s.r += s.v * dt; }
-      groundMat.uniforms.uRing.value[i].set(s.x, s.z, s.r, Math.max(0, s.life) * 1.3);
+      groundMat.uniforms.uRing.value[i].set(s.x, s.z, s.r, Math.max(0, s.life) * 0.9);
     });
 
     // ── Shaders + lights ──
@@ -651,7 +651,7 @@ export function createTetrisWorld(ctx) {
       for (let i = 0; i < 10 + 14 * k; i++) { const a = rnd() * Math.PI * 2, v = 3 + rnd() * 6 * k; spit(x + Math.cos(a) * 0.5, 0.3, 4 + Math.sin(a) * 0.5, Math.cos(a) * v, 3 + rnd() * 6 * k, Math.sin(a) * v * 0.6, 0.3 + rnd() * 0.3, 1.2); }
       for (const b of barrelState) b.y.v += (1.5 + 3 * k) * (0.6 + 0.4 * rnd());
       for (const z of zombies) z.stagger.v += (z.x > x ? 1 : -1) * 3 * k;
-      st.shake = Math.max(st.shake, 0.35 + 0.6 * k); st.flash = Math.max(st.flash, 0.3 * k); st.fov = Math.max(st.fov, 2 * k);
+      st.shake = Math.max(st.shake, 0.35 + 0.6 * k); st.flash = Math.max(st.flash, 0.15 * k); st.fov = Math.max(st.fov, 2 * k);
     } else if (kind === 'hold') {
       st.radFlip.v += 9;
       const picks = [0, 3, 6, 9];
