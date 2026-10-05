@@ -103,7 +103,7 @@ export class BattleSession {
     // The battle music runs through its own gain so the announcer can duck it.
     this.duckGain = this.ctx.createGain();
     this.duckGain.connect(this.audio.trackGain);
-    this.ann = new Announcer(this.ctx, this.audio.masterGain, this.duckGain, { enabled: bridge.voiceEnabled !== false });
+    this.ann = new Announcer(this.ctx, this.audio.masterGain, this.duckGain, { enabled: bridge.voiceEnabled !== false, rival: level.dancers.rival });
     const profile = level.ai[st.difficulty] || level.ai.medium;
     this.battle = new RhythmBattle({ clock: this.clock, music: this.mcfg, seed: level.chart.seed + (Date.now() % 997), aiProfile: profile });
     this.battle.on((type, data) => this._onBattle(type, data));

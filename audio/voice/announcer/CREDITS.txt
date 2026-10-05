@@ -1,6 +1,7 @@
 Announcer voice lines generated with Kokoro-82M TTS (https://github.com/hexgrad/kokoro,
-model weights Apache-2.0) via kokoro-onnx, voice "am_fenrir". Each line was then
-re-pitched into a shouted delivery (higher, wider pitch contour, lowered formants,
-held syllables — Praat via parselmouth), EQ'd, compressed, saturated, given a
-sub-octave double and an arena slapback/echo tail for a fighting-game announcer sound.
-To replace with real recordings, keep the same file names.
+model weights Apache-2.0) via kokoro-onnx — a blend of the "am_fenrir" and "am_michael"
+voices — phrase by phrase, each phrase re-pitched onto a versus-arcade hype contour with
+its last vowel held (Praat via parselmouth), then EQ, compression, rasp, detuned doubling
+and an arena slapback/echo. lines.json: per line, seconds to the punch word ("accent")
+and the voice length before the echo ("dry"). Keep the file names to replace with real
+recordings (update lines.json timings).

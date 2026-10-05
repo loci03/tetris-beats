@@ -38,7 +38,7 @@ export async function createBackdrop(levelId, { canvas, low = false } = {}) {
   const rigs = { player: createCharacter(pDef), rival: createCharacter(rDef) };
   // The board covers the middle of the screen: the dancers move out to
   // either side of it (backdrop.spread = |x| of each dancer).
-  const bdc = mod.backdrop || {}, spread = bdc.spread ?? 2.9;
+  const bdc = mod.backdrop || {}, spread = bdc.spread ?? 3.5;
   rigs.player.root.position.copy(world.anchors.player).setX(-spread).setZ(world.anchors.player.z + (bdc.forward ?? 0.9));
   rigs.rival.root.position.copy(world.anchors.rival).setX(spread).setZ(world.anchors.rival.z + (bdc.forward ?? 0.9));
   rigs.player.baseYaw = 0.12; rigs.rival.baseYaw = -0.12;

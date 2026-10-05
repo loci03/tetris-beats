@@ -1,0 +1,166 @@
+{
+ "ready": {
+  "accent": 0.11,
+  "dry": 0.6
+ },
+ "go": {
+  "accent": 0.08,
+  "dry": 0.76
+ },
+ "solo": {
+  "accent": 0.748,
+  "dry": 1.35
+ },
+ "fever": {
+  "accent": 0.27,
+  "dry": 0.55
+ },
+ "you-win": {
+  "accent": 0.679,
+  "dry": 1.16
+ },
+ "vs-toni": {
+  "accent": 1.067,
+  "dry": 1.44
+ },
+ "toni-wins": {
+  "accent": 0.939,
+  "dry": 1.55
+ },
+ "vs-violetta": {
+  "accent": 0.717,
+  "dry": 1.64
+ },
+ "violetta-wins": {
+  "accent": 0.857,
+  "dry": 1.47
+ },
+ "vs-null": {
+  "accent": 0.917,
+  "dry": 1.32
+ },
+ "null-wins": {
+  "accent": 0.621,
+  "dry": 1.23
+ },
+ "vs-bunni": {
+  "accent": 0.687,
+  "dry": 1.28
+ },
+ "bunni-wins": {
+  "accent": 0.671,
+  "dry": 1.28
+ },
+ "vs-rhett": {
+  "accent": 0.737,
+  "dry": 1.63
+ },
+ "rhett-wins": {
+  "accent": 0.931,
+  "dry": 1.54
+ },
+ "vs-gouda": {
+  "accent": 0.777,
+  "dry": 1.7
+ },
+ "gouda-wins": {
+  "accent": 0.972,
+  "dry": 1.59
+ },
+ "vs-kaya": {
+  "accent": 0.847,
+  "dry": 1.2
+ },
+ "kaya-wins": {
+  "accent": 0.69,
+  "dry": 1.3
+ },
+ "vs-sage": {
+  "accent": 0.797,
+  "dry": 1.42
+ },
+ "sage-wins": {
+  "accent": 0.664,
+  "dry": 1.28
+ },
+ "vs-zoot": {
+  "accent": 0.857,
+  "dry": 1.33
+ },
+ "zoot-wins": {
+  "accent": 0.618,
+  "dry": 1.23
+ },
+ "vs-monday": {
+  "accent": 1.097,
+  "dry": 1.78
+ },
+ "monday-wins": {
+  "accent": 1.035,
+  "dry": 1.65
+ },
+ "vs-sarge": {
+  "accent": 0.837,
+  "dry": 1.25
+ },
+ "sarge-wins": {
+  "accent": 0.745,
+  "dry": 1.36
+ },
+ "vs-skye": {
+  "accent": 0.827,
+  "dry": 1.23
+ },
+ "skye-wins": {
+  "accent": 0.703,
+  "dry": 1.32
+ },
+ "vs-mecha": {
+  "accent": 0.937,
+  "dry": 1.67
+ },
+ "mecha-wins": {
+  "accent": 0.947,
+  "dry": 1.56
+ },
+ "vs-grace": {
+  "accent": 1.247,
+  "dry": 1.77
+ },
+ "grace-wins": {
+  "accent": 1.044,
+  "dry": 1.66
+ },
+ "vs-tina": {
+  "accent": 0.857,
+  "dry": 1.2
+ },
+ "tina-wins": {
+  "accent": 0.71,
+  "dry": 1.32
+ },
+ "vs-coco": {
+  "accent": 0.807,
+  "dry": 1.45
+ },
+ "coco-wins": {
+  "accent": 0.778,
+  "dry": 1.39
+ },
+ "vs-rex": {
+  "accent": 1.157,
+  "dry": 1.67
+ },
+ "rex-wins": {
+  "accent": 1.012,
+  "dry": 1.63
+ },
+ "vs-nova": {
+  "accent": 0.917,
+  "dry": 1.45
+ },
+ "nova-wins": {
+  "accent": 0.73,
+  "dry": 1.34
+ }
+}

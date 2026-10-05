@@ -51,6 +51,13 @@
     width: 100%; height: 100%;
     z-index: 0;
   }
+  /* 3D level backdrop (story/backdrop.js) — replaces the 2D scene when on. */
+  #bg3d {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    z-index: 0; display: none; image-rendering: auto;
+  }
+  body.bg3d-on #bg3d { display: block; }
+  body.bg3d-on #bg-canvas { opacity: 0; }
   #game-container {
     position: relative;
     z-index: 1;
@@ -828,7 +835,7 @@
   /* Story Mode level list (start screen, STORY tab) */
   #story-panel, #beat-panel {
     flex-direction: column; gap: 8px;
-    width: min(380px, 92%);
+    width: min(600px, 94%);
     margin: 0 auto 18px;
   }
   .story-kicker {
@@ -856,6 +863,17 @@
   .story-level-locked .sl-num { color: rgba(255,255,255,0.5); }
   .sl-body b { display: block; font-family: var(--font-display); font-size: 15px; letter-spacing: 3px; }
   .sl-body small { display: block; margin-top: 3px; font-size: 12px; line-height: 1.35; color: rgba(255,255,255,0.72); }
+  .sl-body small em { font-style: normal; font-weight: 800; color: #ffd27a; letter-spacing: 1px; }
+  .story-levels {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    max-height: min(46vh, 430px); overflow-y: auto; padding: 2px 4px 2px 0;
+    scrollbar-width: thin;
+  }
+  .story-levels .story-level { padding: 9px 12px; gap: 10px; border-radius: 13px; }
+  .story-levels .sl-num { font-size: 18px; min-width: 26px; }
+  .story-levels .sl-body b { font-size: 12px; letter-spacing: 1.5px; }
+  .story-levels .sl-body small { font-size: 11px; }
+  @media (max-width: 520px) { .story-levels { grid-template-columns: 1fr; max-height: 40vh; } }
 
   /* Settings panel */
   #settings-btn { margin-top: 12px; padding: 10px 22px; font-size: 12px; }
@@ -2017,6 +2035,7 @@
      start playback inside primeVoiceOnClick (the Start-button user gesture). -->
 <audio id="ios-silence-unlock" src="audio/sfx/silence.mp3" loop preload="auto" playsinline style="display:none"></audio>
 
+<canvas id="bg3d" aria-hidden="true"></canvas>
 <canvas id="bg-canvas"></canvas>
 
 <div id="start-screen">
@@ -2073,39 +2092,14 @@
        into a rhythm dance battle (story/*.js). -->
   <div id="story-panel" style="display:none;">
     <div class="story-kicker">STORY MODE</div>
-    <button class="story-level story-level-active" type="button" data-story-level="underground">
-      <span class="sl-num">01</span>
-      <span class="sl-body">
-        <b>THE UNDERGROUND</b>
-        <small>Clear a line with the golden piece to enter the dance battle vs ALFRED.</small>
-      </span>
-    </button>
-    <button class="story-level" type="button" data-story-level="taco">
-      <span class="sl-num">02</span>
-      <span class="sl-body">
-        <b>TACO TOWN</b>
-        <small>Clear a line with the golden piece to enter the dance battle vs TINA.</small>
-      </span>
-    </button>
+    <div class="story-levels" data-kind="story"></div>
   </div>
   <!-- BUST A BEAT: the Story Mode dance battle by itself — no Tetris.
-       Same levels / music / rival; ALFRED'S DIFFICULTY applies. -->
+       Same levels / music / boss; ALFRED'S DIFFICULTY applies. Cards are
+       built from story/levels.js. -->
   <div id="beat-panel" style="display:none;">
     <div class="story-kicker">BUST A BEAT</div>
-    <button class="story-level story-level-active" type="button" data-beat-level="underground">
-      <span class="sl-num">01</span>
-      <span class="sl-body">
-        <b>THE UNDERGROUND</b>
-        <small>Dance battle vs ALFRED in the warehouse. Enter the arrows, GROOVE on beat 4.</small>
-      </span>
-    </button>
-    <button class="story-level" type="button" data-beat-level="taco">
-      <span class="sl-num">02</span>
-      <span class="sl-body">
-        <b>TACO TOWN</b>
-        <small>Dance battle vs TINA, the glam taco queen. The whole song, start to finish.</small>
-      </span>
-    </button>
+    <div class="story-levels" data-kind="beat"></div>
   </div>
   <!-- Difficulty picker - visible only when "VS ALFRED" mode is selected.
        Three tiers wired to AI_DIFFICULTIES presets in JS. Persists across
@@ -4264,6 +4258,7 @@ function softDrop() {
 }
 
 function hardDrop() {
+  Backdrop3D.event('drop', {});
   let drop = 0;
   const startY = currentY;
   while (!collides(currentPiece, currentX, currentY + 1)) { currentY++; drop++; }
@@ -4443,6 +4438,7 @@ function clearLines() {
   for (let r = ROWS - 1; r >= 0; r--) {
     if (board[r].every(c => c !== null)) { clearRows.push(r); cleared++; }
   }
+  if (cleared > 0) Backdrop3D.event('clear', { lines: cleared });
   // Story Mode: did a cleared row contain the special piece?
   const clearedSpecial = cleared > 0 && gameMode === 'storymode'
     && clearRows.some(r => board[r].includes(SPECIAL_COLOR));
@@ -4606,6 +4602,7 @@ function clearLines() {
         dropInterval = computeDropInterval(level);
         lockDelay = computeLockDelay(level);
         onLevelChange();
+        Backdrop3D.event('levelUp', { level });
       }
     }
     if (!zoneActive) zoneEnergy = Math.min(100, zoneEnergy + cleared * 15);
@@ -4901,6 +4898,7 @@ const audioEngine = {
     src.connect(g);
     g.connect(this.trackGain);
     src.start();
+    this._trackStartAt = this.ctx.currentTime;
     g.gain.linearRampToValueAtTime(1, this.ctx.currentTime + 0.4);
     this._trackSource = { node: src, gain: g };
     this._trackName = name;
@@ -18487,6 +18485,70 @@ function drawBeachCruiseScene(theme,now,playRects){
 }
 
 
+// ── 3D level backdrops ────────────────────────────────────────────
+// A level that has a Bust a Beat stage (story/levels/<id>.js) shows it in
+// 3D behind the board: the stage, the crowd, YOU and the level's boss
+// dancing either side of the board to the song, reacting to your clears.
+// Off with low graphics / auto-degrade; if it can't keep up it hands back
+// to the 2D scene for the rest of the session.
+const Backdrop3D = {
+  bd: null, track: null, loading: null, failed: new Set(), map: null, mod: null, lastT: 0, wasOver: false,
+  canvas: document.getElementById('bg3d'),
+  enabled() {
+    return settings.quality !== 'low' && !_autoDegraded && gameStarted && !document.body.classList.contains('vs-mode');
+  },
+  _load() {
+    if (!this.mod) this.mod = import('./story/backdrop.js').then(async (bdm) => {
+      const { STORY_LEVELS } = await import('./story/levels.js');
+      this.map = {};
+      for (const L of Object.values(STORY_LEVELS)) this.map[L.music.track] = L.id;
+      return bdm;
+    });
+    return this.mod;
+  },
+  // Called from render(): returns true when the 3D backdrop drew this frame.
+  frame(nowT) {
+    const theme = getTheme(level), track = theme && theme.track;
+    if (!this.enabled() || !track || this.failed.has(track)) { this.hide(); return false; }
+    if (this.track !== track) {
+      this.dispose();
+      this.track = track;
+      const want = track;
+      this.loading = this._load().then(async (bdm) => {
+        const id = this.map[want];
+        if (!id || this.track !== want) return;
+        const bd = await bdm.createBackdrop(id, { canvas: this.canvas, low: IS_TOUCH });
+        if (this.track !== want) { bd.dispose(); return; }
+        this.bd = bd; this.lastT = 0; this.bd.react('start', {});
+      }).catch((e) => { console.warn('[backdrop] unavailable', e); this.failed.add(want); });
+    }
+    if (!this.bd) { this.hide(); return false; }
+    if (this.bd.failed) { this.failed.add(track); this.dispose(); return false; }
+    document.body.classList.add('bg3d-on');
+    if (gameOver && !this.wasOver) this.bd.react('gameOver', {});
+    this.wasOver = gameOver;
+    const dt = this.lastT ? Math.min(0.1, (nowT - this.lastT) / 1000) : 1 / 60;
+    this.lastT = nowT;
+    if (paused) return true;
+    const ae = audioEngine, src = ae && ae._trackSource;
+    let songTime = null;
+    if (src && ae._trackName === track && ae.ctx && ae._trackStartAt != null) {
+      const dur = src.node.buffer ? src.node.buffer.duration : 0;
+      songTime = ae.ctx.currentTime - ae._trackStartAt;
+      if (dur && src.node.loop) songTime %= dur;
+    }
+    this.bd.update(dt, { songTime });
+    return true;
+  },
+  event(kind, data) { if (this.bd && document.body.classList.contains('bg3d-on')) this.bd.react(kind, data); },
+  hide() { document.body.classList.remove('bg3d-on'); },
+  dispose() {
+    this.hide();
+    if (this.bd) { try { this.bd.dispose(); } catch {} }
+    this.bd = null; this.track = null; this.wasOver = false;
+  },
+};
+
 function drawBackground() {
   const theme = getTheme(level);
   const [r1, g1, b1] = hexToRgb(theme.colors.bg1);
@@ -19394,7 +19456,7 @@ function render(timestamp) {
   render._lastT = nowT;
   monitorFrameRate(rawDt);
   // Story Mode's 3D world covers the screen: skip all 2D drawing.
-  if (storyHide2D) return;
+  if (storyHide2D) { Backdrop3D.hide(); return; }
   // Cheer pulse decays each frame (rises only on line clears in clearLines()).
   // Linear decay over ~1.4s feels right against a 4-beat cheer at 100 bpm.
   if (cheerPulse > 0) cheerPulse = Math.max(0, cheerPulse - 0.012 * dtF);
@@ -19404,7 +19466,9 @@ function render(timestamp) {
   if (stageFlash > 0) stageFlash = Math.max(0, stageFlash - 0.05 * dtF);
   // Board drop pulse - quick decay, gone in ~400ms
   if (boardDropPulse > 0) boardDropPulse = Math.max(0, boardDropPulse - 0.06 * dtF);
-  try { drawBackground(); } catch(e) { /* background scene error — pieces still draw */ }
+  if (!Backdrop3D.frame(nowT)) {
+    try { drawBackground(); } catch(e) { /* background scene error — pieces still draw */ }
+  }
   // Screen shake + hard-drop kick, applied via CSS transform on P1's main
   // canvas (cheaper than redrawing into a translated context).
   //  - Shake: smooth layered sine wobble with a random phase per shake
@@ -20533,14 +20597,25 @@ window.TetrisBridge = {
 let _storyLoading = null;
 // Level picked on the STORY / BEAT tabs (cards in #story-panel / #beat-panel).
 let _storyLevelId = 'underground', _beatLevelId = 'underground';
-document.querySelectorAll('[data-story-level], [data-beat-level]').forEach(card => {
-  card.addEventListener('click', () => {
-    const story = card.hasAttribute('data-story-level');
-    const id = story ? card.dataset.storyLevel : card.dataset.beatLevel;
-    if (story) _storyLevelId = id; else _beatLevelId = id;
-    card.parentElement.querySelectorAll('.story-level').forEach(c => c.classList.toggle('story-level-active', c === card));
+// One card per level (story/levels.js), in both the STORY and BEAT lists.
+import('./story/levels.js').then(({ LEVEL_ORDER, STORY_LEVELS, LEVEL_CARDS }) => {
+  document.querySelectorAll('.story-levels').forEach(list => {
+    const kind = list.dataset.kind;
+    list.innerHTML = LEVEL_ORDER.map(id => {
+      const L = STORY_LEVELS[id], [boss, style] = LEVEL_CARDS[id] || ['?', ''];
+      const sel = (kind === 'story' ? _storyLevelId : _beatLevelId) === id;
+      return `<button class="story-level${sel ? ' story-level-active' : ''}" type="button" data-level="${id}">
+        <span class="sl-num">${String(L.number).padStart(2, '0')}</span>
+        <span class="sl-body"><b>${L.title}</b><small>vs <em>${boss}</em> · ${style}</small></span></button>`;
+    }).join('');
+    list.addEventListener('click', (e) => {
+      const card = e.target.closest('.story-level');
+      if (!card) return;
+      if (kind === 'story') _storyLevelId = card.dataset.level; else _beatLevelId = card.dataset.level;
+      list.querySelectorAll('.story-level').forEach(c => c.classList.toggle('story-level-active', c === card));
+    });
   });
-});
+}).catch(e => console.error('[levels] list failed', e));
 
 function loadStoryMode(quiet) {
   if (window.StoryMode) return Promise.resolve(true);
@@ -21213,6 +21288,8 @@ window.addEventListener('resize', () => positionP2Monitor());
   function setTab(tab) {
     if (select) select.dataset.activeTab = tab;
     tabs.forEach(t => t.classList.toggle('mode-tab-active', t.dataset.tab === tab));
+    const diffLabel = diff && diff.querySelector('.diff-label');
+    if (diffLabel) diffLabel.textContent = tab === 'beat' ? 'BOSS DIFFICULTY' : "ALFRED'S DIFFICULTY";
     btns.forEach(b => b.style.display = b.dataset.tab === tab ? '' : 'none');
     // STORY tab: show WIP, hide start button and vibe picker
     const isStory = (tab === 'story');

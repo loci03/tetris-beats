@@ -35,6 +35,16 @@ const SONGS = [
   ['galaxy', 20, 'GALAXY', 'galaxy.mp3', 91.5, 0.011, 370.8, 1, 'nova'],
 ];
 
+// Boss display names + the song's style, for the level select.
+export const LEVEL_CARDS = {
+  underground: ['COOL TONI', 'disco swagger'], violins: ['VIOLETTA', 'ballet & strings'], backformore: ['NULL', 'tutting & glitch'],
+  whiterabbit: ['BUNNI', 'rave shuffle'], ferrari: ['RHETT RYDER', 'country line dance'], maccheese: ['CHEF GOUDA', 'party classics'],
+  lifeisgood: ['KAYA', 'dancehall'], relax: ['SAGE', 'tai chi flow'], trumpets: ['ZOOT', 'swing & Charleston'],
+  work: ['MR. MONDAY', 'office house'], triggered: ['SARGE', 'krump'], higher: ['SKYE', 'laid-back R&B'],
+  dream: ['MECHA-9', 'robot & popping'], hegotme: ['DEACON GRACE', 'gospel praise'], taco: ['TINA', 'glam diva'],
+  living: ['COCO', 'roller disco'], nuclear: ['ROTTEN REX', 'zombie shuffle'], galaxy: ['NOVA', 'zero-gravity'],
+};
+
 // Rival skill grows with the level (rank 0 → 1).
 function aiFor(rank) {
   const r = Math.max(0, Math.min(1, rank)), L = (a, b) => +(a + (b - a) * r).toFixed(2);
