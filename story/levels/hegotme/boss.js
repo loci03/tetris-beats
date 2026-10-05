@@ -70,16 +70,16 @@ export default {
     for (const sx of [1, -1]) {
       const st = part(chest, new THREE.BoxGeometry(0.075, 0.46, 0.02), stole, 0.07 * sx, 0.12, 0.17, 1, 1, 1, false);
       st.rotation.z = 0.12 * sx;
-      part(hips, new THREE.BoxGeometry(0.075, 0.38, 0.02), stole, 0.09 * sx, -0.26, 0.21, 1, 1, 1, false);
-      part(hips, new THREE.BoxGeometry(0.04, 0.01, 0.01), crossMat, 0.09 * sx, -0.36, 0.225, 1, 1, 1, false);
-      part(hips, new THREE.BoxGeometry(0.012, 0.07, 0.01), crossMat, 0.09 * sx, -0.355, 0.225, 1, 1, 1, false);
-      part(hips, new THREE.BoxGeometry(0.08, 0.025, 0.022), gold, 0.09 * sx, -0.45, 0.215, 1, 1, 1, false); // fringe
+      part(hips, new THREE.BoxGeometry(0.075, 0.38, 0.02), stole, 0.09 * sx, -0.26, 0.27, 1, 1, 1, false);
+      part(hips, new THREE.BoxGeometry(0.04, 0.01, 0.01), crossMat, 0.09 * sx, -0.36, 0.285, 1, 1, 1, false);
+      part(hips, new THREE.BoxGeometry(0.012, 0.07, 0.01), crossMat, 0.09 * sx, -0.355, 0.285, 1, 1, 1, false);
+      part(hips, new THREE.BoxGeometry(0.08, 0.025, 0.022), gold, 0.09 * sx, -0.45, 0.31, 1, 1, 1, false); // fringe
     }
     part(chest, new THREE.CylinderGeometry(0.2, 0.2, 0.06, 18), toon(C.topShade), 0, 0.31, 0, 1.2, 1, 0.8, false);
     // Long flowing skirt of the robe, flaring to mid-shin, open low at the
     // back so the steps stay free.
-    part(hips, new THREE.CylinderGeometry(0.25, 0.42, 0.6, 26, 1, true), robe, 0, -0.27, 0, 1, 1, 0.85).material.side = THREE.DoubleSide;
-    part(hips, new THREE.TorusGeometry(0.42, 0.018, 4, 30), toon(C.topShade), 0, -0.57, 0, 1, 1, 0.85, false).rotation.x = Math.PI / 2;
+    part(hips, new THREE.CylinderGeometry(0.25, 0.46, 0.6, 26, 1, true), robe, 0, -0.27, 0.04, 1, 1, 1.08).material.side = THREE.DoubleSide;
+    part(hips, new THREE.TorusGeometry(0.46, 0.018, 4, 30), toon(C.topShade), 0, -0.57, 0.04, 1, 1, 1.08, false).rotation.x = Math.PI / 2;
     part(spine, new THREE.CylinderGeometry(0.21, 0.24, 0.24, 18), robe, 0, 0.04, 0, 1.05, 1, 0.82, false);
     // Bell sleeves flaring at the wrist, a gold cuff stripe.
     for (const side of ['L', 'R']) {

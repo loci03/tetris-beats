@@ -254,7 +254,7 @@ export const moves = {
         const t = (b - 2.75), air = Math.sin(Math.PI * clamp01(t / 0.7)), land = smooth((t - 0.55) / 0.4);
         p.foot('L', 0.06 + 0.2 * land, 0.3 * air, 0, 0.5 * air); p.foot('R', 0.06 + 0.2 * land, 0.3 * air, 0, 0.5 * air);
         p.hips(0, -0.04 + 0.36 * air - 0.2 * land * (1 - smooth((t - 0.8) / 0.4)) - 0.06 * land, 0);
-        arm(p, 'L', OPEN, HIGH, smooth(t / 0.4)); arm(p, 'R', OPEN, HIGH, smooth(t / 0.4));
+        arm(p, 'L', OPEN, HIGH, smooth((t + 0.15) / 0.7)); arm(p, 'R', OPEN, HIGH, smooth((t + 0.15) / 0.7));
         p.lean(-0.1, -0.25); p.look(-0.5);
         p.root(0.004 * Math.sin(B * 40) * land, 0, 0);
       }],

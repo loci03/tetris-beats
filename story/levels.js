@@ -23,7 +23,7 @@ const SONGS = [
   ['maccheese', 7, 'MAC & CHEESE', 'mac-and-cheese.mp3', 94.005, 0.496, 158.3, 1, 'gouda'],
   ['lifeisgood', 8, 'LIFE IS GOOD', 'life-is-good.mp3', 94.085, 0.509, 126.1, 1, 'kaya'],
   ['relax', 9, 'RELAX YOUR MIND', 'relax-your-mind.mp3', 67.05, 0.487, 200.4, 2, 'sage'],
-  ['trumpets', 10, 'TRUMPETS PLEASE', 'trumpets-please.mp3', 78.66, 2.327, 173.1, 1, 'zoot'],
+  ['trumpets', 10, 'TRUMPETS PLEASE', 'trumpets-please.mp3', 117.99, 0.548, 173.1, 1, 'zoot'],
   ['work', 11, 'WORK', 'work.mp3', 127.155, 0.932, 189.9, 1, 'monday'],
   ['triggered', 12, 'TRIGGERED', 'trigger-on.mp3', 72.6, 0.032, 95.0, 2, 'sarge'],
   ['higher', 13, 'HIGHER', 'rooftop-ember-haze.mp3', 75.025, 0.603, 222.8, 2, 'skye'],
