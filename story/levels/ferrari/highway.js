@@ -697,8 +697,18 @@ export function createHighway(ctx) {
         if (n >= 2) st.highN = Math.max(st.highN, n - 1);
         if (n >= 3) st.backfire = 1;
       }
+    } else if (kind === 'move') {
+      // Every piece move: a flick of the wheel that way.
+      if (st.spin < 0 && !st.stopped) st.vx += (data.dir || 0) * 2.4;
+    } else if (kind === 'rotate') {
+      st.flash = Math.max(st.flash, 0.12);   // headlight flick on each spin
+      st.thumpV -= 0.15;
+    } else if (kind === 'soft') {
+      st.boost = Math.min(1.6, st.boost + 0.06);
+    } else if (kind === 'hold') {
+      st.backfire = 1;
     } else if (kind === 'drop') {
-      st.thumpV -= 0.9;
+      st.thumpV -= 0.5 + Math.min(1, (data.rows || 0) / 12);
     } else if (kind === 'levelUp') {
       st.level = data.level || st.level + 1;
       st.vBase = Math.min(56, 36 * (1 + 0.04 * (st.level - 1)));

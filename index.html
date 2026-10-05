@@ -57,7 +57,7 @@
     z-index: 0; display: none; image-rendering: auto;
   }
   body.bg3d-on #bg3d { display: block; }
-  body.bg3d-on #bg-canvas { opacity: 0; }
+  body.bg3d-on #bg-canvas { z-index: 0; pointer-events: none; }
   #game-container {
     position: relative;
     z-index: 1;
@@ -2283,6 +2283,10 @@
         <button type="button" role="radio" data-q="low">LOW</button>
       </div>
       <p class="set-note" id="set-quality-note"></p>
+      <div class="set-chips">
+        <button class="ov-chip" id="set-bg3d" type="button" aria-pressed="true">3D STAGE BACKGROUNDS</button>
+      </div>
+      <p class="set-note">On: each level's 3D stage plays behind the board with you and the boss dancing. Off: the classic 2D backgrounds.</p>
     </section>
     <section class="desktop-only">
       <h3>Keys</h3>
@@ -4216,6 +4220,7 @@ function rotatePiece(dir) {
       spawnParticles(currentX * CELL + CELL * 2, currentY * CELL + CELL, _themePieceColor(currentType), 6);
       _resetLockIfBudget();
       nudgeMovePulse(0.10);
+      _bdPiece('rotate', { dir: dir > 0 ? 1 : -1, kick: _lastRotation.wasKick });
       recordReplayEvent(dir > 0 ? 'r' : 'l');
       return;
     }
@@ -4226,6 +4231,12 @@ function rotatePiece(dir) {
 // shouldn't twitch the crowd (the crowd is reacting to the player at the
 // stage). Each call clamps to a max so the crowd doesn't go nuts on rapid
 // auto-repeat moves.
+// Piece actions for the 3D backdrop (human player only).
+function _bdPiece(kind, data) {
+  if (activePlayer && activePlayer.isAI) return;
+  data.col = currentX;
+  Backdrop3D.event(kind, data);
+}
 function nudgeMovePulse(amt) {
   if (activePlayer && activePlayer.isAI) return;
   movePulse = Math.min(0.7, movePulse + amt);
@@ -4241,27 +4252,30 @@ function _resetLockIfBudget(forceUnlock) {
 function moveLeft() {
   if (!collides(currentPiece, currentX - 1, currentY)) {
     currentX--; audioEngine.playMove(); _resetLockIfBudget(); nudgeMovePulse(0.08);
+    _bdPiece('move', { dir: -1 });
     recordReplayEvent('L');
   }
 }
 function moveRight() {
   if (!collides(currentPiece, currentX + 1, currentY)) {
     currentX++; audioEngine.playMove(); _resetLockIfBudget(); nudgeMovePulse(0.08);
+    _bdPiece('move', { dir: 1 });
     recordReplayEvent('R');
   }
 }
 function softDrop() {
   if (!collides(currentPiece, currentX, currentY + 1)) {
     currentY++; score += 1; audioEngine.playMove(); _resetLockIfBudget(); nudgeMovePulse(0.06);
+    _bdPiece('soft', {});
     recordReplayEvent('D');
   }
 }
 
 function hardDrop() {
-  Backdrop3D.event('drop', {});
   let drop = 0;
   const startY = currentY;
   while (!collides(currentPiece, currentX, currentY + 1)) { currentY++; drop++; }
+  _bdPiece('drop', { rows: drop });
   if (drop > 0 && _fxEnabled()) {
     // Streak from where each column of the piece started to where it
     // landed, plus a short downward board kick scaled by drop distance.
@@ -4438,7 +4452,7 @@ function clearLines() {
   for (let r = ROWS - 1; r >= 0; r--) {
     if (board[r].every(c => c !== null)) { clearRows.push(r); cleared++; }
   }
-  if (cleared > 0) Backdrop3D.event('clear', { lines: cleared });
+  if (cleared > 0 && !(activePlayer && activePlayer.isAI)) Backdrop3D.event('clear', { lines: cleared, combo: Math.max(0, (typeof combo === 'number' ? combo : 0) + 1) });
   // Story Mode: did a cleared row contain the special piece?
   const clearedSpecial = cleared > 0 && gameMode === 'storymode'
     && clearRows.some(r => board[r].includes(SPECIAL_COLOR));
@@ -4620,6 +4634,7 @@ function clearLines() {
 function holdCurrentPiece() {
   if (!canHold) return;
   canHold = false;
+  _bdPiece('hold', {});
   audioEngine.playHold();
   recordReplayEvent('hold');
   if (holdPieceType) {
@@ -18495,7 +18510,7 @@ const Backdrop3D = {
   bd: null, track: null, loading: null, failed: new Set(), map: null, mod: null, lastT: 0, wasOver: false,
   canvas: document.getElementById('bg3d'),
   enabled() {
-    return settings.quality !== 'low' && !_autoDegraded && gameStarted && !document.body.classList.contains('vs-mode');
+    return settings.bg3d && settings.quality !== 'low' && !_autoDegraded && gameStarted && !document.body.classList.contains('vs-mode');
   },
   _load() {
     if (!this.mod) this.mod = import('./story/backdrop.js').then(async (bdm) => {
@@ -18537,8 +18552,43 @@ const Backdrop3D = {
       songTime = ae.ctx.currentTime - ae._trackStartAt;
       if (dur && src.node.loop) songTime %= dur;
     }
-    this.bd.update(dt, { songTime });
+    // What the stage reacts to besides the music: where the piece is
+    // (lights and crowd lean, camera drifts with it), how high the stack is,
+    // and the same pulses the 2D scenes read.
+    let top = ROWS;
+    for (let r = 0; r < ROWS; r++) { if (board[r] && board[r].some(c => c !== null)) { top = r; break; } }
+    const pieceX = (typeof currentX === 'number') ? Math.max(-1, Math.min(1, ((currentX + 1.5) / COLS) * 2 - 1)) : 0;
+    this.bd.update(dt, { songTime, pieceX, danger: 1 - top / ROWS, move: movePulse, cheer: cheerPulse, flash: stageFlash });
     return true;
+  },
+  // The 2D layer over the 3D stage: confetti, the clear flash and the
+  // golden slam ring round the board (as the 2D scenes drew them).
+  overlay() {
+    const w = bgCanvas.width, h = bgCanvas.height;
+    bgCtx.clearRect(0, 0, w, h);
+    drawConfetti();
+    const theme = getTheme(level), acc = hexToRgb(theme.colors.accent || '#ffffff');
+    if (stageFlash > 0) {
+      bgCtx.fillStyle = `rgba(${acc[0]},${acc[1]},${acc[2]},${stageFlash * 0.28})`;
+      bgCtx.fillRect(0, 0, w, h);
+    }
+    if (boardDropPulse > 0) {
+      if (!this._rect || this._rectKey !== w + 'x' + h) {
+        const c = document.getElementById('main-canvas');
+        const r = c && c.getBoundingClientRect();
+        this._rect = r && r.width ? { x: r.left - 6, y: r.top - 6, w: r.width + 12, h: r.height + 12 } : null;
+        this._rectKey = w + 'x' + h;
+      }
+      if (this._rect) {
+        const R = this._rect;
+        bgCtx.save();
+        bgCtx.strokeStyle = `rgba(255,210,90,${boardDropPulse * 0.75})`;
+        bgCtx.lineWidth = 3 + 4 * boardDropPulse;
+        bgCtx.shadowColor = 'rgba(255,190,60,0.9)'; bgCtx.shadowBlur = 24 * boardDropPulse;
+        bgCtx.strokeRect(R.x, R.y, R.w, R.h);
+        bgCtx.restore();
+      }
+    }
   },
   event(kind, data) { if (this.bd && document.body.classList.contains('bg3d-on')) this.bd.react(kind, data); },
   hide() { document.body.classList.remove('bg3d-on'); },
@@ -19468,6 +19518,8 @@ function render(timestamp) {
   if (boardDropPulse > 0) boardDropPulse = Math.max(0, boardDropPulse - 0.06 * dtF);
   if (!Backdrop3D.frame(nowT)) {
     try { drawBackground(); } catch(e) { /* background scene error — pieces still draw */ }
+  } else {
+    try { Backdrop3D.overlay(); } catch(e) {}
   }
   // Screen shake + hard-drop kick, applied via CSS transform on P1's main
   // canvas (cheaper than redrawing into a translated context).
@@ -19610,6 +19662,7 @@ const settings = (() => {
     arr: num(saved.arr, 0, 100, SETTINGS_DEFAULTS.arr),
     shake: saved.shake !== false,
     quality: ['auto', 'high', 'low'].includes(saved.quality) ? saved.quality : 'auto',
+    bg3d: saved.bg3d !== false,
     rhythmOffset: num(saved.rhythmOffset, -200, 200, 0),
     keymap: km,
   };
@@ -20721,6 +20774,7 @@ function syncSettingsUI() {
   press('set-voice', voiceEnabled);
   press('set-ghost', showGhost);
   press('set-shake', settings.shake);
+  press('set-bg3d', settings.bg3d);
   $('set-das').value = String(settings.das);
   $('set-das-val').textContent = settings.das + 'ms';
   $('set-arr').value = String(settings.arr);
@@ -20805,6 +20859,7 @@ function monitorFrameRate(rawDt) {
   on('set-voice', 'click', () => { setVoiceEnabled(!voiceEnabled); syncSettingsUI(); });
   on('set-ghost', 'click', () => { setShowGhost(!showGhost); syncSettingsUI(); });
   on('set-shake', 'click', () => { settings.shake = !settings.shake; saveSettings(); syncSettingsUI(); });
+  on('set-bg3d', 'click', () => { settings.bg3d = !settings.bg3d; saveSettings(); syncSettingsUI(); if (!settings.bg3d) Backdrop3D.dispose(); });
   on('set-das', 'input', () => { settings.das = DAS = Number($('set-das').value); saveSettings(); syncSettingsUI(); });
   on('set-arr', 'input', () => { settings.arr = ARR = Number($('set-arr').value); saveSettings(); syncSettingsUI(); });
   on('set-rhythm', 'input', () => { settings.rhythmOffset = Number($('set-rhythm').value); saveSettings(); syncSettingsUI(); });
