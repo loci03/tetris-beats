@@ -106,7 +106,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     add(new THREE.Mesh(geo(new THREE.BoxGeometry(0.7, 0.15, 30)), capMat), sx * 18, 1.15, 3);
   }
   // The building drops away below the parapet.
-  add(new THREE.Mesh(geo(new THREE.BoxGeometry(36, 30, 30)), towerMat), 0, -15.1, 3);
+  add(new THREE.Mesh(geo(new THREE.BoxGeometry(36, 30, 30)), toon(0x2a2228)), 0, -15.1, 3);
   const tileSize = 0.64, tiles = [];
   for (let ix = -7; ix <= 7; ix++) for (let iz = -6; iz <= 6; iz++) {
     const x = ix * tileSize, z = iz * tileSize;
@@ -208,7 +208,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
   const hazes = [];
   for (let i = 0; i < (low ? 4 : 7); i++) {
     const m = add(new THREE.Mesh(geo(new THREE.PlaneGeometry(14, 5)), keep(new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.5, fog: false }))), 0, 0, 0);
-    hazes.push({ m, x0: -14 + i * 4.7, y: 1.2 + (i % 3) * 1.4, z: -9 + (i % 4) * 2.6, sp: 0.25 + (i % 3) * 0.12, ph: i });
+    hazes.push({ m, x0: -14 + i * 4.7, y: 1.4 + (i % 3) * 1.5, z: -10.5 + (i % 4) * 1.4, sp: 0.25 + (i % 3) * 0.12, ph: i });
   }
   const EMB = low ? 120 : 260;
   const embPos = new Float32Array(EMB * 3), embSeed = new Float32Array(EMB);
@@ -302,7 +302,6 @@ export function buildWorld({ lowGraphics = false } = {}) {
     blink.visible = (songTime % 1.6) < 0.25;
     fans.forEach((f, i) => { f.rotation.y += dt * (8 + i); });
     neonMesh.material.color.setScalar(0.7 + 0.3 * onBeat);
-    winTex.offset.y = 0;
     bulbSpots.forEach((b, i) => {
       const on = ((i + whole) % 4 === 0) ? 1 : 0.45;
       bulbs.setColorAt(i, col.copy(warm).multiplyScalar((0.3 + 0.7 * on * (0.6 + 0.4 * onBeat)) * Math.max(0.15, L)));
@@ -314,7 +313,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
     hazes.forEach((h) => {
       const x = ((h.x0 + songTime * h.sp + 16) % 32 + 32) % 32 - 16;
       h.m.position.set(x, h.y + Math.sin(songTime * 0.3 + h.ph) * 0.3, h.z);
-      h.m.material.opacity = (0.35 + 0.15 * Math.sin(songTime * 0.5 + h.ph) + 0.1 * onBeat) * Math.max(0.3, L);
+      h.m.material.opacity = (0.22 + 0.1 * Math.sin(songTime * 0.5 + h.ph) + 0.08 * onBeat) * Math.max(0.3, L);
     });
     const rise = 0.5 + emberBoost * 2;
     for (let i = 0; i < EMB; i++) {

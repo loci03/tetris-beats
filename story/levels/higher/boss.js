@@ -103,8 +103,7 @@ export default {
     part(head, new THREE.TorusGeometry(0.262, 0.022, 6, 26), band, 0, 0.36, -0.01, 1, 1, 1, false).rotation.x = Math.PI / 2;
     for (const sx of [1, -1]) part(face, new THREE.CylinderGeometry(0.058, 0.058, 0.02, 18), shades, 0.085 * sx, 0.235, 0.235, 1, 1, 1).rotation.x = Math.PI / 2;
     part(face, new THREE.BoxGeometry(0.06, 0.012, 0.012), phones, 0, 0.245, 0.245, 1, 1, 1, false);
-    // A small chain and a little goatee.
+    // A small chain.
     part(chest, new THREE.TorusGeometry(0.12, 0.012, 5, 20), toon(0xffd25a, { emissive: 0x3a2a00 }), 0, 0.25, 0.12, 1, 1.2, 1, false).rotation.x = 1.2;
-    part(face, sphere(0.03), mats.hair, 0, 0.04, 0.225, 1.1, 1, 0.6, false);
   },
 };

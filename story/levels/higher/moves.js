@@ -10,7 +10,7 @@ const PI = Math.PI;
 const mod4 = (b) => ((b % 4) + 4) % 4;
 const armMix = (p, side, A, B, t) => p.arm(side, lerp(A[0], B[0], t), lerp(A[1], B[1], t), lerp(A[2], B[2], t), lerp(A[3] || 0, B[3] || 0, t));
 const LOOSE = [-0.25, 0.42, 0.45, 0];            // arms hanging loose, a little out and back
-const POCKET = [0.32, -0.12, 1.5, -1.2];         // hand in the hoodie pocket
+const POCKET = [0.12, -0.05, 1.3, -1.15];         // hand in the hoodie pocket
 const BRIM = [2.05, 0.55, 2.25, -0.4];           // fingers on the hat brim
 const HEAD_BACK = [0.4, 2.2, 2.6, 0.9];          // hands behind the head
 const SKY = [0.35, 2.75, 0.05, 0];               // reaching for the sky
@@ -21,13 +21,14 @@ export const moves = {
   // loose, knees easy, chin up.
   skyeLeanBack(p, b, B, s) {
     groove(p, B, s, 0.8);
-    const lean = 0.5 - 0.5 * Math.cos(PI * b), rock = Math.sin(TAU * b);
+    const lean = 0.5 - 0.5 * Math.cos(PI * b), rock = Math.sin(TAU * b), side = Math.sin(PI * b / 2);
     p.foot('L', 0.21, 0, 0.02, 0.3 * (0.5 + 0.5 * rock) ** 2); p.foot('R', 0.21, 0, 0.02, 0.3 * (0.5 - 0.5 * rock) ** 2);
-    p.hips(0.03 * rock, -0.14 - 0.04 * lean, 0.05 + 0.04 * lean, 0.12 * rock);
-    p.lean(-0.12 - 0.16 * lean, -0.1 - 0.1 * lean, 0.12 * rock, 0.05 * rock);
-    p.shrug(0.16 * (0.5 + 0.5 * rock), 0.16 * (0.5 - 0.5 * rock));
-    p.arm('L', LOOSE[0] - 0.15 * lean, LOOSE[1] + 0.1 * lean, LOOSE[2] + 0.1 * rock); p.arm('R', LOOSE[0] - 0.15 * lean, LOOSE[1] + 0.1 * lean, LOOSE[2] - 0.1 * rock);
-    p.look(-0.05 - 0.08 * lean, 0.15 * rock, 0.06 * rock);
+    p.hips(0.05 * side, -0.15 - 0.05 * lean, 0.05 + 0.05 * lean, 0.28 * side);
+    p.lean(-0.14 - 0.18 * lean, -0.1 - 0.12 * lean, 0.15 * rock, -0.22 * side);
+    p.shrug(0.18 * (0.5 + 0.5 * rock), 0.18 * (0.5 - 0.5 * rock));
+    p.arm('L', POCKET[0], POCKET[1], POCKET[2], POCKET[3]);
+    p.arm('R', -0.35 - 0.2 * lean + 0.15 * rock, 0.5 + 0.15 * lean, 0.5 + 0.25 * (0.5 - 0.5 * rock), 0.2); p.wrist('R', 0.3 * rock);
+    p.look(-0.08 - 0.1 * lean, 0.2 * rock + 0.15 * side, 0.08 * rock + 0.1 * side);
   },
 
   // Shoulder rolls over a lazy step-drag: step out on the beat, drag the
@@ -50,12 +51,13 @@ export const moves = {
   // other on its toe, swapping on the pulse, leaning into the travel.
   skyeGlide(p, b, B, s) {
     groove(p, B, s, 0.7);
-    const X = 0.26 * Math.sin(PI * b / 2), v = Math.cos(PI * b / 2), sw = Math.sin(TAU * b);
+    const X = 0.36 * Math.sin(PI * b / 2), v = Math.cos(PI * b / 2), sw = Math.sin(TAU * b);
     p.footX('L', X + 0.13, 0, 0.03 * sw, 0.45 * (0.5 + 0.5 * sw) - 0.25 * (0.5 - 0.5 * sw));
     p.footX('R', X - 0.13, 0, -0.03 * sw, 0.45 * (0.5 - 0.5 * sw) - 0.25 * (0.5 + 0.5 * sw));
     p.hips(X, -0.13, 0, 0.18 * v);
-    p.arm('L', 0.25 - 0.35 * v, 0.4, 0.8 + 0.2 * sw, -0.2); p.arm('R', 0.25 + 0.35 * v, 0.4, 0.8 - 0.2 * sw, -0.2);
-    p.lean(0.02, -0.08, 0.15 * v, -0.1 * v);
+    p.arm('L', 0.3 - 0.6 * v, 0.5 + 0.25 * v, 1.0 + 0.25 * sw, -0.3); p.arm('R', 0.3 + 0.6 * v, 0.5 - 0.25 * v, 1.0 - 0.25 * sw, -0.3);
+    p.wrist('L', 0.35 * sw); p.wrist('R', -0.35 * sw);
+    p.lean(0.04, -0.08, 0.2 * v, -0.16 * v);
     p.look(0, 0.3 * v, 0.08 * v);
   },
 
@@ -66,9 +68,9 @@ export const moves = {
     const ph = mod4(b), dip = Math.pow(0.5 + 0.5 * Math.cos(TAU * (b - 0.1)), 1.5), side = Math.cos(PI * b);
     const wave = win(ph, 2.7, 4, 0.4), w = Math.sin(TAU * (b - 3));
     p.foot('L', 0.2, 0, 0.03 * side); p.foot('R', 0.2, 0, -0.03 * side);
-    p.hips(0.04 * side, -0.08 - 0.22 * dip, 0, 0.1 * side);
-    armMix(p, 'L', [0.15 + 0.45 * side, 0.3, 0.9, -0.2], [0.3, 1.5 + 0.3 * w, 0.4 + 0.4 * w, 1.4], wave);
-    armMix(p, 'R', [0.15 - 0.45 * side, 0.3, 0.9, -0.2], [0.3, 1.5 - 0.3 * w, 0.4 - 0.4 * w, 1.4], wave);
+    p.hips(0.05 * side, -0.08 - 0.3 * dip, 0, 0.16 * side);
+    armMix(p, 'L', [0.2 + 0.65 * side, 0.4, 1.1, -0.3], [0.3, 1.5 + 0.3 * w, 0.4 + 0.4 * w, 1.4], wave);
+    armMix(p, 'R', [0.2 - 0.65 * side, 0.4, 1.1, -0.3], [0.3, 1.5 - 0.3 * w, 0.4 - 0.4 * w, 1.4], wave);
     p.lean(0.08 * dip - 0.06, 0.05 * dip, 0.08 * side);
     p.look(0.28 * dip - 0.1, 0.1 * side);
   },
@@ -92,7 +94,7 @@ export const moves = {
   // body riding it, knees bouncing.
   skyeArmWave(p, b, B, s) {
     groove(p, B, s, 0.8);
-    const dir = Math.cos(PI * b / 2) >= 0 ? 1 : -1;
+    const dir = Math.cos(PI * b / 2);                         // wave travels L→R, then back
     const w = (k) => Math.sin(TAU * b - k * 0.8 * dir);
     const side = Math.sin(PI * b / 2);
     p.foot('L', 0.2); p.foot('R', 0.2);
@@ -132,7 +134,7 @@ export const moves = {
       }],
       [Infinity, (p, b, B, s) => {
         scratchPose(p, b, B, s);
-        const k = win(b, 3.45, 4.2, 0.3);
+        const k = win(b, 3.3, 4.3, 0.5);
         armMix(p, 'L', [0.85, 0.3, 1.5, -0.6], SKY, k);
         p.look(-0.25 * k, 0.1 * k);
       }],
@@ -231,7 +233,7 @@ export const moves = {
         const t = smooth(b / 2);
         p.foot('L', 0.02, 0, 0, 0.45); p.foot('R', 0.08, 0.15, 0.04, 0.5);
         p.hips(0, -0.06, 0); p.root(0, 0, 0, TAU * t);
-        p.arm('L', 0.3, 1.5, 0.15); p.arm('R', 0.3, 1.5, 0.15); p.look(-0.15);
+        p.arm('L', 0.3 + 0.2 * Math.sin(TAU * b), 1.5 + 0.25 * Math.sin(PI * b), 0.15 + 0.2 * t); p.arm('R', 0.3 - 0.2 * Math.sin(TAU * b), 1.5 + 0.25 * Math.sin(PI * b), 0.15 + 0.2 * t); p.look(-0.15);
       }],
       [Infinity, (p, b, B, s) => {
         groove(p, B, s, 0.6);
@@ -388,7 +390,7 @@ export const moveMeta = {
     skyeAccent: 0.4, skyeIntro: 0.5, skyeTaunt: 0.4, skyeVictory: 0.5,
   },
   fnGroove: { skyeKneeDrop: 0, skyeChillSpin: 0, skyeSkyHigh: 0, skyeScratch: 0.2 },
-  stiff: { skyeWoah: 1.5 },
+  stiff: { skyeWoah: 1.3 },
 };
 
 export default { moves, moveMeta };
