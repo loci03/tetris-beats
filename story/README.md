@@ -16,45 +16,45 @@ object; the mode never touches game internals directly.
 
 | File | Role |
 |---|---|
-| `levels.js` | Level registry — **all level-specific data** (theme, special-piece rules, song grid + Story / Bust a Beat sections, stage, dancers, AI, rewards). Levels: 01 THE UNDERGROUND (vs ALFRED), 02 TACO TOWN (vs TINA). |
+| `levels.js` | Level registry: every level with a song (18) — theme, special-piece rules, the measured song grid + Story / Bust a Beat sections, boss, AI (harder each level), rewards — and `loadLevel(id)`, which imports `levels/<id>.js`. |
+| `levels/<id>.js` (+ `levels/<id>/`) | One level each: the **boss** (look via `build(kit)`, style, routines, moves per tier, ★ branch moves, solo, intro + battle taunt with its projectile and HUD disruption), its **moves**, its 3D **stage** and its Tetris **backdrop** framing. |
+| `backdrop.js` | The level's stage in 3D behind the Tetris board: YOU and the boss dance either side of the board to the song and react to clears; adaptive resolution / frame-rate governor, falls back to the 2D scene. |
 | `story-mode.js` | `StoryModeManager`: special-piece timing, trigger, freeze/resume, battle bonus. Entry point (`createStoryMode(bridge)`). |
 | `battle-session.js` | One trip into the world: renderer, music hand-off, input, and the event wiring between the systems below. |
 | `music-clock.js` | `MusicClock` — the beat/BPM manager. Song position from the AudioContext clock, latency- and user-offset-compensated; grid phase check and drum-hit (kick / snare) analysis of the decoded song. **Everything is timed in song time.** |
 | `chart.js` | The command tree: levels 1-4 (3→6 directions), ★ branches (signature moves) unlocked by Enthusiasm, the SOLO at the top. |
 | `rhythm-battle.js` | `RhythmBattle` — pure rules: untimed direction entry + the timed GROOVE finisher on beat 4, scoring, levels, enthusiasm, hype, taunt / dodge / stun, battle timer. Emits events. |
 | `opponent-ai.js` | Rival skill profile → finisher timing, branch choices, taunt decisions, dodges. |
-| `characters.js` | Toon dancer rigs (joint hierarchy + outlined parts + anime face: joy ^^ eyes, wink, kiss), and each dancer's own dance identity — base routines, moves per level, ★ branch moves, solo, intro taunt, anime marks. YOU = hip-hop / b-boy, ALFRED = disco + rock'n'roll, TINA = glam diva with her purse. |
+| `characters.js` | Toon dancer rigs (joint hierarchy + outlined parts + anime face: joy ^^ eyes, wink, kiss), and each dancer's own dance identity — base routines, moves per level, ★ branch moves, solo, intro taunt, anime marks. YOU = hip-hop / b-boy, COOL TONI = disco + rock'n'roll, TINA = glam diva with her purse; other bosses register from their level modules (`registerCharacter`). |
 | `dance.js` | Choreography: beat-keyframed named moves (two-step, running man, Roger Rabbit, cabbage patch, robot, moonwalk, disco point, jump split…), a groove layer that bounces on every beat (harder on 2 & 4), always-on 8-count base routines, leg IK so planted feet stay planted, and `DanceController` (queue, crossfades, reactions). |
 | `camera.js` | `CameraDirector` — two-shot, push-ins, orbit, taunt and winner shots; aspect-aware. |
 | `transition.js` | Board capture → 3D tiles aligned to the 2D board; shatter/fly-through in, reassemble out. |
 | `hud.js`, `story.css` | Battle HUD, note lane, touch pads, toasts. |
 | `sfx.js` | Synthesized hit / whoosh / riser / impact / crowd / count-in sounds. |
-| `announcer.js` | Versus-game announcer — a few shouted lines ("A new challenger… Tina!", "Ready?", "DANCE!", "Solo time!", "Fever!", winner) scheduled so the stressed word lands on the beat; ducks the music. |
-| `anime-fx.js` | Manga marks over the dancers: hearts, sparkles, notes, sweat drops, anger veins, "!". |
+| `announcer.js` | Versus-arcade announcer — a few yelled lines ("Here comes… Rhett Ryder!", "Ready?", "DANCE!", "Solo time!", "Fever!", who wins) scheduled so the punch word lands on the beat (`lines.json`); ducks the music. |
+| `anime-fx.js` | Manga marks over the dancers (hearts, sparkles, notes, sweat drops, anger veins, "!", plus level sprites) and thrown taunt projectiles. |
 | `worlds/underground-world.js` | Level 1 stage: graffiti warehouse, neon, lasers, passing subway train. |
-| `worlds/taco-world.js` | Level 2 stage: sunset taco-shell street party. |
+| `worlds/taco-world.js` | Level 16 stage: sunset taco-shell street party. |
+| `dev/level.html`, `dev/backdrop.html` | Dev harnesses: render a level's stage / moves from any camera, or its Tetris backdrop, headless. |
 
 `vendor/three/` holds three.js r170 (MIT), so the mode works offline and on
 GitHub Pages without a CDN.
 
 ## Adding a level
 
-1. Add an entry to `STORY_LEVELS` in `levels.js` (copy `taco`).
-2. **Music:** set `track`, `bpm` and `firstBeat` for the MP3, then a `story`
-   section (`battleStartBar` on a high-energy run, ~24 bars) and a `beat`
-   section (Bust a Beat: intro from bar 0, battle to just before the song
-   ends). For half-time songs set `bounce: 2` so dancers bounce on every snare. The Taco numbers
-   were measured with kick- and snare-band comb fits over the battle section of
-   the decoded track. The tempo must be exact for the section you battle in
-   (0.2 BPM off drifts half a beat over 50 bars); `MusicClock.alignPhase()`
-   then fine-tunes the phase (±60 ms) against the decoded buffer at runtime,
-   which also absorbs per-browser MP3 decoder padding.
-3. **Stage:** add a builder in `worlds/` that returns `{ group, anchors, update,
-   react, setLightLevel, dispose }` and register it in `WORLDS` in
-   `battle-session.js`.
-4. **Dancers:** add a character to `CHARACTERS` in `characters.js` (colours,
-   look, style, a move list per tier) or reuse existing ones.
-5. Add a card for it in the STORY tab (`#story-panel` in `index.html`).
+1. **Registry:** add a row to `SONGS` in `levels.js` (`[id, themeIndex, title,
+   track, bpm, firstBeat, seconds, bounce, bossId]`) and a `LEVEL_CARDS` entry.
+   Grids were measured from the decoded MP3s (onset autocorrelation, then a
+   whole-song comb fit of tempo and phase, kick-on-1/3 for the downbeat).
+   Songs faster than ~130 BPM battle on the half-time grid (`bounce: 2`).
+   The tempo must be exact (0.2 BPM off drifts half a beat over 50 bars);
+   `MusicClock.alignPhase()` fine-tunes the phase (±60 ms) at runtime. A level
+   module can correct its grid with `music: { bpm, firstBeat, bounce }`.
+2. **Module:** `levels/<id>.js` default-exports `{ boss, moves, moveMeta,
+   sprites, buildWorld, backdrop }` — see any finished level. Move names are
+   global: prefix them with the boss id.
+3. Story / Bust a Beat sections, the menu cards and the Tetris backdrop all
+   follow from the registry.
 
 ## How a battle plays (Bust a Groove rules)
 
@@ -84,9 +84,13 @@ The **BEAT** tab on the start screen plays the same battle on its own — no
 Tetris. `StoryModeManager.startBeat(levelId)` runs a `BattleSession` with
 `standalone: true`: no board transition (it opens on the stage), its own
 pause card (Esc / P / the ❚❚ button) and a result screen with PLAY AGAIN /
-MENU. It plays the level's whole song from the top. Levels, dancers and
-ALFRED'S DIFFICULTY are shared with Story Mode, so every new Story level is a
-new Bust a Beat stage too.
+MENU. It plays the level's whole song from the top. Levels, bosses and the
+difficulty setting are shared with Story Mode. Every boss has their own moves
+for their genre, a SOLO (the camera circles them) and their own taunt: a move,
+marks thrown across the stage, and a disruption of your controls while
+you're stunned (`BattleHUD.disrupt`: shake, wobble, blur, glitch, flash,
+darkness, spin, or the taunt's sprite floating / falling / swirling /
+splatting / clouding over the arrows).
 
 ## Controls (battle)
 
