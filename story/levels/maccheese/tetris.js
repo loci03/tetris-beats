@@ -60,13 +60,13 @@ void main(){
   if (n.y < 0.0) n = -n;
   vec3 V = normalize(cameraPosition - vW);
   vec3 L = normalize(vec3(0.3, 0.85, 0.45));
-  vec3 base = mix(vec3(0.94, 0.62, 0.16), vec3(1.0, 0.45, 0.08), uHeat * 0.6);
-  base = mix(base, vec3(0.45, 0.33, 0.2), uCool);
+  vec3 base = mix(vec3(0.9, 0.5, 0.06), vec3(0.95, 0.32, 0.03), uHeat * 0.6);
+  base = mix(base, vec3(0.36, 0.28, 0.18), uCool);
   // Boiling: cells of bubbles that swell and pop.
   vec2 dv = vW.xz - uVort.xy;
   float ang = uVort.z * 0.8 * exp(-dot(dv, dv) / 60.0);
   vec2 q = uVort.xy + mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * dv;
-  vec2 p = q * 0.7;
+  vec2 p = q * 0.55;
   vec2 cell = floor(p), f = fract(p) - 0.5;
   float hh = hash(cell);
   float ph = fract(uT * (0.25 + 0.5 * hh) + hh * 7.0);
@@ -76,18 +76,17 @@ void main(){
   float bub = on * smoothstep(r, r - 0.06, dd) * (1.0 - smoothstep(0.85, 1.0, ph));
   float rim = on * smoothstep(0.05, 0.0, abs(dd - r)) * (1.0 - smoothstep(0.85, 1.0, ph));
   float pop = on * step(0.86, ph) * smoothstep(0.5, 0.0, abs(dd - (ph - 0.86) * 4.0)) * (1.0 - ph) * 8.0;
-  vec3 c = base * (0.45 + 0.6 * max(dot(n, L), 0.0));
-  c += base * 0.25 * bub + vec3(1.0, 0.9, 0.6) * (rim * 0.35 + pop * 0.3);
+  vec3 c = base * (0.4 + 0.5 * max(dot(n, L), 0.0));
+  c += base * 0.07 * bub + vec3(1.0, 0.75, 0.35) * (rim * 0.14 + pop * 0.2);
   // Glossy sauce: warm specular + fresnel glow of the pot's light.
   vec3 Hh = normalize(L + V);
-  c += vec3(1.0, 0.92, 0.7) * pow(max(dot(n, Hh), 0.0), 60.0) * (0.9 - 0.6 * uCool);
+  c += vec3(1.0, 0.9, 0.65) * pow(max(dot(n, Hh), 0.0), 80.0) * (0.8 - 0.6 * uCool);
   float fr = pow(1.0 - max(dot(n, V), 0.0), 3.0);
-  c += vec3(1.0, 0.55, 0.15) * fr * (0.35 + 0.3 * uHeat);
+  c += vec3(1.0, 0.5, 0.1) * fr * (0.25 + 0.3 * uHeat) * (1.0 - 0.7 * uCool);
   c *= 1.0 + 0.35 * uFlash + 0.06 * uBeat;
   c += vec3(0.6, 0.12, 0.0) * uHeat * 0.12;
   float fd = smoothstep(uFogN, uFogF, length(vW - cameraPosition));
   gl_FragColor = vec4(mix(c, uFogC, fd), 1.0);
-  #include <colorspace_fragment>
 }`;
 
 export function createTetrisWorld(ctx) {
@@ -140,12 +139,11 @@ export function createTetrisWorld(ctx) {
       #include <fog_pars_fragment>
       void main(){
         float band = 0.5 + 0.5 * sin(vUv.x * 60.0);
-        vec3 steel = mix(vec3(0.18, 0.13, 0.1), vec3(0.42, 0.3, 0.2), pow(band, 6.0) * 0.6 + 0.2);
+        vec3 steel = mix(vec3(0.16, 0.08, 0.04), vec3(0.45, 0.22, 0.1), pow(band, 6.0) * 0.6 + 0.2);
         float crust = smoothstep(1.6, 0.2, vW.y) * (0.7 + 0.3 * sin(vUv.x * 230.0 + vW.y * 4.0));
-        vec3 c = mix(steel, vec3(0.85, 0.5, 0.12), crust);
+        vec3 c = mix(steel, vec3(0.8, 0.42, 0.06), crust);
         c += vec3(0.6, 0.25, 0.03) * uGlow * smoothstep(5.0, 0.0, vW.y);
         gl_FragColor = vec4(c, 1.0);
-        #include <colorspace_fragment>
         #include <fog_fragment>
       }`,
   }));
@@ -174,7 +172,7 @@ export function createTetrisWorld(ctx) {
     uniforms: {
       uT: { value: 0 }, uSlosh: { value: 0 }, uSwirl: { value: 0 }, uRip: { value: rip }, uVort: { value: new THREE.Vector3(0, -14, 0) },
       uBoil: { value: 0.25 }, uHeat: { value: 0 }, uCool: { value: 0 }, uFlash: { value: 0 }, uBeat: { value: 0 },
-      uFogC: { value: FOG }, uFogN: { value: 26 }, uFogF: { value: 95 },
+      uFogC: { value: FOG.clone().convertLinearToSRGB() }, uFogN: { value: 26 }, uFogF: { value: 95 },
     },
     vertexShader: LAKE_VS, fragmentShader: LAKE_FS,
   }));
@@ -210,16 +208,16 @@ export function createTetrisWorld(ctx) {
 
   // ── Drips hanging from the lid ──────────────────────────────────
   const prof = [];
-  for (let i = 0; i <= 8; i++) { const t = i / 8; prof.push(new THREE.Vector2(Math.max(0.02, 1 - 0.62 * Math.pow(t, 0.7)), -t)); }
+  for (let i = 0; i <= 8; i++) { const t = i / 8; prof.push(new THREE.Vector2(Math.max(0.02, 0.62 + 0.38 * Math.pow(1 - t, 3) - 0.12 * t), -t)); }
   prof.reverse();
   const dripGeo = keep(new THREE.LatheGeometry(prof, 10));
   const blobGeo = keep(new THREE.SphereGeometry(1, 12, 8));
-  const ND = low ? 16 : 26;
+  const ND = low ? 14 : 22;
   const drips = [];
   for (let i = 0; i < ND; i++) {
     const side = i % 2 ? 1 : -1;
     const x = side * (1.5 + ((i * 7.3) % 22)), z = -5 - ((i * 13.7) % 34);
-    drips.push({ x, z, w: 0.28 + ((i * 3.1) % 1) * 0.35, base: 1.4 + ((i * 5.7) % 4.2), ph: i * 2.1, sway: 0, swayV: 0,
+    drips.push({ x, z, w: 0.45 + ((i * 3.1) % 1) * 0.45, base: 1.4 + ((i * 5.7) % 4.2), ph: i * 2.1, sway: 0, swayV: 0,
       swayDir: Math.sin(i * 2.1 * 3.7) >= 0 ? 1 : -1, grow: 1, lag: 0.7 + ((i * 0.37) % 0.6), len: 1 });
   }
   const dripMesh = new THREE.InstancedMesh(dripGeo, cheeseMat, ND);
@@ -273,7 +271,7 @@ export function createTetrisWorld(ctx) {
   const NB = low ? 16 : 28;
   const bubbles = [];
   for (let i = 0; i < NB; i++) bubbles.push({ x: (Math.random() - 0.5) * 36, y: Math.random() * LID, z: -3 - Math.random() * 26, r: 0.15 + Math.random() * 0.4, sp: 0.4 + Math.random() * 0.9, ph: Math.random() * 6 });
-  const bubMat = keep(new THREE.MeshPhongMaterial({ color: 0xffe196, emissive: 0x6a3a08, specular: 0xffffff, shininess: 120, transparent: true, opacity: 0.55, depthWrite: false }));
+  const bubMat = keep(new THREE.MeshPhongMaterial({ color: 0xffe196, emissive: 0xb06a18, specular: 0xffffff, shininess: 120, transparent: true, opacity: 0.55, depthWrite: false }));
   const bubMesh = new THREE.InstancedMesh(keep(new THREE.SphereGeometry(1, 14, 10)), bubMat, NB + 1);
   bubMesh.frustumCulled = false; root.add(bubMesh);
   const gloop = { on: false, t: 0, x: 0, z: 0, side: 1 };   // the hold bubble (last instance)
@@ -296,8 +294,10 @@ export function createTetrisWorld(ctx) {
   const SP = { x: 13, z: -30 };
 
   // ── Geyser column (Tetris) ──────────────────────────────────────
-  const geyser = new THREE.Mesh(keep(new THREE.CylinderGeometry(1.2, 2.4, 1, 14, 1, true)), cheeseMat);
-  geyser.position.set(0, 0, -14); geyser.visible = false; root.add(geyser);
+  const geyser = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.9, 1.5, 1, 14, 1, true)), cheeseMat);
+  const crown = new THREE.Mesh(blobGeo, cheeseMat); crown.visible = false; root.add(crown);
+  const GZ = { x: 9, z: -14 };
+  geyser.position.set(GZ.x, 0, GZ.z); geyser.visible = false; root.add(geyser);
 
   // ── Update ──────────────────────────────────────────────────────
   const G = 18;
@@ -308,10 +308,10 @@ export function createTetrisWorld(ctx) {
     st.t = t;
     st.danger += ((info.danger || 0) - st.danger) * Math.min(1, dt * 1.5);
     const dec = (k, r) => { st[k] = Math.max(0, st[k] - dt * r); };
-    dec('flash', 2); dec('stretch', 0.8); dec('bubbleK', 0.6); dec('shake', 2.5); dec('geyser', 0.7);
+    dec('flash', 2); dec('stretch', 0.8); dec('bubbleK', 0.6); dec('shake', 2.5); dec('geyser', 0.9);
     st.heat = Math.max(0, st.heat - dt * 0.08);
     const spring = (k, v, hz, damp) => { const w = 2 * Math.PI * hz; st[v] += (-w * w * st[k] - 2 * damp * w * st[v]) * dt; st[k] += st[v] * dt; };
-    spring('slosh', 'sloshV', 0.5, 0.25); spring('camX', 'camVX', 1.5, 0.5); spring('roll', 'rollV', 1.3, 0.35); spring('dip', 'dipV', 2, 0.45);
+    spring('slosh', 'sloshV', 0.5, 0.25); st.geyserMax = st.geyserMax || 1; spring('camX', 'camVX', 1.5, 0.5); spring('roll', 'rollV', 1.3, 0.35); spring('dip', 'dipV', 2, 0.45);
     st.vortV += -st.vort * 2 * dt - st.vortV * 1.2 * dt; st.vort += st.vortV * dt;
     const coolT = st.dead ? 1 : 0; st.cool += (coolT - st.cool) * Math.min(1, dt * 0.8);
     const heatK = Math.min(1, st.heat * 0.25 + Math.max(0, st.danger - 0.5) * 1.6);
@@ -340,7 +340,7 @@ export function createTetrisWorld(ctx) {
       const sw = d.sway + Math.sin(t / 2.2 + d.ph) * 0.03 + d.swayDir * move * 0.05;
       dummy.position.set(d.x, LID, d.z); dummy.rotation.set(Math.sin(t * 0.7 + d.ph) * 0.03, 0, sw);
       dummy.scale.set(d.w, d.len, d.w); dummy.updateMatrix(); dripMesh.setMatrixAt(i, dummy.matrix);
-      const bw = d.w * 0.5 * (0.7 + 0.3 * d.grow) * (1 + 0.1 * onKick);
+      const bw = d.w * 0.68 * (0.7 + 0.3 * d.grow) * (1 + 0.1 * onKick);
       dummy.position.set(d.x + Math.sin(sw) * d.len, LID - Math.cos(sw) * d.len - bw * 0.3, d.z);
       dummy.rotation.set(0, 0, 0); dummy.scale.set(bw, bw * (1.1 + 0.2 * Math.min(1, st.stretch)), bw); dummy.updateMatrix(); blobMesh.setMatrixAt(i, dummy.matrix);
       // Long enough? It lets go on its own now and then.
@@ -435,14 +435,17 @@ export function createTetrisWorld(ctx) {
 
     // Geyser.
     if (st.geyser > 0) {
-      const g = st.geyser, hgt = 14 * Math.sin(Math.min(1, g) * Math.PI * 0.5) * Math.min(1, (1.2 - g) * 8 + 0.2);
-      geyser.visible = true; geyser.scale.set(1 + 0.3 * Math.sin(t * 20), Math.max(0.1, hgt), 1); geyser.position.y = hgt / 2;
-      if (Math.random() < dt * 30) fling((Math.random() - 0.5) * 2, hgt, -14 + (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 18, 4 + Math.random() * 6, 2 + Math.random() * 4);
-      if (Math.random() < dt * 40) spray(0, hgt, -14, 3, 7, 4, 0.16);
-    } else geyser.visible = false;
+      const g = st.geyser, up = Math.min(1, (st.geyserMax - g) * 5), hgt = 11 * up * Math.min(1, g * 2);
+      geyser.visible = true; geyser.scale.set(1 + 0.25 * Math.sin(t * 23), Math.max(0.1, hgt), 1 + 0.25 * Math.cos(t * 19));
+      geyser.position.set(GZ.x, hgt / 2 - 0.3, GZ.z);
+      crown.visible = true; crown.position.set(GZ.x, hgt, GZ.z); crown.scale.set(1.7 + 0.3 * Math.sin(t * 17), 0.9 + 0.2 * Math.cos(t * 21), 1.7);
+      if (Math.random() < dt * 30) fling(GZ.x + (Math.random() - 0.5) * 2, hgt, GZ.z + (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 18, 4 + Math.random() * 6, 2 + Math.random() * 4);
+      if (Math.random() < dt * 40) spray(GZ.x, hgt, GZ.z, 4, 6, 4, 0.18);
+      if (Math.random() < dt * 8) ripple(GZ.x, GZ.z, 0.4);
+    } else geyser.visible = crown.visible = false;
 
     // ── Camera: skimming low over the sauce ──
-    const aspect = camera.aspect || 1.6, portrait = aspect < 0.9;
+    const aspect = camera.aspect || 1.6, portrait = aspect < 0.9; st.portrait = portrait;
     const sh = st.shake;
     camera.position.set(Math.sin(t * 0.08) * 1.6 + st.camX + (Math.random() - 0.5) * sh * 0.5,
       (portrait ? 3.6 : 3.2) + Math.sin(t * 0.13) * 0.25 + st.dip + (Math.random() - 0.5) * sh * 0.4 + 0.06 * Math.sin(t * 0.9),
@@ -460,7 +463,8 @@ export function createTetrisWorld(ctx) {
     dropGlob(d.x + Math.sin(sw) * d.len, LID - Math.cos(sw) * d.len - bw * 0.4, d.z, bw * 1.1, -1, 0.25 + d.w * 0.4);
     d.grow = 0.25;
   }
-  const colX = (c) => ((c ?? 4.5) - 4.5) * 0.7;
+  const colX = (c) => { const u = (c ?? 4.5) - 4.5, s = u < 0 ? -1 : 1; return st.portrait ? u * 0.7 : s * (7 + Math.abs(u) * 1.1); };
+  const nearZ = () => (st.portrait ? 2 : -8);
   const longest = (n) => drips.slice().sort((a, b) => b.len * b.grow - a.len * a.grow).slice(0, n);
 
   function react(kind, data = {}) {
@@ -486,13 +490,13 @@ export function createTetrisWorld(ctx) {
       case 'drop': {
         const r = data.rows || 0, k = Math.min(1, 0.3 + r / 14);
         const x = colX(data.col);
-        dropGlob(x, 2.5, -8, 0.5 + 0.5 * k, -16, k);
+        dropGlob(x, 2.5, nearZ(), 0.5 + 0.5 * k, -16, k);
         st.shake = Math.max(st.shake, 0.6 * k); st.dipV -= 1.2 * k;
         for (const d of drips) d.swayV += (Math.random() - 0.5) * 2 * k;
         break;
       }
       case 'hold':
-        gloop.side = -gloop.side; gloop.on = true; gloop.t = 0; gloop.x = gloop.side * (6 + Math.random() * 3); gloop.z = -7 - Math.random() * 3;
+        gloop.side = -gloop.side; gloop.on = true; gloop.t = 0; gloop.x = gloop.side * (st.portrait ? 1.5 : 6 + Math.random() * 3); gloop.z = st.portrait ? 1.5 : -7 - Math.random() * 3;
         break;
       case 'clear': {
         const n = Math.max(1, data.lines || 1), combo = data.combo || 0;
@@ -502,9 +506,10 @@ export function createTetrisWorld(ctx) {
         for (const d of longest(n * 2 + combo)) release(d);
         for (const m of floats) if (Math.random() < 0.15 * n) { m.jv = Math.max(m.jv, 2 + 1.5 * n + Math.random() * 2); m.spin += (Math.random() - 0.5) * 12; }
         if (n >= 4) {
-          st.geyser = 1.2 + 0.15 * Math.min(4, combo); st.flash = 1; st.shake = 1; ripple(0, -14, 1.2);
-          spray(0, 0.5, -14, 60, 9, 9, 0.18);
-          for (let i = 0; i < 26; i++) fling((Math.random() - 0.5) * 2, 1, -14, (Math.random() - 0.5) * 22, 9 + Math.random() * 8, 2 + Math.random() * 6);
+          GZ.x = (Math.random() < 0.5 ? -1 : 1) * (st.portrait ? 2.2 : 8 + Math.random() * 3); GZ.z = st.portrait ? -2 : -14;
+          st.geyser = st.geyserMax = 1.3 + 0.15 * Math.min(4, combo); st.flash = 1; st.shake = 1; ripple(GZ.x, GZ.z, 1.2);
+          spray(GZ.x, 0.5, GZ.z, 60, 9, 9, 0.18);
+          for (let i = 0; i < 26; i++) fling(GZ.x + (Math.random() - 0.5) * 2, 1, GZ.z, (Math.random() - 0.5) * 22, 9 + Math.random() * 8, 2 + Math.random() * 6);
           for (const d of drips) release(d);
         } else if (n === 3) { ripple(0, -12, 0.7); for (let i = 0; i < 8; i++) fling((Math.random() - 0.5) * 4, 0.5, -12, (Math.random() - 0.5) * 14, 7 + Math.random() * 4, 2 + Math.random() * 3); }
         if (combo >= 2) for (let i = 0; i < Math.min(12, combo * 3); i++) fling((Math.random() < 0.5 ? -1 : 1) * (6 + Math.random() * 6), 0.3, -6 - Math.random() * 8, (Math.random() - 0.5) * 4, 6 + Math.random() * 3 + combo, (Math.random() - 0.5) * 2);
@@ -520,7 +525,7 @@ export function createTetrisWorld(ctx) {
         st.bubbleK = 1.5; st.heat = Math.min(4, st.heat + 0.5);
         break;
       case 'gameOver':
-        st.dead = true; st.heat = 0; st.flash = 0.3;
+        st.dead = true; st.heat = 0; st.flash = 0.3; st.geyser = Math.min(st.geyser, 0.3);
         break;
       case 'start':
         st.dead = false; st.heat = 0; st.combo = 0;

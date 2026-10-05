@@ -10,9 +10,10 @@ import boss from './relax/boss.js';
 import mv from './relax/moves.js';
 import { buildWorld } from './relax/world.js';
 import sprites from './relax/sprites.js';
+import { createTetrisWorld } from './relax/tetris.js';
 
 export default {
   boss, moves: mv.moves, moveMeta: mv.moveMeta, sprites,
   buildWorld,
-  backdrop: { camera: { pos: [0, 2.3, 8.8], look: [0, 1.8, 0], fov: 50 }, spread: 3.5, forward: 0.9 },
+  backdrop: { camera: { pos: [0, 2.3, 8.8], look: [0, 1.8, 0], fov: 50 }, spread: 3.5, forward: 0.9, create: createTetrisWorld },
 };
