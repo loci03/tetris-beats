@@ -734,6 +734,14 @@ export class BattleSession {
       this.director.update(dt, { beat, leader: this.battle.groove });
       if (this.phase === 'result' && songTime >= this.outAtSong) this.standalone ? this._finishStandalone() : this._startOut();
     }
+    // Name tags under the dancers' feet, where the camera put them.
+    if (!this.trans && (this.phase === 'intro' || this.phase === 'battle' || this.phase === 'result')) {
+      const v = this._tagV || (this._tagV = new THREE.Vector3()), W = window.innerWidth, H = window.innerHeight;
+      this.camera.updateMatrixWorld();
+      // (under the hips, so the tag follows steps that travel, at floor level)
+      const pt = (rig) => { rig.joints.hips.getWorldPosition(v); v.y = 0; v.project(this.camera); return v.z < 1 ? { x: (v.x + 1) / 2 * W, y: (1 - v.y) / 2 * H } : null; };
+      this.hud.placeTags({ player: pt(this.pRig), rival: pt(this.rRig) });
+    } else this.hud.placeTags(null);
     this.renderer.render(this.scene, this.camera);
   }
 

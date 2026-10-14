@@ -36,7 +36,7 @@ object; the mode never touches game internals directly.
 | `dev/danceview.html` | **Dance View** (menu: BEAT tab → DANCE VIEW): any dancer, any move / string / chain / miss / solo at any BPM and speed, scrubbing, cameras, skeleton + foot contacts, state ribbon and step timing. |
 | `camera.js` | `CameraDirector` — two-shot, lean-ins, orbits, taunt and winner shots. Every shot is fitted by projection into the screen area the HUD leaves free, so both dancers stay head-to-feet in frame on any screen (see COMMANDS.md §4.3). |
 | `transition.js` | Board capture → 3D tiles aligned to the 2D board; shatter/fly-through in, reassemble out. |
-| `hud.js`, `story.css` | Battle HUD, kept small: a slim top bar (scores, combo, Enthusiasm, attacks, timer, the rival's command line), a bottom dock (callout ticker + your command strip: arrows, the ✕ / ○ box, 1-2-3-4 beat track with beat 4's window), a beat pulse driven by the battle's beat events, touch via swipes and tapping the strip's boxes. |
+| `hud.js`, `story.css` | Battle HUD (reference layout): scores, timer and Enthusiasm bars with YOUR command panel at the top (arrows → ✕ / ○ button, BEAT chip, 1-2-3-4 segments), name tags under the dancers, the boss's command line and the hint at the bottom; a beat pulse driven by the battle's beat events; touch via swipes and tapping the panel's button. |
 | `sfx.js` | Synthesized hit / whoosh / riser / impact / crowd / count-in sounds. |
 | `announcer.js` | Versus-arcade announcer — a few yelled lines ("Here comes… Rhett Ryder!", "Ready?", "DANCE!", "Solo time!", "Fever!", who wins) scheduled so the punch word lands on the beat (`lines.json`); ducks the music. |
 | `anime-fx.js` | Manga marks over the dancers (hearts, sparkles, notes, sweat drops, anger veins, "!", plus level sprites) and thrown taunt projectiles. |
@@ -115,7 +115,7 @@ attack, X/□ = dodge, Start = pause. Everything is remappable on the CONTROLS
 screen (Bust a Beat tab), with per-device latency offsets on top of the
 **Rhythm timing** slider in Settings (audio latency, e.g. Bluetooth headphones).
 On touch screens: **swipe anywhere** for the arrows (zig-zags chain without
-lifting); tap the ✕ / ○ box (□ on a dodge) in your command strip on beat 4, and the △ chip to attack — no pad buttons over the stage. **2P VS** (Bust a Beat tab): P2 plays
+lifting); tap the ✕ / ○ button (□ on a dodge) in your command panel on beat 4, and the △ chip to attack — no pad buttons over the stage. **2P VS** (Bust a Beat tab): P2 plays
 the rival on the arrows + . / ; ' or the second gamepad. See COMMANDS.md.
 
 ## Testing notes

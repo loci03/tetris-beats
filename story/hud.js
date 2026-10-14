@@ -1,28 +1,34 @@
-// BattleHUD — the rhythm battle's 2D overlay, kept small so the dancers own
-// the screen:
-//   • a slim TOP BAR: each dancer's name, score, combo, Enthusiasm and
-//     attacks, the timer + pause in the middle, and the rival's command as
-//     one compact line under it;
-//   • a compact BOTTOM DOCK: a one-line ticker for callouts, then YOUR
-//     command strip (CommandBar) — the command(s) on offer as direction
-//     boxes plus the ✕ / ○ box, two fixed rows when a branch is open, and a
-//     1-2-3-4 beat track with beat 4's timing window.
-// The strip PULSES ON EVERY BEAT of the song: the battle emits a 'beat'
+// BattleHUD — the rhythm battle's 2D overlay, laid out like the reference
+// mock-up so the dancers own the middle of the screen:
+//
+//   YOU          [ 1:13 ❚❚ ]          BOSS        names + scores, timer/pause
+//   1,792                            25,359
+//   ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬  ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬            Enthusiasm (pink / cyan)
+//   ┌ YOUR MOVE 3/8                  BEAT 4 ┐     YOUR command panel
+//   │        ←  ↓  →   →   [○]              │     (two compact rows when the
+//   │  ▬▬▬▬   ▬▬▬▬   ▬▬▬▬   ████            │      ★ branch is open)
+//   └───────────────────────────────────────┘     beats 1-2-3-4
+//               (the dance battle stage)
+//            YOU                BOSS              name tags under the dancers
+//   ┌ BOSS · MOVE 2/8                  → ○ ┐      the rival's command, one line
+//     SWIPE DIRECTIONS · TAP ✕ / ○ ON BEAT FOUR   hint / callouts
+//
+// The panel PULSES ON EVERY BEAT of the song: the battle emits a 'beat'
 // event from the same audio clock its judge uses (onBeat), and each frame
 // the pulse envelope is computed from that clock's song time — so it can't
 // drift, freezes on pause and is right again after a seek or a slow frame.
-// Beat 4 of the command's measure gets its own, stronger gold pulse.
-// Touch: swipe anywhere for the directions; tap the ✕ / ○ (or □) box in the
-// strip and the △ chip — no permanent pad buttons.
+// Beat 4 of a measure you press in gets its own, stronger green pulse.
+// Touch: swipe anywhere for the directions; tap the ✕ / ○ (or □) button in
+// the panel, and the △ chip — no pad buttons over the stage.
 // Everything here only *reads* battle state; it never decides a result.
 
 import { DRAW } from './anime-fx.js';
-import { GLYPH, commandStatus } from './commands.js';
+import { GLYPH } from './commands.js';
 
 const DIR_GLYPH = { L: '←', U: '↑', D: '↓', R: '→' };
 const DIR_COLOR = { L: '#ff4f9a', U: '#39d0ff', D: '#4be08a', R: '#ffa53a' };
-const BTN_COLOR = { X: '#7fb2ff', O: '#ff6b6b', T: '#5dffb0', S: '#ff8ad8' };
-const JUDGE_COLOR = { perfect: '#ffe45c', great: '#5dffb0', good: '#7ecbff', miss: '#ff5a6e' };
+const BTN_COLOR = { X: '#8fb8ff', O: '#8be8c0', T: '#5dffb0', S: '#ff9ad8' };
+const JUDGE_COLOR = { perfect: '#ffe45c', great: '#6dffb4', good: '#8fd3ff', miss: '#ff5a6e' };
 const REASON = { early: 'TOO EARLY', late: 'TOO LATE', incomplete: 'INCOMPLETE', 'wrong-button': 'WRONG BUTTON' };
 
 // Beat pulse (real-time seconds): a quick attack, then an exponential decay.
@@ -50,52 +56,52 @@ function el(tag, cls, parent, html) {
 }
 
 export class BattleHUD {
-  // controlsHint: e.g. 'Arrows / WASD · ✕ J · ○ K · △ I · □ U'
+  // controlsHint: the keyboard hint (desktop); touch screens get the swipe one.
   constructor({ names, isTouch, onPad, onPause, controlsHint = '', twoPlayer = false, hints2 = null }) {
     this.names = names;
     this.isTouch = !!isTouch;
     this.twoPlayer = twoPlayer;
     this.root = el('div', 'story-hud' + (twoPlayer ? ' sh-2p' : '') + (isTouch ? ' sh-touch' : ''));
     this.root.setAttribute('aria-live', 'polite');
+    const pad = onPad || (() => {});
 
-    // ── Top bar ──
-    const top = this.top = el('div', 'sh-top', this.root);
-    const row = el('div', 'sh-toprow', top);
-    this.p = this._panel(row, 'sh-p1', names.player, !(isTouch && !twoPlayer));
-    const mid = el('div', 'sh-mid', row);
-    const timerRow = el('div', 'sh-timer-row', mid);
-    this.timer = el('div', 'sh-timer', timerRow, '1:00');
+    // ── Top: scores + timer, Enthusiasm bars, your command panel ──
+    const head = this.head = el('div', 'sh-head', this.root);
+    const scores = this.scores = el('div', 'sh-scores', head);
+    this.p = this._side(scores, 'sh-p1', names.player);
+    const mid = el('div', 'sh-mid', scores);
+    const pill = el('div', 'sh-timer', mid);
+    this.timer = el('span', 'sh-time', pill, '1:00');
     if (onPause) {
-      const pb = el('button', 'sh-pause', timerRow, '❚❚');
+      const pb = el('button', 'sh-pause', pill, '<i></i><i></i>');
       pb.type = 'button';
       pb.setAttribute('aria-label', 'Pause');
       pb.addEventListener('click', (e) => { e.preventDefault(); onPause(); });
     }
-    this.grooveBar = el('div', 'sh-groove-bar', mid);
-    this.grooveBar.title = 'Groove: who is leading';
-    this.grooveKnob = el('i', '', this.grooveBar);
-    this.r = this._panel(row, 'sh-p2', names.rival, true);
+    this.r = this._side(scores, 'sh-p2', names.rival);
+    const bars = el('div', 'sh-bars', head);
+    this.p.enth = el('div', 'sh-enth sh-p1', bars); this.p.enthFill = el('i', '', this.p.enth);
+    this.r.enth = el('div', 'sh-enth sh-p2', bars); this.r.enthFill = el('i', '', this.r.enth);
+    this.p.enth.title = this.r.enth.title = 'Enthusiasm';
+
+    this.bars = {};
+    this.bars.player = new CommandBar(head, {
+      who: 'player', variant: 'panel', onPad: pad, attack: isTouch,
+      title: twoPlayer ? names.player : 'YOUR MOVE', hint: twoPlayer && !isTouch ? hints2 && hints2[0] : '',
+    });
 
     this.banner = el('div', 'sh-banner', this.root);
+    // Name tags under the dancers (placed by the session from the 3D feet).
+    this.tags = { player: el('div', 'sh-tag sh-p1', this.root, twoPlayer ? 'P1' : 'YOU'), rival: el('div', 'sh-tag sh-p2', this.root, twoPlayer ? 'P2' : names.rival) };
 
-    // ── Bottom dock: ticker + command strip(s) ──
-    const dock = this.dock = el('div', 'sh-dock', this.root);
-    this.ticker = el('div', 'sh-ticker', dock);
-    this.hint = isTouch ? 'SWIPE <b>← ↑ ↓ →</b> ANY TIME · TAP <b>✕</b> / <b>○</b> ON BEAT 4' : controlsHint;
-    const pad = onPad || (() => {});
-    if (twoPlayer) {
-      const cols = el('div', 'sh-cols', dock);
-      this.bars = {
-        player: new CommandBar(el('div', 'sh-col', cols), { who: 'player', label: names.player, variant: 'strip', onPad: pad, hint: hints2 && hints2[0] }),
-        rival: new CommandBar(el('div', 'sh-col', cols), { who: 'rival', label: names.rival, variant: 'strip', hint: hints2 && hints2[1] }),
-      };
-    } else {
-      this.bars = {
-        player: new CommandBar(dock, { who: 'player', label: names.player, variant: 'strip', onPad: pad, attack: isTouch }),
-        // The rival's command: one compact line under the top bar.
-        rival: new CommandBar(top, { who: 'rival', label: names.rival, variant: 'mini' }),
-      };
-    }
+    // ── Bottom: the rival's command (a full panel in 2P), hint / callouts ──
+    const foot = this.foot = el('div', 'sh-foot', this.root);
+    this.bars.rival = twoPlayer
+      ? new CommandBar(foot, { who: 'rival', variant: 'panel', title: names.rival, hint: !isTouch ? hints2 && hints2[1] : '' })
+      : new CommandBar(foot, { who: 'rival', variant: 'line', title: names.rival });
+    this.ticker = el('div', 'sh-ticker', foot);
+    // (in 2P each panel shows its own keys)
+    this.hint = isTouch ? 'SWIPE DIRECTIONS · TAP ✕ / ○ ON BEAT FOUR' : twoPlayer ? 'ARROWS ANY TIME · ✕ / ○ ON BEAT FOUR' : controlsHint;
 
     if (isTouch) {
       // Touch: swipe anywhere (under the HUD) for the directions.
@@ -108,23 +114,18 @@ export class BattleHUD {
     this._calloutTimer = 0;
     this._callout = false;
     this._beatK = null;
-    this._showHint(true);
+    this._setTicker(this.hint, 'hint');
     this.resize();
   }
 
-  _panel(parent, cls, name, showAttack) {
+  _side(parent, cls, name) {
     const p = el('div', 'sh-side ' + cls, parent);
-    const id = el('div', 'sh-id', p);
-    el('span', 'sh-name', id, name);
-    const score = el('span', 'sh-score', id, '0');
-    const combo = el('span', 'sh-combo', id, '');
-    const meta = el('div', 'sh-meta', p);
-    const enth = el('div', 'sh-enth', meta);
-    enth.title = 'Enthusiasm';
-    const enthFill = el('i', '', enth);
-    const jam = el('span', 'sh-jam', meta, '');
-    if (!showAttack) jam.style.display = 'none';
-    return { p, score, combo, enth, enthFill, jam };
+    const top = el('div', 'sh-label', p);
+    el('span', 'sh-name', top, name);
+    const jam = el('span', 'sh-jam', top, '');
+    const combo = el('span', 'sh-combo', top, '');
+    const score = el('div', 'sh-score', p, '0');
+    return { p, score, combo, jam };
   }
 
   // Swipe recognition. A swipe is judged at the onset of the flick — the
@@ -189,25 +190,41 @@ export class BattleHUD {
     setTimeout(() => fx.remove(), 450);
   }
 
-  // Where the HUD leaves room for the stage, in px: the band between the top
-  // bar and the dock, and (when the dock sits in a corner) the area beside
-  // it. The camera frames the dancers into the best of these.
+
+  // Where the HUD leaves room for the stage, in px: the band between the
+  // top (scores + your panel) and the bottom (rival line + hint); and when
+  // the panels sit in a left column (short landscape), the area beside it.
+  // The camera frames the dancers into the best of these.
   layout() {
     const W = window.innerWidth, H = window.innerHeight;
-    const t = this.top.getBoundingClientRect(), d = this.dock.getBoundingClientRect();
-    const topB = Math.min(H * 0.4, t.bottom + 4);
-    const rects = [{ left: 0, right: W, top: topB, bottom: Math.max(topB + 40, d.top - 4) }];
-    // A dock in the lower-left corner (short landscape): the stage can use
-    // the full height to its right.
-    if (d.right < W * 0.62 && d.left < W * 0.2) rects.push({ left: d.right + 4, right: W, top: topB, bottom: H });
+    const s = this.scores.getBoundingClientRect(), h = this.head.getBoundingClientRect(), f = this.foot.getBoundingClientRect();
+    const tagRoom = 22;                                   // name tags under the feet
+    const top = Math.min(H * 0.5, h.bottom + 6);
+    const rects = [{ left: 0, right: W, top, bottom: Math.max(top + 40, f.top - 4 - tagRoom) }];
+    const panel = this.bars.player.root.getBoundingClientRect();
+    if (panel.right < W * 0.62 && f.right < W * 0.62) rects.push({ left: Math.max(panel.right, f.right) + 6, right: W, top: s.bottom + 8, bottom: H - tagRoom - 4 });
     return { W, H, rects };
   }
 
-  // Banner height: the upper part of the stage band.
+  // The stage rect the camera chose: banners sit in its upper part, and
+  // the practice panel tucks under the top HUD.
   setStage(rect) {
     if (!rect) return;
+    this.stage = rect;
     this.root.style.setProperty('--banner-y', `${Math.round(rect.top + (rect.bottom - rect.top) * 0.2)}px`);
     this.root.style.setProperty('--banner-x', `${Math.round((rect.left + rect.right) / 2)}px`);
+    document.documentElement.style.setProperty('--sh-stage-top', `${Math.round(rect.top)}px`);
+  }
+
+  // Name tags: screen points under each dancer's feet (null hides them).
+  placeTags(pts) {
+    for (const who of ['player', 'rival']) {
+      const t = this.tags[who], p = pts && pts[who];
+      if (!p || !Number.isFinite(p.x)) { t.style.opacity = '0'; continue; }
+      const maxY = this.stage ? this.stage.bottom + 18 : window.innerHeight - 40;
+      t.style.opacity = '1';
+      t.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(Math.min(maxY, p.y + 6))}px) translateX(-50%)`;
+    }
   }
 
   resize() {}
@@ -240,22 +257,14 @@ export class BattleHUD {
       const jam = `${GLYPH.T}${d.jammers}`;
       if (ui.jam.textContent !== jam) { ui.jam.textContent = jam; ui.jam.classList.toggle('empty', d.jammers <= 0); ui.jam.title = `${d.jammers} attack${d.jammers === 1 ? '' : 's'} left`; }
     }
-    // Groove meter: player pushes it left, rival right.
-    this.grooveKnob.style.left = (50 - battle.groove * 45) + '%';
     // Timer: time left in the battle.
     const left = Math.max(0, clock.barTime(battle.endBar) - Math.max(songTime, clock.barTime(battle.startBar)));
     const tt = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
     if (this.timer.textContent !== tt) this.timer.textContent = tt;
     this.bars.player.update(battle, clock, songTime, pulse);
     this.bars.rival.update(battle, clock, songTime, pulse);
-    // The controls hint stays in the ticker until the first commands land.
-    if (this._hintOn && battle.player.moves >= 2) this._showHint(false);
   }
 
-  _showHint(on) {
-    this._hintOn = on && !!this.hint;
-    if (!this._callout) this._setTicker(this._hintOn ? this.hint : '', 'hint');
-  }
   _setTicker(html, kind = '') {
     const t = this.ticker;
     t.className = 'sh-ticker' + (html ? ' show ' + kind : '');
@@ -279,12 +288,12 @@ export class BattleHUD {
     this._bannerTimer = setTimeout(() => { b.className = 'sh-banner ' + kind; }, ms);
   }
 
-  // Callouts run in the ticker above the strip — never over the dancers.
+  // Callouts run in the hint line at the bottom — never over the dancers.
   showCallout(text, kind = '', ms = 1600) {
     this._callout = true;
     this._setTicker(text, kind);
     clearTimeout(this._calloutTimer);
-    this._calloutTimer = setTimeout(() => { this._callout = false; this._setTicker(this._hintOn ? this.hint : '', 'hint'); }, ms);
+    this._calloutTimer = setTimeout(() => { this._callout = false; this._setTicker(this.hint, 'hint'); }, ms);
   }
 
   // A landed taunt messes with the victim's controls until the stun ends.
@@ -341,35 +350,37 @@ export class BattleHUD {
     step();
   }
 
+
   destroy() {
     clearTimeout(this._bannerTimer); clearTimeout(this._calloutTimer); clearTimeout(this._dzTimer);
     for (const b of Object.values(this.bars)) b.destroy();
     cancelAnimationFrame(this._dzRaf);
+    document.documentElement.style.removeProperty('--sh-stage-top');
     this.root.remove();
   }
 }
 
 // ── CommandBar ──────────────────────────────────────────────────────
-// One dancer's command display. variant 'strip' (yours, and both in 2P):
-//   head    YOU · MOVE 3/8  ……………………  status / judgment
-//   rows    TOP  ← ↓ →  ✕     (two fixed rows: the ★ BOTTOM line below)
-//   track   [1] [2] [3] [4]   marker + beat 4's timing window
-// variant 'mini' (the rival in 1P): one line — name, move, the options.
+// One dancer's command display.
+//   variant 'panel' (yours; both in 2P):
+//     YOUR MOVE 3/8  △2                         BEAT 4
+//              ←  ↓  →   →   [○]          (★ second row when a branch is open)
+//     ▬▬▬▬  ▬▬▬▬  ▬▬▬▬  ████              beats 1-2-3-4 of the measure
+//   variant 'line' (the rival in 1P): "BOSS · MOVE 2/8 ……… → ○".
 // The rows mirror the battle's candidates for the bar being entered: arrows
-// turn green as they're entered, the next one is outlined, a candidate the
-// input ruled out greys out, the button box lights when its sequence is
-// complete and flashes on beat 4. With onPad, the button boxes are touch
-// targets (✕ / ○ / □), and `attack` adds a △ chip.
+// turn green as they're entered, the next one is bright, a candidate the
+// input ruled out dims, the button lights when its sequence is complete,
+// fills while beat 4's window is open and flashes on beat 4. With onPad the
+// buttons are touch targets (✕ / ○ / □), and `attack` adds a △ chip.
 class CommandBar {
-  constructor(parent, { who, label, variant = 'strip', onPad = null, attack = false, hint = '' }) {
+  constructor(parent, { who, title, variant = 'panel', onPad = null, attack = false, hint = '' }) {
     this.who = who;
     this.variant = variant;
     this.onPad = onPad;
     this.root = el('div', `ch ch-${variant} ch-${who}`, parent);
     const head = el('div', 'ch-head', this.root);
-    // (the rival's mini line sits under its own score panel: no name again)
-    if (variant !== 'mini') el('span', 'ch-who', head, label);
-    this.move = el('span', 'ch-move', head, '');
+    this.titleText = title;
+    this.title = el('span', 'ch-title', head, title);
     if (attack && onPad) {
       this.atk = el('button', 'ch-atk', head, `${GLYPH.T}`);
       this.atk.type = 'button';
@@ -377,13 +388,12 @@ class CommandBar {
       this._tap(this.atk, 'T');
     }
     if (hint) el('span', 'ch-keys', head, hint);
-    this.status = el('span', 'ch-status', head, '');
-    this.rowsEl = el('div', 'ch-rows', this.root);
-    if (variant === 'strip') {
-      const track = el('div', 'ch-track', this.root);
-      this.win = el('i', 'ch-win', track);
-      this.pills = [1, 2, 3, 4].map(n => el('span', 'ch-pill' + (n === 4 ? ' b4' : ''), track, String(n)));
-      this.marker = el('i', 'ch-marker', track);
+    this.chip = el('span', 'ch-chip', head, '');
+    if (variant === 'line') head.appendChild(this.rowsEl = el('div', 'ch-rows'));
+    else this.rowsEl = el('div', 'ch-rows', this.root);
+    if (variant === 'panel') {
+      const segs = el('div', 'ch-segs', this.root);
+      this.segs = [1, 2, 3, 4].map(n => el('i', 'ch-seg' + (n === 4 ? ' b4' : ''), segs));
     }
     this._key = '';
     this._rows = [];
@@ -391,24 +401,17 @@ class CommandBar {
     this._build(null);
   }
 
-  // pointerdown on a box = that button, timed at the touch.
+  // pointerdown on a button = that button, timed at the touch.
   _tap(node, action) {
     node.addEventListener('pointerdown', (e) => {
       e.preventDefault(); e.stopPropagation();
-      if (typeof action === 'function') action = action();
-      if (!action) return;
       node.classList.remove('tap'); void node.offsetWidth; node.classList.add('tap');
       this.onPad(action, e.timeStamp);
     });
   }
 
-  _row(cls) {
-    const row = el('div', 'ch-row ' + cls, this.rowsEl);
-    return row;
-  }
-
   _btn(row, button) {
-    const tag = this.onPad && this.variant === 'strip' ? 'button' : 'b';
+    const tag = this.onPad && this.variant === 'panel' ? 'button' : 'b';
     const btn = el(tag, `ch-btn ch-btn-${button}`, row, GLYPH[button]);
     btn.style.setProperty('--c', BTN_COLOR[button]);
     if (tag === 'button') {
@@ -423,35 +426,34 @@ class CommandBar {
     this.rowsEl.innerHTML = '';
     this._rows = [];
     this.root.dataset.type = b ? b.type : 'none';
-    const strip = this.variant === 'strip';
+    const panel = this.variant === 'panel';
     if (b && b.type === 'command' && b.cands) {
+      this.rowsEl.dataset.n = String(b.cands.length);
       for (const o of b.cands) {
-        const row = this._row(`${o.slot} ${o.kind}`);
-        el('span', 'ch-tag', row, o.kind === 'solo' ? '★★' : o.slot === 'top' ? 'TOP' : '★');
+        const row = el('div', `ch-row ${o.slot} ${o.kind}`, this.rowsEl);
+        if (b.cands.length > 1 || o.kind === 'solo') el('span', 'ch-tag', row, o.kind === 'solo' ? '★★' : !panel ? (o.slot === 'top' ? '' : '★') : (o.slot === 'top' ? '' : '★') + 'LV' + (o.col + 1));
         const seq = el('span', 'ch-seq', row);
         const arrows = o.seq.map(d => {
           const a = el('i', 'ch-dir', seq, DIR_GLYPH[d]);
           a.style.setProperty('--c', DIR_COLOR[d]);
           return a;
         });
-        if (!o.seq.length && strip) el('i', 'ch-none', seq, 'no arrows');
+        if (o.seq.length && panel) el('span', 'ch-sep', row, '→');
         const btn = this._btn(row, o.button);
-        if (strip) el('span', 'ch-lv', row, o.kind === 'solo' ? 'SOLO' : `LV${o.col + 1}`);
         this._rows.push({ o, row, arrows, btn, sig: '' });
       }
     } else if (b && b.type === 'dodge') {
-      const row = this._row('note dodge');
-      el('span', 'ch-note', row, strip ? 'INCOMING! DODGE ON 4' : 'DODGE');
+      this.rowsEl.dataset.n = '1';
+      const row = el('div', 'ch-row note dodge', this.rowsEl);
+      el('span', 'ch-note', row, panel ? 'INCOMING! DODGE' : 'DODGE');
+      el('span', 'ch-sep', row, '→');
       const btn = this._btn(row, 'S');
       this._rows.push({ o: null, row, arrows: [], btn, sig: '' });
-    } else if (b) {
-      const label = { stunned: 'STUNNED…', rest: 'FREEZE! — REST BAR', solo: '★★ SOLO TIME ★★', watch: 'WATCH THE SOLO', idle: 'GROOVING' }[b.type] || '';
-      el('div', `ch-row note ${b.type}`, this.rowsEl, label);
-    } else if (strip) {
-      el('div', 'ch-row note idle', this.rowsEl, 'GET READY');
+    } else {
+      this.rowsEl.dataset.n = '1';
+      const label = !b ? (panel ? 'GET READY' : '') : ({ stunned: 'STUNNED…', rest: 'FREEZE! — REST', solo: '★★ SOLO TIME ★★', watch: 'WATCH THE SOLO', idle: 'GROOVING' }[b.type] || '');
+      if (label) el('div', `ch-row note ${b ? b.type : 'idle'}`, this.rowsEl, label);
     }
-    // Strips keep two row slots so the layout never jumps when a branch opens.
-    if (strip) while (this.rowsEl.children.length < 2) el('div', 'ch-row empty', this.rowsEl);
   }
 
   update(battle, clock, now, pulse) {
@@ -460,40 +462,45 @@ class CommandBar {
     if (key !== this._key) { this._key = key; this._build(b); }
     // Move type (row 1-8) of the TOP command.
     const top = b && b.cands && b.cands[0];
-    const mv = top ? (top.kind === 'solo' ? 'SOLO' : this.variant === 'mini' ? `${top.row}/8` : `MOVE ${top.row}/8`) : '';
-    if (this.move.textContent !== mv) this.move.textContent = mv;
+    // ("YOUR MOVE 3/8" on your panel, "NAME · MOVE 2/8" elsewhere)
+    const own = this.titleText === 'YOUR MOVE';
+    const mv = !top ? '' : top.kind === 'solo' ? (own ? ': SOLO' : ' · SOLO') : own ? ` ${top.row}/8` : ` · MOVE ${top.row}/8`;
+    const title = this.titleText + mv;
+    if (this.title.textContent !== title) this.title.textContent = title;
 
     // Where the command's measure is: u = beats since its beat 1.
+    const bpb = clock.beatsPerBar;
     const input = b && (b.type === 'command' || b.type === 'dodge');
-    const u = b ? pulse.beat - b.bar * clock.beatsPerBar : -9;
+    const u = b ? pulse.beat - b.bar * bpb : -9;
     const win = battle.win ? battle.win.good / clock.spb : 0.2;       // ± beats
     const inWindow = input && !b.resolved && Math.abs(u - 3) <= win;
     // Beat 4 of a measure this dancer had to press in (from that beat until
     // the next — independent of which command is on screen by then).
-    const kBar = Math.floor(pulse.k / clock.beatsPerBar), kb = battle.dancer(this.who).bars.get(kBar);
-    const four = pulse.k - kBar * clock.beatsPerBar === 3 && !!kb && (kb.type === 'command' || kb.type === 'dodge');
+    const kBar = Math.floor(pulse.k / bpb), kb = battle.dancer(this.who).bars.get(kBar);
+    const count = pulse.k - kBar * bpb + 1;                            // 1-4, the song's beat
+    const four = count === 4 && !!kb && (kb.type === 'command' || kb.type === 'dodge');
     const p = pulseEnvelope(pulse.since, PULSE.attack, four ? PULSE.decay4 : PULSE.decay);
     const rs = this.root.style;
     rs.setProperty('--p', four ? '0' : p.toFixed(3));
     rs.setProperty('--p4', four ? p.toFixed(3) : '0');
-    this.root.classList.toggle('four', !!four);
+    this.root.classList.toggle('four', four);
     this.root.classList.toggle('window', !!inWindow);
 
-    if (this.variant === 'strip') {
-      // Beat track: pill k lights on beat k (centred on it); beat 4's
-      // window is the gold band; the marker runs on the audio clock.
-      const x = Math.max(-0.5, Math.min(4, u + 0.5));
-      this.marker.style.left = `${(x / 4) * 100}%`;
-      this.marker.classList.toggle('pre', !b || u < -0.5);
-      const cur = b && u >= -0.02 && u < 4 ? Math.floor(u + 0.02) : -1;
-      if (cur !== this._cur) {
-        this._cur = cur;
-        this.pills.forEach((c, i) => { c.classList.toggle('on', i === cur); c.classList.toggle('past', cur > i); });
+    if (this.variant === 'panel') {
+      // Beats 1-2-3-4: the beat that's on lights (beat 4 brightest); the
+      // ones before it in the measure stay faintly lit; beat 4's window
+      // pre-lights its segment.
+      const sig = `${count}${!!inWindow}`;
+      if (sig !== this._segSig) {
+        this._segSig = sig;
+        this.segs.forEach((s, i) => { s.classList.toggle('on', i === count - 1); s.classList.toggle('past', i < count - 1); });
+        this.segs[3].classList.toggle('win', !!inWindow && count !== 4);
       }
-      const w = Math.min(0.5, win);
-      if (this._w !== w) { this._w = w; this.win.style.left = `${((3.5 - w) / 4) * 100}%`; this.win.style.width = `${(2 * w / 4) * 100}%`; }
-    }
-    if (!b) { this._status(''); return; }
+      // The chip: the beat (or, for a moment, the judgment).
+      if (now >= this._judgeUntil) this._chip(b ? `BEAT ${count}` : '', four ? 'go' : '');
+    } else if (now >= this._judgeUntil) this._chip('', '');
+    if (this._judgeNew) { this._judgeNew = false; this._judgeUntil = now + 0.6 * (clock.rate || 1); }
+    if (!b) return;
 
     // Rows.
     for (const r of this._rows) {
@@ -502,9 +509,9 @@ class CommandBar {
       const done = o ? prog === o.seq.length && alive : true;
       const chosen = b.resolved && b.success && (b.chosen === o || b.type === 'dodge');
       const failed = b.resolved && !b.success;
-      const sig = `${prog}${alive}${done}${chosen}${failed}${b.resolved}`;
-      if (sig !== r.sig) {
-        r.sig = sig;
+      const rsig = `${prog}${alive}${done}${chosen}${failed}${b.resolved}`;
+      if (rsig !== r.sig) {
+        r.sig = rsig;
         r.arrows.forEach((a, i) => {
           a.classList.toggle('done', i < prog);
           a.classList.toggle('next', !b.resolved && alive && i === prog);
@@ -516,26 +523,12 @@ class CommandBar {
       }
       r.btn.classList.toggle('flash', four && b.bar === kBar && !b.resolved && done);
     }
-
-    // Status: what to do next (or the judgment for a moment — timed on the
-    // song, so a pause holds it).
-    if (this._judgeNew) { this._judgeNew = false; this._judgeUntil = now + 0.6 * (clock.rate || 1); }
-    if (now < this._judgeUntil) return;
-    let st = '';
-    if (b.type === 'command' && b.cands) {
-      if (b.resolved) st = b.success ? `${(b.judged || '').toUpperCase()}!` : (REASON[b.reason] || 'MISS');
-      else {
-        const s = commandStatus(b.cands);
-        if (s.phase === 'dirs') st = this.variant === 'mini' ? '' : `ENTER ${s.next.map(d => DIR_GLYPH[d]).join('/')} · ${s.entered}/${s.total}`;
-        else if (s.phase === 'button') st = `${s.buttons.map(k => GLYPH[k]).join(' or ')} ON 4`;
-      }
-    } else if (b.type === 'dodge') st = b.resolved ? (b.success ? 'DODGED!' : 'HIT!') : `${GLYPH.S} ON 4`;
-    this._status(st, '');
   }
 
-  _status(t, color = '') {
-    if (this.status.textContent !== t) this.status.textContent = t;
-    if (this.status.style.color !== color) this.status.style.color = color;
+  _chip(t, cls) {
+    if (this.chip.textContent !== t) this.chip.textContent = t;
+    const c = 'ch-chip' + (cls ? ' ' + cls : '') + (t ? '' : ' empty');
+    if (this.chip.className !== c) this.chip.className = c;
   }
 
   flashWrong() {
@@ -543,19 +536,18 @@ class CommandBar {
     r.classList.remove('wrong'); void r.offsetWidth; r.classList.add('wrong');
   }
 
-  // Instant result: the strip flashes (green ✓ / red ✗) and the status shows
-  // the judgment with the offset.
+  // Instant result: the panel flashes (green hit / red miss) and the chip
+  // shows the judgment with the offset for a moment.
   judge(judgment, delta, reason) {
     const ok = judgment !== 'miss';
     const off = Math.round((delta || 0) * 1000);
-    const ms = ok && Number.isFinite(delta) ? ` ${off >= 0 ? '+' : '−'}${Math.abs(off)}ms` : '';
-    const txt = ok ? `${judgment.toUpperCase()}!${this.variant === 'strip' ? ms : ''}` : `MISS${reason && this.variant === 'strip' ? ' · ' + (REASON[reason] || '') : '!'}`;
+    const ms = ok && Number.isFinite(delta) && this.variant === 'panel' ? ` ${off >= 0 ? '+' : '−'}${Math.abs(off)}ms` : '';
+    const txt = ok ? `${judgment.toUpperCase()}!${ms}` : (this.variant === 'panel' && reason ? `MISS · ${REASON[reason] || ''}` : 'MISS!');
     this._judgeNew = true;
-    this._status(txt, JUDGE_COLOR[judgment]);
+    this._chip(txt, ok ? 'judge' : 'judge miss');
+    this.chip.style.setProperty('--jc', JUDGE_COLOR[judgment]);
     const r = this.root;
     r.classList.remove('ok', 'bad'); void r.offsetWidth; r.classList.add(ok ? 'ok' : 'bad');
-    const s = this.status;
-    s.classList.remove('pop'); void s.offsetWidth; s.classList.add('pop');
   }
 
   destroy() { this.root.remove(); }

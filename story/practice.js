@@ -17,7 +17,7 @@ function css() {
   const st = document.createElement('style');
   st.id = 'pr-css';
   st.textContent = `
-  .pr { position: fixed; left: calc(env(safe-area-inset-left, 0px) + 8px); top: calc(env(safe-area-inset-top, 0px) + 92px); z-index: 12; width: 290px; max-height: calc(100vh - 250px); overflow: auto;
+  .pr { position: fixed; left: calc(env(safe-area-inset-left, 0px) + 8px); top: calc(var(--sh-stage-top, 200px) + 6px); z-index: 12; width: 290px; max-height: calc(100vh - 250px); overflow: auto;
     background: rgba(12, 6, 22, 0.88); border: 1px solid rgba(255, 201, 58, 0.45); border-radius: 14px; padding: 10px 12px;
     font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: #efe8ff; pointer-events: auto; }
   .pr h3 { margin: 0 0 6px; font: 900 12px var(--font-display, system-ui); letter-spacing: 3px; color: #ffc93a; display: flex; justify-content: space-between; cursor: pointer; user-select: none; }
@@ -34,7 +34,7 @@ function css() {
   .pr .ctl { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
   .pr button, .pr select { font: 700 11px var(--font-ui, system-ui); color: #fff; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.22); border-radius: 7px; padding: 4px 7px; cursor: pointer; }
   .pr button.on { border-color: #ffc93a; color: #ffc93a; }
-  @media (max-width: 760px) { .pr { top: calc(env(safe-area-inset-top, 0px) + 96px); width: 70vw; max-height: 45vh; font-size: 10px; } }`;
+  @media (max-width: 760px) { .pr { top: calc(var(--sh-stage-top, 200px) + 4px); width: 70vw; max-height: 45vh; font-size: 10px; } }`;
   document.head.appendChild(st);
 }
 

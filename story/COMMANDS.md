@@ -54,35 +54,42 @@ Two things the sources don't settle, so we chose:
 
 The rival AI produces timestamped inputs that go through the same buffer and judge as the player's.
 
-## 4. The battle HUD and the command strip
+## 4. The battle HUD and the command panel
 
-The dancers come first. The HUD is a slim **top bar** plus a compact **bottom dock**, and the camera frames both dancers, head to feet, into the space between them (§4.3). Nothing opaque sits over the stage.
+The layout follows the reference mock-up: your command at the top, the dancers in the middle, the boss's command at the bottom. Panels are translucent so the stage shows through, and the camera frames both dancers, head to feet, into the space between the top and bottom groups (§4.3).
 
 ```
-YOU 1,390 ×4 ▬▬▬▬     2:14 ❚❚     ×3 398 NULL ▬▬ △2      ← score · combo · Enthusiasm · attacks
-                         ─●─       4/8 ✕ ON 4 [↓✕] [★↓○]  ← the rival's command, one line
-
-                  (both dancers, full body)
-
-        ★ 4/8 LOCK & POP · PERFECT +972                    ← ticker: callouts / controls hint
-┌ YOU · MOVE 4/8  △                       PERFECT! −3ms ┐  ← status / judgment + offset
-│ TOP  [↓]                            (○)  LV2          │  ← two fixed rows (no jump when
-│ ★    [↑][↑]                         (✕)  LV3          │    a branch opens)
-│ [ 1 ][ 2 ][ 3 ][▮4▮]                                   │  ← each lights on its beat; gold band
-└────────────────────────────────────────────────────────┘    = beat 4's timing window
+YOU △2 ×4                 [ 1:13 ⏸ ]              ×3 △2 NULL    names, attacks, combo
+1,792                                                 25,359    scores
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬     ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬    Enthusiasm (pink / cyan)
+┌ YOUR MOVE 3/8  △                               BEAT 4 ┐    your command panel
+│              ←  ↓  →   →   [○]                       │    (a ★LV3 second row
+│  ▬▬▬▬▬▬▬     ▬▬▬▬▬▬▬     ▬▬▬▬▬▬▬     ███████          │     when a branch opens)
+└───────────────────────────────────────────────────────┘    beats 1-2-3-4
+                    (the dance battle stage)
+              YOU                         NULL                  tags under the dancers
+┌ NULL · MOVE 2/8                                    → ○ ┐    the boss's command
+        SWIPE DIRECTIONS · TAP ✕ / ○ ON BEAT FOUR              hint / callouts
 ```
 
-- **Arrows** turn green as you enter them; the next one is outlined; a line your input ruled out dims; a wrong arrow shakes the strip red.
-- **The final button box** lights when its arrows are complete. It fills (gold ring) while beat 4's window is open, and flashes on beat 4.
-- **Feedback:** the strip flashes green on a hit and red on a miss; the status shows PERFECT / GREAT / GOOD / MISS (with the reason) and the offset in ms. These judgments are a modern addition.
-- **Other measures:** dodge (`INCOMING! DODGE ON 4 [□]`), stunned, rest (Freeze), solo and watch measures replace the rows.
-- **Removed duplication:** the move-row pips and LV in the score panels (MOVE n/8 and LV are on the strip), the separate status line (now in the strip header), and the full controls line (shown in the ticker only until your first commands land).
+- **Arrows** turn green as you enter them; the next one is bright; a line your input ruled out dims; a wrong arrow shakes the panel red.
+- **The ✕ / ○ button** (a rounded square) lights when its arrows are complete. It fills, with a green ring, while beat 4's window is open, and flashes on beat 4.
+- **Beat segments 1–4:** the beat that's on lights, with the earlier ones faint. Beat 4 is the bright green one, and its segment pre-lights while the window is open.
+- **The BEAT chip** shows the beat and turns solid green on beat 4. For a moment after each press it shows the judgment instead (PERFECT / GREAT / GOOD / MISS + reason, with the offset in ms — a modern addition).
+- **Feedback:** the panel flashes green on a hit, red on a miss.
+- **Other measures:** dodge (`INCOMING! DODGE → [□]`), stunned, rest (Freeze), solo and watch measures replace the rows.
+- **2P VS:** P2 gets a full panel at the bottom in place of the boss line; each panel shows its keys.
+- **Layouts:**
+  - **Wide screens:** the top and bottom groups are a centred column (max 640 px).
+  - **Phones on their side:** your panel and the boss line move to a left column, and the dancers get the full height beside it.
+- **Stable sizes:** the panel's height never changes (one big row, or two compact rows in the same space), and neither do the other HUD parts.
+- **Removed duplication:** the move-row pips and LV readouts (MOVE n/8 is in the panel title), the separate status line, the groove meter, and the full controls line.
 
 ### 4.1 Beat pulse (synchronised to the music)
 - **Source:** RhythmBattle (the judge) emits a `beat` event for every beat of the song on its own grid. Beat 4's event time is exactly the judge's beat 4. The HUD receives it as `onBeat(beatIndex, measureIndex, songTime)`.
-- **Envelope:** every frame, the strip's pulse is computed from the music clock's song time: `pulseEnvelope(since beat)`, a 40 ms attack and a 140 ms decay.
-  - Beats 1–3 brighten the border glow, scale the strip by ~1.2 % and light that beat's pill.
-  - Beat 4 of a measure you had to press in is a separate, stronger gold pulse: a 280 ms decay, the gold ring, the gold pill and the button box scaled up.
+- **Envelope:** every frame, the panel's pulse is computed from the music clock's song time: `pulseEnvelope(since beat)`, a 40 ms attack and a 140 ms decay.
+  - Beats 1–3 brighten the panel border, scale the panel by ~1.2 % and light that beat's segment.
+  - Beat 4 of a measure you had to press in is a separate, stronger green pulse: a 280 ms decay, the green ring, the solid BEAT 4 chip and segment, and the button scaled up.
 - **Why it can't drift:**
   - There is no timer and no CSS animation on an interval: the pulse is computed from song time each frame.
   - A pause freezes it.
@@ -92,8 +99,8 @@ YOU 1,390 ×4 ▬▬▬▬     2:14 ❚❚     ×3 398 NULL ▬▬ △2      ←
 
 ### 4.2 Touch (no pad buttons)
 - **Directions:** swipe anywhere on the stage.
-- **✕ / ○ (and □ on a dodge measure):** tap that box in your strip. Both rows' boxes work, so ✕ and ○ stay separately selectable when both lines are open. Each box has a padded touch target.
-- **△ attack:** the small △ chip in the strip header.
+- **✕ / ○ (and □ on a dodge measure):** tap that button in your panel. Both rows' buttons work, so ✕ and ○ stay separately selectable when both lines are open. Each button has a padded touch target.
+- **△ attack:** the small △ chip in the panel header.
 - **Timing:** taps and swipes are timed at touch-down. A missed beat 4 is only called after a short input-delivery grace (100 ms, or more on slow devices, following the measured frame time). A press that happened inside the window but reached the game a frame late still counts, judged by its own timestamp.
 
 ### 4.3 Stage framing
