@@ -38,12 +38,13 @@ function tStep(p, b, travel = 0.18) {
   const ph = ((b % 4) + 4) % 4, first = ph < 2, X = travel * Math.cos(Math.PI * b / 2);
   const kk = (0.5 - 0.5 * Math.cos(2 * TAU * b)) * win(first ? ph : ph - 2, 0, 2, 0.3);
   const sw = 0.025 * Math.sin(2 * TAU * b);
+  const tw = 0.35 * Math.cos(2 * TAU * b);              // standing foot's heel-toe swivel
   if (first) {
-    p.footX('L', X + 0.125 + sw, 0, 0.02, 0.25 * kk);
+    p.footX('L', X + 0.125 + sw, 0, 0.02, 0.25 * kk, tw);
     p.footX('R', X - 0.125 - 0.3 * kk, 0.22 * kk, 0.06 * kk);
     p.hips(X + 0.07 * kk + 0.03, -0.12 - 0.03 * kk, 0, -0.2 * kk);
   } else {
-    p.footX('R', X - 0.125 - sw, 0, 0.02, 0.25 * kk);
+    p.footX('R', X - 0.125 - sw, 0, 0.02, 0.25 * kk, tw);
     p.footX('L', X + 0.125 + 0.3 * kk, 0.22 * kk, 0.06 * kk);
     p.hips(X - 0.07 * kk - 0.03, -0.12 - 0.03 * kk, 0, 0.2 * kk);
   }
@@ -96,7 +97,8 @@ const moves = {
     const sw = Math.cos(TAU * b), hop = 0.5 - 0.5 * Math.cos(2 * TAU * b);
     const act = first ? 'R' : 'L', st = first ? 'L' : 'R';
     p.foot(st, 0.12, 0.02 * hop * e, 0);
-    p.foot(act, 0.13 + 0.04 * e, (0.05 + 0.08 * hop) * e, 0.26 * sw * e, 0.5 * e);
+    // (It eases back home before it settles, so it never slides on the floor.)
+    p.foot(act, 0.13 + 0.04 * e * e, (0.05 + 0.08 * hop) * Math.sqrt(e), 0.26 * sw * e * e, 0.5 * e);
     p.hips((first ? 0.05 : -0.05) * e, -0.12 + 0.03 * hop * e, 0, 0.32 * sw * e * (first ? 1 : -1));
     p.arm('L', 0.6 + 0.5 * sw, 0.5, 1.1, -0.3); p.arm('R', 0.6 - 0.5 * sw, 0.5, 1.1, -0.3);
     p.wrist('L', 0, 0.5 * sw); p.wrist('R', 0, -0.5 * sw);
@@ -459,6 +461,9 @@ function landEars(p, b, B, s, start) {
 }
 
 const moveMeta = {
+  // Shuffle footwork slides on purpose: the running man's planted foot
+  // slides back, the T-step travels on a swivelling standing foot.
+  slides: ['bunniRunningMan', 'bunniGlowSwirl', 'bunniHyperShuffle', 'bunniTStep', 'bunniWonderleap', 'bunniDownTheHole'],
   labels: {
     bunniHop: 'BUNNY HOP', bunniGlowSwirl: 'GLOW SWIRL', bunniKickSpin: 'KICK SPIN', bunniGloving: 'GLOVING',
     bunniJumpstyle: 'JUMPSTYLE', bunniSpinStep: 'SPIN STEP', bunniRabbitHole: 'RABBIT HOLE', bunniStarJump: 'STAR JUMP',

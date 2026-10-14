@@ -155,7 +155,9 @@ export const moves = {
       }],
       [Infinity, (p, b) => {
         const k = smooth((b - 3) / 0.4);
-        p.foot('L', 0.15); p.foot('R', 0.17, 0, 0.04, 0.3 * k);
+        // Standing up he draws the right foot in (lands on the "and").
+        const u = clamp01((b - 3) / 0.5);
+        p.foot('L', 0.2); p.foot('R', 0.2 - 0.03 * smooth(u), 0.05 * Math.sin(Math.PI * u), 0.04 * smooth(u), 0.3 * k);
         p.hips(0.03, -0.1, -0.12 * (1 - k), 0.75 * (1 - k) + 0.15 * k);
         p.lean(0.55 * (1 - k), 0.25 * (1 - k) - 0.05 * k);
         p.arm('L', lerp(1.5, 1.25, k), lerp(0.2, 0.35, k), lerp(0.3, 1.1, k), -0.6);

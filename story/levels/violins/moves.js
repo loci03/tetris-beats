@@ -94,8 +94,12 @@ export const moves = {
     groove(p, B, s, 0.45);
     const x = 0.2 * Math.sin(Math.PI * b / 2), v = Math.cos(Math.PI * b / 2);
     const r = Math.sin(TAU * b * 3);
-    p.footX('L', x + 0.05, 0.035 * (0.5 + 0.5 * r), 0.04, POINTE);
-    p.footX('R', x - 0.02, 0.035 * (0.5 - 0.5 * r), -0.03, POINTE);
+    // Each foot travels while it is up and all but stops while it is down
+    // (its own clock runs slow on the floor), so the ripple steps, not skates.
+    const c = 0.9 * Math.cos(TAU * b * 3) / (TAU * 3);
+    const xL = 0.2 * Math.sin(Math.PI * (b - c) / 2), xR = 0.2 * Math.sin(Math.PI * (b + c) / 2);
+    p.footX('L', xL + 0.05, 0.035 * (0.5 + 0.5 * r), 0.04, POINTE);
+    p.footX('R', xR - 0.02, 0.035 * (0.5 - 0.5 * r), -0.03, POINTE);
     p.hips(x + 0.01, 0.06, 0, 0.08 * v);
     for (const S of ['L', 'R']) {
       const ph = TAU * b / 2 + (S === 'L' ? 0 : Math.PI);
@@ -312,7 +316,11 @@ export const moves = {
       [1, (p, b, B, s) => {
         groove(p, B, s, 0.3);
         const k = smooth(b / 0.6);
-        p.foot('L', 0.14, 0, 0.36 * k); p.foot('R', 0.14, 0, -0.32 * k, 0.5 * k);
+        // The lunge is two steps: the left foot reaches forward (lands on
+        // the "and"), then the right steps back onto its ball (on 2).
+        const uL = clamp01(b / 0.5), uR = clamp01((b - 0.5) / 0.5), kL = smooth(uL), kR = smooth(uR);
+        p.foot('L', 0.14, 0.08 * Math.sin(Math.PI * uL), 0.36 * kL);
+        p.foot('R', 0.14, 0.07 * Math.sin(Math.PI * uR), -0.32 * kR, 0.5 * kR);
         p.hips(0.04 * k, -0.06 - 0.2 * k, 0.04 * k, 0.25 * k);
         arm(p, 'L', 'bas', 'sideHigh', k); arm(p, 'R', 'bas', 'sideHigh', k);
         p.lean(0.05 * k, -0.1 * k); p.look(-0.2 * k, 0.3 * k);

@@ -287,7 +287,11 @@ const moves = {
       [Infinity, (p, b, B, s) => {
         groove(p, B, s, 0.4);
         const u = smooth((b - 3) / 0.85), w = (d) => bump(u - d, 0.18);
-        p.foot('L', 0.2 - 0.04 * u, 0, 0.16 * (1 - u)); p.foot('R', 0.16, 0, -0.38 * (1 - u), 0.9 * (1 - u));
+        // Rising, the back foot steps up beside the front one (lands on the
+        // "and"), then the front foot draws in (lands on the next beat).
+        const tR = clamp01((b - 2.95) / 0.5), tL = clamp01((b - 3.45) / 0.5), uR = smooth(tR), uL = smooth(tL);
+        p.foot('L', 0.2 - 0.04 * uL, 0.05 * Math.sin(Math.PI * tL), 0.16 * (1 - uL));
+        p.foot('R', 0.16, 0.02 * (1 - tR) + 0.07 * Math.sin(Math.PI * tR), -0.38 * (1 - uR), 0.9 * (1 - uR));
         p.hips(0, -0.46 + 0.36 * u, -0.04 + 0.1 * w(0.35), 0.25 * u);
         p.add('spine', 0.25 * w(0.55)); p.add('chest', 0.32 * w(0.75) - 0.12 * u);
         p.look(-0.3 * w(0.95) - 0.1 * u, 0.3 * u);
@@ -523,6 +527,8 @@ const moves = {
 };
 
 const moveMeta = {
+  // The glide is the popper's ice-skate glide: the feet slide on purpose.
+  slides: ['nullGlide'],
   labels: {
     nullTick: 'TICKING', nullArmWave: 'ARM WAVE', nullTutBox: 'KING TUT', nullFingerTut: 'FINGER TUT',
     nullBulletDodge: 'BULLET DODGE', nullGlide: 'GLIDE', nullStrobe: 'STROBE', nullWaveDrop: 'WAVE DROP',

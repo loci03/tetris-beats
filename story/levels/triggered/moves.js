@@ -179,7 +179,7 @@ export const moves = {
       }],
       [3.55, (p, b) => {
         const k = smooth((b - 3) / 0.4);
-        wideStance(p, 0.12 + 0.1 * k);
+        wideStance(p, 0.12);
         p.hips(0, -0.1 - 0.42 * k, -0.08 * k);
         p.lean(0.75 * k, 0.25 * k);
         p.arms(0.15 + 0.55 * k, 0.2, 0.1); p.look(-0.2 * k);
@@ -188,8 +188,9 @@ export const moves = {
         const t = clamp01((b - 3.55) / 0.45), air = Math.sin(Math.PI * t);
         const hy = lerp(-0.52, -0.06, smooth(t / 0.4)) + 0.4 * air;
         p.hips(0, hy, -0.08 * (1 - t));
-        const fl = Math.max(0, hy + 0.04) * 0.9;
-        p.foot('L', 0.18, fl, 0, 0.4 * air); p.foot('R', 0.18, fl, 0, 0.4 * air);
+        // The feet jump out from the burpee squat to his stance while airborne.
+        const fl = Math.max(0, hy + 0.04) * 0.9, w = 0.12 + 0.06 * smooth((t - 0.35) / 0.4);
+        p.foot('L', w, fl, 0, 0.4 * air); p.foot('R', w, fl, 0, 0.4 * air);
         p.lean(0.75 * (1 - smooth(t / 0.5)), 0.25 * (1 - t) - 0.15 * t);
         p.arms(0.3, lerp(0.2, 2.75, smooth(t / 0.5)), 0.15); p.look(-0.25 * t);
       }],
@@ -319,7 +320,22 @@ export const moves = {
     const f = frac(b), lift = Math.pow(Math.sin(Math.PI * f), 1.4) * (1 - smooth((b - 2.5) / 0.4));
     const lifted = Math.cos(Math.PI * (b - f)) > 0 ? 'R' : 'L', sg = lifted === 'R' ? 1 : -1;
     const roar = win(b, 2.6, 5, 0.35);
-    p.foot(lifted === 'R' ? 'L' : 'R', 0.2 + 0.05 * roar, 0, z); p.foot(lifted, 0.2 + 0.05 * roar, 0.3 * lift, z + 0.1 * lift);
+    // Each stomp carries its foot forward while it is up (R on 1 and 3, L on
+    // 2); the planted foot stays put. For the roar he steps back, R then L.
+    const Z = (t) => 0.28 * smooth(t / 2.6), n = Math.floor(b);
+    const fz = (side) => {
+      const first = side === 'R' ? 0 : 1, last = side === 'R' ? 2 : 1;
+      const back = side === 'R' ? clamp01((b - 3.1) / 0.4) : clamp01((b - 3.5) / 0.45);
+      let zz;
+      if (n < first) zz = 0;
+      else if (n > last) zz = Z(last + 1);
+      else zz = (n - first) % 2 === 0 ? lerp(Z(n - 1), Z(n + 1), smooth(f)) : Z(n);
+      return [zz * (1 - smooth(back)), 0.07 * Math.sin(Math.PI * back)];
+    };
+    for (const S of ['L', 'R']) {
+      const [zz, up] = fz(S), l = S === lifted ? lift : 0;
+      p.foot(S, 0.2 + 0.05 * roar, 0.3 * l + up, zz + 0.1 * l);
+    }
     p.hips(0.08 * sg * lift, -0.26 + 0.08 * lift - 0.06 * roar, z);
     // Chest beats: fists alternate onto the chest on the pulses.
     const beat = 0.5 + 0.5 * Math.cos(TAU * b * 2), alt = Math.sin(Math.PI * b * 2);

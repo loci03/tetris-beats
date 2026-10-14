@@ -155,7 +155,10 @@ export const moves = {
       [Infinity, (p, b, B, s) => {
         groove(p, B, s, 0.5);
         const k = smooth((b - 2.75) / 0.3);
-        wideStance(p, 0.13 + 0.09 * k);
+        // Snapping upright he stomps out wide: right foot on 3, left on the "and".
+        const uR = clamp01((b - 2.75) / 0.25), uL = clamp01((b - 3) / 0.5);
+        p.foot('R', 0.13 + 0.09 * smooth(uR), 0.07 * Math.sin(Math.PI * uR), -0.02 * (1 - smooth(uR)), 0.15 * (1 - smooth(uR)));
+        p.foot('L', 0.13 + 0.09 * smooth(uL), 0.07 * Math.sin(Math.PI * uL), -0.02 * (1 - smooth(uL)), 0.15 * (1 - smooth(uL)));
         p.root(0, 0, 0, 0.9 * (1 - k));
         p.hips(0, -0.08 - 0.12 * k, 0.32 * (1 - k), 0.2 * k);
         p.lean(0.36 * (1 - k) - 0.05 * k, 0.12 * (1 - k) - 0.1 * k);
@@ -242,12 +245,21 @@ export const moves = {
     groove(p, B, s, 0.5);
     const glide = b < 3 ? b : 3, z0 = -0.09 * glide + 0.27 * smooth((b - 3) / 0.9);
     p.root(0, 0, 0, 1.2 * smooth(b / 0.4) * (1 - smooth((b - 3.2) / 0.6)));      // shown in profile
-    const ph = frac(b), sideK = Math.cos(Math.PI * (b - ph));       // which foot is flat this beat
-    const flatSlide = smooth(ph), toeUp = 0.7 * (1 - smooth((ph - 0.7) / 0.3));
+    // Each beat the flat foot drags back from in front of the toe foot to
+    // behind it (E(n) = where beat n's drag ends), then they swap: the toe
+    // foot rolls down flat as the dragged one rolls up onto its toes. From
+    // 3 both feet carry back in under him.
+    const E = (n) => -0.09 * (n + 1) - 0.045;
     const back = b < 3 ? 1 : 1 - smooth((b - 3) / 0.6);
-    const fFlat = z0 + (0.15 - 0.3 * flatSlide) * back, fToe = z0 - 0.08 * back;
-    const flat = sideK > 0 ? 'L' : 'R', toe = sideK > 0 ? 'R' : 'L';
-    p.foot(flat, 0.12, 0, fFlat, 0); p.foot(toe, 0.12, 0.01 * back, fToe, toeUp * back);
+    if (b < 3) {
+      const n = Math.floor(b), ph = b - n, sv = smooth((ph - 0.7) / 0.3);
+      const flat = n % 2 === 0 ? 'L' : 'R', toe = flat === 'L' ? 'R' : 'L';
+      p.foot(flat, 0.12, 0.01 * sv, lerp(E(n - 2), E(n), smooth(ph)), 0.7 * sv);
+      p.foot(toe, 0.12, 0.01 * (1 - sv), E(n - 1), 0.7 * (1 - sv));
+    } else {
+      p.foot('L', 0.12, 0.01 * back, z0 + (E(2) + 0.27) * back, 0.7 * back);
+      p.foot('R', 0.12, 0, z0 + (E(1) + 0.27) * back, 0);
+    }
     p.hips(0, -0.12, z0 - 0.02);
     p.lean(0.12, 0.08);
     reach(p, 1, 0.1 * Math.sin(TAU * b)); p.look(0.15, 0.15 * Math.sin(Math.PI * b), 0.2);
@@ -278,7 +290,7 @@ export const moves = {
       [Infinity, (p, b, B, s) => {
         groove(p, B, s, 0.5);
         const k = smooth((b - 3.3) / 0.25);
-        wideStance(p, 0.13 + 0.08 * k);
+        wideStance(p, 0.21);                 // (the seam steps the feet out of the spin)
         p.hips(0, -0.06 - 0.1 * k, 0, 0.15 * k);
         claw(p, 'L', k, 0.9); claw(p, 'R', k, 0.9);
         p.look(0.05, 0.15 * k, -0.75 * k);
@@ -421,6 +433,8 @@ export const moves = {
 };
 
 export const moveMeta = {
+  // The moon shamble is a zombie moonwalk: the feet glide on purpose.
+  slides: ['rexMoonShamble'],
   labels: {
     rexClaw: 'CLAW SWIPE', rexLimbFlop: 'LIMB FLOP', rexThrillerStep: 'THRILLER STEP', rexShimmy: 'SHOULDER SHIMMY',
     rexDeadLean: 'DEAD MAN LEAN', rexJitter: 'ZOMBIE JITTER', rexRiseUp: 'GRAVE RISE', rexBoneCrack: 'BONE CRACK',

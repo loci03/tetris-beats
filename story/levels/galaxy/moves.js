@@ -18,6 +18,8 @@ function zeroLean(p, th) {
   p.hips(x, -0.9 * (1 - Math.cos(th)) - 0.02, 0);
   p.footX('L', x + 0.11); p.footX('R', x - 0.11);
 }
+// Moonwalk: where step n's backward slide ends.
+const moonE = (n) => -0.13 * (n + 1);
 // Diva halo pose: arms arched overhead into a ring, chin up.
 function haloArms(p, k = 1, from = 0.4) { for (const sd of ['L', 'R']) p.arm(sd, lerp(0.3, 0.35, k), lerp(from, 2.75, k), lerp(0.3, 1.55, k), lerp(0, -1.25, k)); }
 
@@ -92,18 +94,23 @@ const moves = {
     groove(p, B, s, 0.4);
     phased(p, b, B, s, [
       [3, (p, b) => {
+        // Each step the flat foot slides back from in front of the toe foot
+        // to behind it (E(n) = where step n's slide ends), then they swap:
+        // the toe foot drops its heel as the slider rises onto its toes.
         const step = Math.floor(b), ph = b - step, z0 = -0.13 * b;
         const toe = step % 2 === 0 ? 'R' : 'L', flat = toe === 'R' ? 'L' : 'R';
-        p.foot(flat, 0.11, 0, z0 + 0.14 - 0.28 * smooth(ph), 0);
-        p.foot(toe, 0.11, 0.01, z0 - 0.1, 0.7 * (1 - smooth((ph - 0.78) / 0.22)));
-        p.hips(0, -0.1, z0 - 0.02);
+        const sv = smooth((ph - 0.78) / 0.22);
+        p.foot(flat, 0.11, 0.01 * sv, lerp(moonE(step - 2), moonE(step), smooth(ph)), 0.7 * sv);
+        p.foot(toe, 0.11, 0.01 * (1 - sv), moonE(step - 1), 0.7 * (1 - sv));
+        p.hips(0, -0.1, z0 + 0.04);
         p.arm('L', 0.5, 0.35, 1.4, -0.5); p.arm('R', 0.5, 0.35, 1.4, -0.5);
         p.wrist('L', 0, 0.3 * Math.sin(Math.PI * b)); p.wrist('R', 0, -0.3 * Math.sin(Math.PI * b));
         p.lean(0.08, 0.04); p.look(-0.05, 0.12);
       }],
       [Infinity, (p, b) => {
-        const t = smooth((b - 3) / 0.6), z = -0.39 * (1 - t);
-        p.foot('L', 0.09, 0.02 * Math.sin(Math.PI * t), z, 0.8 * t); p.foot('R', 0.1, 0.02 * Math.sin(Math.PI * t), z + 0.03, 0.8 * t);
+        const t = smooth((b - 3) / 0.6), z = -0.35 * (1 - t);
+        p.foot('L', lerp(0.11, 0.09, t), 0.01 * (1 - t) + 0.02 * Math.sin(Math.PI * t), lerp(moonE(2), 0, t), 0.7 + 0.1 * t);
+        p.foot('R', lerp(0.11, 0.1, t), 0.02 * Math.sin(Math.PI * t), lerp(moonE(1), 0.03, t), 0.8 * t);
         p.hips(0, -0.08 + 0.09 * t, z);
         p.arm('L', 0.4, 0.4 + 2.1 * t, 0.2); p.arm('R', 0.6, 0.5, 1.6, -0.6);
         p.look(-0.3 * t, 0.3 * t); p.lean(-0.03, -0.12 * t, 0.15 * t);
@@ -161,9 +168,12 @@ const moves = {
   novaComet(p, b, B, s) {
     groove(p, B, s, 0.5);
     const first = b < 2, u = first ? b / 2 : (b - 2) / 2, d = first ? 1 : -1;
-    const e = win(u, 0, 1, 0.2), sw = smooth(clamp01((u - 0.1) / 0.6));
+    const e = win(u, 0, 1, 0.25), sw = smooth(clamp01((u - 0.1) / 0.6));
     const lead = first ? 'L' : 'R', tr = first ? 'R' : 'L';
-    p.footX(lead, d * (0.14 + 0.26 * e), 0, 0.05 * e);
+    // The lead foot steps out into the lunge (lands on the "and") and steps
+    // back in (on the next downbeat), clear of the floor while it travels.
+    const up = 0.07 * (Math.sin(Math.PI * clamp01(u / 0.25)) + Math.sin(Math.PI * clamp01((u - 0.75) / 0.25)));
+    p.footX(lead, d * (0.14 + 0.26 * e), up, 0.05 * e);
     p.footX(tr, -d * 0.14, 0, -0.03 * e, 0.3 * e);
     p.hips(d * 0.13 * e, -0.08 - 0.15 * e, 0.02 * e, d * 0.25 * e);
     p.arm(lead, lerp(2.7, 1.1, sw), lerp(0.6, 1.6, sw) * e + 0.3 * (1 - e), 0.15);
@@ -477,6 +487,10 @@ const moves = {
 };
 
 const moveMeta = {
+  // Moonwalk and the ice glide slide on purpose; in the zero-G lean the
+  // whole body tips about the hips, so her pinned boots only move in the
+  // pose's (pre-tilt) frame.
+  slides: ['novaMoonwalk', 'novaGlide', 'novaZeroG'],
   labels: {
     novaMoonwalk: 'MOONWALK', novaWave: 'SLOW-MO WAVE', novaOrbitSpin: 'ORBIT SPIN', novaComet: 'COMET',
     novaZeroG: 'ZERO-G LEAN', novaMoonJump: 'MOON JUMP', novaSupernova: 'SUPERNOVA', novaBlackHole: 'BLACK HOLE',

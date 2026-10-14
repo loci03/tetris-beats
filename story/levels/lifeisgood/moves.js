@@ -23,11 +23,21 @@ const hopX = (b, f) => { const i = Math.floor(b), u = smooth(frac(b) / 0.8); ret
 // in and out on the 8ths with the hips pumping.
 function butterflyLegs(p, b, depth = 1) {
   const fl = Math.sin(TAU * b * 2), open = 0.5 + 0.5 * fl;
-  const w = 0.24 + 0.08 * open;
-  p.foot('L', w, 0, 0.02, 0.35 + 0.15 * (1 - open)); p.foot('R', w, 0, 0.02, 0.35 + 0.15 * (1 - open));
+  // The feet stay planted on their balls: the knees fan from the hips and
+  // the toes swivelling out / in, the stance only breathing a little.
+  const w = 0.28 + 0.015 * fl, tw = 0.3 * fl;
+  p.foot('L', w, 0, 0.02, 0.35 + 0.15 * (1 - open), tw); p.foot('R', w, 0, 0.02, 0.35 + 0.15 * (1 - open), tw);
   p.hips(0, -0.38 * depth - 0.06 * open * depth, 0.03 * fl, 0);
   p.add('hips', -0.15 * fl, 0, 0);
   return fl;
+}
+
+// Spin drop's landing: out of the turn the lifted right foot steps wide
+// (lands on the "and"), then the left steps wide under the drop (on 2).
+function dropFeet(p, b) {
+  const uR = clamp01((b - 1.25) / 0.25), uL = clamp01((b - 1.5) / 0.5);
+  p.foot('R', 0.08 + 0.25 * smooth(uR), 0.16 * (1 - uR) + 0.06 * Math.sin(PI * uR), 0.04 * (1 - smooth(uR)), 0.6 - 0.4 * smooth(uR));
+  p.foot('L', 0.01 + 0.32 * smooth(uL), 0.07 * Math.sin(PI * uL), 0, 0.5 - 0.3 * smooth(uL));
 }
 
 export const moves = {
@@ -168,14 +178,14 @@ export const moves = {
       }],
       [1.75, (p, b) => {
         const t = smooth((b - 1.25) / 0.5);
-        p.foot('L', 0.13 + 0.2 * t); p.foot('R', 0.13 + 0.2 * t, 0.06 * Math.sin(PI * t));
+        dropFeet(p, b);
         p.hips(0, -0.03 - 0.4 * t, 0);
         armMix(p, 'L', [0.4, 1.5, 0.3], KNEE, t); armMix(p, 'R', [0.4, 1.5, 0.3], KNEE, t);
         p.lean(0.3 * t);
       }],
       [3.25, (p, b) => {
         const a = PI * (b - 1.75) * 2, cx = Math.cos(a), cz = Math.sin(a);
-        p.foot('L', 0.33, 0, 0, 0.2); p.foot('R', 0.33, 0, 0, 0.2);
+        dropFeet(p, b);
         p.hips(0.09 * cx, -0.43 + 0.03 * cz, 0.07 * cz, 0.2 * cx);
         p.add('hips', 0.25 * cz, 0, 0.18 * cx);
         p.arm('L', KNEE[0], KNEE[1] + 0.1 * cx, KNEE[2], KNEE[3]); p.arm('R', KNEE[0], KNEE[1] - 0.1 * cx, KNEE[2], KNEE[3]);
@@ -184,7 +194,10 @@ export const moves = {
       [Infinity, (p, b, B, s) => {
         groove(p, B, s, 0.5);
         const t = smooth((b - 3.25) / 0.5);
-        p.foot('L', 0.33 - 0.2 * t); p.foot('R', 0.33 - 0.14 * t, 0.08 * Math.sin(PI * t), 0, 0.4 * t);
+        // Rising: the right foot steps in onto its ball (on the "and"), then
+        // the left draws in under her.
+        const uR = clamp01((b - 3.25) / 0.25), uL = clamp01((b - 3.5) / 0.5);
+        p.foot('L', 0.33 - 0.2 * smooth(uL), 0.06 * Math.sin(PI * uL)); p.foot('R', 0.33 - 0.14 * smooth(uR), 0.08 * Math.sin(PI * uR), 0, 0.4 * smooth(uR));
         p.hips(0.05 * t, -0.43 + 0.33 * t, 0, -0.2 * t);
         armMix(p, 'L', KNEE, CROWN_L, t); armMix(p, 'R', KNEE, CROWN_L, t);
         p.lean(0.3 * (1 - t), -0.12 * t, 0, 0.1 * t); p.look(-0.2 * t, 0.2 * t, 0.1 * t);

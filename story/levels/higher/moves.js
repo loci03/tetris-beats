@@ -114,7 +114,7 @@ export const moves = {
     [0.6, (p) => { p.foot('L', 0.2); p.foot('R', 0.22); p.hips(0.02, -0.12, 0.03, 0.15); p.arm('L', 0.6, 0.4, 0.9); p.arm('R', -0.1, 0.6, 0.5); p.lean(-0.1, -0.12, 0.1); p.look(-0.08, 0.2); }],
     [1, (p) => { p.foot('R', 0.2); p.foot('L', 0.22, 0, 0, 0.3); p.hips(-0.04, -0.2, 0, -0.25); p.arm('R', 1.45, 0.1, 1.6, -1.3); p.arm('L', 0.2, 1.3, 0.1); p.lean(0.05, 0.05, -0.2); p.look(0.1, -0.35); }, 'snap'],
     [1.6, (p) => { p.foot('R', 0.2); p.foot('L', 0.22); p.hips(-0.02, -0.12, 0.03, -0.15); p.arm('R', 0.6, 0.4, 0.9); p.arm('L', -0.1, 0.6, 0.5); p.lean(-0.1, -0.12, -0.1); p.look(-0.08, -0.2); }],
-    [2, (p) => { p.foot('L', 0.24); p.foot('R', 0.24); p.hips(0, -0.26, 0); p.arm('L', 0.4, 0.5, 2.3, -0.9); p.arm('R', 0.4, 0.5, 2.3, -0.9); p.lean(0.18, 0.14); p.look(0.25); }, 'snap'],
+    [2, (p) => { p.foot('L', 0.22); p.foot('R', 0.22); p.hips(0, -0.26, 0); p.arm('L', 0.4, 0.5, 2.3, -0.9); p.arm('R', 0.4, 0.5, 2.3, -0.9); p.lean(0.18, 0.14); p.look(0.25); }, 'snap'],
     [2.6, (p) => { p.foot('L', 0.22); p.foot('R', 0.22); p.hips(0, -0.14, 0.03); p.arms(0.3, 0.5, 1.0); p.lean(-0.06, -0.1); p.look(-0.05); }],
     [3, (p) => { p.foot('L', 0.16); p.foot('R', 0.26, 0, 0.1, 0.4); p.hips(0.05, -0.16, 0, 0.3); p.arm('L', 0.5, 2.5, 0.1); p.arm('R', 0.3, 0.4, 2.4, -1.0); p.lean(-0.1, -0.15, 0.15, 0.1); p.look(-0.25, 0.3); }, 'snap'],
     [3.6, (p) => { p.foot('L', 0.18); p.foot('R', 0.22, 0, 0.04); p.hips(0.02, -0.13, 0.03, 0.15); p.arm('L', 0.4, 1.2, 0.6); p.arm('R', 0.1, 0.5, 1.0); p.lean(-0.12, -0.12); p.look(-0.1, 0.15); }],
@@ -147,7 +147,8 @@ export const moves = {
     phased(p, b, B, s, [
       [1.2, (p, b) => {
         const t = smooth(b / 1.2);
-        p.foot('L', 0.15, 0, 0.18 * t); p.foot('R', 0.13, 0.04 * Math.sin(PI * t), -0.38 * t, 0.9 * t);
+        const u = clamp01(b / 1.1), tr = smooth(u);              // the right foot reaches back, down on 2
+        p.foot('L', 0.15, 0, 0.18 * t); p.foot('R', 0.13, 0.04 * Math.sin(PI * u), -0.38 * tr, 0.9 * tr);
         p.hips(0, -0.04 - 0.42 * t, -0.04 * t);
         p.arm('L', 0.4, 0.5 + 0.4 * t, 0.6); p.arm('R', 0.4, 0.5, 0.6);
         p.lean(0.15 * t, 0.05 * t); p.look(0.1 * t);
@@ -373,6 +374,9 @@ function scratchPose(p, b, B, s) {
 }
 
 export const moveMeta = {
+  // The glide and the float walk are popping glides: the feet slide on
+  // purpose (heel-toe), and the sky-high solo glides in its second count.
+  slides: ['skyeGlide', 'skyeFloatWalk', 'skyeSkyHigh'],
   labels: {
     skyeNodSnap: 'NOD & SNAP', skyeArmWave: 'ARM WAVE', skyeWoah: 'THE WOAH', skyeShoulderRoll: 'SHOULDER ROLLS',
     skyeGlide: 'TWO-STEP GLIDE', skyeSlowBounce: 'SLOW-MO BOUNCE', skyeScratch: 'SCRATCH', skyeKneeDrop: 'KNEE DROP',

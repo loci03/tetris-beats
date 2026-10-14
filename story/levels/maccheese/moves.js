@@ -252,8 +252,10 @@ export const moves = {
     const kL = Math.pow(0.5 + 0.5 * side, 3), kR = Math.pow(0.5 - 0.5 * side, 3);
     const into = smooth(b / 0.5), hey = win(ph, 2.7, 4.0, 0.4);
     const hop = Math.pow(Math.sin(PI * frac(b)), 4);         // little hop as the legs swap
-    p.foot('L', 0.12 + 0.24 * kL * into, 0.04 * hop + 0.34 * kL * into, -0.04 + 0.6 * kL * into, -0.2 * kL);
-    p.foot('R', 0.12 + 0.24 * kR * into, 0.04 * hop + 0.34 * kR * into, -0.04 + 0.6 * kR * into, -0.2 * kR);
+    // (Going in, the first kick leaves the floor before it reaches out.)
+    const reach = into * into;
+    p.foot('L', 0.12 + 0.24 * kL * reach, 0.04 * hop + 0.34 * kL * into, -0.04 + 0.6 * kL * reach, -0.2 * kL);
+    p.foot('R', 0.12 + 0.24 * kR * reach, 0.04 * hop + 0.34 * kR * into, -0.04 + 0.6 * kR * reach, -0.2 * kR);
     p.hips(0.05 * (kR - kL), -0.03 - 0.44 * into + 0.06 * hop, -0.1 * into);
     const fold = [1.45, 0.1, 1.6, -1.35];
     armMix(p, 'L', fold, [0.7, 2.2, 0.15, 0.3], hey);

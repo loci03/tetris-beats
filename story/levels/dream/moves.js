@@ -169,19 +169,23 @@ const moves = {
   // mark on locked legs.
   mechaMoonbot(p, b, B, s) {
     groove(p, B, s, 0.4);
+    // Each step the flat foot slides back from in front of the toe foot to
+    // behind it (E(n) = where step n's slide ends), then the two swap: the
+    // toe foot drops its heel and the slider rises onto its toes.
+    const E = (n) => -0.13 * (n + 1);
     if (b < 3) {
       const step = Math.floor(b), ph = b - step, z0 = -0.13 * b;
       const toe = step % 2 === 0 ? 'R' : 'L', flat = toe === 'R' ? 'L' : 'R';
-      const sw = smooth(ph / 0.8);
-      p.foot(flat, 0.11, 0, z0 + 0.14 - 0.28 * sw, 0);
-      p.foot(toe, 0.11, 0.01, z0 - 0.1, 0.7 * (1 - smooth((ph - 0.8) / 0.2)));
-      p.hips(0, -0.1, z0 - 0.02);
+      const sw = smooth(ph / 0.8), sv = smooth((ph - 0.8) / 0.2);
+      p.foot(flat, 0.11, 0.01 * sv, lerp(E(step - 2), E(step), sw), 0.7 * sv);
+      p.foot(toe, 0.11, 0.01 * (1 - sv), E(step - 1), 0.7 * (1 - sv));
+      p.hips(0, -0.1, z0 + 0.04);
       const a = Math.cos(Math.PI * servo(b, 1, 0.6));
       p.arm('L', 0.6 * a, 0.12, 1.57); p.arm('R', -0.6 * a, 0.12, 1.57);
       p.look(0, 0.2 * a);
     } else {
-      const t = smooth((b - 3) / 0.8), z = -0.39 * (1 - t);
-      p.foot('L', 0.12, 0, z + 0.02); p.foot('R', 0.12, 0, z - 0.02);
+      const t = smooth((b - 3) / 0.8), z = -0.35 * (1 - t);
+      p.foot('L', 0.12 - 0.01 * (1 - t), 0.01 * (1 - t), lerp(E(2), 0.02, t), 0.7 * (1 - t)); p.foot('R', 0.12 - 0.01 * (1 - t), 0, lerp(E(1), -0.02, t));
       p.hips(0, -0.06, z + 0.03 * Math.sin(Math.PI * t));
       p.arm('L', 0.4 * t, 0.4 + 1.17 * t, 1.57 * t, 1.57 * t); p.arm('R', 0.4 * t, 0.4 + 1.17 * t, 1.57 * t, 1.57 * t);
       p.lean(-0.06 * Math.sin(Math.PI * t));
@@ -441,6 +445,8 @@ const moves = {
 };
 
 const moveMeta = {
+  // Moonwalk and knee slide: the feet glide on purpose.
+  slides: ['mechaMoonbot', 'mechaPowerSlide'],
   labels: {
     mechaRobot: 'THE ROBOT', mechaServoWave: 'SERVO WAVE', mechaAnimatronic: 'ANIMATRONIC', mechaTicking: 'TICKING',
     mechaLaserEyes: 'LASER EYES', mechaMoonbot: 'MOONBOT', mechaPowerSlide: 'POWER SLIDE', mechaRocketJump: 'ROCKET JUMP',

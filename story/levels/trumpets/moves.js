@@ -142,8 +142,10 @@ export const moves = {
     const cross = Math.cos(Math.PI * b);              // hands swap knees every beat
     arm(p, 'L', [0.62, -0.45 + 0.8 * f, 0.25, -0.4 * cross]); arm(p, 'R', [0.62, -0.45 + 0.8 * f, 0.25, 0.4 * cross]);
     p.lean(0.32, 0.12); p.look(-0.25, 0.2 * cross);
-    // Swivelling on the balls of the feet opens and shuts the knees.
-    p.foot('L', 0.07 + 0.22 * f, 0, 0.05, 0.6); p.foot('R', 0.07 + 0.22 * f, 0, 0.05, 0.6);
+    // Swivelling on the balls of the feet opens and shuts the knees (toes
+    // turn out as they open) — a swivel, declared in moveMeta.slides.
+    const tw = 0.5 * (f - 0.5);
+    p.foot('L', 0.07 + 0.22 * f, 0, 0.05, 0.6, tw); p.foot('R', 0.07 + 0.22 * f, 0, 0.05, 0.6, tw);
   },
 
   // Tap: shuffle-ball-change, shuffle-ball-change, stomp-stomp, heel drop
@@ -163,12 +165,14 @@ export const moves = {
   // Lindy swing-out with an invisible partner: rock step back, pull her in
   // (both hands), whip round 360° together, and fling her out wide.
   zootSwingOut(p, b, B, s) {
-    const rock = win(b, -0.5, 1.1, 0.4), turn = smooth((b - 1.1) / 1.8), out = smooth((b - 2.9) / 0.5);
+    const rock = win(b, -0.5, 1.0, 0.4), turn = smooth((b - 1.1) / 1.8), out = smooth((b - 2.9) / 0.5);
+    // Replacing the rock step: the left foot comes back up off the floor.
+    const back = Math.sin(Math.PI * clamp01((b - 0.6) / 0.4));
     const spin = turn;
     groove(p, B, s, 0.6 * (1 - spin * (1 - out)));
     const r = Math.sin(Math.PI * clamp01((b - 1.1) / 1.8));
     const stepPh = Math.sin(TAU * (b - 1.1) * 2) * r;
-    p.foot('L', 0.13, 0.07 * Math.max(0, stepPh) ** 2, -0.16 * rock + 0.04 * r);
+    p.foot('L', 0.13, 0.07 * Math.max(0, stepPh) ** 2 + 0.06 * back, -0.16 * rock + 0.04 * r);
     p.foot('R', 0.13, 0.07 * Math.max(0, -stepPh) ** 2, 0.06 * rock - 0.04 * r, 0.3 * rock);
     p.hips(0, -0.14 - 0.06 * rock, -0.08 * rock + 0.04 * r, 0.1);
     p.root(0, 0, 0, TAU * spin);
@@ -386,6 +390,9 @@ export const moves = {
 };
 
 export const moveMeta = {
+  // Bee's knees swivels the feet open and shut on their balls; the
+  // Nicholas splits rise by sliding the legs back together.
+  slides: ['zootBeesKnees', 'zootNicholasSplits'],
   labels: {
     zootJazzHands: 'JAZZ HANDS', zootTrumpetBlast: 'TRUMPET BLAST',
     zootBeesKnees: "BEE'S KNEES", zootTapStomp: 'TAP STOMP',

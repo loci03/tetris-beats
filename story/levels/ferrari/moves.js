@@ -164,8 +164,9 @@ const moves = {
         p.lean(-0.03, -0.1, -0.1 * st); p.look(-0.3, 0.1 * st, -0.05);
       }],
       [3, (p, t) => {
-        const k = smooth((t - 2.5) / 0.3);
-        p.footX('L', 0.15, 0, 0.02 + 0.12 * k); p.footX('R', -0.15, 0, -0.04);
+        const k = smooth((t - 2.5) / 0.3), f = clamp01((t - 2.5) / 0.45);
+        // The throw steps the left boot forward, landing on 3.
+        p.footX('L', 0.15, 0.07 * Math.sin(Math.PI * f), 0.02 + 0.12 * smooth(f)); p.footX('R', -0.15, 0, -0.04);
         p.hips(0.05 * k, -0.1 - 0.05 * k, 0.06 * k, 0.4 * k);
         p.arm('R', lerp(2.9, 1.45, k), lerp(0.4, -0.15, k), lerp(0.4, 0.05, k));
         belt(p, 'L');
@@ -188,7 +189,8 @@ const moves = {
     const ph = ((b % 4) + 4) % 4, fl = win(ph, 2.7, 4, 0.3);
     const bow = 0.5 + 0.5 * Math.sin(TAU * b * 2 - 0.6), tap = 0.5 + 0.5 * Math.cos(TAU * b * 2);
     const show = smooth(b / 0.4);
-    p.foot('L', 0.14); p.foot('R', 0.16, 0.02 * tap, 0.12 * tap, -0.45 * tap);
+    // The tapping boot swings out to its heel and back clear of the floor.
+    p.foot('L', 0.14); p.foot('R', 0.16, 0.02 * tap + 0.06 * Math.sin(Math.PI * Math.sqrt(tap)), 0.12 * tap, -0.45 * tap);
     p.hips(-0.02, -0.11 - 0.03 * tap, 0, 0.18);
     p.arm('L', 1.35 + 0.1 * fl, 0.5, 0.55, -0.15);
     p.set('handL', -0.2, 0.5 * show, 0);

@@ -21,6 +21,8 @@ export default {
   // head floating against it.
   style: {
     swagger: 1.25, bounce: 0.85, phraseOffset: 1,
+    // On roller skates: her feet roll on purpose (not foot-skating).
+    slides: true,
     feel: (p, { B, Bb, d, amt, e, s }) => {
       const k = amt * e;
       const sw = Math.sin(Math.PI * B - 0.4) * k * s.swagger;
