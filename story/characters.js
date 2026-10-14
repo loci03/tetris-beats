@@ -94,7 +94,7 @@ export const CHARACTERS = {
     // Feel 'sway' = hips land side to side on the beat; poses on count 5.
     style: {
       swagger: 1.4, bounce: 1.0, feel: 'sway', phraseOffset: 1,
-      routines: { chill: ['sassyStrut', 'purseGroove'], hype: ['shimmyBounce', 'tacoHop', 'sassyStrut'] },
+      routines: { chill: ['sassyStrut', 'purseGroove'], hype: ['shimmyBounce', 'hipSway', 'sassyStrut'] },
       accent: { pose: 'accentDiva', at: 5 },
     },
     victory: 'kissBlow',

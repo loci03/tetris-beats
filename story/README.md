@@ -26,7 +26,11 @@ object; the mode never touches game internals directly.
 | `rhythm-battle.js` | `RhythmBattle` — pure rules: untimed direction entry + the timed GROOVE finisher on beat 4, scoring, levels, enthusiasm, hype, taunt / dodge / stun, battle timer. Emits events. |
 | `opponent-ai.js` | Rival skill profile → finisher timing, branch choices, taunt decisions, dodges. |
 | `characters.js` | Toon dancer rigs (joint hierarchy + outlined parts + anime face: joy ^^ eyes, wink, kiss), and each dancer's own dance identity — base routines, moves per level, ★ branch moves, solo, intro taunt, anime marks. YOU = hip-hop / b-boy, COOL TONI = disco + rock'n'roll, TINA = glam diva with her purse; other bosses register from their level modules (`registerCharacter`). |
-| `dance.js` | Choreography: beat-keyframed named moves (two-step, running man, Roger Rabbit, cabbage patch, robot, moonwalk, disco point, jump split…), a groove layer that bounces on every beat (harder on 2 & 4), always-on 8-count base routines, leg IK so planted feet stay planted, and `DanceController` (queue, crossfades, reactions). |
+| `dance.js` | Animation engine: beat-keyframed moves, a groove layer that bounces on every beat (harder on 2 & 4), always-on 8-count idle routines, leg IK + foot swivels so planted feet stay planted, and `DanceController` — moves lead in so they land ON their downbeat, blends step the feet, the dance state machine, `moveProfile()` (flip / airborne / spin detection). |
+| `choreo.js` | `Choreographer`: Bust a Groove-style **dance strings** — row 1-8 of the standard or ★ line, the finisher into the character's **freeze** (held through the rest bar), the solo (the only place for flips), miss → stutter → recovery; the 14 dance states; auto plans for level bosses with every special filtered out. See `DANCE.md`. |
+| `vocab.js` | The shared grounded vocabulary: knee bounce, shoulder bounce / rolls, hip sway, heel-toe, cross step, Charleston, kick-ball-change, toprock, swivels, side glide, half turn, wave & pops, isolations, jazz square, Bus Stop, footwork, finishers, freezes, miss / recovery. |
+| `dance-metrics.js` | `MotionMonitor`: per-frame skating, foot contacts vs the beat grid, pose pops, flips, illegal state transitions — shared by the Dance View and the tests. |
+| `dev/danceview.html` | **Dance View** (menu: BEAT tab → DANCE VIEW): any dancer, any move / string / chain / miss / solo at any BPM and speed, scrubbing, cameras, skeleton + foot contacts, state ribbon and step timing. |
 | `camera.js` | `CameraDirector` — two-shot, push-ins, orbit, taunt and winner shots; aspect-aware. |
 | `transition.js` | Board capture → 3D tiles aligned to the 2D board; shatter/fly-through in, reassemble out. |
 | `hud.js`, `story.css` | Battle HUD, note lane, touch pads, toasts. |
@@ -73,6 +77,13 @@ theirs — no commands, solo then encore, the camera sweeps around them, the
 house lights drop and the spotlights close in, the opponent watches (then
 claps), +2500 per bar. A solo spends the gauge.
 
+Every landed command also walks one row down the dancer's **dance string**
+(the HUD pips): rows 1-2 grooves, 3-6 steps, 7 an advanced move, and row 8
+the **finisher → FREEZE**, held through a **rest bar** (no command) before
+the next string. The ★ branch takes the harder line of the same string; a
+miss is a stutter and a recovery and cuts the string short; a landed taunt
+resets it, dodging doesn't (`choreo.js`, `DANCE.md`).
+
 Battle states: INTRO (entrance) → the rival calls the player out → the
 player answers → READY + a 3-2-1 count-in on the beat → GROOVE. Both dancers
 never stop: between moves they loop their own 8-count routines, and a
@@ -102,7 +113,11 @@ Settings compensates for audio latency (e.g. Bluetooth headphones).
 ## Testing notes
 
 `rhythm-battle.js` is pure logic and can be driven from Node with a fake clock
-(the folder is marked `"type": "module"` for that). The full loop was verified
+(the folder is marked `"type": "module"` for that). `npm test` runs
+`tests/*.test.mjs`: rhythm sync (moves land on their downbeat, steps on the
+8th grid, tempo-locked), the state machine, dance-string advancement (rules +
+choreography), the flip budget for all 19 dancers, foot skating and floor
+contact (`tests/motion.mjs` drives a DanceController headless). The full loop was verified
 headless with an autoplayer asserting that board, queue, hold, piece, lines and
 level are unchanged after the battle and that the score only gains the bonus.
 

@@ -344,7 +344,7 @@ const moves = {
     const ph = mod(b, 4), A = amp(s);
     const r = TAU * b * 1.5;
     const roll = 1 - win(ph, 1.75, 4, 0.25);
-    const upK = win(ph, 1.75, 3.1, 0.3), dnK = win(ph, 2.85, 4, 0.3);
+    const upK = win(ph, 1.7, 3.1, 0.38), dnK = win(ph, 2.8, 4, 0.36);
     const a = p.a;
     _t1.set(a);
     p.arm('L', 0.8 + 0.45 * Math.sin(r), 0.15, 1.15 + 0.45 * Math.cos(r), -1.0);
@@ -447,14 +447,19 @@ const moves = {
   },
 
   // ── Freezes (held, breathing, a tremble of effort) ────────────────
-  // Chair freeze: one hand planted, body tipped onto it, knees up.
+  // Chair freeze: tipped ~60° onto the right hand (arm straight down to the
+  // floor under the shoulder), knees tucked with both feet off the floor,
+  // the free arm thrown up and out, the head held up against the tilt.
   freezeChair(p, b, B, s) {
     const hit = Math.exp(-b * 6), breathe = Math.sin(TAU * b * 0.5);
-    p.hips(0, -0.56 - 0.02 * hit, 0);
-    p.tumble(0.15, 1.12 + 0.03 * hit + 0.004 * Math.sin(B * 40));
-    p.foot('L', 0.2, 0.18, 0.3, 0.6); p.foot('R', 0.26, 0.22, 0.25, 0.6);
-    p.arm('R', 0.2, 2.2, 0.05); p.arm('L', 1.2, 0.4, 1.8, -0.4);
-    p.add('chest', 0.02 * breathe); p.look(-0.3, 0.3, -0.4);
+    const R = 1.02 + 0.04 * hit + 0.004 * Math.sin(B * 40);   // a tremble of effort
+    p.hips(0, -0.45 - 0.02 * hit, 0, 0.12);
+    p.tumble(0.1, R);
+    p.foot('L', -0.14, 0.26, 0.3, 0.3); p.foot('R', 0.3, 0.33, 0.24, 0.3);
+    p.arm('R', 0.08, R - 0.02, 0.3);
+    p.arm('L', 0.35, 1.75, 0.35);
+    p.add('chest', 0.02 * breathe);
+    p.look(-0.12, 0.3, -0.6);
   },
   // The Travolta: hip popped, right hand pointing to the sky, left on the
   // hip, chin up — held.
@@ -487,17 +492,22 @@ const moves = {
   },
 
   // ── Miss / recovery ───────────────────────────────────────────────
-  // MISSED INPUT — a hitch, not a fall: the weight arrives late, a catch
-  // step out to the side, arms flicking out for balance, a glance down.
+  // MISSED INPUT — a stutter, not a fall (the original's miss: "your dancer
+  // stutters, unable to perform his move"): a knee buckles and the chest
+  // dips with the arms flaring for balance, a catch step forward on the
+  // "and", then straighten up with a shake of the head.
   missStumble(p, b, B, s) {
-    const t = clamp01(b / 1.2), hitch = Math.sin(Math.PI * Math.min(1, t * 1.6)) * (1 - 0.6 * t);
-    const settle = smooth((b - 0.6) / 0.6);
-    p.foot('L', 0.14 + 0.1 * hitch, 0.06 * Math.max(0, Math.sin(Math.PI * clamp01(b / 0.45))), 0.02); p.foot('R', 0.14);
-    p.hips(0.05 * hitch, -0.06 - 0.06 * hitch, -0.02 * hitch, -0.1 * hitch);
-    p.lean(0.12 * hitch, 0.05 * hitch, 0.1 * hitch, 0.14 * hitch);
-    p.arm('L', 0.2, 0.3 + 0.6 * hitch, 0.6); p.arm('R', 0.3, 0.3 + 0.35 * hitch, 0.8);
-    p.look(0.3 * hitch * (1 - settle) + 0.05, -0.1 * hitch);
-    groove(p, B, s, 0.25 + 0.4 * settle);
+    const buckle = Math.sin(Math.PI * clamp01(b / 0.7)) * (b < 0.7 ? 1 : 0);
+    const step = smooth(clamp01((b - 0.25) / 0.45));                      // catch step lands ~0.7
+    const up = smooth(clamp01((b - 0.7) / 0.5));
+    p.footX('L', 0.13, 0.1 * Math.sin(Math.PI * step), 0.16 * step); p.footX('R', -0.14, 0, -0.02, 0.15 * buckle);
+    p.hips(0.03 * buckle, -0.07 - 0.11 * buckle - 0.03 * (1 - up), 0.05 * step, -0.12 * buckle);
+    p.add('hips', 0, 0, -0.1 * buckle);
+    p.lean(0.28 * buckle + 0.06 * (1 - up), 0.1 * buckle, 0.1 * buckle, -0.12 * buckle);
+    p.arm('L', 0.35, 0.3 + 0.75 * buckle, 0.5); p.arm('R', 0.2, 0.3 + 0.95 * buckle, 0.4);
+    const shake = Math.sin(TAU * (b - 0.7) * 2.5) * up * (1 - smooth((b - 1.1) / 0.3));
+    p.look(0.25 * buckle + 0.08, 0.3 * shake, 0.06 * buckle);
+    groove(p, B, s, 0.2 + 0.4 * up);
   },
   // RECOVERY — shake it off and find the pocket again: a head shake and
   // loose-arm shake over small bounces, settling back into the groove.

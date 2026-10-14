@@ -73,9 +73,10 @@ small { color: var(--dim); }
 import * as THREE from '../../vendor/three/three.module.min.js';
 import { createCharacter, CHARACTERS } from '../characters.js';
 import { DanceController, MOVES, MOVE_LABELS, LAYOUT, moveProfile } from '../dance.js';
-import { Choreographer, buildChoreo, ROW_NAMES, STATES, canTransition } from '../choreo.js';
+import { Choreographer } from '../choreo.js';
 import { LEVEL_ORDER, STORY_LEVELS, loadLevel } from '../levels.js';
 import { musicalPosition } from '../music-clock.js';
+import { MotionMonitor, describe } from '../dance-metrics.js';
 
 const { ROOT, FEET, FS, ANK } = LAYOUT;
 const q = new URLSearchParams(location.search);
@@ -132,6 +133,7 @@ const S = {
   loopBeats: 64, plan: [], labels: [], contacts: [], stateLog: [], warnings: new Map(), lastPose: null,
 };
 let rig = null, dc = null, choreo = null;
+const monitor = new MotionMonitor();
 const fakeAcc = { kick: 0, snare: 0, energy: 1 };
 
 function accAt(beat) {
@@ -239,8 +241,8 @@ function seek(beat) {
   dc = new DanceController(rig, { ...def.style, spb: 60 / S.bpm }, +1);
   for (const e of S.plan) dc.play(e.name, e.start, e.len, { state: e.state, fade: e.fade, lead: e.lead, out: e.out, level: e.level, mirror: e.mirror });
   if (S.mode === 'groove') dc.level = 3;
-  S.contacts = []; S.stateLog = []; S.warnings.clear(); S.lastPose = null; trailN = [0, 0];
-  footPrev[0] = footPrev[1] = null; footWas[0] = footWas[1] = true;
+  S.stateLog = []; S.warnings.clear(); trailN = [0, 0];
+  monitor.spb = 60 / S.bpm; monitor.allSlide = !!def.style.slides; monitor.reset(); S.contacts = monitor.contacts;
   const step = 1 / 60 / (60 / S.bpm);
   const from = Math.max(-1, beat - 3);
   for (let b = from; b < beat - step * 0.5; b += step) tick(b, true);
@@ -251,44 +253,15 @@ function seek(beat) {
 const _v = new THREE.Vector3();
 const jw = (n) => rig.joints[n].getWorldPosition(new THREE.Vector3());
 let trailN = [0, 0];
-const footWas = [true, true];
-const footPrev = [null, null];
 function tick(beat, quiet = false) {
   const st = dc.update(beat, accAt(beat));
   const o = dc.out, spb = 60 / S.bpm;
   rig.root.updateMatrixWorld(true);
-  const prof = moveProfile(dc.cur.name === 'groove' ? 'twoStep' : dc.cur.name, CHARACTERS[S.char].style);
-  const special = prof.special && !['SOLO_SEQUENCE', 'VICTORY_DANCE', 'JAMMER_ATTACK'].includes(dc.state);
   const warn = (k, msg) => S.warnings.set(k, { msg, at: beat });
-  if (Math.max(Math.abs(o[ROOT + 4]), Math.abs(o[ROOT + 5])) > 1.2) warn('flip', special ? `FLIP in ${dc.cur.name} (not a designated special!)` : `flip (designated special: ${dc.cur.name})`);
-  if (o[ROOT + 1] > 0.12) warn('air', `airborne in ${dc.cur.name}`);
-  // Foot contacts: planted when the ankle target is on the floor.
-  for (let i = 0; i < 2; i++) {
-    const f = FEET + i * FS, planted = o[f + 1] < ANK + 0.012;
-    if (planted && !footWas[i]) S.contacts.push({ beat, side: i });
-    // A planted foot travelling across the floor = skating (unless the move slides on purpose).
-    if (planted && footWas[i] && footPrev[i] && beat - footPrev[i][2] > 0.004) {
-      const d = Math.hypot(o[f] - footPrev[i][0], o[f + 2] - footPrev[i][1]);
-      const v = d / Math.max(1e-6, (beat - footPrev[i][2]) * spb);
-      const slides = MOVES[dc.cur.name] && MOVES[dc.cur.name].slide || /glide|moonwalk|swivel|runningMan|rogerRabbit/i.test(dc.cur.name);
-      if (v > 0.9 && !slides && beat - footPrev[i][2] < 0.1) warn('slide' + i, `${i ? 'R' : 'L'} foot skating ${v.toFixed(1)} u/s in ${dc.cur.name}`);
-    }
-    footWas[i] = planted; footPrev[i] = [o[f], o[f + 2], beat];
-  }
-  if (S.contacts.length > 80) S.contacts.splice(0, S.contacts.length - 80);
-  // Pose pops: a joint jumping between frames (bad transitions).
-  if (S.lastPose && beat - S.lastPose.beat > 0.004 && beat - S.lastPose.beat < 0.1) {
-    const dt = (beat - S.lastPose.beat) * spb;
-    let worst = 0, wj = -1;
-    for (let k = 0; k < ROOT; k++) { const w = Math.abs(o[k] - S.lastPose.a[k]) / dt; if (w > worst) { worst = w; wj = k; } }
-    if (worst > 28) warn('pop', `pose jump ${worst.toFixed(0)} rad/s (${LAYOUT_NAMES[Math.floor(wj / 3)]}) at ${dc.cur.name}`);
-  }
-  if (!S.lastPose) S.lastPose = { a: new Float32Array(o.length), beat };
-  S.lastPose.a.set(o); S.lastPose.beat = beat;
-  // State log + illegal transitions.
+  for (const e of monitor.feed(beat, o, dc.state, dc.cur.name)) warn(e.kind + (e.side || ''), describe(e));
+  S.contacts = monitor.contacts;
   const last = S.stateLog[S.stateLog.length - 1];
   if (!last || last.state !== dc.state) {
-    if (last && !canTransition(last.state, dc.state)) warn('fsm', `illegal transition ${last.state} → ${dc.state}`);
     S.stateLog.push({ beat, state: dc.state, move: dc.cur.name });
     if (S.stateLog.length > 64) S.stateLog.shift();
   }
@@ -297,7 +270,6 @@ function tick(beat, quiet = false) {
   if (!quiet) updateOverlays();
   return st;
 }
-const LAYOUT_NAMES = ['hips', 'spine', 'chest', 'neck', 'head', 'shL', 'armL', 'foreL', 'handL', 'shR', 'armR', 'foreR', 'handR', 'thighL', 'shinL', 'footL', 'thighR', 'shinR', 'footR'];
 
 function updateOverlays() {
   const pos = skelGeo.attributes.position.array;
@@ -373,8 +345,8 @@ function timeline() {
     if (c.beat < b0) continue;
     const near = Math.round(c.beat * 2) / 2, ms = (c.beat - near) * spb * 1000;
     sum += Math.abs(ms); n++;
-    const y = c.side ? 98 : 70;
-    g.fillStyle = c.side ? '#ff6ad5' : '#4de8ff';
+    const R = c.side === 'R', y = R ? 98 : 70;
+    g.fillStyle = R ? '#ff6ad5' : '#4de8ff';
     g.beginPath(); g.arc(x(c.beat), y, 5, 0, TAU); g.fill();
     g.fillStyle = Math.abs(ms) > 45 ? '#ff4d6d' : '#9a8cb8'; g.font = '10px monospace';
     g.fillText(`${ms >= 0 ? '+' : ''}${ms.toFixed(0)}ms`, x(c.beat) + 7, y + 4);
@@ -466,7 +438,11 @@ window.dv = {
   },
   seek(b) { seek(b); updateOverlays(); placeCamera(0); hud(); timeline(); renderer.render(scene, camera); },
   shot(q = 0.8) { return renderer.domElement.toDataURL('image/jpeg', q); },
-  info() { return { char: S.char, mode: S.mode, beat: S.beat, state: dc.state, move: dc.cur.name, warnings: [...S.warnings.values()], contacts: S.contacts, plan: S.plan, labels: S.labels, choreo: choreo.plan }; },
+  info() {
+    const y = (n) => +jw(n).y.toFixed(3);
+    return { char: S.char, mode: S.mode, beat: S.beat, state: dc.state, move: dc.cur.name, warnings: [...S.warnings.values()], contacts: S.contacts, plan: S.plan, labels: S.labels, choreo: choreo.plan,
+      heights: { handL: y('handL'), handR: y('handR'), footL: y('footL'), footR: y('footR'), head: y('head'), hips: y('hips') } };
+  },
   chars: charIds,
 };
 window.ready = true;

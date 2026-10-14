@@ -184,6 +184,11 @@ export function validateChoreo(plan, style = {}) {
   check(plan.freeze, 'freeze');
   check(plan.stumble, 'miss'); check(plan.recover, 'recovery');
   plan.solo.forEach((n, i) => check(n, `solo ${i + 1}`, true));
+  // The idle groove and the phrase accent are everyday dancing too.
+  const r = style.routines;
+  const rs = !r ? [] : Array.isArray(r) ? r : [...(r.chill || []), ...(r.hype || [])];
+  [...new Set(rs)].forEach((n) => check(n, 'idle groove'));
+  if (style.accent && style.accent.pose) check(style.accent.pose, 'phrase accent');
   return issues;
 }
 
@@ -222,7 +227,7 @@ export class Choreographer {
       // Finisher on counts 1-2, the freeze hits on 3 and is held through
       // the rest measure; then a slow come-up into the groove.
       out.push({ name: this.moveFor(7, alt), start: B, len: 2, state: 'ADVANCED_COMBO', level, mirror });
-      out.push({ name: P.freeze, start: B + 2, len: 3.5, state: 'FREEZE_POSE', fade: 0.35, lead: 0.35, out: 1.1, level, mirror });
+      out.push({ name: P.freeze, start: B + 2, len: 3.5, state: 'FREEZE_POSE', fade: 0.45, lead: 0.45, out: 1.5, level, mirror });
       this.row = 0; this.string++;
     } else {
       out.push({ name: this.moveFor(row, alt), start: B, len: 4, state: rowState(row), level, mirror });
@@ -260,7 +265,7 @@ export class Choreographer {
     }
     // Close: finisher into the freeze, held into the next bar.
     out.push({ name: P.finisher.alt, start: B + t, len: 2, state: 'SOLO_SEQUENCE', level: 4 });
-    out.push({ name: P.freeze, start: B + t + 2, len: len - t - 2 + 1.5, state: 'FREEZE_POSE', fade: 0.35, lead: 0.35, out: 1.1, level: 4 });
+    out.push({ name: P.freeze, start: B + t + 2, len: len - t - 2 + 1.5, state: 'FREEZE_POSE', fade: 0.45, lead: 0.45, out: 1.5, level: 4 });
     this.row = 0; this.string++;
     return out;
   }

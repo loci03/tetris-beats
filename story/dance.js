@@ -1031,9 +1031,10 @@ export const MOVES = {
     p.hips(0.06 * Math.sin(TAU * b), -0.05 - 0.45 * down, 0.04 * down);
     p.foot('L', 0.22 + 0.12 * down, 0, 0, 0.5 * down); p.foot('R', 0.22 + 0.12 * down, 0, 0, 0.5 * down);
     p.shrug(0.15 * sh, -0.15 * sh); p.add('chest', 0, 0.15 * sh, 0);
-    p.arm('L', 0.5 + 1.8 * (1 - down), 0.6 + 1.2 * down, 0.4); p.arm('R', 0.6, 0.4, 1.6);
-    p.lean(0.2 * down, 0.1 * down); p.look(-0.15);
-    if (b > 3.2) { const k = smooth((b - 3.2) / 0.3); p.arm('L', 0.4, 2.5 * k + 0.3, 0.1); p.look(-0.3 * k, 0.3 * k); }
+    // Coming up, the free hand sweeps up into a high point (blended, not cut).
+    const k = smooth((b - 3.0) / 0.5);
+    p.arm('L', lerp(0.5 + 1.8 * (1 - down), 0.4, k), lerp(0.6 + 1.2 * down, 2.8, k), lerp(0.4, 0.1, k)); p.arm('R', 0.6, 0.4, 1.6);
+    p.lean(0.2 * down, 0.1 * down); p.look(-0.15 - 0.15 * k, 0.3 * k);
   },
 
   // Blow a kiss to the rival — twice.
@@ -1604,7 +1605,9 @@ function blendPoses(out, a, b, w, pin = null) {
   // landing half way (a ball-change into the beat).
   const dL = Math.hypot(b[FEET] - a[FEET], b[FEET + 2] - a[FEET + 2]);
   const dR = Math.hypot(b[FEET + FS] - a[FEET + FS], b[FEET + FS + 2] - a[FEET + FS + 2]);
-  const both = dL > 0.04 && dR > 0.04, first = dL >= dR ? 0 : 1;
+  // (Feet heading into the air — a freeze, a tuck — just go together.)
+  const downL = b[FEET + 1] - Math.max(0, b[FEET + 3]) * 0.06 < ANK + 0.03, downR = b[FEET + FS + 1] - Math.max(0, b[FEET + FS + 3]) * 0.06 < ANK + 0.03;
+  const both = dL > 0.04 && dR > 0.04 && downL && downR, first = dL >= dR ? 0 : 1;
   for (let side = 0; side < 2; side++) {
     const o = FEET + side * FS;
     const d = side ? dR : dL;
@@ -1672,9 +1675,16 @@ export const kit = {
   seq, groove, win, smooth, lerp, frac, clamp01, TAU, hitAt, EASE, phased, evalMove,
   fists, hipHand, crossArms, clapFront, clapHigh, wideStance, twoStepFeet, MOVES,
 };
-// `meta`: { labels, expressions, hits, fnGroove, stiff } keyed by move name.
+// Moves whose planted feet travel on purpose (glides, skates, shuffles,
+// moonwalks) — the motion checks don't count them as skating. Keyframed
+// moves can also say `slide: true` in their seq options.
+export const SLIDES = new Set(['moonwalk', 'runningMan', 'rogerRabbit', 'sideGlide', 'swivelStep']);
+// `meta`: { labels, expressions, hits, fnGroove, stiff, slides } keyed by
+// move name (`slides`: an array of move names, or { name: true }).
 export function registerMoves(moves, meta = {}) {
   Object.assign(MOVES, moves);
+  const sl = meta.slides || [];
+  for (const n of Array.isArray(sl) ? sl : Object.keys(sl).filter(k => sl[k])) SLIDES.add(n);
   Object.assign(MOVE_LABELS, meta.labels || {});
   Object.assign(EXPRESSIONS, meta.expressions || {});
   Object.assign(HITS, meta.hits || {});
@@ -1789,6 +1799,8 @@ export class DanceController {
   }
 
   _switch(entry, beat) {
+    // Nothing has been danced yet (first frame / a seek): just start.
+    if (!this._started) { this.prev = null; this.cur = entry; this.fadeStart = -Infinity; this.fadeLen = 0.5; return; }
     // Cutting into a blend that's still running: blend on from where the
     // body actually is, not from the old move.
     if (this.prev && beat - this.fadeStart < this.fadeLen) this.prev = { name: '_frozen', pose: Float32Array.from(this._blend) };
@@ -1848,7 +1860,7 @@ export class DanceController {
     }
     // Moves are authored with the opponent on the dancer's left; `mirror`
     // flips a move to lead with the other foot.
-    if ((entry.faceFoe && this.foeSide < 0) !== !!entry.mirror) a.set(mirrorPose(a, _mirror));
+    if (!!(entry.faceFoe && this.foeSide < 0) !== !!entry.mirror) a.set(mirrorPose(a, _mirror));
     return a;
   }
 
@@ -1868,7 +1880,7 @@ export class DanceController {
     const w = smooth((beat - this.fadeStart) / this.fadeLen);
     if (this.prev && w < 1) {
       // A spin that ends on 2π must not unwind back to 0; feet step across.
-      blendPoses(this.out, this._eval(this.prev, beat, this._pb), a, w, this._lastBeat == null ? null : this._pin);
+      blendPoses(this.out, this._eval(this.prev, beat, this._pb), a, w, this._pin);
       // Preparation: gather into the knees on the "and" before the downbeat.
       if (beat < this.cur.start) {
         const g = Math.sin(Math.PI * w);
@@ -1886,6 +1898,7 @@ export class DanceController {
       if (this.onState) this.onState(st, this.cur, beat);
     }
     this._blend.set(this.out);
+    this._started = true;
     const name = this.cur.name === 'groove' ? this.routineAt(beat) : this.cur.name;
     hitLayer(this.out, acc, hitsFor(name) * (this.prev ? Math.min(1, w + 0.3) : 1), beat, this.style.feel);
     this._follow(beatNow, STIFF[name] || 1);

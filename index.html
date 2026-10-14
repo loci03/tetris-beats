@@ -838,6 +838,8 @@
     width: min(600px, 94%);
     margin: 0 auto 18px;
   }
+  .story-danceview { display: block; margin: 8px auto 0; width: max-content; font-family: inherit; font-weight: 800; font-size: 11px; line-height: 1; letter-spacing: 2px; color: #9a8cb8; text-decoration: none; padding: 6px 10px; border: 1px solid rgba(154,140,184,0.35); border-radius: 6px; }
+  .story-danceview:hover { color: #fff; border-color: #4de8ff; }
   .story-kicker {
     font-size: 11px; font-weight: 800; letter-spacing: 4px;
     color: rgba(255,210,120,0.8); text-align: center; margin-bottom: 2px;
@@ -2100,6 +2102,9 @@
   <div id="beat-panel" style="display:none;">
     <div class="story-kicker">BUST A BEAT</div>
     <div class="story-levels" data-kind="beat"></div>
+    <!-- DANCE VIEW: every dancer's moves and dance strings on the beat grid
+         (story/dev/danceview.html) — like the original game's Dance View. -->
+    <a class="story-danceview" href="story/dev/danceview.html" target="_blank" rel="noopener">DANCE VIEW ▸ watch every move</a>
   </div>
   <!-- Difficulty picker - visible only when "VS ALFRED" mode is selected.
        Three tiers wired to AI_DIFFICULTIES presets in JS. Persists across
