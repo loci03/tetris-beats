@@ -14,6 +14,9 @@ import { RhythmBattle } from './rhythm-battle.js';
 import { createCharacter, CHARACTERS } from './characters.js';
 import { DanceController, MOVE_LABELS } from './dance.js';
 import { Choreographer, ACTION_STATE, ROW_NAMES } from './choreo.js';
+import { InputMapper, loadControls, bindingsFor } from './input.js';
+import { soloCommandFor, GLYPH } from './commands.js';
+import { PracticePanel } from './practice.js';
 import { CameraDirector } from './camera.js';
 import { BoardTransition, cameraAlongPath, START_POSE } from './transition.js';
 import { BattleHUD } from './hud.js';
@@ -27,13 +30,17 @@ const IN_DUR = 2.35;      // seconds, board → world
 const DROP_AT = 1.3;      // the music drop lands as the camera passes the board
 const OUT_DUR = 2.4;      // seconds, world → board
 
-const KEY_DIRS = { ArrowLeft: 'L', ArrowRight: 'R', ArrowUp: 'U', ArrowDown: 'D', a: 'L', d: 'R', w: 'U', s: 'D' };
+// Short key names for the controls hint.
+const KEY_NAME = (code) => ({ Space: 'Space', Enter: 'Enter', ShiftLeft: 'Shift', ShiftRight: 'Shift', Escape: 'Esc', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[code] || code.replace(/^Key/, '').replace(/^Digit/, ''));
 
 export class BattleSession {
   // `standalone`: Bust a Beat — the battle on its own, no Tetris board to
   // fly through; it fades in on the stage and ends on the result screen.
   // `buildWorld`: the level's stage builder (from loadLevel()).
-  constructor({ bridge, level, specialCells, impactRow, onDone, standalone = false, onPause = null, buildWorld = null }) {
+  // `practice`: Practice mode options (see practice.js) — { speed, holdRow,
+  // startRow, startCol, branch, rival }.
+  constructor({ bridge, level, specialCells, impactRow, onDone, standalone = false, onPause = null, buildWorld = null, practice = null, onPracticeRestart = null }) {
+    this.practice = practice;
     this.bridge = bridge;
     this.level = level;
     this.onDone = onDone;
@@ -83,8 +90,8 @@ export class BattleSession {
     this.rDance = new DanceController(this.rRig, { ...rDef.style, bounceRate, spb }, -1);
     this.pDef = pDef; this.rDef = rDef;
     // Dance strings → phrased moves (choreo.js).
-    this.pChoreo = new Choreographer(pDef);
-    this.rChoreo = new Choreographer(rDef);
+    this.pChoreo = new Choreographer(pDef, level.dancers.player);
+    this.rChoreo = new Choreographer(rDef, level.dancers.rival);
     this.fx = new AnimeFx(this.scene);
     this.director = new CameraDirector(this.camera, this.world.anchors);
     this.director.motion = this.motion;
@@ -103,25 +110,39 @@ export class BattleSession {
     this.ctx = this.audio.ctx;
     this.clock = new MusicClock(this.ctx, this.mcfg);
     this.clock.userOffsetMs = st.rhythmOffsetMs;
+    if (practice && practice.speed) this.clock.rate = practice.speed;
     this.sfx = new StorySfx(this.ctx, this.audio.masterGain);
     // The battle music runs through its own gain so the announcer can duck it.
     this.duckGain = this.ctx.createGain();
     this.duckGain.connect(this.audio.trackGain);
     this.ann = new Announcer(this.ctx, this.audio.masterGain, this.duckGain, { enabled: bridge.voiceEnabled !== false, rival: level.dancers.rival });
     const profile = level.ai[st.difficulty] || level.ai.medium;
-    this.battle = new RhythmBattle({ clock: this.clock, music: this.mcfg, seed: level.chart.seed + (Date.now() % 997), aiProfile: profile });
+    this.battle = new RhythmBattle({ clock: this.clock, music: this.mcfg, seed: level.chart.seed + (Date.now() % 997), aiProfile: profile, practice });
+    this.battle.setSoloCommand('player', soloCommandFor(level.dancers.player, pDef));
+    this.battle.setSoloCommand('rival', soloCommandFor(level.dancers.rival, rDef));
     this.battle.on((type, data) => this._onBattle(type, data));
 
+    // Keyboard + gamepads (+ touch pads) → battle actions, timestamped.
+    this.controls = loadControls();
+    this.input = new InputMapper({
+      controls: this.controls,
+      onAction: (a, ts, info) => this._action(a, ts, info),
+      onDevice: (dev) => this._device(dev),
+    });
+    this.input.claims = (action) => this.phase !== 'dead' && this.phase !== 'done' && !this.bridge.uiBlocking()
+      && !document.querySelector('.ctl-wrap') && (action === 'P' || !this.paused);
+    const names = (a) => { const b = bindingsFor(this.controls, a); return b.keys.slice(0, 2).map(KEY_NAME).join('/'); };
     this.hud = new BattleHUD({
       names: { player: pDef.name, rival: rDef.name },
       isTouch: bridge.isTouch,
-      onPad: (kind, dir, ts) => this._input(kind, dir, ts ?? performance.now()),
-      onPause: () => { if (this.phase === 'done' || this.phase === 'dead') return; if (this.standalone) { if (this.onPause) this.onPause(); } else this.bridge.togglePause(); },
+      onPad: (a, ts) => this.input.touch(a, ts ?? performance.now()),
+      onPause: () => this._togglePause(),
+      controlsHint: `Directions ${names('U')}${names('L') ? ' · ' + names('L') : ''}… any time · ${GLYPH.X} ${names('X')} · ${GLYPH.O} ${names('O')} on beat 4 · ${GLYPH.T} attack ${names('T')} · ${GLYPH.S} dodge ${names('S')}`,
     });
 
-    this._onKey = (e) => this._key(e);
+    if (practice) this.practicePanel = new PracticePanel(this, { onRestart: onPracticeRestart });
+
     this._onResize = () => this._resize();
-    window.addEventListener('keydown', this._onKey, true);
     window.addEventListener('resize', this._onResize);
     this._resize();
   }
@@ -242,7 +263,8 @@ export class BattleSession {
 
   destroy() {
     cancelAnimationFrame(this._raf);
-    window.removeEventListener('keydown', this._onKey, true);
+    this.input.destroy();
+    if (this.practicePanel) this.practicePanel.destroy();
     window.removeEventListener('resize', this._onResize);
     this._removeFilter();
     this.hud.destroy();
@@ -293,30 +315,31 @@ export class BattleSession {
   }
 
   // ── Input ─────────────────────────────────────────────────────────
-  _key(e) {
-    if (this.phase === 'dead' || this.phase === 'done') return;
-    if (this.bridge.uiBlocking()) return;      // settings panel etc.
-    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    if (k === 'Escape' || k === 'p') {
-      e.preventDefault(); e.stopImmediatePropagation();
-      if (!e.repeat) { if (this.standalone) { if (this.onPause) this.onPause(); } else this.bridge.togglePause(); }
-      return;
-    }
-    if (this.paused) return;
-    let kind = null, dir = null;
-    if (KEY_DIRS[k]) { kind = 'arrow'; dir = KEY_DIRS[k]; }
-    else if (k === ' ' || k === 'Enter') kind = 'groove';
-    else if (k === 't' || k === 'Shift') kind = 'taunt';
-    else if (k === 'm') { return; }  // let the global mute shortcut through
-    if (!kind) return;
-    e.preventDefault(); e.stopImmediatePropagation();
-    if (e.repeat) return;
-    this._input(kind, dir, e.timeStamp);
+  _togglePause() {
+    if (this.phase === 'done' || this.phase === 'dead') return;
+    if (this.standalone) { if (this.onPause) this.onPause(); } else this.bridge.togglePause();
   }
 
-  _input(kind, dir, ts) {
+  // One mapped action (keyboard, gamepad or touch) with its timestamp.
+  _action(action, ts, info) {
+    if (action === 'P') { this._togglePause(); return; }
+    this.lastInput = { action, ts, source: info && info.source };
+    this._input(action, ts);
+  }
+
+  _input(action, ts) {
     if (this.paused || (this.phase !== 'battle' && this.phase !== 'intro')) return;
-    this.battle.input(kind, dir, ts);
+    this.battle.input('player', action, ts ?? performance.now());
+  }
+
+  // A controller came or went: say so; losing it mid-battle pauses.
+  _device(dev) {
+    if (!this.hud) return;
+    if (dev.connected) this.hud.showCallout(`🎮 Controller ${dev.index + 1} connected`, 'good', 1600);
+    else {
+      this.hud.showCallout(`🎮 Controller ${dev.index + 1} disconnected`, 'warn', 2400);
+      if (!this.paused && (this.phase === 'battle' || this.phase === 'intro')) this._togglePause();
+    }
   }
 
   // ── Battle events → dancers / camera / stage / HUD / audio ────────
@@ -412,8 +435,8 @@ export class BattleSession {
           this._fx('player', 'anger', 1);
           this.sfx.crowdCheer(0.6, this._at(B + 3));
           this.cues.push({ beat: B + 3, fn: () => this._fx('player', 'note', 4) });
-          if (this.bridge.isTouch) this.hud.showCallout('<b>SWIPE</b> the arrows any time · <b>TAP</b> on beat 4', '', 4000);
-          else this.hud.showCallout('Enter the <b>arrows</b> any time · <b>SPACE</b> on beat 4', '', 4000);
+          if (this.bridge.isTouch) this.hud.showCallout('<b>SWIPE</b> the arrows any time · tap <b>✕</b> / <b>○</b> on beat 4', '', 4000);
+          else this.hud.showCallout('Enter the <b>arrows</b> any time · then <b>✕</b> or <b>○</b> as shown, on beat 4', '', 4000);
         } else if (i === 3) {
           // READY + count-in: 3 — 2 — 1 — GROOVE, on the beat.
           this.pDance.play('ready', B, 4, { state: 'INTRO_TAUNT' }); this.rDance.play('ready', B, 4, { state: 'INTRO_TAUNT' });
@@ -442,18 +465,19 @@ export class BattleSession {
         break;
       }
       case 'dir':
-        this.sfx.dir(this._dirCount = d.ok ? (this._dirCount || 0) + 1 : 0, d.ok);
-        this.hud.dirFeedback(d.ok);
-        if (d.complete) this._dirCount = 0;
+        if (d.who === 'player') {
+          this.sfx.dir(this._dirCount = d.ok ? (this._dirCount || 0) + 1 : 0, d.ok);
+          if (d.complete) this._dirCount = 0;
+        }
+        this.hud.dirFeedback(d.who, d.ok);
         break;
       case 'judge':
+        this.hud.judge(d.who, d.judgment, d.delta, d.reason);
+        if (this.practicePanel) this.practicePanel.onJudge(d);
         if (d.who === 'player') {
-          this.hud.judge(d.judgment, d.delta, d.reason);
           if (d.note.kind === 'groove' && d.judgment !== 'miss') { this.sfx.groove(); this.sfx.hit(d.judgment); }
           else this.sfx.hit(d.judgment);
           if (d.combo && d.combo % 8 === 0) this.sfx.crowdCheer(0.8);
-        } else if (d.note.kind !== 'dodge' && d.note.kind !== 'taunt') {
-          this.hud.rivalJudgment(d.judgment);
         }
         break;
       case 'move': {
@@ -463,6 +487,7 @@ export class BattleSession {
         const inSolo = this._soloUntil && d.bar < this._soloUntil;
         const plan = d.soloTime || inSolo ? [] : this._choreo(d.who).success(d);
         if (plan.length) this._perform(d.who, plan, beatNow);
+        if (this.practicePanel) this.practicePanel.onMove(d, plan, this._choreo(d.who));
         const name = plan.length ? plan[0].name : def.solo;
         this._dc(d.who).level = Math.min(4, d.tier + 1);
         const foe = d.who === 'player' ? 'rival' : 'player';
@@ -506,24 +531,16 @@ export class BattleSession {
         this._fx(d.who, 'sweat', 1);
         if (d.who === 'player') this._voice('rival', 'single', 0.3);
         break;
-      case 'hypeFull':
-        if (d.who === 'player') {
-          this.hud.showCallout(this.bridge.isTouch ? 'HYPE FULL — tap <b>TAUNT</b>!' : 'HYPE FULL — press <b>T</b> to TAUNT!', 'taunt', 2200);
-          this.sfx.taunt();
-        }
-        break;
-      case 'tauntQueued':
-        if (d.attacker === 'rival') {
-          this.hud.showCallout(`${rivalName} IS WINDING UP A TAUNT — hit <b>DODGE</b> on the red note!`, 'warn', 2600);
-          this._voice('rival', 'triple');
-        } else {
-          this.hud.showCallout(this.bridge.isTouch ? 'Hit <b>TAUNT</b> on the purple note!' : 'Hit <b>T</b> on the purple note!', 'taunt', 2200);
-        }
-        break;
       case 'taunt': {
+        // △ on beat 4: the attacker throws their jammer through the next
+        // bar; the defender has to dodge (□) on its beat 4.
         const tt = this._taunt(d.attacker);
-        this._dc(d.attacker).react(tt.move, beatNow, 4 - (beatNow % 4) + 0.001, { faceFoe: true, fade: 0.15, state: 'JAMMER_ATTACK' });
-        this.cues.push({ beat: beatNow + 0.75, fn: () => this._throw(d.attacker, tt.projectile, tt.n) });
+        this._dc(d.attacker).react(tt.move, beatNow, Math.max(1, (d.bar + 2) * 4 - beatNow), { faceFoe: true, fade: 0.15, state: 'JAMMER_ATTACK' });
+        this.cues.push({ beat: (d.bar + 1) * 4 + 1.5, fn: () => this._throw(d.attacker, tt.projectile, tt.n) });
+        if (d.attacker === 'rival') {
+          this.hud.showCallout(`${rivalName} ATTACKS — press <b>${GLYPH.S}</b> on beat 4 to dodge!`, 'warn', 2600);
+          this._voice('rival', 'triple');
+        } else this.hud.showCallout(`ATTACK! ${rivalName} must dodge… (${GLYPH.T} ×${d.jammers} left)`, 'taunt', 1800);
         this.cues.sort((a, b) => a.beat - b.beat);
         this._fx(d.attacker, (this._def(d.attacker).fx || {}).taunt, 5);
         this._fx(d.attacker === 'player' ? 'rival' : 'player', 'anger', 1);
@@ -564,10 +581,13 @@ export class BattleSession {
         this._voice(d.attacker, 'tetris');
         break;
       case 'tauntNotReady':
-        this.hud.showCallout(`Fill your HYPE to taunt (${Math.floor(d.hype)}%)`, '', 900);
+        if (d.who === 'player') this.hud.showCallout(`No attacks left (${GLYPH.T} is twice per battle)`, '', 1100);
         break;
       case 'tauntBlocked':
-        this.hud.showCallout('Can\'t taunt right now', '', 800);
+        if (d.who === 'player') this.hud.showCallout('Can\'t attack right now', '', 900);
+        break;
+      case 'stray':
+        if (d.who === 'player' && d.kind === 'attack') this.hud.showCallout(`${GLYPH.T} goes on beat 4`, '', 800);
         break;
       case 'bar':
         this.sfx.hype(0.3 + Math.abs(d.groove) * 0.7);
@@ -649,6 +669,7 @@ export class BattleSession {
     if (inWorld) {
       this.battle.update(songTime);
       this.hud.update(this.battle, this.clock, songTime);
+      if (this.practicePanel) this.practicePanel.update();
     }
     while (this.cues.length && beat >= this.cues[0].beat) this.cues.shift().fn();
     const beatForDance = inWorld ? beat : 0;

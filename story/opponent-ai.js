@@ -1,7 +1,9 @@
-// Opponent AI — the rival plays the same command tree as the player, but
-// its finisher timing is rolled from a skill profile instead of read from
-// input. Pressure matters: a rival that's being out-danced gets flustered,
-// and longer commands (higher levels, branches) are harder for it too.
+// Opponent AI — the rival plays the same command tree as the player. Its
+// skill profile rolls which line it takes and how well it times beat 4;
+// RhythmBattle turns that into timestamped inputs (arrows, then the
+// button) that go through the same input buffer and judge as the
+// player's. Pressure matters: a rival that's being out-danced gets
+// flustered, and longer commands are harder for it too.
 
 export class OpponentAI {
   constructor(profile, rng) {
@@ -35,17 +37,8 @@ export class OpponentAI {
     return this.rng() < (option.kind === 'solo' ? base * 0.85 : base);
   }
 
-  // Taunt note on the downbeat of its own taunt bar.
-  judgeTaunt() {
-    return this.rng() < this.p.taunt ? (this.rng() < 0.5 ? 'perfect' : 'great') : 'miss';
-  }
-
-  // Should it spend a full hype gauge on a taunt next bar?
-  wantsTaunt(leading) {
-    return this.rng() < this.p.tauntChance * (leading ? 0.8 : 1.2);
-  }
-
-  // Does it dodge an incoming taunt? A sharper taunt is harder to dodge.
+  // Does it dodge an incoming attack (□ on beat 4)? A sharper attack is
+  // harder to dodge.
   dodges(tauntJudgment, leading) {
     const sharp = tauntJudgment === 'perfect' ? -0.12 : tauntJudgment === 'great' ? -0.05 : 0.05;
     return this.rng() < this.p.dodge + sharp + (leading ? 0.08 : 0);

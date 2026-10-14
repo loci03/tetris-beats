@@ -22,6 +22,12 @@
 
 import { MOVES, moveProfile, registerMoves } from './dance.js';
 import './vocab.js';
+import { moveDefinitions } from './commands.js';
+
+// Animations a plan asked for that don't exist (logged once each; the
+// fallback is the same row's standard move, else a knee bounce — never a
+// flip).
+export const MISSING_ANIMS = new Set();
 
 // ── States ──────────────────────────────────────────────────────────
 export const STATES = [
@@ -197,13 +203,30 @@ export function validateChoreo(plan, style = {}) {
 //   { name, start, len, state, fade?, lead?, out?, level, mirror?, react? }
 // (start/len in beats; react = cut in now instead of leading in).
 export class Choreographer {
-  constructor(def) {
+  constructor(def, charId = def && (def.id || def.name)) {
     this.def = def;
     this.plan = buildChoreo(def);
+    // Every node of the command tree → this dancer's move (commands.js).
+    this.moves = moveDefinitions(String(charId || 'dancer').toLowerCase(), this.plan, (def.choreo && def.choreo.nodes) || {});
     this.row = 0;
     this.string = 0;
-    this.history = [];             // { bar, row, name, state }
+    this.history = [];             // { bar, row, name, state, moveId }
   }
+
+  // The animation to play for `name`, or an explicit grounded fallback when
+  // the asset is missing (logged once).
+  anim(name, row = 0) {
+    if (name && MOVES[name]) return name;
+    if (!MISSING_ANIMS.has(name)) {
+      MISSING_ANIMS.add(name);
+      console.warn(`[choreo] missing animation "${name}" for ${this.def && this.def.name} — using a fallback`);
+    }
+    const alt = this.plan.std[Math.max(0, Math.min(6, row))];
+    return MOVES[alt] ? alt : 'kneeBounce';
+  }
+
+  // The move definition a resolved command plays (commands.js).
+  moveDef(node) { return this.moves.get(node) || null; }
 
   // The move for a dance-string row on the standard / ★ line.
   moveFor(row, alt = false) {
@@ -217,6 +240,22 @@ export class Choreographer {
   // choreographer keeps its own count.
   success(e) {
     const P = this.plan, B = e.bar * 4, level = e.tier || 1;
+    // A resolved command node: its move definition decides the animation.
+    const md = e.node && this.moves.get(e.node);
+    if (md) {
+      const out = [];
+      if (md.freeze) {
+        out.push({ name: this.anim(md.anim, 6), start: B, len: 2, state: 'ADVANCED_COMBO', level, mirror: md.mirror, moveId: md.id });
+        out.push({ name: this.anim(md.freeze, 6), start: B + 2, len: 3.5, state: 'FREEZE_POSE', fade: 0.45, lead: 0.45, out: 1.5, level, mirror: md.mirror, moveId: md.id });
+        this.row = 0; this.string++;
+      } else {
+        out.push({ name: this.anim(md.anim, md.type - 1), start: B, len: 4, state: rowState(md.type - 1), level, mirror: md.mirror, moveId: md.id });
+        this.row = Math.min(7, md.type);
+      }
+      for (const x of out) this.history.push({ bar: e.bar, row: md.type - 1, name: x.name, state: x.state, moveId: md.id });
+      if (this.history.length > 64) this.history.splice(0, this.history.length - 64);
+      return out;
+    }
     const row = e.row ?? this.row;
     const freeze = e.freeze ?? row >= 7;
     const alt = e.kind === 'branch';

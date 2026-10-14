@@ -1,74 +1,70 @@
-// RhythmBattle — the rules of the dance battle. Pure logic: it reads song
-// time from the MusicClock, takes timestamped inputs, and emits events that
-// the dancers, camera, stage, HUD and audio react to. No rendering here.
+// RhythmBattle — the rules of the dance battle (Bust a Groove's command
+// system, see commands.js). Pure logic: it reads song time from the
+// MusicClock, takes timestamped inputs, and emits events that the dancers,
+// camera, stage, HUD and audio react to. No rendering here.
 //
-// Loop per 4/4 bar (both dancers, simultaneously — like Bust a Groove):
-//   • Each dancer gets a command from the command tree (chart.js): a
-//     direction sequence, entered any time from the previous bar's finisher
-//     until beat 4, then GROOVE exactly on beat 4. Only the finisher is
-//     timed (Perfect/Great/Good); a wrong direction is simply ignored.
-//   • Land it and the dancer performs the move during the next bar, the
-//     level climbs (longer commands, bigger moves, more points) and the
-//     ENTHUSIASM gauge fills; once it's high a ★ branch is offered next to
-//     the standard command (signature moves), and at level 4 the SOLO.
-//     A fumble drains enthusiasm; two in a row drop a level.
-//   • Landed commands also fill HYPE. Full hype = a TAUNT: press it, hit
-//     the taunt note on the next downbeat, and the opponent must DODGE
-//     (GROOVE on beat 3) or get stunned for a bar.
-//   • Every landed command also walks the dancer one row down their DANCE
-//     STRING (8 moves, as in Bust a Groove's 8-row command tree): row 8 is
-//     the FREEZE finisher, and the bar the freeze plays in is a REST bar
-//     (no command) before the next string starts. A miss or a landed
-//     jammer cuts the string short (back to row 1); taunting and dodging
-//     don't break it.
-//   • The rival runs the same rules with AI-rolled results.
+// Per 4/4 bar, for each dancer (both at once, independently):
+//   • COMMAND bar: the options on offer come from the dancer's place in the
+//     8-row command tree — TOP continues at their move level, BOTTOM (when
+//     eligible) steps up a level. Directions go into the dancer's ordered
+//     input buffer any time before beat 4 (each narrows the candidates);
+//     the command's button (✕ / ○) must land on beat 4. Success = the whole
+//     sequence entered + the right button + inside the timing window; the
+//     move plays through the next bar and the string advances. Anything
+//     else is a miss: the string restarts at row 1.
+//   • Row 8 is the FREEZE: the next bar is a REST bar (no command).
+//   • ATTACK: △ on beat 4 instead of the button (twice per battle). It
+//     doesn't break the attacker's string. The defender's next bar becomes
+//     a DODGE bar: □ on beat 4 dodges (string kept); otherwise they're hit —
+//     stunned for a bar, string reset.
+//   • SOLO (our addition): with a full gauge on rows 5-7 the BOTTOM option
+//     is the dancer's SOLO command; landing it gives them two bars of solo.
+// The rival runs the same rules: its AI produces timestamped inputs that go
+// through the very same buffer and judge as the player's.
+//
+// Scheduled work (bar preparation, AI inputs, time-outs) is processed in
+// song-time order (`_advanceTo`), so results don't depend on frame rate.
 
-import { buildCommand, buildTauntBar, buildDodgeBar, buildStunnedBar, makeRng } from './chart.js';
+import { makeRng } from './chart.js';
 import { OpponentAI } from './opponent-ai.js';
+import {
+  RULES, windowsFor, judgeTiming, resolveCommands, advance, startCandidates, applyDirection,
+  resolveFinal, commandStatus, InputBuffer, ROWS,
+} from './commands.js';
 
-// Generous: the finisher is the only timed press in a bar.
-export const WINDOWS = { perfect: 0.07, great: 0.125, good: 0.2 };
-const FINISH_POINTS = { perfect: 1000, great: 700, good: 400, miss: 0 };
-const HYPE_GAIN = { perfect: 18, great: 13, good: 6, miss: -15 };
+export const WINDOWS = RULES.timing;
+export const STRING_ROWS = ROWS;
 const ENTH_GAIN = { perfect: 22, great: 16, good: 10, miss: -20 };
-const TAUNT_LAND_BONUS = 1500;
-// SOLO TIME: landing the SOLO gives the dancer two bars of freestyle — no
-// commands, the camera and spotlights are theirs — and the opponent
-// watches. Each solo bar scores this much.
+const ATTACK_LAND_BONUS = 1500;
+const DODGE_BONUS = 800;
+const FREEZE_BONUS = 1200;
+// SOLO TIME: two bars that are the dancer's alone (no commands); the
+// opponent watches. Each solo bar scores this much.
 const SOLO_BARS = 2;
 const SOLO_BAR_POINTS = 2500;
-const DODGE_BONUS = 800;
-// Dance string: 8 rows, the last one the freeze. A hot streak (high
-// enthusiasm) starts the next string two rows in — the original sometimes
-// starts a new string on row 2 or 3.
-export const STRING_ROWS = 8;
-const HOT_START_ENTH = 70;
-const FREEZE_BONUS = 1200;
-// Bars are built (and commands shown) this far ahead; the lane shows the
-// finisher this far ahead. Also the last moment a taunt can claim a bar.
-export const LOOKAHEAD = 2.0;
+// Bars are built this far ahead (seconds) so the HUD can show what's coming.
+export const LOOKAHEAD = 2.5;
+const INPUT_BAR_TYPES = ['command', 'dodge'];
 
-function newDancer(id) {
+function newDancer(id, controller) {
   return {
-    id, score: 0, combo: 0, maxCombo: 0, chain: 0, level: 1, enthusiasm: 0, hype: 0,
+    id, controller,                       // 'human' | 'ai' | 'none'
+    score: 0, chain: 0, maxCombo: 0, level: 1, enthusiasm: 0, jammers: RULES.jammers,
     counts: { perfect: 0, great: 0, good: 0, miss: 0 },
-    moves: 0, branches: 0, solos: 0, tauntsLanded: 0, dodges: 0, stuns: 0, bestLevel: 1,
-    bars: new Map(), stunNext: false, barPoints: new Map(),
-    row: 0, strings: 0, freezes: 0, restNext: false,
+    moves: 0, branches: 0, solos: 0, tauntsLanded: 0, dodges: 0, stuns: 0, attacks: 0, bestLevel: 1,
+    bars: new Map(), barPoints: new Map(), forced: new Map(),
+    row: 0, col: 0, strings: 0, freezes: 0,
+    lastPress: -Infinity, aiQueue: [], soloUntil: 0, soloRole: null,
+    get combo() { return this.chain; },
+    get hype() { return this.jammers > 0 ? 100 : 0; },
   };
-}
-
-function judgmentFor(absDelta) {
-  if (absDelta <= WINDOWS.perfect) return 'perfect';
-  if (absDelta <= WINDOWS.great) return 'great';
-  if (absDelta <= WINDOWS.good) return 'good';
-  return 'miss';
 }
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 export class RhythmBattle {
-  constructor({ clock, music, seed = 1, aiProfile }) {
+  // practice: { holdRow, startRow (0-7), startCol, branch: 'auto'|'always'|'never', rival: 'ai'|'none' }
+  constructor({ clock, music, seed = 1, aiProfile, practice = null, rival = 'ai', timing = null }) {
     this.clock = clock;
     this.music = music;
     this.startBar = music.battleStartBar;
@@ -76,15 +72,19 @@ export class RhythmBattle {
     this.introStartBar = music.battleStartBar - music.introBars;
     this.rng = makeRng(seed);
     this.ai = new OpponentAI(aiProfile, makeRng((seed ^ 0x9e3779b9) >>> 0));
-    this.player = newDancer('player');
-    this.rival = newDancer('rival');
+    this.practice = practice;
+    this.win = windowsFor(clock.spb, timing || RULES.timing);
+    this.player = newDancer('player', 'human');
+    this.rival = newDancer('rival', practice && practice.rival === 'none' ? 'none' : rival);
+    for (const d of [this.player, this.rival]) this._restart(d);
+    this.solo = { player: null, rival: null };    // { seq, button } per dancer
     this.groove = 0;            // tug of war: -1 rival … +1 player
-    this.pendingTaunt = null;   // { attacker, bar }
     this.nextBuild = this.startBar;
     this.lastBarSeen = this.introStartBar - 1;
     this.listeners = [];
     this.ended = false;
     this.songTime = -Infinity;
+    this._clockT = -Infinity;   // song time the schedule has been processed to
   }
 
   on(fn) { this.listeners.push(fn); return this; }
@@ -93,170 +93,306 @@ export class RhythmBattle {
   other(who) { return who === 'player' ? 'rival' : 'player'; }
   barIndex(bar) { return bar - this.startBar; }       // 0-based battle bar
   get barsTotal() { return this.endBar - this.startBar; }
+  setSoloCommand(who, cmd) { this.solo[who] = cmd; }
 
-  // ── Build ────────────────────────────────────────────────────────
-  _materialize(spec, bar, who) {
-    const t0 = this.clock.barTime(bar), spb = this.clock.spb;
+  // A dancer's string state after a miss / at the start (practice can pin
+  // a row and level).
+  _restart(d) {
+    const p = this.practice;
+    d.row = p && p.startRow != null ? clamp(p.startRow, 0, ROWS - 1) : 0;
+    d.col = p && p.startCol != null ? Math.max(0, Math.min(d.row, p.startCol)) : 0;
+  }
+
+  // ── Bars ─────────────────────────────────────────────────────────
+  _materialize(type, bar, who, meta = {}) {
+    const clock = this.clock, t0 = clock.barTime(bar), spb = clock.spb;
     const b = {
-      bar, who, type: spec.type, tier: spec.tier, resolved: false, success: false,
-      notes: spec.notes.map(n => ({ ...n, bar, who, time: t0 + n.beat * spb, judged: null, delta: 0 })),
+      bar, who, type, t0, end: clock.barTime(bar + 1), finish: t0 + 3 * spb,
+      resolved: false, success: false, prepared: false, options: null, cands: null,
+      buffer: new InputBuffer(), judged: null, delta: 0, reason: null, chosen: null, resolvedAt: null, meta,
     };
-    if (spec.type === 'command') {
-      b.options = spec.options.map(o => ({ ...o, progress: 0 }));
-      b.finisher = b.notes[0];
-      // Directions open right after the previous bar's finisher window.
-      b.openTime = t0 - spb + WINDOWS.good;
-      b.chosen = null;
-    }
+    // The timed press of the bar (the HUD / old callers read `finisher`).
+    if (INPUT_BAR_TYPES.includes(type)) {
+      b.finisher = { bar, who, kind: type === 'dodge' ? 'dodge' : 'groove', time: b.finish, judged: null, delta: 0 };
+      b.notes = [b.finisher];
+    } else b.notes = [];
     return b;
   }
 
   _buildBar(bar) {
-    const taunt = this.pendingTaunt && this.pendingTaunt.bar === bar ? this.pendingTaunt : null;
-    for (const who of ['player', 'rival']) {
-      const d = this.dancer(who);
-      let spec;
-      if (bar < (d.soloUntil || 0)) spec = { type: d.soloRole, tier: 0, notes: [] };
-      else if (taunt) spec = taunt.attacker === who ? buildTauntBar() : buildDodgeBar();
-      else if (d.stunNext) { spec = buildStunnedBar(); d.stunNext = false; }
-      else if (d.restNext) { spec = { type: 'rest', tier: 0, notes: [] }; d.restNext = false; }
-      else spec = buildCommand(this.rng, d.level, d.enthusiasm);
-      const b = this._materialize(spec, bar, who);
-      if (who === 'rival') this._rollRival(b);
-      d.bars.set(bar, b);
+    for (const d of [this.player, this.rival]) {
+      let type = 'command', meta = {};
+      if (bar < d.soloUntil) type = d.soloRole;
+      else if (d.forced.has(bar)) ({ type, meta } = d.forced.get(bar));
+      else if (d.controller === 'none') type = 'idle';
+      d.forced.delete(bar);
+      d.bars.set(bar, this._materialize(type, bar, d.id, meta));
     }
     this.emit('barBuilt', { bar, player: this.player.bars.get(bar), rival: this.rival.bars.get(bar) });
-
-    // The rival decides whether to taunt the bar after this one, so the
-    // player sees it coming a full bar ahead.
-    const r = this.rival;
-    if (!this.pendingTaunt && r.hype >= 100 && bar >= this.startBar + 1 && bar + 1 <= this.endBar - 2
-        && bar + 1 >= (r.soloUntil || 0) && this.ai.wantsTaunt(this.groove < 0)) {
-      this._queueTaunt('rival', bar + 1);
-    }
   }
 
-  // Pre-roll the rival's result so its performance is decided (and
-  // reproducible) when the bar is built; it's applied at the finisher.
-  _rollRival(b) {
-    const pressure = Math.max(0, this.groove);
-    for (const n of b.notes) {
-      if (n.kind === 'taunt') n.ai = { judgment: this.ai.judgeTaunt(), delta: 0 };
-      else if (n.kind === 'dodge') n.ai = null; // decided when the taunt lands
-      else {
-        const opt = b.options.length > 1 && this.ai.takesBranch(b.options[1]) ? b.options[1] : b.options[0];
-        b.aiOption = opt;
-        n.ai = this.ai.judge(opt, pressure);
-      }
-    }
+  // Turn a (future) bar of `d` into `type` — rest / dodge / stunned.
+  _setBarType(d, bar, type, meta = {}) {
+    if (bar >= this.endBar || bar < d.soloUntil) return false;
+    const prev = d.bars.get(bar);
+    if (prev) {
+      if (prev.resolved) return false;
+      d.bars.set(bar, this._materialize(type, bar, d.id, meta));
+      d.aiQueue = d.aiQueue.filter(e => e.bar !== bar);
+      this.emit('barReplaced', { who: d.id, bar, type });
+    } else d.forced.set(bar, { type, meta });
+    return true;
   }
 
-  _queueTaunt(attacker, bar) {
-    const d = this.dancer(attacker);
-    d.hype = 0;
-    this.pendingTaunt = { attacker, bar };
-    this.emit('tauntQueued', { attacker, bar });
+  // When a bar's command is decided and shown: the moment the dancer's
+  // previous command is decided (its result picks the next node), or a beat
+  // before the bar when nothing is pending (first bar, after a rest …).
+  _prepareTime(d, b) {
+    const prev = d.bars.get(b.bar - 1);
+    if (prev && INPUT_BAR_TYPES.includes(prev.type) && !prev.resolved) return Infinity;
+    return b.t0 - this.clock.spb;
+  }
+
+  _prepare(d, b, t) {
+    if (b.prepared || b.resolved) return;
+    // A dancer switched off (practice: rival off) just grooves.
+    if (d.controller === 'none' && b.type === 'command') { b.type = 'idle'; b.notes = []; b.finisher = null; return; }
+    b.prepared = true;
+    b.preparedAt = t;
+    if (b.type === 'command') {
+      b.options = b.cands = startCandidates(resolveCommands(d, {
+        branch: this.practice && this.practice.branch, solo: this.solo[d.id],
+      }));
+      b.tier = d.level;
+      this.emit('commandReady', { who: d.id, bar: b.bar, options: b.cands });
+    } else if (b.type === 'dodge') {
+      this.emit('commandReady', { who: d.id, bar: b.bar, dodge: true });
+    }
+    if (d.controller === 'ai') this._planAI(d, b, t);
+  }
+
+  // ── AI: timestamped inputs through the same judge ────────────────
+  _planAI(d, b, t) {
+    const clock = this.clock, spb = clock.spb, ev = [];
+    const at = (time, kind, value) => ev.push({ t: Math.max(t + 0.01, time), kind, value, bar: b.bar });
+    if (b.type === 'dodge') {
+      if (this.ai.dodges(b.meta.judgment || 'great', this.groove < 0)) at(b.finish + (this.ai.rng() * 2 - 1) * 0.05, 'S');
+      d.aiQueue.push(...ev); d.aiQueue.sort((a, c) => a.t - c.t);
+      return;
+    }
+    const pressure = Math.max(0, d === this.rival ? this.groove : -this.groove);
+    // Spend a jammer instead of dancing this bar?
+    if (d.jammers > 0 && this._attackAllowed(d, b) && this.ai.rng() < (this.ai.p.tauntChance || 0.5) * 0.12) {
+      at(b.finish + (this.ai.rng() * 2 - 1) * 0.04, 'T');
+      d.aiQueue.push(...ev); d.aiQueue.sort((a, c) => a.t - c.t);
+      return;
+    }
+    const opts = b.cands;
+    const opt = opts.length > 1 && this.ai.takesBranch(opts[1]) ? opts[1] : opts[0];
+    const { judgment, delta } = this.ai.judge(opt, pressure);
+    // Arrows spread through the measure, then the button.
+    const n = opt.seq.length, from = Math.max(t + 0.05, b.t0 - spb * 0.6), to = b.finish - spb * 0.6;
+    for (let i = 0; i < n; i++) at(from + (to - from) * (i + 1) / (n + 1), 'dir', opt.seq[i]);
+    if (judgment !== 'miss') at(b.finish + clamp(delta, -this.win.good * 0.95, this.win.good * 0.95), opt.button);
+    else if (this.ai.rng() < 0.5) at(b.finish - this.win.good - 0.05 - this.ai.rng() * spb, opt.button);   // jumps the gun
+    // else: never presses — the time-out judges it.
+    d.aiQueue.push(...ev); d.aiQueue.sort((a, c) => a.t - c.t);
   }
 
   // ── Input ────────────────────────────────────────────────────────
-  // kind: 'arrow' | 'groove' | 'taunt'; dir: L/U/D/R for arrows.
-  input(kind, dir, evTime) {
-    if (this.ended) return;
-    const t = this.clock.inputSongTime(evTime);
-    if (kind === 'arrow') { this._dirInput(t, dir); return; }
-    const p = this.player;
-
-    // Timed notes (finisher / dodge / taunt) inside the good window.
-    const cands = [];
-    for (const b of p.bars.values()) {
-      if (b.resolved) continue;
-      for (const n of b.notes) {
-        if (n.judged) continue;
-        const dt = t - n.time;
-        if (Math.abs(dt) <= WINDOWS.good) cands.push({ n, dt });
-      }
+  // A human input: who = 'player' | 'rival', action = U D L R (directions),
+  // X O (the final buttons), T (attack △), S (dodge □). evTime is the
+  // event's performance.now() timestamp (converted with the clock's latency
+  // and calibration offsets).
+  input(who, action, evTime) {
+    // Back-compat: input(kind, dir, ts) with kind 'arrow' | 'groove' | 'taunt'.
+    if (who === 'arrow' || who === 'groove' || who === 'taunt') {
+      const map = { arrow: action, groove: 'X', taunt: 'T' };
+      return this.input('player', map[who], evTime);
     }
-    const matches = (n) => ((n.kind === 'groove' || n.kind === 'dodge') && kind === 'groove')
-      || (n.kind === 'taunt' && kind === 'taunt');
-    const hit = cands.filter(c => matches(c.n)).sort((a, b) => Math.abs(a.dt) - Math.abs(b.dt))[0];
-    if (hit) { this._applyJudgment(p, hit.n, judgmentFor(Math.abs(hit.dt)), hit.dt); return; }
-
-    if (kind === 'taunt') {
-      // Not on a taunt note: this is a request to taunt.
-      if (this.pendingTaunt) { this.emit('tauntBlocked', { who: 'player' }); return; }
-      if (p.hype < 100) { this.emit('tauntNotReady', { who: 'player', hype: p.hype }); return; }
-      const bar = this.nextBuild;
-      if (bar < this.startBar || bar > this.endBar - 2 || bar < (p.soloUntil || 0)) { this.emit('tauntBlocked', { who: 'player' }); return; }
-      this._queueTaunt('player', bar);
-      return;
-    }
-    // GROOVE well before beat 4 is just a stray press — it doesn't cost
-    // the command (a stray tap on a phone shouldn't).
-    this.emit('stray', { kind, dir });
+    return this.inputAt(who, action, this.clock.inputSongTime(evTime));
   }
 
-  // The earliest unresolved command bar accepting input at song time t.
-  _openCommand(d, t, needIncomplete = false) {
+  // The same, at a song time (seconds).
+  inputAt(who, action, t) {
+    if (this.ended) return null;
+    const d = this.dancer(who);
+    this._advanceTo(t);
+    if (action === 'U' || action === 'D' || action === 'L' || action === 'R') return this._dir(d, t, action);
+    if (action === 'X' || action === 'O') return this._button(d, t, action);
+    if (action === 'T') return this._attack(d, t);
+    if (action === 'S') return this._dodge(d, t);
+    return null;
+  }
+
+  // The bar a press at song time t belongs to: the dancer's earliest
+  // unresolved, prepared input bar whose window hasn't closed.
+  _inputBar(d, t) {
     let best = null;
     for (const b of d.bars.values()) {
-      if (b.resolved || b.type !== 'command') continue;
-      if (t < b.openTime || t > b.finisher.time + WINDOWS.good) continue;
-      if (needIncomplete && b.options.some(o => o.progress === o.seq.length)) continue;
+      if (b.resolved || !b.prepared || !INPUT_BAR_TYPES.includes(b.type)) continue;
+      if (t > b.finish + this.win.good + 1e-6) continue;
       if (!best || b.bar < best.bar) best = b;
     }
     return best;
   }
 
-  _dirInput(t, dir) {
-    const b = this._openCommand(this.player, t, true);
-    if (!b) { this.emit('stray', { kind: 'arrow', dir }); return; }
-    // Forgiving entry: a direction that matches the next arrow of any
-    // option advances it; a wrong one is ignored (it doesn't wipe the
-    // sequence). Options that haven't started can still be picked up.
-    let advanced = false;
-    for (const o of b.options) {
-      if (o.seq[o.progress] === dir) { o.progress++; advanced = true; }
+  _dir(d, t, dir) {
+    const b = this._inputBar(d, t);
+    // Directions only count before beat 4.
+    if (!b || b.type !== 'command' || t > b.finish) {
+      this.emit('stray', { who: d.id, kind: 'dir', value: dir, t });
+      return { stray: true };
     }
-    const done = b.options.find(o => o.progress === o.seq.length) || null;
-    this.emit('dir', { who: 'player', bar: b.bar, dir, ok: advanced, complete: done && done.id });
+    const r = applyDirection(b.cands, dir);
+    b.buffer.push(t, 'dir', dir, r.ok ? 'ok' : 'wrong');
+    const st = commandStatus(b.cands);
+    this.emit('dir', { who: d.id, bar: b.bar, dir, ok: r.ok, complete: st.phase === 'button', status: st });
+    return { ok: r.ok, bar: b.bar };
   }
 
-  _applyJudgment(d, n, j, dt, reason = null) {
-    const b = d.bars.get(n.bar);
-    if (n.kind === 'taunt') {
-      n.judged = j; n.delta = dt;
-      this.emit('judge', { who: d.id, note: n, judgment: j, delta: dt });
-      this._resolveTaunt(d, b, n, j);
-      return;
+  _button(d, t, button) {
+    if (t - d.lastPress < RULES.doubleTap) { this.emit('stray', { who: d.id, kind: 'double', value: button, t }); return { stray: true }; }
+    const b = this._inputBar(d, t);
+    if (!b || b.type !== 'command') { this.emit('stray', { who: d.id, kind: 'btn', value: button, t }); return { stray: true }; }
+    const dt = t - b.finish;
+    // Right after a command appears, an early press is the tail of the last
+    // one (a late or doubled press), not a commitment to this one.
+    if (dt < -this.win.good && t - b.preparedAt < RULES.graceAfterShow) {
+      this.emit('stray', { who: d.id, kind: 'late', value: button, t });
+      return { stray: true };
     }
-    if (n.kind === 'dodge') {
-      n.judged = j; n.delta = dt;
-      this.emit('judge', { who: d.id, note: n, judgment: j, delta: dt });
-      this._resolveDodge(d, b, n, j);
-      return;
+    d.lastPress = t;
+    b.buffer.push(t, 'btn', button, null);
+    if (dt < -this.win.good) return this._judgeCommand(d, b, 'miss', dt, null, 'early', t);
+    const j = judgeTiming(dt, this.win);
+    const r = resolveFinal(b.cands, button);
+    if (!r.ok) return this._judgeCommand(d, b, 'miss', dt, null, r.reason, t);
+    return this._judgeCommand(d, b, j, dt, r.option, null, t);
+  }
+
+  _attackAllowed(d, b) {
+    const foe = this.dancer(this.other(d.id));
+    return b.bar + 1 < this.endBar - 1 && b.bar >= this.startBar && b.bar + 1 >= foe.soloUntil && b.bar >= d.soloUntil;
+  }
+
+  _attack(d, t) {
+    const b = this._inputBar(d, t);
+    if (!b || b.type !== 'command' || Math.abs(t - b.finish) > this.win.good) {
+      this.emit('stray', { who: d.id, kind: 'attack', t });
+      return { stray: true };
     }
-    // Command finisher.
-    let opt = null;
-    if (d === this.rival) opt = b.aiOption;
-    else opt = b.options.filter(o => o.progress === o.seq.length).sort((x, y) => y.seq.length - x.seq.length)[0] || null;
-    if (!opt && j !== 'miss') { j = 'miss'; reason = 'incomplete'; }
-    if (!reason && j === 'miss') reason = 'late';
-    n.judged = j; n.delta = dt;
-    b.chosen = opt;
+    if (d.jammers <= 0) { this.emit('tauntNotReady', { who: d.id, jammers: 0 }); return { blocked: true }; }
+    if (!this._attackAllowed(d, b)) { this.emit('tauntBlocked', { who: d.id }); return { blocked: true }; }
+    const dt = t - b.finish, j = judgeTiming(dt, this.win);
+    d.lastPress = t;
+    d.jammers--; d.attacks++;
+    b.buffer.push(t, 'atk', 'T', j);
+    b.resolved = true; b.success = true; b.judged = j; b.delta = dt; b.kind = 'attack'; b.resolvedAt = t;
+    b.finisher.judged = j; b.finisher.delta = dt;
+    const foe = this.dancer(this.other(d.id));
+    this._setBarType(foe, b.bar + 1, 'dodge', { attacker: d.id, judgment: j });
+    this.emit('judge', { who: d.id, note: b.finisher, judgment: j, delta: dt, kind: 'attack' });
+    this.emit('taunt', { attacker: d.id, bar: b.bar, judgment: j, dodgeBar: b.bar + 1, jammers: d.jammers });
+    this._afterResolve(d, b, t);
+    return { attack: true, judgment: j };
+  }
+
+  _dodge(d, t) {
+    const b = this._inputBar(d, t);
+    if (!b || b.type !== 'dodge') { this.emit('stray', { who: d.id, kind: 'dodge', t }); return { stray: true }; }
+    d.lastPress = t;
+    const dt = t - b.finish;
+    b.buffer.push(t, 'dodge', 'S', null);
+    const j = dt < -this.win.good ? 'miss' : judgeTiming(dt, this.win);
+    return this._resolveDodge(d, b, j, dt, t, dt < -this.win.good ? 'early' : null);
+  }
+
+  // ── Resolution ───────────────────────────────────────────────────
+  _judgeCommand(d, b, j, dt, opt, reason, t) {
+    b.resolved = true; b.resolvedAt = t;
+    b.judged = j; b.delta = dt; b.reason = reason; b.chosen = opt;
+    b.finisher.judged = j; b.finisher.delta = dt;
+    b.success = j !== 'miss';
     d.counts[j]++;
-    if (j === 'miss') d.combo = 0;
-    else { d.combo++; d.maxCombo = Math.max(d.maxCombo, d.combo); }
     let pts = 0;
-    if (j !== 'miss') {
-      pts = Math.round(FINISH_POINTS[j] * opt.mult * (1 + Math.min(d.combo, 20) * 0.03));
-      this._addPoints(d, n.bar, pts);
+    if (b.success) {
+      d.chain++;
+      d.maxCombo = Math.max(d.maxCombo, d.chain);
+      pts = Math.round(opt.points * RULES.judgmentScale[j] * (1 + Math.min(d.chain, 20) * 0.02));
+      this._addPoints(d, b.bar, pts);
     }
-    const rate = d === this.rival ? (this.ai.p.hypeRate || 1) : 1;
-    d.hype = clamp(d.hype + HYPE_GAIN[j] * (HYPE_GAIN[j] > 0 ? rate : 1), 0, 100);
-    this.emit('judge', { who: d.id, note: n, judgment: j, delta: dt, reason, points: pts, combo: d.combo, option: opt && opt.kind });
-    if (d.hype >= 100 && d._hypeWasFull !== true) { d._hypeWasFull = true; this.emit('hypeFull', { who: d.id }); }
-    if (d.hype < 100) d._hypeWasFull = false;
-    this._resolveCommand(d, b, j, opt, pts, reason);
+    this.emit('judge', { who: d.id, note: b.finisher, judgment: j, delta: dt, reason, points: pts, combo: d.chain, option: opt && opt.kind, node: opt && opt.node });
+    if (b.success) this._landed(d, b, j, opt, pts);
+    else this._missed(d, b, reason);
+    this._afterResolve(d, b, t);
+    return { judgment: j, reason, option: opt };
+  }
+
+  _landed(d, b, j, opt, pts) {
+    d.moves++;
+    if (opt.kind === 'branch') d.branches++;
+    if (opt.kind === 'solo') d.solos++;
+    // A solo spends the gauge: it's the climax, not a loop.
+    d.enthusiasm = opt.kind === 'solo' ? 25 : clamp(d.enthusiasm + ENTH_GAIN[j] + (opt.kind === 'branch' ? 6 : 0), 0, 100);
+    d.level = opt.col + 1;
+    d.bestLevel = Math.max(d.bestLevel, d.level);
+    const soloTime = opt.kind === 'solo' && b.bar + 1 + SOLO_BARS <= this.endBar;
+    const freeze = opt.kind !== 'solo' && opt.row >= ROWS && b.bar + 1 < this.endBar;
+    const string = d.strings;
+    const next = advance(d, opt, { hold: !!(this.practice && this.practice.holdRow) });
+    d.row = next.row; d.col = next.col;
+    if (freeze || soloTime) d.strings++;
+    if (freeze) { d.freezes++; this._addPoints(d, b.bar, FREEZE_BONUS); }
+    this.emit('move', {
+      who: d.id, bar: b.bar + 1, node: opt.node, row: opt.row - 1, col: opt.col, kind: opt.kind,
+      tier: Math.min(4, 1 + Math.floor((opt.row - 1) / 2)), judgment: j, perfect: j === 'perfect', bonus: pts,
+      points: opt.points, chain: d.chain, soloTime, string, freeze,
+    });
+    if (soloTime) this._startSolo(d, b.bar + 1);
+    else if (freeze) this._setBarType(d, b.bar + 1, 'rest');
+  }
+
+  _missed(d, b, reason) {
+    d.chain = 0;
+    this._restart(d);
+    d.level = d.col + 1;
+    d.enthusiasm = clamp(d.enthusiasm + ENTH_GAIN.miss, 0, 100);
+    this.emit('fumble', { who: d.id, bar: b.bar, reason });
+  }
+
+  _resolveDodge(d, b, j, dt, t, reason = null) {
+    b.resolved = true; b.resolvedAt = t; b.judged = j; b.delta = dt; b.reason = reason;
+    b.finisher.judged = j; b.finisher.delta = dt;
+    const attacker = this.dancer(b.meta.attacker || this.other(d.id));
+    this.emit('judge', { who: d.id, note: b.finisher, judgment: j, delta: dt, kind: 'dodge', reason });
+    if (j !== 'miss') {
+      // Dodged: the string carries on where it was.
+      b.success = true;
+      d.dodges++;
+      this._addPoints(d, b.bar, DODGE_BONUS);
+      this.emit('dodge', { who: d.id, attacker: attacker.id, bar: b.bar, judgment: j });
+    } else {
+      b.success = false;
+      d.stuns++;
+      d.chain = 0;
+      this._restart(d);
+      d.level = d.col + 1;
+      d.enthusiasm = clamp(d.enthusiasm - 30, 0, 100);
+      attacker.tauntsLanded++;
+      this._addPoints(attacker, b.bar, ATTACK_LAND_BONUS);
+      this._setBarType(d, b.bar + 1, 'stunned');
+      this.emit('tauntLanded', { attacker: attacker.id, defender: d.id, bar: b.bar, stunBar: b.bar + 1 });
+    }
+    this._afterResolve(d, b, t);
+    return { judgment: j, dodge: j !== 'miss' };
+  }
+
+  // The next command shows as soon as this one is decided.
+  _afterResolve(d, b, t) {
+    const next = d.bars.get(b.bar + 1);
+    if (next && INPUT_BAR_TYPES.includes(next.type)) this._prepare(d, next, t);
+    this._barDone(b.bar);
   }
 
   _addPoints(d, bar, pts) {
@@ -264,144 +400,24 @@ export class RhythmBattle {
     d.barPoints.set(bar, (d.barPoints.get(bar) || 0) + pts);
   }
 
-  _resolveCommand(d, b, j, opt, pts, reason) {
-    b.resolved = true;
-    b.success = j !== 'miss';
-    const level = b.tier;
-    if (b.success) {
-      d.chain++;
-      d.fumbles = 0;
-      d.moves++;
-      if (opt.kind === 'branch') d.branches++;
-      if (opt.kind === 'solo') d.solos++;
-      // A solo spends the gauge: it's the climax, not a loop.
-      d.enthusiasm = opt.kind === 'solo' ? 25 : clamp(d.enthusiasm + ENTH_GAIN[j] + (opt.kind === 'branch' ? 6 : 0), 0, 100);
-      d.bestLevel = Math.max(d.bestLevel, level + (opt.kind === 'branch' ? 0.5 : opt.kind === 'solo' ? 1 : 0));
-      d.level = Math.min(4, d.level + 1);
-      const soloTime = opt.kind === 'solo' && b.bar + 1 + SOLO_BARS <= this.endBar;
-      // Dance string: this command earns row `row`; row 8 is the freeze.
-      const row = d.row, string = d.strings;
-      const freeze = !soloTime && row >= STRING_ROWS - 1 && b.bar + 1 < this.endBar;
-      if (freeze || soloTime) {
-        d.strings++;
-        d.row = d.enthusiasm >= HOT_START_ENTH ? 2 : 0;
-      } else {
-        d.row = Math.min(STRING_ROWS - 1, row + 1);
-      }
-      if (freeze) { d.freezes++; this._addPoints(d, b.bar, FREEZE_BONUS); }
-      this.emit('move', { who: d.id, bar: b.bar + 1, tier: level, kind: opt.kind, judgment: j, perfect: j === 'perfect', bonus: pts, chain: d.chain, soloTime, row, string, freeze });
-      if (soloTime) this._startSolo(d, b.bar + 1);
-      else if (freeze) this._restBar(d, b.bar + 1);
-    } else {
-      d.chain = 0;
-      d.row = 0;                       // a miss cuts the string short
-      d.fumbles = (d.fumbles || 0) + 1;
-      if (d.fumbles >= 2) { d.level = Math.max(1, d.level - 1); d.fumbles = 0; }
-      d.enthusiasm = clamp(d.enthusiasm + ENTH_GAIN.miss, 0, 100);
-      this.emit('fumble', { who: d.id, bar: b.bar, reason });
-    }
-    this._barDone(b.bar);
-  }
-
-  // After a freeze: the bar it plays in carries no command — the dancer
-  // holds the freeze, the player gets four beats to breathe.
-  _restBar(d, bar) {
-    if (bar >= this.endBar || bar < (d.soloUntil || 0)) return;
-    const prev = d.bars.get(bar);
-    if (prev && (prev.resolved || prev.type !== 'command')) return;
-    if (prev) {
-      d.bars.set(bar, this._materialize({ type: 'rest', tier: 0, notes: [] }, bar, d.id));
-      this.emit('barReplaced', { who: d.id, bar });
-    } else {
-      d.restNext = true;
-    }
-  }
-
   // SOLO TIME: the next SOLO_BARS bars become 'solo' for the dancer and
   // 'watch' for the opponent (bars already built are swapped out).
   _startSolo(d, startBar) {
     const foe = this.dancer(this.other(d.id));
     const until = startBar + SOLO_BARS;
-    d.soloUntil = foe.soloUntil = until;
-    d.soloRole = 'solo'; foe.soloRole = 'watch';
-    for (let bar = startBar; bar < until; bar++) {
-      for (const dd of [d, foe]) {
+    for (const dd of [d, foe]) {
+      dd.soloRole = dd === d ? 'solo' : 'watch';
+      for (let bar = startBar; bar < until; bar++) {
         const prev = dd.bars.get(bar);
         if (prev && prev.resolved) continue;
-        if (prev) this.emit('barReplaced', { who: dd.id, bar });
-        dd.bars.set(bar, this._materialize({ type: dd.soloRole, tier: 0, notes: [] }, bar, dd.id));
+        if (prev) this.emit('barReplaced', { who: dd.id, bar, type: dd.soloRole });
+        dd.bars.set(bar, this._materialize(dd.soloRole, bar, dd.id));
+        dd.forced.delete(bar);
       }
-    }
-    // A taunt aimed into the solo is called off (the hype is refunded).
-    if (this.pendingTaunt && this.pendingTaunt.bar >= startBar && this.pendingTaunt.bar < until) {
-      this.dancer(this.pendingTaunt.attacker).hype = 100;
-      this.pendingTaunt = null;
+      dd.aiQueue = dd.aiQueue.filter(e => e.bar < startBar || e.bar >= until);
+      dd.soloUntil = until;
     }
     this.emit('soloStart', { who: d.id, bar: startBar, bars: SOLO_BARS });
-  }
-
-  _resolveTaunt(d, b, n, j) {
-    b.resolved = true;
-    b.success = j !== 'miss';
-    const foe = this.dancer(this.other(d.id));
-    const foeBar = foe.bars.get(b.bar);
-    if (!b.success) {
-      // Whiffed taunt: the defender's dodge note is void.
-      if (foeBar) {
-        for (const x of foeBar.notes) if (!x.judged) x.judged = 'void';
-        foeBar.resolved = true;
-        foeBar.success = true;
-      }
-      this.emit('tauntWhiff', { attacker: d.id, bar: b.bar });
-      if (this.pendingTaunt && this.pendingTaunt.bar === b.bar) this.pendingTaunt = null;
-      this._barDone(b.bar);
-      return;
-    }
-    this.emit('taunt', { attacker: d.id, bar: b.bar, judgment: j });
-    // An AI defender decides now whether its dodge will land.
-    if (foe === this.rival && foeBar) {
-      const dn = foeBar.notes.find(x => x.kind === 'dodge');
-      if (dn) {
-        const ok = this.ai.dodges(j, this.groove < 0);
-        dn.ai = ok ? { judgment: this.ai.rng() < 0.5 ? 'great' : 'good', delta: 0.03 } : { judgment: 'miss', delta: 0.2 };
-      }
-    }
-    this._barDone(b.bar);
-  }
-
-  _resolveDodge(d, b, n, j) {
-    b.resolved = true;
-    const attacker = this.dancer(this.other(d.id));
-    if (j !== 'miss') {
-      b.success = true;
-      d.dodges++;
-      d.hype = Math.min(100, d.hype + 20);
-      this._addPoints(d, b.bar, DODGE_BONUS);
-      this.emit('dodge', { who: d.id, attacker: attacker.id, bar: b.bar, judgment: j });
-      if (d.hype >= 100 && d._hypeWasFull !== true) { d._hypeWasFull = true; this.emit('hypeFull', { who: d.id }); }
-    } else {
-      b.success = false;
-      d.stuns++;
-      d.chain = 0;
-      d.combo = 0;
-      d.row = 0;                       // a landed jammer resets the string
-      d.level = Math.max(1, d.level - 1);
-      d.enthusiasm = clamp(d.enthusiasm - 30, 0, 100);
-      attacker.tauntsLanded++;
-      this._addPoints(attacker, b.bar, TAUNT_LAND_BONUS);
-      // Stunned next bar: wipe it if already built, else mark it.
-      const next = d.bars.get(b.bar + 1);
-      if (next && b.bar + 1 < this.endBar) {
-        const stunned = this._materialize(buildStunnedBar(), b.bar + 1, d.id);
-        d.bars.set(b.bar + 1, stunned);
-        this.emit('barReplaced', { who: d.id, bar: b.bar + 1 });
-      } else if (b.bar + 1 < this.endBar) {
-        d.stunNext = true;
-      }
-      this.emit('tauntLanded', { attacker: attacker.id, defender: d.id, bar: b.bar, stunBar: b.bar + 1 });
-    }
-    if (this.pendingTaunt && this.pendingTaunt.bar === b.bar) this.pendingTaunt = null;
-    this._barDone(b.bar);
   }
 
   // Once both dancers' bars are resolved, nudge the groove meter.
@@ -419,9 +435,8 @@ export class RhythmBattle {
   // ── Time ─────────────────────────────────────────────────────────
   update(songTime) {
     this.songTime = songTime;
-    const clock = this.clock;
     if (this.ended) return;
-
+    const clock = this.clock;
     // Bar starts (intro + battle).
     const curBar = Math.floor(clock.beatAt(songTime) / clock.beatsPerBar);
     while (this.lastBarSeen < curBar) {
@@ -429,56 +444,7 @@ export class RhythmBattle {
       const b = this.lastBarSeen;
       if (b >= this.introStartBar && b < this.endBar) this.emit('barStart', { bar: b, index: this.barIndex(b) });
     }
-
-    // Build bars just-in-time.
-    while (this.nextBuild < this.endBar && clock.barTime(this.nextBuild) - LOOKAHEAD <= songTime) {
-      this._buildBar(this.nextBuild);
-      this.nextBuild++;
-    }
-
-    // Rival results land at their note times; its sequence fills in over
-    // beats 1-3 for anyone watching.
-    for (const b of this.rival.bars.values()) {
-      if (b.resolved) continue;
-      if (b.type === 'command' && b.aiOption) {
-        const f = clamp((songTime - clock.barTime(b.bar)) / (clock.spb * 2.6), 0, 1);
-        b.aiOption.progress = Math.floor(f * b.aiOption.seq.length);
-      }
-      for (const n of b.notes) {
-        if (n.judged || n.time > songTime || !n.ai) continue;
-        this._applyJudgment(this.rival, n, n.ai.judgment, n.ai.delta);
-        if (b.resolved) break;
-      }
-    }
-
-    // Player finishers / dodges / taunts that slipped past the window.
-    for (const b of this.player.bars.values()) {
-      if (b.resolved) continue;
-      for (const n of b.notes) {
-        if (!n.judged && songTime > n.time + WINDOWS.good) {
-          const incomplete = b.type === 'command' && !b.options.some(o => o.progress === o.seq.length);
-          this._applyJudgment(this.player, n, 'miss', WINDOWS.good, incomplete ? 'incomplete' : 'late');
-          if (b.resolved) break;
-        }
-      }
-    }
-
-    // Note-less bars (stunned / solo / watch) resolve when they end; solo
-    // bars pay out.
-    for (const d of [this.player, this.rival]) {
-      for (const b of d.bars.values()) {
-        if (!b.resolved && b.notes.length === 0 && songTime >= clock.barTime(b.bar + 1)) {
-          b.resolved = true;
-          if (b.type === 'solo') {
-            b.success = true;
-            this._addPoints(d, b.bar, SOLO_BAR_POINTS);
-            if (b.bar + 1 >= d.soloUntil) this.emit('soloEnd', { who: d.id, bar: b.bar });
-          }
-          this._barDone(b.bar);
-        }
-      }
-    }
-
+    this._advanceTo(songTime);
     // Battle over at the downbeat after the last battle bar.
     if (!this.ended && songTime >= clock.barTime(this.endBar)) {
       this.ended = true;
@@ -486,35 +452,102 @@ export class RhythmBattle {
     }
   }
 
+  // Everything scheduled up to song time `t`, in time order: building bars,
+  // showing commands, the AI's inputs, missed windows and note-less bars
+  // ending. Called by update() and before every input.
+  _advanceTo(t) {
+    const clock = this.clock;
+    while (this.nextBuild < this.endBar && clock.barTime(this.nextBuild) - LOOKAHEAD <= t) {
+      this._buildBar(this.nextBuild);
+      this.nextBuild++;
+    }
+    for (let guard = 0; guard < 10000; guard++) {
+      let best = null;
+      const consider = (time, fn) => { if (time <= t && (!best || time < best.time)) best = { time, fn }; };
+      for (const d of [this.player, this.rival]) {
+        if (d.aiQueue.length) {
+          const e = d.aiQueue[0];
+          consider(e.t, () => {
+            d.aiQueue.shift();
+            if (e.kind === 'dir') this._dir(d, e.t, e.value);
+            else if (e.kind === 'T') this._attack(d, e.t);
+            else if (e.kind === 'S') this._dodge(d, e.t);
+            else this._button(d, e.t, e.kind);
+          });
+        }
+        for (const b of d.bars.values()) {
+          if (b.resolved) continue;
+          if (INPUT_BAR_TYPES.includes(b.type)) {
+            if (!b.prepared) { const pt = this._prepareTime(d, b); consider(pt, () => this._prepare(d, b, pt)); }
+            else {
+              const tt = b.finish + this.win.good;
+              consider(tt + 1e-6, () => {
+                if (b.type === 'dodge') this._resolveDodge(d, b, 'miss', this.win.good, tt);
+                else {
+                  const st = commandStatus(b.cands);
+                  this._judgeCommand(d, b, 'miss', this.win.good, null, st.phase === 'button' ? 'late' : 'incomplete', tt);
+                }
+              });
+            }
+          } else {
+            consider(b.end, () => this._endNoteless(d, b));
+          }
+        }
+      }
+      if (!best) break;
+      this._clockT = best.time;
+      best.fn();
+    }
+  }
+
+  // Note-less bars (stunned / rest / solo / watch / idle) resolve when they
+  // end; solo bars pay out.
+  _endNoteless(d, b) {
+    b.resolved = true; b.resolvedAt = b.end;
+    if (b.type === 'solo') {
+      b.success = true;
+      this._addPoints(d, b.bar, SOLO_BAR_POINTS);
+      if (b.bar + 1 >= d.soloUntil) {
+        d.row = 0; d.col = 0; d.level = 1;
+        this.emit('soloEnd', { who: d.id, bar: b.bar });
+      }
+    }
+    this._afterResolve(d, b, b.end);
+  }
+
   summary() {
     const pack = (d) => ({
       score: d.score, counts: { ...d.counts }, maxCombo: d.maxCombo, moves: d.moves,
-      branches: d.branches, solos: d.solos, bestTier: d.bestLevel,
-      tauntsLanded: d.tauntsLanded, dodges: d.dodges, stuns: d.stuns,
+      branches: d.branches, solos: d.solos, bestTier: d.bestLevel, freezes: d.freezes, strings: d.strings,
+      tauntsLanded: d.tauntsLanded, dodges: d.dodges, stuns: d.stuns, attacks: d.attacks,
     });
     const player = pack(this.player), rival = pack(this.rival);
     return { winner: player.score >= rival.score ? 'player' : 'rival', player, rival, groove: this.groove };
   }
 
-  // The command bar the HUD should show for `who` at song time t: the one
-  // being entered now (or coming up), held briefly after its finisher.
+  // What the HUD shows for `who` at song time t: the command being entered
+  // (or the dodge), the one just judged for a moment after its result, or
+  // the bar that's on (rest / stunned / solo …).
   commandFor(who, t) {
-    let best = null;
-    for (const b of this.dancer(who).bars.values()) {
-      if (!['command', 'taunt', 'dodge', 'stunned', 'solo', 'watch', 'rest'].includes(b.type)) continue;
-      const end = b.type === 'command' ? b.finisher.time + 0.3 : this.clock.barTime(b.bar + 1) - this.clock.spb + 0.3;
-      if (end < t) continue;
-      if (!best || b.bar < best.bar) best = b;
+    const d = this.dancer(who);
+    let open = null, recent = null, now = null;
+    const cur = Math.floor(this.clock.beatAt(t) / this.clock.beatsPerBar);
+    for (const b of d.bars.values()) {
+      if (!b.resolved && b.prepared && INPUT_BAR_TYPES.includes(b.type)) { if (!open || b.bar < open.bar) open = b; }
+      if (b.resolved && INPUT_BAR_TYPES.includes(b.type) && b.resolvedAt != null && t >= b.resolvedAt && t - b.resolvedAt < 0.35) {
+        if (!recent || b.bar > recent.bar) recent = b;
+      }
+      if (b.bar === cur) now = b;
     }
-    return best;
+    if (recent) return recent;
+    if (open) return open;
+    return now && !INPUT_BAR_TYPES.includes(now.type) ? now : null;
   }
 
-  // Timed notes for the HUD lane (finishers, dodges, taunts).
+  // Back-compat for older callers: the timed presses in a window.
   visibleNotes(who, fromTime, toTime) {
     const out = [];
-    for (const b of this.dancer(who).bars.values()) {
-      for (const n of b.notes) if (n.time >= fromTime && n.time <= toTime) out.push(n);
-    }
+    for (const b of this.dancer(who).bars.values()) for (const n of b.notes) if (n.time >= fromTime && n.time <= toTime) out.push(n);
     return out;
   }
 }

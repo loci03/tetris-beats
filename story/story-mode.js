@@ -92,9 +92,12 @@ class StoryModeManager {
   // ── BUST A BEAT ───────────────────────────────────────────────────
   // The dance battle by itself: straight onto the stage, play the battle,
   // result screen with PLAY AGAIN / MENU.
-  async startBeat(levelId = this.level.id) {
+  // `practice` (Practice mode options, see practice.js) or null; RESTART
+  // keeps the last choice.
+  async startBeat(levelId = this.level.id, practice = undefined) {
     this.teardown();
     this.level = STORY_LEVELS[levelId] || this.level;
+    if (practice !== undefined) this._practice = practice ? { ...practice } : null;
     this.phase = 'beat';
     this._beatUI();
     this._onVis = this._onVis || (() => { if (document.hidden && this.phase === 'beat' && this.session && !this.session.paused) this._beatPause(true); });
@@ -107,6 +110,8 @@ class StoryModeManager {
       if (this.phase !== 'beat') return;
       this.session = new BattleSession({
         bridge: this.bridge, level: this.level, standalone: true, buildWorld: mod.buildWorld,
+        practice: this._practice ? { ...this._practice } : null,
+        onPracticeRestart: (opts) => this.startBeat(this.level.id, opts),
         onDone: (r) => this._beatResult(r),
         onPause: () => this._beatPause(!this.session.paused),
       });

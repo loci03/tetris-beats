@@ -8,7 +8,8 @@ import { DanceController, MOVES, LAYOUT, registerMoves, moveProfile } from '../s
 import { CHARACTERS, registerCharacter } from '../story/characters.js';
 import { Choreographer, buildChoreo, validateChoreo, canTransition, rowState, STATES } from '../story/choreo.js';
 import { musicalPosition } from '../story/music-clock.js';
-import { RhythmBattle, STRING_ROWS } from '../story/rhythm-battle.js';
+import { STRING_ROWS } from '../story/rhythm-battle.js';
+import { makeBattle, playBar, ev } from './battle-harness.mjs';
 import { STORY_LEVELS, LEVEL_ORDER } from '../story/levels.js';
 import { simulate, skating, acrobatics, illegalTransitions, overreach, stateSequence } from './motion.mjs';
 
@@ -138,44 +139,27 @@ test('state machine table: every state is known and reachable', () => {
 });
 
 // ── Dance-string advancement ────────────────────────────────────────
-function battle() {
-  const clock = { spb: 0.5, barTime: (bar) => bar * 2, beatAt: (t) => t / 0.5 };
-  const music = { battleStartBar: 4, battleBars: 40, introBars: 4 };
-  return new RhythmBattle({ clock, music, seed: 3, aiProfile: STORY_LEVELS.underground.ai.medium });
-}
-function land(rb, d, bar, kind = 'std') {
-  const b = rb._materialize({ type: 'command', tier: d.level, notes: [{ kind: 'groove', beat: 3 }], options: [{ id: 'a', kind, seq: [], level: d.level }] }, bar, d.id);
-  d.bars.set(bar, b);
-  rb._resolveCommand(d, b, 'perfect', b.options[0], 1000, '');
-}
-function miss(rb, d, bar) {
-  const b = rb._materialize({ type: 'command', tier: d.level, notes: [{ kind: 'groove', beat: 3 }], options: [{ id: 'a', kind: 'std', seq: [], level: d.level }] }, bar, d.id);
-  d.bars.set(bar, b);
-  rb._resolveCommand(d, b, 'miss', b.options[0], 0, 'late');
-}
-
+// Played through the real input path (arrows, then the button on beat 4).
 test('rules: 8 landed commands walk rows 1-8, the 8th is the freeze, then a rest bar', () => {
-  const rb = battle(), ev = [];
-  rb.on((t, d) => ev.push([t, d]));
-  const d = rb.player;
-  for (let i = 0; i < 8; i++) land(rb, d, 4 + i);
-  const moves = ev.filter(([t, x]) => t === 'move' && x.who === 'player').map(([, x]) => x);
+  const rb = makeBattle(), d = rb.player;
+  for (let i = 0; i < 8; i++) assert.equal(playBar(rb, 'player', 4 + i).judgment, 'perfect');
+  const moves = ev(rb, 'move', 'player');
   assert.deepEqual(moves.map(m => m.row), [0, 1, 2, 3, 4, 5, 6, 7]);
   assert.deepEqual(moves.map(m => m.freeze), [false, false, false, false, false, false, false, true]);
   assert.equal(d.strings, 1); assert.equal(d.freezes, 1);
   assert.ok(d.row === 0 || d.row === 2, 'the next string starts at the top (or row 3 on a hot streak)');
   // The bar the freeze plays in carries no command.
-  rb._buildBar(12);
+  rb.update(rb.clock.barTime(12));
   assert.equal(d.bars.get(12).type, 'rest');
 });
 
-test('rules: a miss cuts the string short; dodges keep it; a landed jammer resets it', () => {
-  const rb = battle(), d = rb.player;
-  land(rb, d, 4); land(rb, d, 5); land(rb, d, 6);
+test('rules: a miss cuts the string short', () => {
+  const rb = makeBattle(), d = rb.player;
+  playBar(rb, 'player', 4); playBar(rb, 'player', 5); playBar(rb, 'player', 6);
   assert.equal(d.row, 3);
-  miss(rb, d, 7);
+  assert.equal(playBar(rb, 'player', 7, { offset: 0.3 }).stray, true, 'a press after the window is not a new command');
   assert.equal(d.row, 0);
-  land(rb, d, 8); land(rb, d, 9);
+  playBar(rb, 'player', 8); playBar(rb, 'player', 9);
   assert.equal(d.row, 2);
 });
 

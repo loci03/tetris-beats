@@ -19,21 +19,25 @@ export class MusicClock {
     this._est = null;        // smoothed audible song time
     this._estPerf = 0;       // performance.now() of _est
     this._frozen = false;
+    this.rate = 1;           // playback speed (Practice mode slows the song down)
   }
 
-  // Start `buffer` so that song second `offset` is heard at ctx time `when`.
-  play(buffer, destination, offset, when, fadeIn = 0.02) {
+  // Start `buffer` so that song second `offset` is heard at ctx time `when`,
+  // at `rate` × speed (song time then runs `rate` song-seconds per second).
+  play(buffer, destination, offset, when, fadeIn = 0.02, rate = this.rate) {
     const ctx = this.ctx;
     const node = ctx.createBufferSource();
     node.buffer = buffer;
     node.loop = true;
+    this.rate = rate;
+    node.playbackRate.value = rate;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, when);
     gain.gain.linearRampToValueAtTime(1, when + Math.max(0.005, fadeIn));
     node.connect(gain);
     gain.connect(destination);
     node.start(when, offset);
-    this.t0 = when - offset;
+    this.t0 = when - offset / rate;
     this.duration = buffer.duration;
     this._est = null;
     return { node, gain };
@@ -193,7 +197,7 @@ export class MusicClock {
   beatTime(beat) { return this.firstBeat + beat * this.spb; }
   barTime(bar) { return this.beatTime(bar * this.beatsPerBar); }
   beatAt(songSec) { return (songSec - this.firstBeat) / this.spb; }
-  songToCtx(songSec) { return this.t0 + songSec; }
+  songToCtx(songSec) { return this.t0 + songSec / this.rate; }
 
   // Raw (un-smoothed) audible song time for a performance.now() instant.
   _measure(perfNow) {
@@ -201,10 +205,10 @@ export class MusicClock {
     const ts = ctx.getOutputTimestamp ? ctx.getOutputTimestamp() : null;
     if (ts && ts.contextTime > 0 && ts.performanceTime > 0) {
       // contextTime is what is coming out of the speakers at performanceTime.
-      return ts.contextTime + (perfNow - ts.performanceTime) / 1000 - this.t0;
+      return (ts.contextTime + (perfNow - ts.performanceTime) / 1000 - this.t0) * this.rate;
     }
     const latency = (ctx.outputLatency || 0) + (ctx.baseLatency || 0);
-    return ctx.currentTime - latency - this.t0;
+    return (ctx.currentTime - latency - this.t0) * this.rate;
   }
 
   // Audible song position at `perfNow` (defaults to now). Smoothed so the
@@ -221,7 +225,7 @@ export class MusicClock {
     if (this._est == null) {
       this._est = measured;
     } else {
-      const pred = this._est + (perfNow - this._estPerf) / 1000;
+      const pred = this._est + (perfNow - this._estPerf) / 1000 * this.rate;
       const err = measured - pred;
       this._est = Math.abs(err) > 0.05 ? measured : pred + err * 0.12;
     }
@@ -234,8 +238,10 @@ export class MusicClock {
   inputSongTime(evTime) {
     const now = performance.now();
     const base = this.songTime(now);
-    const t = (evTime && evTime <= now + 5) ? base - (now - evTime) / 1000 : base;
-    return t - this.userOffsetMs / 1000;
+    // Real-time gaps (event age, output latency calibration) are song time
+    // scaled by the playback rate.
+    const t = (evTime && evTime <= now + 5) ? base - (now - evTime) / 1000 * this.rate : base;
+    return t - this.userOffsetMs / 1000 * this.rate;
   }
 }
 
