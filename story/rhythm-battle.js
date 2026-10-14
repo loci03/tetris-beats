@@ -15,6 +15,12 @@
 //   • Landed commands also fill HYPE. Full hype = a TAUNT: press it, hit
 //     the taunt note on the next downbeat, and the opponent must DODGE
 //     (GROOVE on beat 3) or get stunned for a bar.
+//   • Every landed command also walks the dancer one row down their DANCE
+//     STRING (8 moves, as in Bust a Groove's 8-row command tree): row 8 is
+//     the FREEZE finisher, and the bar the freeze plays in is a REST bar
+//     (no command) before the next string starts. A miss or a landed
+//     jammer cuts the string short (back to row 1); taunting and dodging
+//     don't break it.
 //   • The rival runs the same rules with AI-rolled results.
 
 import { buildCommand, buildTauntBar, buildDodgeBar, buildStunnedBar, makeRng } from './chart.js';
@@ -32,6 +38,12 @@ const TAUNT_LAND_BONUS = 1500;
 const SOLO_BARS = 2;
 const SOLO_BAR_POINTS = 2500;
 const DODGE_BONUS = 800;
+// Dance string: 8 rows, the last one the freeze. A hot streak (high
+// enthusiasm) starts the next string two rows in — the original sometimes
+// starts a new string on row 2 or 3.
+export const STRING_ROWS = 8;
+const HOT_START_ENTH = 70;
+const FREEZE_BONUS = 1200;
 // Bars are built (and commands shown) this far ahead; the lane shows the
 // finisher this far ahead. Also the last moment a taunt can claim a bar.
 export const LOOKAHEAD = 2.0;
@@ -42,6 +54,7 @@ function newDancer(id) {
     counts: { perfect: 0, great: 0, good: 0, miss: 0 },
     moves: 0, branches: 0, solos: 0, tauntsLanded: 0, dodges: 0, stuns: 0, bestLevel: 1,
     bars: new Map(), stunNext: false, barPoints: new Map(),
+    row: 0, strings: 0, freezes: 0, restNext: false,
   };
 }
 
@@ -106,6 +119,7 @@ export class RhythmBattle {
       if (bar < (d.soloUntil || 0)) spec = { type: d.soloRole, tier: 0, notes: [] };
       else if (taunt) spec = taunt.attacker === who ? buildTauntBar() : buildDodgeBar();
       else if (d.stunNext) { spec = buildStunnedBar(); d.stunNext = false; }
+      else if (d.restNext) { spec = { type: 'rest', tier: 0, notes: [] }; d.restNext = false; }
       else spec = buildCommand(this.rng, d.level, d.enthusiasm);
       const b = this._materialize(spec, bar, who);
       if (who === 'rival') this._rollRival(b);
@@ -265,16 +279,42 @@ export class RhythmBattle {
       d.bestLevel = Math.max(d.bestLevel, level + (opt.kind === 'branch' ? 0.5 : opt.kind === 'solo' ? 1 : 0));
       d.level = Math.min(4, d.level + 1);
       const soloTime = opt.kind === 'solo' && b.bar + 1 + SOLO_BARS <= this.endBar;
-      this.emit('move', { who: d.id, bar: b.bar + 1, tier: level, kind: opt.kind, judgment: j, perfect: j === 'perfect', bonus: pts, chain: d.chain, soloTime });
+      // Dance string: this command earns row `row`; row 8 is the freeze.
+      const row = d.row, string = d.strings;
+      const freeze = !soloTime && row >= STRING_ROWS - 1 && b.bar + 1 < this.endBar;
+      if (freeze || soloTime) {
+        d.strings++;
+        d.row = d.enthusiasm >= HOT_START_ENTH ? 2 : 0;
+      } else {
+        d.row = Math.min(STRING_ROWS - 1, row + 1);
+      }
+      if (freeze) { d.freezes++; this._addPoints(d, b.bar, FREEZE_BONUS); }
+      this.emit('move', { who: d.id, bar: b.bar + 1, tier: level, kind: opt.kind, judgment: j, perfect: j === 'perfect', bonus: pts, chain: d.chain, soloTime, row, string, freeze });
       if (soloTime) this._startSolo(d, b.bar + 1);
+      else if (freeze) this._restBar(d, b.bar + 1);
     } else {
       d.chain = 0;
+      d.row = 0;                       // a miss cuts the string short
       d.fumbles = (d.fumbles || 0) + 1;
       if (d.fumbles >= 2) { d.level = Math.max(1, d.level - 1); d.fumbles = 0; }
       d.enthusiasm = clamp(d.enthusiasm + ENTH_GAIN.miss, 0, 100);
       this.emit('fumble', { who: d.id, bar: b.bar, reason });
     }
     this._barDone(b.bar);
+  }
+
+  // After a freeze: the bar it plays in carries no command — the dancer
+  // holds the freeze, the player gets four beats to breathe.
+  _restBar(d, bar) {
+    if (bar >= this.endBar || bar < (d.soloUntil || 0)) return;
+    const prev = d.bars.get(bar);
+    if (prev && (prev.resolved || prev.type !== 'command')) return;
+    if (prev) {
+      d.bars.set(bar, this._materialize({ type: 'rest', tier: 0, notes: [] }, bar, d.id));
+      this.emit('barReplaced', { who: d.id, bar });
+    } else {
+      d.restNext = true;
+    }
   }
 
   // SOLO TIME: the next SOLO_BARS bars become 'solo' for the dancer and
@@ -344,6 +384,7 @@ export class RhythmBattle {
       d.stuns++;
       d.chain = 0;
       d.combo = 0;
+      d.row = 0;                       // a landed jammer resets the string
       d.level = Math.max(1, d.level - 1);
       d.enthusiasm = clamp(d.enthusiasm - 30, 0, 100);
       attacker.tauntsLanded++;
@@ -460,7 +501,7 @@ export class RhythmBattle {
   commandFor(who, t) {
     let best = null;
     for (const b of this.dancer(who).bars.values()) {
-      if (!['command', 'taunt', 'dodge', 'stunned', 'solo', 'watch'].includes(b.type)) continue;
+      if (!['command', 'taunt', 'dodge', 'stunned', 'solo', 'watch', 'rest'].includes(b.type)) continue;
       const end = b.type === 'command' ? b.finisher.time + 0.3 : this.clock.barTime(b.bar + 1) - this.clock.spb + 0.3;
       if (end < t) continue;
       if (!best || b.bar < best.bar) best = b;

@@ -85,6 +85,9 @@ export class BattleHUD {
     const tier = el('div', 'sh-tier', row);
     const pips = [1, 2, 3, 4].map(() => el('i', '', tier));
     const lv = el('div', 'sh-lv', row, 'LV 1');
+    // Dance-string progress: 8 rows, the last one the freeze.
+    const str = el('div', 'sh-string', row);
+    const rows = [0, 1, 2, 3, 4, 5, 6, 7].map(i => el('i', i === 7 ? 'fz' : '', str));
     const combo = el('div', 'sh-combo', row, '');
     const enth = el('div', 'sh-enth', p);
     const enthFill = el('i', '', enth);
@@ -92,7 +95,7 @@ export class BattleHUD {
     const hype = el('div', 'sh-hype', p);
     const fill = el('i', '', hype);
     const label = el('span', '', hype, 'HYPE');
-    return { p, score, pips, lv, combo, enth, enthFill, hype, fill, label };
+    return { p, score, pips, lv, rows, combo, enth, enthFill, hype, fill, label };
   }
 
   _pad(parent, cls, label, fn, color) {
@@ -199,6 +202,7 @@ export class BattleHUD {
       ui.score.textContent = d.score.toLocaleString();
       ui.pips.forEach((pip, i) => pip.classList.toggle('on', i < d.level));
       ui.lv.textContent = `LV ${d.level}`;
+      if (ui._row !== d.row) { ui._row = d.row; ui.rows.forEach((r, i) => r.classList.toggle('on', i < d.row)); }
       ui.combo.textContent = d.combo >= 2 ? `${d.combo} COMBO` : '';
       ui.enthFill.style.width = d.enthusiasm + '%';
       ui.enth.classList.toggle('branch', d.enthusiasm >= 50);
@@ -251,7 +255,8 @@ export class BattleHUD {
         }
       } else if (b) {
         const label = { taunt: 'TAUNT on beat 1!', dodge: 'DODGE! GROOVE on beat 3', stunned: 'STUNNED…',
-          solo: '★★ SOLO TIME — the stage is yours! ★★', watch: `${this.names.rival}'s SOLO — watch the show` }[b.type];
+          solo: '★★ SOLO TIME — the stage is yours! ★★', watch: `${this.names.rival}'s SOLO — watch the show`,
+          rest: 'FREEZE! — hold it… new string next bar' }[b.type];
         if (label) el('div', 'sh-cmd-row note ' + b.type, this.cmd, label);
       }
     }

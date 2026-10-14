@@ -97,6 +97,11 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
 .sh-tier i.on { background: #ffc93a; box-shadow: 0 0 8px #ffb000; }
 .sh-combo { font-weight: 800; font-size: 11px; letter-spacing: 1.5px; color: #ffe45c; }
 .sh-lv { font-weight: 900; font-size: 11px; letter-spacing: 1.5px; color: #ffc93a; }
+.sh-string { display: flex; gap: 2px; align-items: center; }
+.sh-string i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.18); }
+.sh-string i.on { background: #4de8ff; box-shadow: 0 0 6px #4de8ff; }
+.sh-string i.fz { border-radius: 1px; transform: rotate(45deg); }
+.sh-string i.fz.on { background: #ffc93a; box-shadow: 0 0 8px #ffc93a; }
 .sh-enth {
   position: relative; height: 9px; border-radius: 5px; overflow: hidden; margin-bottom: 5px;
   background: rgba(255, 255, 255, 0.1);
@@ -242,6 +247,7 @@ body.story-charge #game-container .side-panel { opacity: 0.35; transition: opaci
 .sh-cmd-row.note.taunt { border-color: #b35cff; color: #e2c4ff; }
 .sh-cmd-row.note.dodge { border-color: #ff3355; color: #ffc2cc; }
 .sh-cmd-row.note.stunned { border-color: #ff6b7e; color: #ff9aa8; }
+.sh-cmd-row.note.rest { border-color: #ffc93a; color: #ffe08a; }
 .sh-cmd-row.note.solo { border-color: #ffd23f; color: #fff3b0; background: linear-gradient(90deg, rgba(90, 30, 110, 0.9), rgba(140, 40, 70, 0.9)); box-shadow: 0 0 22px rgba(255, 200, 60, 0.6); }
 .sh-cmd-row.note.watch { border-color: rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.8); }
 .sh-lane-wrap { position: relative; width: 100%; }

@@ -24,8 +24,9 @@ export const JOINTS = [
 ];
 const J = Object.fromEntries(JOINTS.map((n, i) => [n, i * 3]));
 const ROOT = JOINTS.length * 3;       // root x, y, z, yaw, pitch, roll
-const FEET = ROOT + 6;                // footL x, y, z, pitch, footR x, y, z, pitch
-export const POSE_SIZE = FEET + 8;
+const FEET = ROOT + 6;                // footL x, y, z, pitch, yaw, footR x, y, z, pitch, yaw
+const FS = 5;                         // values per foot
+export const POSE_SIZE = FEET + 2 * FS;
 
 // Rig proportions (body units, see characters.js).
 const HIP_Y = 1.0, HIP_W = 0.11, HIP_DROP = 0.04, LEG = 0.44;
@@ -97,21 +98,24 @@ class Pose {
   wrist(side, x, z = 0) { return this.set('hand' + side, x, 0, side === 'L' ? z : -z); }
 
   // Foot target: `out` from centre toward that foot's own side, `lift` off
-  // the floor, `fwd` toward the dancer's front, `pitch` > 0 raises the heel.
-  foot(side, out, lift = 0, fwd = 0, pitch = 0) {
-    const o = FEET + (side === 'L' ? 0 : 4);
+  // the floor, `fwd` toward the dancer's front, `pitch` > 0 raises the heel
+  // (< 0 raises the toes: a heel dig), `turn` > 0 swivels the toes out
+  // (< 0 pigeon-toes them in) — heel pivots, Charleston twists, swivels.
+  foot(side, out, lift = 0, fwd = 0, pitch = 0, turn = 0) {
+    const o = FEET + (side === 'L' ? 0 : FS);
     const a = this.a;
     a[o] = (side === 'L' ? 1 : -1) * out;
     a[o + 1] = ANK + lift + Math.max(0, pitch) * 0.06;
     a[o + 2] = fwd - Math.max(0, pitch) * 0.03;
     a[o + 3] = pitch;
+    a[o + 4] = (side === 'L' ? 1 : -1) * turn;
     return this;
   }
   // Foot at an absolute x (dancer's left = +x) — for travelling steps.
-  footX(side, x, lift = 0, fwd = 0, pitch = 0) {
-    return this.foot(side, side === 'L' ? x : -x, lift, fwd, pitch);
+  footX(side, x, lift = 0, fwd = 0, pitch = 0, turn = 0) {
+    return this.foot(side, side === 'L' ? x : -x, lift, fwd, pitch, turn);
   }
-  lift(side, h, fwd = 0) { const o = FEET + (side === 'L' ? 0 : 4); this.a[o + 1] += h; this.a[o + 2] += fwd; return this; }
+  lift(side, h, fwd = 0) { const o = FEET + (side === 'L' ? 0 : FS); this.a[o + 1] += h; this.a[o + 2] += fwd; return this; }
   // Knees bend by lowering the hips; the IK keeps the feet where they are.
   squat(k) { this.a[ROOT + 1] -= 0.2 * k; return this; }
   lean(spine, chest = 0, twist = 0, side = 0) { this.add('spine', spine, 0, side * 0.5); this.add('chest', chest, twist, side * 0.5); return this; }
@@ -129,8 +133,9 @@ export function mirrorPose(src, out = new Float32Array(POSE_SIZE)) {
   }
   out[ROOT] = -src[ROOT]; out[ROOT + 1] = src[ROOT + 1]; out[ROOT + 2] = src[ROOT + 2]; out[ROOT + 3] = -src[ROOT + 3];
   out[ROOT + 4] = src[ROOT + 4]; out[ROOT + 5] = -src[ROOT + 5];
-  for (let k = 0; k < 4; k++) { out[FEET + k] = src[FEET + 4 + k]; out[FEET + 4 + k] = src[FEET + k]; }
-  out[FEET] = -out[FEET]; out[FEET + 4] = -out[FEET + 4];
+  for (let k = 0; k < FS; k++) { out[FEET + k] = src[FEET + FS + k]; out[FEET + FS + k] = src[FEET + k]; }
+  out[FEET] = -out[FEET]; out[FEET + FS] = -out[FEET + FS];
+  out[FEET + 4] = -out[FEET + 4]; out[FEET + FS + 4] = -out[FEET + FS + 4];
   return out;
 }
 
@@ -140,7 +145,7 @@ function solveLegs(a, prevZ) {
   const hx = a[J.hips], hy = a[J.hips + 1], hz = a[J.hips + 2];
   const px = a[ROOT], py = HIP_Y + a[ROOT + 1], pz = a[ROOT + 2];
   for (let side = 0; side < 2; side++) {
-    const f = FEET + side * 4, sx = side === 0 ? 1 : -1;
+    const f = FEET + side * FS, sx = side === 0 ? 1 : -1;
     let vx = a[f] - px, vy = a[f + 1] - py, vz = a[f + 2] - pz;
     // Into the hips' local frame (inverse of Rx·Ry·Rz).
     let c = Math.cos(hx), s = Math.sin(hx), t;
@@ -164,7 +169,7 @@ function solveLegs(a, prevZ) {
     const th = J[side === 0 ? 'thighL' : 'thighR'], sh = J[side === 0 ? 'shinL' : 'shinR'], ft = J[side === 0 ? 'footL' : 'footR'];
     a[th] = tx - alpha; a[th + 1] = 0; a[th + 2] = tz;
     a[sh] = 2 * alpha; a[sh + 1] = 0; a[sh + 2] = 0;
-    a[ft] = -(tx + alpha) + a[f + 3]; a[ft + 1] = -hy; a[ft + 2] = -tz;   // shoes keep facing front
+    a[ft] = -(tx + alpha) + a[f + 3]; a[ft + 1] = -hy + a[f + 4]; a[ft + 2] = -tz;   // shoes face front unless swivelled
   }
 }
 
@@ -1534,6 +1539,11 @@ function evalMove(name, b, B, style, pose) {
     if (POP[k1.ease]) {
       const w = EASE[k1.ease](u);
       for (let q = 0; q < POSE_SIZE; q++) a[q] = A[q] + (Bk[q] - A[q]) * w;
+      // A popped key still *steps* a travelling foot rather than skating it.
+      for (let f = FEET; f < POSE_SIZE; f += FS) {
+        const d = Math.hypot(Bk[f] - A[f], Bk[f + 2] - A[f + 2]);
+        if (!m.slide && d > 0.04) a[f + 1] += Math.sin(Math.PI * w) * Math.min(0.08, 0.03 + d * 0.3);
+      }
     } else {
       // Cubic Hermite through the neighbouring keys (Catmull-Rom tangents),
       // so the body keeps travelling through each key instead of stopping
@@ -1551,11 +1561,25 @@ function evalMove(name, b, B, style, pose) {
         const m0 = (Bk[q] - M[q]) * s0 * c0, m1 = (N[q] - A[q]) * s1 * c1;
         a[q] = h00 * A[q] + h10 * m0 + h01 * Bk[q] + h11 * m1;
       }
-      for (let f = FEET; f < FEET + 8; f += 4) {
+      for (let f = FEET; f < POSE_SIZE; f += FS) {
         // A foot travelling between two planted keys steps there (lifts in
         // an arc) instead of sliding — unless the move slides on purpose.
         const d = Math.hypot(Bk[f] - A[f], Bk[f + 2] - A[f + 2]);
-        if (!m.slide && d > 0.04 && A[f + 1] < ANK + 0.03 && Bk[f + 1] < ANK + 0.03) a[f + 1] += Math.sin(Math.PI * u) * Math.min(0.1, 0.03 + d * 0.35);
+        const upA = A[f + 1] - Math.max(0, A[f + 3]) * 0.06 > ANK + 0.03, upB = Bk[f + 1] - Math.max(0, Bk[f + 3]) * 0.06 > ANK + 0.03;
+        if (!m.slide && d > 0.04 && !upA && !upB) a[f + 1] += Math.sin(Math.PI * u) * Math.min(0.1, 0.03 + d * 0.35);
+        else if (upA && !upB) {
+          // Landing: the foot travels over its spot, then drops onto the floor
+          // accelerating, so the contact lands ON the key's beat.
+          const ux = smooth(Math.min(1, u * 1.25));
+          a[f] = A[f] + (Bk[f] - A[f]) * ux; a[f + 2] = A[f + 2] + (Bk[f + 2] - A[f + 2]) * ux;
+          a[f + 1] = A[f + 1] + (Bk[f + 1] - A[f + 1]) * u * u;
+        } else if (!upA && upB) {
+          // Take-off: the foot leaves the floor at the key and bursts up.
+          const uo = 1 - (1 - u) * (1 - u);
+          a[f + 1] = A[f + 1] + (Bk[f + 1] - A[f + 1]) * uo;
+          const ux = smooth(Math.max(0, u * 1.25 - 0.25));
+          a[f] = A[f] + (Bk[f] - A[f]) * ux; a[f + 2] = A[f + 2] + (Bk[f + 2] - A[f + 2]) * ux;
+        }
         // Curves can dip a foot through the floor between steps.
         a[f + 1] = Math.max(a[f + 1], ANK);
       }
@@ -1568,16 +1592,32 @@ function evalMove(name, b, B, style, pose) {
 // Blend pose `a` → `b` by `w` into `out`. Body yaw/pitch/roll go the short
 // way round; a foot that has to move *steps* there (lifts in an arc, one
 // foot after the other) instead of sliding across the floor.
-function blendPoses(out, a, b, w) {
+// `pin` (optional): where the feet were when the blend began — once the
+// body commits to the next move, the old move's footwork stops (a foot
+// waiting to step stays put instead of carrying on with the old pattern).
+function blendPoses(out, a, b, w, pin = null) {
   for (let i = 0; i < FEET; i++) out[i] = a[i] + (b[i] - a[i]) * w;
   for (let i = ROOT + 3; i <= ROOT + 5; i++) out[i] = a[i] + wrapAngle(b[i] - a[i]) * w;
+  if (pin) a = pin;
+  // Which feet have to travel: one alone lands exactly as the blend ends
+  // (on the downbeat of a lead-in); two go one after the other, the first
+  // landing half way (a ball-change into the beat).
+  const dL = Math.hypot(b[FEET] - a[FEET], b[FEET + 2] - a[FEET + 2]);
+  const dR = Math.hypot(b[FEET + FS] - a[FEET + FS], b[FEET + FS + 2] - a[FEET + FS + 2]);
+  const both = dL > 0.04 && dR > 0.04, first = dL >= dR ? 0 : 1;
   for (let side = 0; side < 2; side++) {
-    const o = FEET + side * 4;
-    const d = Math.hypot(b[o] - a[o], b[o + 2] - a[o + 2]);
+    const o = FEET + side * FS;
+    const d = side ? dR : dL;
     let ws = w;
-    if (d > 0.04) ws = side === 0 ? smooth(w / 0.6) : smooth((w - 0.4) / 0.6);
-    for (let k = 0; k < 4; k++) out[o + k] = a[o + k] + (b[o + k] - a[o + k]) * ws;
+    if (d > 0.04) ws = !both ? smooth(w) : side === first ? smooth(w / 0.5) : smooth((w - 0.5) / 0.5);
+    for (let k = 0; k < FS; k++) out[o + k] = a[o + k] + (b[o + k] - a[o + k]) * ws;
     if (d > 0.04) out[o + 1] += Math.sin(Math.PI * ws) * Math.min(0.1, 0.03 + d * 0.35);
+    else {
+      // A foot coming down onto a planted target lands as the blend ends
+      // (accelerating into the floor), not early half way through it.
+      const ya = a[o + 1] - Math.max(0, a[o + 3]) * 0.06, yb = b[o + 1] - Math.max(0, b[o + 3]) * 0.06;
+      if (ya > ANK + 0.02 && yb < ANK + 0.01) out[o + 1] = a[o + 1] + (b[o + 1] - a[o + 1]) * w * w;
+    }
   }
   return out;
 }
@@ -1593,6 +1633,38 @@ for (const [names, f, z] of [
   [['shL', 'shR'], 6, 0.55], [['armL', 'armR'], 5, 0.55], [['foreL', 'foreR'], 4.5, 0.5], [['handL', 'handR'], 4, 0.45],
 ]) for (const n of names) for (let k = 0; k < 3; k++) { SPRING_F[J[n] + k] = f; SPRING_Z[J[n] + k] = z; }
 for (let k = 0; k < 3; k++) { SPRING_F[ROOT + k] = 9; SPRING_Z[ROOT + k] = 0.8; SPRING_F[ROOT + 3 + k] = 6; SPRING_Z[ROOT + 3 + k] = 0.85; }
+
+// Pose layout + rig proportions, for tools (Dance View, tests).
+export const LAYOUT = { J, ROOT, FEET, FS, ANK, HIP_Y, HIP_W, HIP_DROP, LEG, STANCE };
+
+// Motion profile of a move, measured without a rig: how far the body
+// tumbles (pitch / roll), how long the hips are airborne, how many turns it
+// spins and how low it gets. The choreographer uses it to keep flips, jumps
+// and multi-turn spins out of the everyday choreography (designated
+// specials only).
+const _profiles = new Map();
+export function moveProfile(name, style = {}, beats = 4) {
+  const key = name + '|' + (style.feel || '') + '|' + beats;
+  if (_profiles.has(key)) return _profiles.get(key);
+  const st = { swagger: 1, bounce: 1, ...style, energy: 1, level: 1 };
+  const p = new Pose();
+  let tumble = 0, air = 0, n = 0, yawPrev = null, travel = 0, minHip = Infinity;
+  for (let b = 0; b < beats; b += 1 / 48) {
+    const a = evalMove(name, b, b, st, p);
+    tumble = Math.max(tumble, Math.abs(a[ROOT + 4]), Math.abs(a[ROOT + 5]));
+    if (a[ROOT + 1] > 0.12) air++;
+    const y = a[ROOT + 3];
+    if (yawPrev !== null) travel += Math.abs(wrapAngle(y - yawPrev));
+    yawPrev = y;
+    minHip = Math.min(minHip, a[ROOT + 1]);
+    n++;
+  }
+  const r = { name, tumble, airborne: air / n, turns: travel / TAU, minHip };
+  r.flip = tumble > 1.2; r.air = r.airborne > 0.1; r.spin = r.turns > 1.25;
+  r.special = r.flip || r.air || r.spin;
+  _profiles.set(key, r);
+  return r;
+}
 
 // ── Authoring kit for level modules (story/levels/*.js) ─────────────
 // Boss move sets live with their level; they register here at load time.
@@ -1628,25 +1700,41 @@ export class DanceController {
     this._sx = new Float32Array(POSE_SIZE); this._sv = new Float32Array(POSE_SIZE);
     this._lastBeat = null; this._tight = 1;
     this._blend = new Float32Array(POSE_SIZE);
+    this._pin = new Float32Array(POSE_SIZE);
     this._thighZ = [0, 0];
     this._pa = new Pose(); this._pb = new Pose(); this._pc = new Pose(); this._pd = new Pose();
     this._phrases = new Map();
     this._energy = 1;
     this.out = new Float32Array(POSE_SIZE);
+    // Dance state machine (see choreo.js STATES): what the dancer is doing
+    // now, and a log of the transitions for tests / the Dance View.
+    this.level = 1;                              // combo level 1-4: idle groove intensity
+    this.state = 'IDLE_GROOVE';
+    this.stateLog = [];
+    this.onState = null;
   }
 
-  // Schedule `name` to start at `startBeat` for `len` beats.
+  // Schedule `name` to start at `startBeat` for `len` beats. Planned moves
+  // LEAD IN: the blend out of whatever the body is doing starts `lead`
+  // beats early (the preparation — a small gather on the "and"), so the
+  // move's first key lands exactly ON its downbeat rather than half a beat
+  // late. opts: { fade, lead, out (fade back to the groove), state, level,
+  // faceFoe }.
   play(name, startBeat, len = 4, opts = {}) {
-    const entry = { name, start: startBeat, len, faceFoe: !!opts.faceFoe, fade: opts.fade };
+    const fade = opts.fade ?? 0.5;
+    const entry = {
+      name, start: startBeat, len, faceFoe: !!opts.faceFoe, fade, lead: opts.lead ?? fade,
+      out: opts.out, state: opts.state || null, level: opts.level || 0, mirror: !!opts.mirror,
+    };
     this.queue.push(entry);
-    this.queue.sort((a, b) => a.start - b.start);
+    this.queue.sort((a, b) => (a.start - a.lead) - (b.start - b.lead));
     return entry;
   }
 
   // Cut in immediately (reactions).
   react(name, nowBeat, len = 2, opts = {}) {
     this.queue = this.queue.filter(q => q.start > nowBeat + len);
-    this._switch({ name, start: nowBeat, len, faceFoe: !!opts.faceFoe, fade: Math.max(0.25, opts.fade ?? 0.3) }, nowBeat);
+    this._switch({ name, start: nowBeat, len, faceFoe: !!opts.faceFoe, fade: Math.max(0.2, opts.fade ?? 0.3), lead: 0, out: opts.out, state: opts.state || null, level: opts.level || 0, mirror: !!opts.mirror }, nowBeat);
   }
 
   clearQueue() { this.queue.length = 0; }
@@ -1697,7 +1785,7 @@ export class DanceController {
       for (let k = 0; k < steps; k++) { vc += h * (wf * wf * (out[c] - xc) - 2 * 0.9 * wf * vc); xc += h * vc; }
       x[c] = xc; v[c] = vc; out[c] = xc;
     }
-    for (let f = FEET; f < FEET + 8; f += 4) out[f + 1] = Math.max(out[f + 1], ANK);
+    for (let f = FEET; f < POSE_SIZE; f += FS) out[f + 1] = Math.max(out[f + 1], ANK);
   }
 
   _switch(entry, beat) {
@@ -1705,13 +1793,25 @@ export class DanceController {
     // body actually is, not from the old move.
     if (this.prev && beat - this.fadeStart < this.fadeLen) this.prev = { name: '_frozen', pose: Float32Array.from(this._blend) };
     else this.prev = this.cur;
+    this._pin.set(this._blend);
     this.cur = entry;
     this.fadeStart = beat;
-    this.fadeLen = entry.fade ?? 0.5;
+    // A lead-in blends over exactly the time left before the downbeat.
+    this.fadeLen = entry.lead > 0 && entry.start > beat ? Math.max(0.12, entry.start - beat) : (entry.fade ?? 0.5);
+  }
+
+  // The dance state for `beat` (see choreo.js STATES).
+  _stateAt(beat) {
+    const c = this.cur;
+    if (c.name === 'groove') return this.prev ? 'MOVE_TRANSITION' : 'IDLE_GROOVE';
+    if (beat < c.start) return 'MOVE_PREPARATION';
+    return c.state || 'DANCE_MOVE';
   }
 
   _eval(entry, beat, pose) {
     if (entry.name === '_frozen') return entry.pose;
+    // Moves embellish with the combo level (style.level, 1-4).
+    this.style.level = entry.name === 'groove' ? this.level : (entry.level || this.level);
     let a;
     if (entry.name === 'groove') {
       // Base routines run on the absolute beat, so they're always in phase
@@ -1746,8 +1846,9 @@ export class DanceController {
     } else {
       a = evalMove(entry.name, beat - entry.start, beat, this.style, pose);
     }
-    // Moves are authored with the opponent on the dancer's left.
-    if (entry.faceFoe && this.foeSide < 0) a.set(mirrorPose(a, _mirror));
+    // Moves are authored with the opponent on the dancer's left; `mirror`
+    // flips a move to lead with the other foot.
+    if ((entry.faceFoe && this.foeSide < 0) !== !!entry.mirror) a.set(mirrorPose(a, _mirror));
     return a;
   }
 
@@ -1759,18 +1860,30 @@ export class DanceController {
     const beat = beatNow + 0.02 / this.spb;
     this.style.energy = acc ? acc.energy : 1;
     this._energy += ((acc ? acc.energy : 1) - this._energy) * 0.03;
-    while (this.queue.length && this.queue[0].start <= beat) this._switch(this.queue.shift(), beat);
+    while (this.queue.length && this.queue[0].start - (this.queue[0].lead || 0) <= beat) this._switch(this.queue.shift(), beat);
     if (this.cur.name !== 'groove' && beat >= this.cur.start + this.cur.len) {
-      this._switch({ name: 'groove', start: beat, len: Infinity, faceFoe: false, fade: 0.6 }, beat);
+      this._switch({ name: 'groove', start: beat, len: Infinity, faceFoe: false, fade: this.cur.out ?? 0.6, lead: 0 }, beat);
     }
     const a = this._eval(this.cur, beat, this._pa);
     const w = smooth((beat - this.fadeStart) / this.fadeLen);
     if (this.prev && w < 1) {
       // A spin that ends on 2π must not unwind back to 0; feet step across.
-      blendPoses(this.out, this._eval(this.prev, beat, this._pb), a, w);
+      blendPoses(this.out, this._eval(this.prev, beat, this._pb), a, w, this._lastBeat == null ? null : this._pin);
+      // Preparation: gather into the knees on the "and" before the downbeat.
+      if (beat < this.cur.start) {
+        const g = Math.sin(Math.PI * w);
+        this.out[ROOT + 1] -= 0.035 * g; this.out[J.chest] += 0.05 * g; this.out[J.head] += 0.04 * g;
+      }
     } else {
       this.prev = null;
       this.out.set(a);
+    }
+    const st = this._stateAt(beat);
+    if (st !== this.state) {
+      this.state = st;
+      this.stateLog.push({ beat, state: st, move: this.cur.name });
+      if (this.stateLog.length > 256) this.stateLog.shift();
+      if (this.onState) this.onState(st, this.cur, beat);
     }
     this._blend.set(this.out);
     const name = this.cur.name === 'groove' ? this.routineAt(beat) : this.cur.name;

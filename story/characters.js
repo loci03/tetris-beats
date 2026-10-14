@@ -29,6 +29,16 @@ export const CHARACTERS = {
     // ★ branch signature moves per level, and the SOLO (command tree, chart.js).
     branchMoves: { 2: 'lockAndPop', 3: 'breakWindmill', 4: 'backflip' },
     solo: 'headspin',
+    // Dance strings (choreo.js): a b-boy in the Heat mould — party grooves
+    // into toprock, footwork and a chair freeze; the ★ line goes through
+    // locking and popping. Flips and power moves live in the solo only.
+    choreo: {
+      std: ['kneeBounce', 'twoStep', 'runningMan', 'charleston', 'toprock', 'kickBallChange', 'toprockKick'],
+      alt: ['shoulderBounce', 'stepClap', 'rogerRabbit', 'lockAndPop', 'isoStep', 'robot', 'popWave'],
+      finisher: { std: 'finBboy', alt: 'footwork' },
+      freeze: 'freezeChair',
+      solo: ['headspin'],
+    },
     fx: { move: 'note', big: 'sparkle', taunt: 'note' },
     // Battle taunt: own move, marks thrown at the rival, HUD disruption
     // (BattleHUD.disrupt) when it lands on the player.
@@ -54,6 +64,16 @@ export const CHARACTERS = {
     moves: { 1: ['discoPoint', 'elvisLegs'], 2: ['funkyChicken', 'fingerGuns'], 3: ['spinPoint', 'airGuitar'], 4: ['jumpSplit', 'splitDrop'] },
     branchMoves: { 2: 'combBack', 3: 'kneeSlide', 4: 'discoSpin' },
     solo: 'discoInferno',
+    // '70s disco in the Hiro / Travolta mould with rock'n'roll swagger: hip
+    // sway, disco points, the Bus Stop and the Hustle, swivels; the ★ line
+    // is Elvis and funk. Finishes with a pirouette into the Travolta.
+    choreo: {
+      std: ['hipSway', 'discoPoint', 'busStop', 'hustle', 'swivelStep', 'kickBallChange', 'discoRolls'],
+      alt: ['kneeBounce', 'elvisSwivel', 'discoStrut', 'fingerGuns', 'elvisLegs', 'funkyChicken', 'halfTurn'],
+      finisher: { std: 'finDisco', alt: 'finDisco' },
+      freeze: 'freezeTravolta',
+      solo: ['discoInferno'],
+    },
     introTaunt: 'introTaunt',
     // Points you out, waves you off, spins: a blast of disco sparkle.
     taunt: 'introTaunt', tauntFx: { projectile: 'sparkle', disrupt: 'swirl+glitch' },
@@ -82,6 +102,16 @@ export const CHARACTERS = {
     moves: { 1: ['hairFlip', 'tacoHop'], 2: ['vogueHands', 'purseTwirl'], 3: ['twirlSpin', 'heartHands'], 4: ['catwalkPose', 'dropItLow'] },
     branchMoves: { 2: 'kissBlow', 3: 'cartwheel', 4: 'toeTouch' },
     solo: 'superstar',
+    // Glam diva / modern jazz (Kelly's lane): sway, catwalk, shoulder rolls,
+    // jazz square, vogue; the ★ line is sass — hair flip, shimmy, drop it
+    // low. A pivot into the diva freeze.
+    choreo: {
+      std: ['hipSway', 'sassyStrut', 'shoulderRoll', 'jazzSquare', 'vogueHands', 'kickBallChange', 'heartHands'],
+      alt: ['shoulderBounce', 'purseGroove', 'crossStep', 'hairFlip', 'shimmyBounce', 'halfTurn', 'dropItLow'],
+      finisher: { std: 'finDiva', alt: 'finDiva' },
+      freeze: 'freezeDiva',
+      solo: ['superstar'],
+    },
     introTaunt: 'tinaTaunt',
     // Finger wag, hair flip, blown kiss: hearts all over your arrows.
     taunt: 'tinaTaunt', tauntFx: { projectile: 'heart', disrupt: 'float+wobble', color: '#ff4f9a' },

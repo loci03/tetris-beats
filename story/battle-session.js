@@ -13,6 +13,7 @@ import { MusicClock } from './music-clock.js';
 import { RhythmBattle } from './rhythm-battle.js';
 import { createCharacter, CHARACTERS } from './characters.js';
 import { DanceController, MOVE_LABELS } from './dance.js';
+import { Choreographer, ACTION_STATE, ROW_NAMES } from './choreo.js';
 import { CameraDirector } from './camera.js';
 import { BoardTransition, cameraAlongPath, START_POSE } from './transition.js';
 import { BattleHUD } from './hud.js';
@@ -81,6 +82,9 @@ export class BattleSession {
     this.pDance = new DanceController(this.pRig, { ...pDef.style, bounceRate, spb }, +1);
     this.rDance = new DanceController(this.rRig, { ...rDef.style, bounceRate, spb }, -1);
     this.pDef = pDef; this.rDef = rDef;
+    // Dance strings → phrased moves (choreo.js).
+    this.pChoreo = new Choreographer(pDef);
+    this.rChoreo = new Choreographer(rDef);
     this.fx = new AnimeFx(this.scene);
     this.director = new CameraDirector(this.camera, this.world.anchors);
     this.director.motion = this.motion;
@@ -340,11 +344,23 @@ export class BattleSession {
     this.fx.throw(kind, p0, p1, n);
   }
 
-  _schedule(who, name, startBeat, len, own = true) {
+  _schedule(who, name, startBeat, len, own = true, opts = {}) {
     const dc = this._dc(who);
     if (own) dc.queue = dc.queue.filter(q => !(q.start === startBeat && q.reaction));
     else if (dc.queue.some(q => q.start === startBeat && !q.reaction)) return;
-    dc.play(name, startBeat, len, { faceFoe: name === 'taunt' }).reaction = !own;
+    dc.play(name, startBeat, len, { faceFoe: name === 'taunt', state: ACTION_STATE[name], ...opts }).reaction = !own;
+  }
+  _choreo(who) { return who === 'player' ? this.pChoreo : this.rChoreo; }
+  // Lay down a choreographer plan (see Choreographer: entries in beats).
+  _perform(who, entries, beatNow) {
+    const dc = this._dc(who);
+    for (const e of entries) {
+      if (e.react) dc.react(e.name, beatNow, e.len, { state: e.state, fade: e.fade, mirror: e.mirror, level: e.level });
+      else {
+        dc.queue = dc.queue.filter(q => !(q.start >= e.start && q.start < e.start + e.len));
+        dc.play(e.name, e.start, e.len, { state: e.state, fade: e.fade, lead: e.lead, out: e.out, level: e.level, mirror: e.mirror });
+      }
+    }
   }
 
   // Character voice lines: only a boss with a recorded voice pack speaks;
@@ -376,13 +392,13 @@ export class BattleSession {
           this.phase = 'intro';
           this.hud.show(true);
           this.hud.showBanner(`${this.level.title}<small>DANCE BATTLE vs ${rivalName}</small>`, 'big', 2200);
-          this.pDance.play('entrance', B, 4); this.rDance.play('entrance', B, 4);
+          this.pDance.play('entrance', B, 4, { state: 'INTRO_TAUNT' }); this.rDance.play('entrance', B, 4, { state: 'INTRO_TAUNT' });
           this.director.cut('two', B, 4);
           this.sfx.crowdCheer(1, this._at(B));
         } else if (i === 1) {
           // The rival calls the player out: point, smirk, spin, signature pose.
-          this.rDance.play(this.rDef.introTaunt || 'introTaunt', B, 4, { faceFoe: true });
-          this.pDance.play('introWatch', B, 4);
+          this.rDance.play(this.rDef.introTaunt || 'introTaunt', B, 4, { faceFoe: true, state: 'INTRO_TAUNT' });
+          this.pDance.play('introWatch', B, 4, { state: 'INTRO_TAUNT' });
           this.director.cut('close', B, 4, { who: 'rival' });
           this.ann.say('vs-' + this.level.dancers.rival, this._at(B + 0.5), { force: true });
           this.sfx.crowdOoh(0.8, this._at(B + 1.5));
@@ -390,8 +406,8 @@ export class BattleSession {
           this.cues.push({ beat: B + 1, fn: () => this._fx('rival', this.rDef.fx && this.rDef.fx.taunt, 5) });
         } else if (i === 2) {
           // The player answers: head shake, two bounces, "come on".
-          this.pDance.play('introAnswer', B, 4, { faceFoe: true });
-          this.rDance.play('introWatch', B, 4);
+          this.pDance.play('introAnswer', B, 4, { faceFoe: true, state: 'INTRO_TAUNT' });
+          this.rDance.play('introWatch', B, 4, { state: 'INTRO_TAUNT' });
           this.director.cut('close', B, 4, { who: 'player' });
           this._fx('player', 'anger', 1);
           this.sfx.crowdCheer(0.6, this._at(B + 3));
@@ -400,7 +416,7 @@ export class BattleSession {
           else this.hud.showCallout('Enter the <b>arrows</b> any time · <b>SPACE</b> on beat 4', '', 4000);
         } else if (i === 3) {
           // READY + count-in: 3 — 2 — 1 — GROOVE, on the beat.
-          this.pDance.play('ready', B, 4); this.rDance.play('ready', B, 4);
+          this.pDance.play('ready', B, 4, { state: 'INTRO_TAUNT' }); this.rDance.play('ready', B, 4, { state: 'INTRO_TAUNT' });
           this.director.cut('two', B, 4);
           this.hud.showBanner('READY?', '', this.clock.spb * 1000 * 0.9);
           // "Ready?" — count-in blips on 3-2-1 — "DANCE!" landing on the
@@ -442,20 +458,21 @@ export class BattleSession {
         break;
       case 'move': {
         const def = this._def(d.who);
-        let name;
-        if (d.kind === 'solo') name = def.solo;
-        else if (d.kind === 'branch') name = def.branchMoves[d.tier];
-        if (!name) { const list = def.moves[d.tier] || ['twoStep']; name = list[d.bar % list.length]; }
+        // The dance string decides the move: row 1-8 on the standard or ★
+        // line, the freeze on row 8 (Choreographer).
         const inSolo = this._soloUntil && d.bar < this._soloUntil;
-        if (!d.soloTime && !inSolo) this._schedule(d.who, name, d.bar * 4, 4, true);
+        const plan = d.soloTime || inSolo ? [] : this._choreo(d.who).success(d);
+        if (plan.length) this._perform(d.who, plan, beatNow);
+        const name = plan.length ? plan[0].name : def.solo;
+        this._dc(d.who).level = Math.min(4, d.tier + 1);
         const foe = d.who === 'player' ? 'rival' : 'player';
-        const big = d.kind !== 'std' || d.tier >= 4;
+        const big = d.kind !== 'std' || d.freeze || d.row >= 6;
         if (d.soloTime) {
           // Solo Time stages itself (soloStart).
         } else if (big) {
           this._schedule(foe, 'reactOoh', d.bar * 4, 2, false);
           this.cuts.push({ bar: d.bar, kind: 'orbit', who: d.who, len: 4 });
-        } else if (d.tier >= 3) {
+        } else if ((d.row ?? 0) >= 4) {
           this.cuts.push({ bar: d.bar, kind: 'close', who: d.who, len: 3 });
         }
         const fxKind = name === 'kissBlow' || name === 'heartHands' ? 'heart' : (def.fx && def.fx.move);
@@ -464,7 +481,9 @@ export class BattleSession {
         const power = d.kind === 'solo' ? 5 : d.kind === 'branch' ? Math.min(5, d.tier + 1) : d.tier;
         this.world.react('move', { ...d, tier: power, songTime: this.clock.barTime(d.bar) });
         if (d.who === 'player') {
-          const label = (d.kind === 'solo' ? '★★ ' : d.kind === 'branch' ? '★ ' : '') + (MOVE_LABELS[name] || 'GROOVE');
+          const row = d.row ?? 0;
+          const label = d.kind === 'solo' ? '★★ SOLO' : (d.kind === 'branch' ? '★ ' : '') +
+            (d.freeze ? `${MOVE_LABELS[name] || 'FINISH'} → FREEZE!` : `${row + 1}/8 ${MOVE_LABELS[name] || ROW_NAMES[row]}`);
           this.hud.showCallout(`${label} · ${d.judgment.toUpperCase()} <b>+${d.bonus}</b>`, d.perfect || big ? 'good' : '', 1400);
           // The host only calls the first ★ branch of the battle ("Fever!");
           // the solo gets its own call when Solo Time starts.
@@ -475,13 +494,15 @@ export class BattleSession {
         if (big) {
           if (d.who === 'player') this.sfx.crowdCheer(d.kind === 'solo' ? 1.4 : 1, this._at(d.bar * 4));
           else this.sfx.crowdOoh(0.7, this._at(d.bar * 4));
-        } else if (d.tier >= 3 && d.who === 'player') {
+        } else if ((d.row ?? 0) >= 4 && d.who === 'player') {
           this.sfx.crowdCheer(0.45, this._at(d.bar * 4));
         }
         break;
       }
       case 'fumble':
-        this._dc(d.who).react('fumble', beatNow, 1.6);
+        // A stutter, not a fall: miss → MISSED_INPUT → RECOVERY.
+        this._perform(d.who, this._choreo(d.who).miss(d, beatNow), beatNow);
+        this._dc(d.who).level = 1;
         this._fx(d.who, 'sweat', 1);
         if (d.who === 'player') this._voice('rival', 'single', 0.3);
         break;
@@ -501,7 +522,7 @@ export class BattleSession {
         break;
       case 'taunt': {
         const tt = this._taunt(d.attacker);
-        this._dc(d.attacker).react(tt.move, beatNow, 4 - (beatNow % 4) + 0.001, { faceFoe: true, fade: 0.15 });
+        this._dc(d.attacker).react(tt.move, beatNow, 4 - (beatNow % 4) + 0.001, { faceFoe: true, fade: 0.15, state: 'JAMMER_ATTACK' });
         this.cues.push({ beat: beatNow + 0.75, fn: () => this._throw(d.attacker, tt.projectile, tt.n) });
         this.cues.sort((a, b) => a.beat - b.beat);
         this._fx(d.attacker, (this._def(d.attacker).fx || {}).taunt, 5);
@@ -513,21 +534,22 @@ export class BattleSession {
         break;
       }
       case 'tauntWhiff':
-        this._dc(d.attacker).react('whiff', beatNow, 2);
+        this._dc(d.attacker).react('whiff', beatNow, 2, { state: 'MISSED_INPUT' });
         if (d.attacker === 'player') this.hud.showCallout('TAUNT WHIFFED', 'bad', 1200);
         else this.hud.showCallout(`${rivalName} WHIFFED THE TAUNT`, 'good', 1200);
         break;
       case 'dodge':
-        this._dc(d.who).react('dodge', beatNow, 2);
+        this._dc(d.who).react('dodge', beatNow, 2, { state: 'JAMMER_DODGE' });
         this._fx(d.who, 'sparkle', 5); this._fx(d.attacker, 'sweat', 1);
-        this._dc(d.attacker).react('whiff', beatNow + 0.2, 2);
+        this._dc(d.attacker).react('whiff', beatNow + 0.2, 2, { state: 'MISSED_INPUT' });
         this.hud.showBanner(d.who === 'player' ? 'DODGED!' : `${rivalName} DODGED`, d.who === 'player' ? 'good' : 'bad', 1100);
         this.world.react('dodge', d);
         this.sfx.crowdCheer(0.8);
         if (d.who === 'player') this._voice('player', 'single');
         break;
       case 'tauntLanded':
-        this._dc(d.defender).react('hitReact', beatNow, 1);
+        this._dc(d.defender).react('hitReact', beatNow, 1, { state: 'MISSED_INPUT' });
+        this._choreo(d.defender).row = 0;
         this._fx(d.defender, 'exclaim', 1); this._fx(d.defender, 'sweat', 2);
         this._schedule(d.defender, 'stunned', d.stunBar * 4, 4, true);
         this._schedule(d.attacker, 'cheer', Math.ceil(beatNow + 0.5), 2, false);
@@ -557,8 +579,9 @@ export class BattleSession {
         const def = this._def(who), B = d.bar * 4, len = d.bars * 4;
         this._soloUntil = d.bar + d.bars;
         this._dc(who).queue = []; this._dc(foe).queue = [];
-        this._schedule(who, def.solo, B, 4, true);
-        this._schedule(who, def.branchMoves[4] || def.solo, B + 4, len - 4, true);
+        // The designated specials, then the finisher into the freeze.
+        this._perform(who, this._choreo(who).solo(d), beatNow);
+        this._dc(who).level = 4;
         this._schedule(foe, 'soloWatch', B, len, true);
         this.cuts = this.cuts.filter(c => c.bar < d.bar || c.bar >= d.bar + d.bars);
         this.cuts.push({ bar: d.bar, kind: 'solo', who, len });
@@ -596,8 +619,9 @@ export class BattleSession {
     const bar = this.battle.endBar;
     const len = m.resultBars * 4;
     this.pDance.clearQueue(); this.rDance.clearQueue();
-    this.pDance.play(win ? (this.pDef.victory || 'victory') : 'defeat', bar * 4, len);
-    this.rDance.play(win ? 'defeat' : (this.rDef.victory || 'victory'), bar * 4, len);
+    // Fever Time: the winner's victory dance; the loser sulks.
+    this._perform(summary.winner, this._choreo(summary.winner).victory(bar, len), bar * 4);
+    (win ? this.rDance : this.pDance).play('defeat', bar * 4, len, { state: 'IDLE_GROOVE' });
     this.director.cut('winner', bar * 4, len, { who: summary.winner });
     this.world.react('end', { who: summary.winner });
     const loser = win ? 'rival' : 'player';

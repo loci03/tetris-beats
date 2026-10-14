@@ -176,6 +176,19 @@ export class MusicClock {
     return { kick: read(A.kick, 0.075), snare: read(A.snare, 0.09), energy };
   }
 
+  // The musical timeline at `songTime` (see musicalPosition): tempo, bar,
+  // beat, sub-beat phase, phrase, plus the offsets in play — what the
+  // choreography and the Dance View key off.
+  timeline(songTime, phraseBars = 4) {
+    const ctx = this.ctx;
+    return {
+      ...musicalPosition(this.beatAt(songTime), this.beatsPerBar, phraseBars),
+      bpm: this.bpm, spb: this.spb, songTime, firstBeat: this.firstBeat,
+      userOffsetMs: this.userOffsetMs,
+      outputLatencyMs: ctx ? ((ctx.outputLatency || 0) + (ctx.baseLatency || 0)) * 1000 : 0,
+    };
+  }
+
   // ── Grid conversions (song seconds <-> beats <-> bars) ──
   beatTime(beat) { return this.firstBeat + beat * this.spb; }
   barTime(bar) { return this.beatTime(bar * this.beatsPerBar); }
@@ -224,4 +237,25 @@ export class MusicClock {
     const t = (evTime && evTime <= now + 5) ? base - (now - evTime) / 1000 : base;
     return t - this.userOffsetMs / 1000;
   }
+}
+
+// Where `beat` (song beats from the first downbeat) sits musically: bar and
+// beat in the bar (count 1-4), the phase inside the beat and its 8th / 16th
+// subdivision, the 8-count, and the phrase (`phraseBars` bars) — so moves
+// can start on downbeats, finish on phrase ends and land accents on the
+// count they were written for.
+export function musicalPosition(beat, beatsPerBar = 4, phraseBars = 4) {
+  const bar = Math.floor(beat / beatsPerBar);
+  const beatInBar = beat - bar * beatsPerBar;
+  const whole = Math.floor(beat), sub = beat - whole;
+  const phrase = Math.floor(bar / phraseBars), barInPhrase = bar - phrase * phraseBars;
+  const eight = Math.floor(beat / 8);
+  return {
+    beat, bar, beatInBar, count: Math.floor(beatInBar) + 1,
+    sub, eighth: Math.floor(sub * 2), sixteenth: Math.floor(sub * 4),
+    downbeat: beatInBar < 1, backbeat: (whole & 1) === 1,
+    eightCount: eight, countIn8: Math.floor(beat - eight * 8) + 1,
+    phrase, barInPhrase, phraseBars,
+    phraseStart: barInPhrase === 0, phraseEnd: barInPhrase === phraseBars - 1,
+  };
 }
