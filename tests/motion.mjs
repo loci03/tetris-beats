@@ -40,7 +40,7 @@ export function simulate(def, plan, { bpm = 120, from = 0, to = 32, fps = 60, ac
     }
     dc.update(b, acc ? A : null);
     const a = Float32Array.from(dc.out);
-    mon.feed(b, a, dc.state, dc.cur.name);
+    mon.feed(b, a, dc.state, dc.cur.name === 'groove' ? dc.routineAt(b) : dc.cur.name);   // idle frames judged by their routine
     frames.push({ beat: b, a, state: dc.state, move: dc.cur.name });
   }
   return { frames, spb, dc, events: mon.events, contacts: mon.contacts };

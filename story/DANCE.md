@@ -322,5 +322,9 @@ old battle scheduled moves.
 - **No footage was watched.** Move content is derived from documented mechanics and from real-world technique for each style, not frame-matched to the original's clips. Hand-built and procedural, not motion-captured.
 - **Hands have no IK:** floor contact in `footwork` / `freezeChair` is aimed by hand-tuned angles (the freeze's hand rests at floor height).
 - **Bosses' strings are auto-built** from their existing moves (specials filtered); their choreography quality is that of their level modules.
+  - Their string moves were cleaned of foot skating: 0–4 frames per 11-bar line, down from up to 380.
+  - Glides that are the point of a move are declared as slides: Coco's roller skates, moonwalks, float walks, rave shuffles.
+  - Some solo, intro, taunt and spin moves of a few bosses still skate; they're outside the strings.
+  - Violetta's pas de chat is a small ballet leap (airborne under 10% of the move).
 - **Grid reporting:** some moves (pivots, swivels, half turns) register "contacts" a 16th off the 8th grid by design. Toni's ★ line has a lower on-8th score (60%) because of its pivots.
 - **Assets:** to go beyond procedural keyframes, licensed motion sources include Mixamo (free with an Adobe account, usable in games), the CMU Graphics Lab Motion Capture Database (free for research and commercial use), and commercial libraries such as ActorCore / Rokoko. Any of them would need a skinned rig and retargeting onto this joint layout.

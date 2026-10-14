@@ -258,7 +258,7 @@ function tick(beat, quiet = false) {
   const o = dc.out, spb = 60 / S.bpm;
   rig.root.updateMatrixWorld(true);
   const warn = (k, msg) => S.warnings.set(k, { msg, at: beat });
-  for (const e of monitor.feed(beat, o, dc.state, dc.cur.name)) warn(e.kind + (e.side || ''), describe(e));
+  for (const e of monitor.feed(beat, o, dc.state, dc.cur.name === 'groove' ? dc.routineAt(beat) : dc.cur.name)) warn(e.kind + (e.side || ''), describe(e));
   S.contacts = monitor.contacts;
   const last = S.stateLog[S.stateLog.length - 1];
   if (!last || last.state !== dc.state) {
