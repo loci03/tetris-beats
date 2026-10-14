@@ -27,9 +27,9 @@ function el(tag, cls, parent, html) {
 
 export class BattleHUD {
   // controlsHint: e.g. 'Arrows / WASD · ✕ J · ○ K · △ I · □ U'
-  constructor({ names, isTouch, onPad, onPause, controlsHint = '' }) {
+  constructor({ names, isTouch, onPad, onPause, controlsHint = '', twoPlayer = false, hints2 = null }) {
     this.names = names;
-    this.root = el('div', 'story-hud');
+    this.root = el('div', 'story-hud' + (twoPlayer ? ' sh-2p' : ''));
     this.root.setAttribute('aria-live', 'polite');
     const top = el('div', 'sh-top', this.root);
     this.p = this._panel(top, 'sh-p1', names.player);
@@ -43,7 +43,7 @@ export class BattleHUD {
       pb.addEventListener('click', (e) => { e.preventDefault(); onPause(); });
     }
     const gm = el('div', 'sh-groove', mid);
-    el('span', 'sh-groove-l', gm, 'YOU');
+    el('span', 'sh-groove-l', gm, twoPlayer ? 'P1' : 'YOU');
     this.grooveBar = el('div', 'sh-groove-bar', gm);
     this.grooveKnob = el('i', '', this.grooveBar);
     el('span', 'sh-groove-r', gm, names.rival);
@@ -54,12 +54,22 @@ export class BattleHUD {
 
     // Command bars: YOU at the bottom centre, the rival's compact one to the
     // right — each with its own state, judgments and feedback.
+    // 2P VS: two full-size bars side by side, each with its keys.
     const bottom = this.bottom = el('div', 'sh-bottom', this.root);
-    this.hint = el('div', 'sh-hint', bottom, isTouch ? '' : controlsHint);
-    this.bars = {
-      player: new CommandBar(bottom, { who: 'player', label: names.player }),
-      rival: new CommandBar(this.root, { who: 'rival', label: names.rival, small: true }),
-    };
+    if (twoPlayer) {
+      const col = (who, hint) => { const c = el('div', 'sh-col', bottom); el('div', 'sh-hint', c, isTouch ? '' : hint); return c; };
+      const c1 = col('player', hints2 ? hints2[0] : ''), c2 = col('rival', hints2 ? hints2[1] : '');
+      this.bars = {
+        player: new CommandBar(c1, { who: 'player', label: names.player }),
+        rival: new CommandBar(c2, { who: 'rival', label: names.rival }),
+      };
+    } else {
+      this.hint = el('div', 'sh-hint', bottom, isTouch ? '' : controlsHint);
+      this.bars = {
+        player: new CommandBar(bottom, { who: 'player', label: names.player }),
+        rival: new CommandBar(this.root, { who: 'rival', label: names.rival, small: true }),
+      };
+    }
 
     if (isTouch) {
       // Touch: swipe anywhere for the directions; the four face buttons.
@@ -226,9 +236,10 @@ export class BattleHUD {
   // `kind` is one or more effects joined by '+':
   //   shake · wobble · blur · glitch · flash · darkness · spin   (the panel itself)
   //   float · fall · swirl · splat · cloud                        (marks of `sprite` over it)
-  disrupt(kind, { sprite = 'note', color = '#ffffff', ms = 2500 } = {}) {
+  disrupt(kind, { sprite = 'note', color = '#ffffff', ms = 2500, who = 'player' } = {}) {
     const kinds = String(kind || 'shake').split('+');
-    const b = this.bottom;
+    // 2P: only the stunned player's column.
+    const b = this.root.classList.contains('sh-2p') ? this.bars[who].root.parentElement : this.bottom;
     const css = kinds.filter(k => ['shake', 'wobble', 'blur', 'glitch', 'flash', 'darkness', 'spin'].includes(k));
     for (const k of css) { b.classList.remove('dz-' + k); void b.offsetWidth; b.classList.add('dz-' + k); }
     b.style.setProperty('--dz-color', color);
@@ -238,6 +249,7 @@ export class BattleHUD {
     if (!pattern || !DRAW[sprite]) return;
     // Marks over the command bar, drawn from the same sprite painters as the
     // 3D anime FX.
+    if (this._dzCanvas && this._dzCanvas.parentElement !== b) { this._dzCanvas.remove(); this._dzCanvas = null; }
     if (!this._dzCanvas) this._dzCanvas = el('canvas', 'sh-disrupt', b);
     const cv = this._dzCanvas, r = b.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);

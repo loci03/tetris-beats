@@ -9,6 +9,8 @@
 // treated as switch chatter, repeated commands (↑ ↑ ↓) need a release in
 // between, and gamepads are polled at ~250 Hz with edge detection (sticks
 // with hysteresis) so a press is timed to within a few ms.
+// 2P VS (players = 2): P2 has its own keyboard map (keys2, checked first —
+// the arrow keys move to P2, P1 keeps WASD) and the second gamepad.
 
 export const ACTIONS = ['U', 'D', 'L', 'R', 'X', 'O', 'T', 'S', 'P'];
 export const ACTION_LABEL = { U: '↑ Up', D: '↓ Down', L: '← Left', R: '→ Right', X: '✕ Cross', O: '○ Circle', T: '△ Attack', S: '□ Dodge', P: 'Pause' };
@@ -28,6 +30,11 @@ export function defaultControls() {
     // Standard gamepad mapping: 0 = bottom face (✕ / A), 1 = right (○ / B),
     // 2 = left (□ / X), 3 = top (△ / Y), 9 = start, 12-15 = d-pad.
     pad: { 12: 'U', 13: 'D', 14: 'L', 15: 'R', 0: 'X', 1: 'O', 3: 'T', 2: 'S', 9: 'P' },
+    // P2's keyboard in 2P VS.
+    keys2: {
+      ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R',
+      Period: 'X', Numpad1: 'X', Slash: 'O', Numpad2: 'O', Semicolon: 'T', Numpad5: 'T', Quote: 'S', Numpad4: 'S',
+    },
     stick: true,
     latency: { key: 0, pad: 0, touch: 0 },   // ms
   };
@@ -39,7 +46,7 @@ export function loadControls(storage = globalThis.localStorage) {
     const raw = storage && storage.getItem(STORE);
     if (!raw) return d;
     const c = JSON.parse(raw);
-    return { ...d, ...c, keys: { ...(c.keys || d.keys) }, pad: { ...(c.pad || d.pad) }, latency: { ...d.latency, ...(c.latency || {}) } };
+    return { ...d, ...c, keys: { ...(c.keys || d.keys) }, keys2: { ...(c.keys2 || d.keys2) }, pad: { ...(c.pad || d.pad) }, latency: { ...d.latency, ...(c.latency || {}) } };
   } catch { return d; }
 }
 export function saveControls(c, storage = globalThis.localStorage) {
@@ -48,15 +55,16 @@ export function saveControls(c, storage = globalThis.localStorage) {
 
 // Rebind `action` to a key code or a pad button, removing what that
 // control did before (one control → one action).
-export function bind(controls, action, binding) {
-  const c = { ...controls, keys: { ...controls.keys }, pad: { ...controls.pad } };
-  if (binding.type === 'key') { c.keys[binding.code] = action; }
+export function bind(controls, action, binding, player = 1) {
+  const c = { ...controls, keys: { ...controls.keys }, keys2: { ...(controls.keys2 || {}) }, pad: { ...controls.pad } };
+  if (binding.type === 'key') { (player === 2 ? c.keys2 : c.keys)[binding.code] = action; }
   else if (binding.type === 'button') { c.pad[binding.index] = action; }
   return c;
 }
-export function bindingsFor(controls, action) {
+export function bindingsFor(controls, action, player = 1) {
+  const keys = (player === 2 ? controls.keys2 : controls.keys) || {};
   return {
-    keys: Object.keys(controls.keys).filter(k => controls.keys[k] === action),
+    keys: Object.keys(keys).filter(k => keys[k] === action),
     pad: Object.keys(controls.pad).filter(k => controls.pad[k] === action).map(Number),
   };
 }
@@ -75,6 +83,7 @@ export class InputMapper {
     this.now = now;
     this.pollMs = pollMs;
     this.enabled = true;
+    this.players = 1;               // 2 = 2P VS (keys2 + second gamepad → P2)
     this.pads = new Map();          // index -> { id, buttons: bool[], dirs: {U,D,L,R} }
     this._last = new Map();         // control key -> last press time (s)
     this._capture = null;
@@ -124,12 +133,13 @@ export class InputMapper {
       if (!e.repeat) { const cb = this._capture; this._capture = null; cb({ type: 'key', code }); }
       return;
     }
-    const action = this.controls.keys[code];
+    const p2 = this.players === 2 && this.controls.keys2 && this.controls.keys2[code];
+    const action = p2 || this.controls.keys[code];
     if (!action) return false;
     if (this.claims && !this.claims(action, e)) return false;
     e.preventDefault(); e.stopImmediatePropagation();
     if (e.repeat) return true;
-    this._emit(action, e.timeStamp || this.now(), { source: 'key', control: 'k:' + code });
+    this._emit(action, e.timeStamp || this.now(), { source: 'key', control: 'k:' + code, player: p2 ? 2 : 1 });
     return true;
   }
 
@@ -149,6 +159,7 @@ export class InputMapper {
     try { list = this.getGamepads() || []; } catch { return; }
     const now = this.now();
     const seen = new Set();
+    const fires = [];             // every pad's new presses, emitted in time order
     for (const gp of list) {
       if (!gp || gp.connected === false) continue;
       seen.add(gp.index);
@@ -165,12 +176,13 @@ export class InputMapper {
       const ts = gp.timestamp && gp.timestamp <= now + 1 && gp.timestamp > now - 100 ? gp.timestamp : now;
       // Directions first so a direction + button in the same poll stay in
       // order (arrows before the final button).
-      const fires = [];
+      const player = this.players === 2 && gp.index >= 1 ? 2 : 1;
+      const push = (order, action, control) => fires.push({ ts, order, action, info: { source: 'pad', pad: gp.index, control, player } });
       const ax = gp.axes || [], x = ax[0] || 0, y = ax[1] || 0;
       if (this.controls.stick) {
         for (const [dir, v] of [['L', -x], ['R', x], ['U', -y], ['D', y]]) {
           const was = st.dirs[dir], on = was ? v > STICK_OFF : v > STICK_ON;
-          if (on && !was) fires.push([0, dir, 'a:' + gp.index + ':' + dir]);
+          if (on && !was) push(0, dir, 'a:' + gp.index + ':' + dir);
           st.dirs[dir] = on;
         }
       }
@@ -179,13 +191,14 @@ export class InputMapper {
         if (this._capture && on && !st.buttons[i]) { const cb = this._capture; this._capture = null; cb({ type: 'button', index: i, pad: gp.index }); }
         else if (on && !st.buttons[i]) {
           const action = this.controls.pad[i];
-          if (action) fires.push(['UDLR'.includes(action) ? 0 : 1, action, 'b:' + gp.index + ':' + i]);
+          if (action) push('UDLR'.includes(action) ? 0 : 1, action, 'b:' + gp.index + ':' + i);
         }
         st.buttons[i] = on;
       });
-      fires.sort((a, b) => a[0] - b[0]);
-      for (const [, action, control] of fires) this._emit(action, ts, { source: 'pad', pad: gp.index, control });
     }
+    // Two pads in one poll (2P): oldest press first.
+    fires.sort((a, b) => a.ts - b.ts || a.order - b.order);
+    for (const f of fires) this._emit(f.action, f.ts, f.info);
     // Pads that vanished without an event (some browsers): forget them.
     for (const idx of [...this.pads.keys()]) {
       if (!seen.has(idx)) { this.pads.delete(idx); if (this.onDevice) this.onDevice({ connected: false, index: idx }); }
@@ -193,7 +206,7 @@ export class InputMapper {
   }
 
   // Touch / on-screen pads call this directly.
-  touch(action, ts) { return this._emit(action, ts, { source: 'touch', control: 't:' + action + ':' + Math.round(ts) }); }
+  touch(action, ts) { return this._emit(action, ts, { source: 'touch', control: 't:' + action + ':' + Math.round(ts), player: 1 }); }
 
   destroy() { this.stop(); this.onAction = () => {}; }
 }

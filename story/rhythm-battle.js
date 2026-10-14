@@ -16,7 +16,7 @@
 //   • ATTACK: △ on beat 4 instead of the button (twice per battle). It
 //     doesn't break the attacker's string. The defender's next bar becomes
 //     a DODGE bar: □ on beat 4 dodges (string kept); otherwise they're hit —
-//     stunned for a bar, string reset.
+//     stunned for a bar, string reset. A dancer in a Freeze is immune.
 //   • SOLO (our addition): with a full gauge on rows 5-7 the BOTTOM option
 //     is the dancer's SOLO command; landing it gives them two bars of solo.
 // The rival runs the same rules: its AI produces timestamped inputs that go
@@ -182,7 +182,7 @@ export class RhythmBattle {
     }
     const pressure = Math.max(0, d === this.rival ? this.groove : -this.groove);
     // Spend a jammer instead of dancing this bar?
-    if (d.jammers > 0 && this._attackAllowed(d, b) && this.ai.rng() < (this.ai.p.tauntChance || 0.5) * 0.12) {
+    if (d.jammers > 0 && this._attackAllowed(d, b) && this.ai.rng() < (this.ai.p.tauntChance ?? 0.5) * 0.12) {
       at(b.finish + (this.ai.rng() * 2 - 1) * 0.04, 'T');
       d.aiQueue.push(...ev); d.aiQueue.sort((a, c) => a.t - c.t);
       return;
@@ -291,9 +291,12 @@ export class RhythmBattle {
     b.resolved = true; b.success = true; b.judged = j; b.delta = dt; b.kind = 'attack'; b.resolvedAt = t;
     b.finisher.judged = j; b.finisher.delta = dt;
     const foe = this.dancer(this.other(d.id));
-    this._setBarType(foe, b.bar + 1, 'dodge', { attacker: d.id, judgment: j });
+    // A dancer holding a Freeze (its rest measure) is immune (original).
+    const nb = foe.bars.get(b.bar + 1), nf = foe.forced.get(b.bar + 1);
+    const immune = (nb ? nb.type : nf && nf.type) === 'rest';
+    if (!immune) this._setBarType(foe, b.bar + 1, 'dodge', { attacker: d.id, judgment: j });
     this.emit('judge', { who: d.id, note: b.finisher, judgment: j, delta: dt, kind: 'attack' });
-    this.emit('taunt', { attacker: d.id, bar: b.bar, judgment: j, dodgeBar: b.bar + 1, jammers: d.jammers });
+    this.emit('taunt', { attacker: d.id, bar: b.bar, judgment: j, dodgeBar: immune ? null : b.bar + 1, immune, jammers: d.jammers });
     this._afterResolve(d, b, t);
     return { attack: true, judgment: j };
   }
@@ -335,13 +338,13 @@ export class RhythmBattle {
     if (opt.kind === 'solo') d.solos++;
     // A solo spends the gauge: it's the climax, not a loop.
     d.enthusiasm = opt.kind === 'solo' ? 25 : clamp(d.enthusiasm + ENTH_GAIN[j] + (opt.kind === 'branch' ? 6 : 0), 0, 100);
-    d.level = opt.col + 1;
-    d.bestLevel = Math.max(d.bestLevel, d.level);
+    d.bestLevel = Math.max(d.bestLevel, opt.col + 1);
     const soloTime = opt.kind === 'solo' && b.bar + 1 + SOLO_BARS <= this.endBar;
     const freeze = opt.kind !== 'solo' && opt.row >= ROWS && b.bar + 1 < this.endBar;
     const string = d.strings;
     const next = advance(d, opt, { hold: !!(this.practice && this.practice.holdRow) });
     d.row = next.row; d.col = next.col;
+    d.level = d.col + 1;                  // the move level of the next TOP command
     if (freeze || soloTime) d.strings++;
     if (freeze) { d.freezes++; this._addPoints(d, b.bar, FREEZE_BONUS); }
     this.emit('move', {

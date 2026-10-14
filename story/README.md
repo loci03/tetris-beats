@@ -22,8 +22,11 @@ object; the mode never touches game internals directly.
 | `story-mode.js` | `StoryModeManager`: special-piece timing, trigger, freeze/resume, battle bonus. Entry point (`createStoryMode(bridge)`). |
 | `battle-session.js` | One trip into the world: renderer, music hand-off, input, and the event wiring between the systems below. |
 | `music-clock.js` | `MusicClock` — the beat/BPM manager. Song position from the AudioContext clock, latency- and user-offset-compensated; grid phase check and drum-hit (kick / snare) analysis of the decoded song. **Everything is timed in song time.** |
-| `chart.js` | The command tree: levels 1-4 (3→6 directions), ★ branches (signature moves) unlocked by Enthusiasm, the SOLO at the top. |
-| `rhythm-battle.js` | `RhythmBattle` — pure rules: untimed direction entry + the timed GROOVE finisher on beat 4, scoring, levels, enthusiasm, hype, taunt / dodge / stun, battle timer. Emits events. |
+| `commands.js` | The command system as data + pure functions (see COMMANDS.md): Bust a Groove's original 8-row command tree, the TOP / BOTTOM resolver, the candidate prefix matcher, beat-4 judge windows, the ordered input buffer, per-character move definitions, solo commands. |
+| `input.js`, `controls-ui.js` | `InputMapper`: keyboard + gamepad (d-pad, stick, face buttons) → battle actions with accurate timestamps; remapping, per-device latency, debounce, connect / disconnect. The CONTROLS screen. |
+| `practice.js` | Practice mode panel: slowed playback, pick the row / level, hold a row, force branches, rival off, live EXPECTED / RECEIVED / STATUS buffer readout, offsets, move id and animation. |
+| `chart.js` | `makeRng` (seeded RNG). |
+| `rhythm-battle.js` | `RhythmBattle` — pure rules: one command per measure (arrows any time before beat 4, ✕ / ○ on beat 4), the dance string and Freeze, attack △ / dodge □ / stun, scoring, enthusiasm, solo; the AI plays through the same judge. Event-ordered, frame-rate independent. Emits events. |
 | `opponent-ai.js` | Rival skill profile → finisher timing, branch choices, taunt decisions, dodges. |
 | `characters.js` | Toon dancer rigs (joint hierarchy + outlined parts + anime face: joy ^^ eyes, wink, kiss), and each dancer's own dance identity — base routines, moves per level, ★ branch moves, solo, intro taunt, anime marks. YOU = hip-hop / b-boy, COOL TONI = disco + rock'n'roll, TINA = glam diva with her purse; other bosses register from their level modules (`registerCharacter`). |
 | `dance.js` | Animation engine: beat-keyframed moves, a groove layer that bounces on every beat (harder on 2 & 4), always-on 8-count idle routines, leg IK + foot swivels so planted feet stay planted, and `DanceController` — moves lead in so they land ON their downbeat, blends step the feet, the dance state machine, `moveProfile()` (flip / airborne / spin detection). |
@@ -33,7 +36,7 @@ object; the mode never touches game internals directly.
 | `dev/danceview.html` | **Dance View** (menu: BEAT tab → DANCE VIEW): any dancer, any move / string / chain / miss / solo at any BPM and speed, scrubbing, cameras, skeleton + foot contacts, state ribbon and step timing. |
 | `camera.js` | `CameraDirector` — two-shot, push-ins, orbit, taunt and winner shots; aspect-aware. |
 | `transition.js` | Board capture → 3D tiles aligned to the 2D board; shatter/fly-through in, reassemble out. |
-| `hud.js`, `story.css` | Battle HUD, note lane, touch pads, toasts. |
+| `hud.js`, `story.css` | Battle HUD: a command bar per dancer (arrows + the final-button box, BEAT 1-4 track on the audio clock, judgments), touch pads, toasts. |
 | `sfx.js` | Synthesized hit / whoosh / riser / impact / crowd / count-in sounds. |
 | `announcer.js` | Versus-arcade announcer — a few yelled lines ("Here comes… Rhett Ryder!", "Ready?", "DANCE!", "Solo time!", "Fever!", who wins) scheduled so the punch word lands on the beat (`lines.json`); ducks the music. |
 | `anime-fx.js` | Manga marks over the dancers (hearts, sparkles, notes, sweat drops, anger veins, "!", plus level sprites) and thrown taunt projectiles. |
@@ -105,16 +108,22 @@ splatting / clouding over the arrows).
 
 ## Controls (battle)
 
-Arrows / WASD to enter the command · Space = GROOVE on beat 4 (and DODGE) · T = taunt ·
-P / Esc = pause. On touch screens: **swipe anywhere** for the arrows (zig-zags
-chain without lifting), **tap anywhere** for GROOVE (timed at touch-down), plus GROOVE / TAUNT buttons. The **Rhythm timing** slider in
-Settings compensates for audio latency (e.g. Bluetooth headphones).
+Directions: arrows / WASD (any time before beat 4, in order) · ✕: J / Space ·
+○: K / Enter (the command's button, ON beat 4) · △ attack: I / T · □ dodge: U /
+Shift · pause: P / Esc. Gamepad: d-pad or left stick, A/✕ = ✕, B/○ = ○, Y/△ =
+attack, X/□ = dodge, Start = pause. Everything is remappable on the CONTROLS
+screen (Bust a Beat tab), with per-device latency offsets on top of the
+**Rhythm timing** slider in Settings (audio latency, e.g. Bluetooth headphones).
+On touch screens: **swipe anywhere** for the arrows (zig-zags chain without
+lifting), and the ✕ ○ △ □ face pads. **2P VS** (Bust a Beat tab): P2 plays
+the rival on the arrows + . / ; ' or the second gamepad. See COMMANDS.md.
 
 ## Testing notes
 
 `rhythm-battle.js` is pure logic and can be driven from Node with a fake clock
 (the folder is marked `"type": "module"` for that). `npm test` runs
-`tests/*.test.mjs`: rhythm sync (moves land on their downbeat, steps on the
+`tests/*.test.mjs`: the command system (`commands.test.mjs`, 20 scenarios —
+see COMMANDS.md), rhythm sync (moves land on their downbeat, steps on the
 8th grid, tempo-locked), the state machine, dance-string advancement (rules +
 choreography), the flip budget for all 19 dancers, foot skating and floor
 contact (`tests/motion.mjs` drives a DanceController headless). The full loop was verified

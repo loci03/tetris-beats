@@ -412,6 +412,33 @@ test('17b. keyboard: physical keys, auto-repeat ignored, remap, saved bindings',
   assert.equal(loadControls({ getItem: () => '{broken' }).keys.KeyJ, 'X', 'corrupt data falls back to defaults');
 });
 
+test('17c. 2P VS routing: P2 keys and the second gamepad drive the rival; P1 keeps WASD + pad 1', () => {
+  const F = fakePads();
+  let now = 1000;
+  const got = [];
+  const m = new InputMapper({ onAction: (a, ts, info) => got.push([a, info.player]), controls: defaultControls(), target: null, getGamepads: () => F.pads, now: () => now, autoStart: false });
+  const key = (code, ts) => m._key({ code, timeStamp: ts, repeat: false, preventDefault() {}, stopImmediatePropagation() {} });
+  key('ArrowUp', 100); key('Period', 200);
+  assert.deepEqual(got, [['U', 1]], '1P: arrows are P1, Period is unbound');
+  got.length = 0; m.players = 2;
+  key('ArrowUp', 300); key('KeyW', 400); key('Period', 500); key('KeyJ', 600);
+  assert.deepEqual(got, [['U', 2], ['U', 1], ['X', 2], ['X', 1]]);
+  got.length = 0;
+  const p0 = F.mk(0), p1 = F.mk(1); F.pads.push(p0, p1); m.poll();
+  now += 20; F.set(p0, 1, true); F.set(p1, 12, true); m.poll();
+  assert.deepEqual(got.sort(), [['O', 1], ['U', 2]]);
+  // Presses from two pads in one poll come out oldest first.
+  F.set(p0, 1, false); F.set(p1, 12, false); now += 20; m.poll();
+  got.length = 0; now += 20;
+  p0.timestamp = now - 1; p1.timestamp = now - 3; F.set(p0, 0, true); F.set(p1, 0, true); m.poll();
+  assert.deepEqual(got, [['X', 2], ['X', 1]]);
+  // And the battle keeps the two dancers apart.
+  const rb = makeBattle({ rival: 'human' });
+  const b = offered(rb, 'rival', 4);
+  assert.equal(rb.inputAt('rival', b.cands[0].button, b.finish).judgment, 'perfect');
+  assert.equal(rb.rival.chain, 1); assert.equal(rb.player.chain, 0);
+});
+
 // 18 ───────────────────────────────────────────────────────────────
 test('18. every move of every character resolves to its own animation (by move id, no flips, no randomness)', () => {
   MISSING_ANIMS.clear();
@@ -530,6 +557,20 @@ test('20. attack △ / dodge □ never corrupt either string', () => {
   b10.cands[0].seq.forEach((d, i) => rb.inputAt('player', d, b10.t0 + 0.05 * i));
   assert.equal(rb.inputAt('player', b10.cands[0].button, b10.finish + 0.03).judgment, 'perfect');
   assert.equal(rb.player.chain, chain + 1);
+});
+
+test('20b. a dancer holding a Freeze is immune to an attack (original rule)', () => {
+  const rb = makeBattle({ rival: 'human' });
+  for (let bar = 4; bar < 11; bar++) { playBar(rb, 'player', bar); playBar(rb, 'rival', bar); }
+  playBar(rb, 'rival', 11);                                 // the rival's 8th move: FREEZE
+  assert.equal(ev(rb, 'move', 'rival').at(-1).freeze, true);
+  const b11 = offered(rb, 'player', 11);
+  assert.equal(rb.inputAt('player', 'T', b11.finish).attack, true);
+  const t = ev(rb, 'taunt').at(-1);
+  assert.equal(t.immune, true);
+  assert.equal(offered(rb, 'rival', 12).type, 'rest');
+  rb.update(rb.clock.barTime(13));
+  assert.equal(rb.rival.stuns, 0); assert.equal(rb.rival.strings, 1);
 });
 
 // ── Pieces ──────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@
 
 import { ACTIONS, ACTION_LABEL, loadControls, saveControls, defaultControls, bind, bindingsFor, InputMapper } from './input.js';
 
-const KEY_NAME = (code) => ({ Space: 'Space', Enter: 'Enter', NumpadEnter: 'Num Enter', ShiftLeft: 'L-Shift', ShiftRight: 'R-Shift', Escape: 'Esc',
+const KEY_NAME = (code) => ({ Period: '.', Slash: '/', Semicolon: ';', Quote: "'", Comma: ',', Space: 'Space', Enter: 'Enter', NumpadEnter: 'Num Enter', ShiftLeft: 'L-Shift', ShiftRight: 'R-Shift', Escape: 'Esc',
   ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[code] || code.replace(/^Key/, '').replace(/^Digit/, ''));
 const PAD_NAME = (i) => ({ 0: 'A / ✕', 1: 'B / ○', 2: 'X / □', 3: 'Y / △', 4: 'LB', 5: 'RB', 6: 'LT', 7: 'RT', 8: 'Select', 9: 'Start', 12: 'D-↑', 13: 'D-↓', 14: 'D-←', 15: 'D-→' }[i] || `Btn ${i}`);
 
@@ -17,7 +17,7 @@ function css() {
   .ctl-card { width: min(560px, 94vw); max-height: 90vh; overflow: auto; background: #170b26; border: 1px solid rgba(255,255,255,0.18); border-radius: 16px; padding: 16px 18px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
   .ctl-card h2 { margin: 0 0 4px; font: 900 18px var(--font-display, system-ui); letter-spacing: 4px; color: #ffc93a; }
   .ctl-card p { margin: 0 0 12px; font-size: 12px; color: rgba(255,255,255,0.7); }
-  .ctl-grid { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 6px 8px; align-items: center; font-size: 13px; }
+  .ctl-grid { display: grid; grid-template-columns: 0.9fr 1.2fr 1fr 1fr; gap: 6px 8px; align-items: center; font-size: 13px; }
   .ctl-grid .h { font-size: 10px; font-weight: 900; letter-spacing: 2px; color: rgba(255,255,255,0.55); }
   .ctl-b { font: 700 12px var(--font-ui, system-ui); color: #fff; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 6px 8px; cursor: pointer; text-align: left; }
   .ctl-b.wait { border-color: #ffc93a; color: #ffc93a; animation: ctlPulse 0.6s ease-in-out infinite alternate; }
@@ -38,7 +38,7 @@ export function openControls({ onChange = null } = {}) {
   wrap.className = 'ctl-wrap';
   wrap.innerHTML = `<div class="ctl-card" role="dialog" aria-label="Controls">
     <h2>CONTROLS</h2>
-    <p>Click a binding, then press the key or gamepad button to use. Directions are entered in order before beat 4; ✕ / ○ must land on beat 4.</p>
+    <p>Click a binding, then press the key or gamepad button to use. Directions are entered in order before beat 4; ✕ / ○ must land on beat 4. In 2P VS the second gamepad and the P2 keys play the rival.</p>
     <div class="ctl-grid"></div>
     <div class="ctl-lat"></div>
     <div class="ctl-pads"></div>
@@ -55,9 +55,9 @@ export function openControls({ onChange = null } = {}) {
   };
   const commit = () => { saveControls(controls); if (onChange) onChange(controls); };
   const render = () => {
-    grid.innerHTML = '<span class="h">ACTION</span><span class="h">KEYBOARD</span><span class="h">GAMEPAD</span>';
+    grid.innerHTML = '<span class="h">ACTION</span><span class="h">KEYBOARD</span><span class="h">GAMEPAD</span><span class="h">P2 KEYS (2P VS)</span>';
     for (const a of ACTIONS) {
-      const b = bindingsFor(controls, a);
+      const b = bindingsFor(controls, a), b2 = bindingsFor(controls, a, 2);
       const name = document.createElement('span'); name.textContent = ACTION_LABEL[a];
       const kb = document.createElement('button'); kb.className = 'ctl-b'; kb.textContent = b.keys.map(KEY_NAME).join(', ') || '—';
       const pb = document.createElement('button'); pb.className = 'ctl-b'; pb.textContent = b.pad.map(PAD_NAME).join(', ') || '—';
@@ -69,7 +69,12 @@ export function openControls({ onChange = null } = {}) {
         if (bd.type === 'button') { controls = bind(controls, a, bd); commit(); }
         render();
       }); };
-      grid.append(name, kb, pb);
+      const k2 = document.createElement('button'); k2.className = 'ctl-b'; k2.textContent = a === 'P' ? '—' : (b2.keys.map(KEY_NAME).join(', ') || '—');
+      if (a !== 'P') k2.onclick = () => { k2.classList.add('wait'); k2.textContent = 'press a key…'; cap.capture((bd) => {
+        if (bd.type === 'key') { controls = bind(controls, a, bd, 2); commit(); }
+        render();
+      }); };
+      grid.append(name, kb, pb, k2);
     }
     lat.innerHTML = '';
     for (const [k, label] of [['key', 'Keyboard'], ['pad', 'Gamepad'], ['touch', 'Touch']]) {

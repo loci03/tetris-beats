@@ -2120,6 +2120,7 @@
         <button type="button" class="beat-opt beat-speed" data-speed="0.75">¾×</button>
         <button type="button" class="beat-opt beat-speed" data-speed="0.5">½×</button>
       </span>
+      <button type="button" class="beat-opt" id="beat-2p" aria-pressed="false" title="2P VS: P1 = WASD + J/K/I/U or gamepad 1 · P2 = arrows + . / ; ' or gamepad 2">2P VS</button>
       <button type="button" class="beat-opt" id="beat-controls">CONTROLS</button>
     </div>
     <a class="story-danceview" href="story/dev/danceview.html" target="_blank" rel="noopener">DANCE VIEW ▸ watch every move</a>
@@ -20067,7 +20068,7 @@ function startGame() {
     if (!window.StoryMode) { loadStoryMode().then(ok => { if (ok) startGame(); }); return; }
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('game-over-screen').style.display = 'none';
-    window.StoryMode.startBeat(_beatLevelId, _beatPractice());
+    window.StoryMode.startBeat(_beatLevelId, _beatPractice(), { twoPlayer: _beat2P });
     return;
   }
   // Any story event from a previous run (restart mid-battle) is torn down.
@@ -20694,7 +20695,7 @@ import('./story/levels.js').then(({ LEVEL_ORDER, STORY_LEVELS, LEVEL_CARDS }) =>
 }).catch(e => console.error('[levels] list failed', e));
 
 // BEAT tab options: PRACTICE (+ speed) and the CONTROLS screen.
-let _beatPracticeOn = false, _beatSpeed = 1;
+let _beatPracticeOn = false, _beatSpeed = 1, _beat2P = false;
 function _beatPractice() {
   return _beatPracticeOn ? { speed: _beatSpeed, startRow: 0, startCol: 0, holdRow: false, branch: 'auto', rival: 'ai' } : null;
 }
@@ -20711,6 +20712,8 @@ function _beatPractice() {
     _beatSpeed = +b.dataset.speed;
     sp.querySelectorAll('.beat-speed').forEach(x => x.classList.toggle('active', x === b));
   });
+  const two = document.getElementById('beat-2p');
+  if (two) two.addEventListener('click', () => { _beat2P = !_beat2P; two.setAttribute('aria-pressed', String(_beat2P)); });
   if (ctl) ctl.addEventListener('click', () => {
     import('./story/controls-ui.js').then(m => m.openControls()).catch(e => console.error('[controls] failed', e));
   });

@@ -31,7 +31,7 @@ const DROP_AT = 1.3;      // the music drop lands as the camera passes the board
 const OUT_DUR = 2.4;      // seconds, world → board
 
 // Short key names for the controls hint.
-const KEY_NAME = (code) => ({ Space: 'Space', Enter: 'Enter', ShiftLeft: 'Shift', ShiftRight: 'Shift', Escape: 'Esc', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[code] || code.replace(/^Key/, '').replace(/^Digit/, ''));
+const KEY_NAME = (code) => ({ Period: '.', Slash: '/', Semicolon: ';', Quote: "'", Space: 'Space', Enter: 'Enter', ShiftLeft: 'Shift', ShiftRight: 'Shift', Escape: 'Esc', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[code] || code.replace(/^Key/, '').replace(/^Digit/, ''));
 
 export class BattleSession {
   // `standalone`: Bust a Beat — the battle on its own, no Tetris board to
@@ -39,8 +39,10 @@ export class BattleSession {
   // `buildWorld`: the level's stage builder (from loadLevel()).
   // `practice`: Practice mode options (see practice.js) — { speed, holdRow,
   // startRow, startCol, branch, rival }.
-  constructor({ bridge, level, specialCells, impactRow, onDone, standalone = false, onPause = null, buildWorld = null, practice = null, onPracticeRestart = null }) {
+  // `twoPlayer`: 2P VS — the rival is a second human (P2 keys / 2nd pad).
+  constructor({ bridge, level, specialCells, impactRow, onDone, standalone = false, onPause = null, buildWorld = null, practice = null, onPracticeRestart = null, twoPlayer = false }) {
     this.practice = practice;
+    this.twoPlayer = twoPlayer;
     this.bridge = bridge;
     this.level = level;
     this.onDone = onDone;
@@ -117,7 +119,7 @@ export class BattleSession {
     this.duckGain.connect(this.audio.trackGain);
     this.ann = new Announcer(this.ctx, this.audio.masterGain, this.duckGain, { enabled: bridge.voiceEnabled !== false, rival: level.dancers.rival });
     const profile = level.ai[st.difficulty] || level.ai.medium;
-    this.battle = new RhythmBattle({ clock: this.clock, music: this.mcfg, seed: level.chart.seed + (Date.now() % 997), aiProfile: profile, practice });
+    this.battle = new RhythmBattle({ clock: this.clock, music: this.mcfg, seed: level.chart.seed + (Date.now() % 997), aiProfile: profile, practice, rival: twoPlayer ? 'human' : 'ai' });
     this.battle.setSoloCommand('player', soloCommandFor(level.dancers.player, pDef));
     this.battle.setSoloCommand('rival', soloCommandFor(level.dancers.rival, rDef));
     this.battle.on((type, data) => this._onBattle(type, data));
@@ -129,11 +131,16 @@ export class BattleSession {
       onAction: (a, ts, info) => this._action(a, ts, info),
       onDevice: (dev) => this._device(dev),
     });
+    this.input.players = twoPlayer ? 2 : 1;
     this.input.claims = (action) => this.phase !== 'dead' && this.phase !== 'done' && !this.bridge.uiBlocking()
       && !document.querySelector('.ctl-wrap') && (action === 'P' || !this.paused);
-    const names = (a) => { const b = bindingsFor(this.controls, a); return b.keys.slice(0, 2).map(KEY_NAME).join('/'); };
+    const names = (a, pl = 1) => { const b = bindingsFor(this.controls, a, pl); return b.keys.slice(0, 2).map(KEY_NAME).join('/'); };
+    const k1 = (a, pl) => names(a, pl).split('/')[pl === 1 && 'UDLR'.includes(a) ? 1 : 0] || names(a, pl);
+    const hint2 = (pl) => `${pl === 2 ? 'P2' : 'P1'}: ${['U', 'L', 'D', 'R'].map(a => k1(a, pl)).join(' ')} · ${GLYPH.X} ${k1('X', pl)} · ${GLYPH.O} ${k1('O', pl)} · ${GLYPH.T} ${k1('T', pl)} · ${GLYPH.S} ${k1('S', pl)}`;
     this.hud = new BattleHUD({
-      names: { player: pDef.name, rival: rDef.name },
+      names: twoPlayer ? { player: `P1 ${pDef.name}`, rival: `P2 ${rDef.name}` } : { player: pDef.name, rival: rDef.name },
+      twoPlayer,
+      hints2: twoPlayer ? [hint2(1), hint2(2)] : null,
       isTouch: bridge.isTouch,
       onPad: (a, ts) => this.input.touch(a, ts ?? performance.now()),
       onPause: () => this._togglePause(),
@@ -323,13 +330,14 @@ export class BattleSession {
   // One mapped action (keyboard, gamepad or touch) with its timestamp.
   _action(action, ts, info) {
     if (action === 'P') { this._togglePause(); return; }
-    this.lastInput = { action, ts, source: info && info.source };
-    this._input(action, ts);
+    const who = this.twoPlayer && info && info.player === 2 ? 'rival' : 'player';
+    this.lastInput = { action, ts, source: info && info.source, who };
+    this._input(action, ts, who);
   }
 
-  _input(action, ts) {
+  _input(action, ts, who = 'player') {
     if (this.paused || (this.phase !== 'battle' && this.phase !== 'intro')) return;
-    this.battle.input('player', action, ts ?? performance.now());
+    this.battle.input(who, action, ts ?? performance.now());
   }
 
   // A controller came or went: say so; losing it mid-battle pauses.
@@ -537,7 +545,9 @@ export class BattleSession {
         const tt = this._taunt(d.attacker);
         this._dc(d.attacker).react(tt.move, beatNow, Math.max(1, (d.bar + 2) * 4 - beatNow), { faceFoe: true, fade: 0.15, state: 'JAMMER_ATTACK' });
         this.cues.push({ beat: (d.bar + 1) * 4 + 1.5, fn: () => this._throw(d.attacker, tt.projectile, tt.n) });
-        if (d.attacker === 'rival') {
+        if (d.immune) {
+          this.hud.showCallout(d.attacker === 'rival' ? `${rivalName} ATTACKS — your FREEZE is immune!` : `${rivalName} is FROZEN — immune!`, d.attacker === 'rival' ? 'good' : 'bad', 2000);
+        } else if (d.attacker === 'rival') {
           this.hud.showCallout(`${rivalName} ATTACKS — press <b>${GLYPH.S}</b> on beat 4 to dodge!`, 'warn', 2600);
           this._voice('rival', 'triple');
         } else this.hud.showCallout(`ATTACK! ${rivalName} must dodge… (${GLYPH.T} ×${d.jammers} left)`, 'taunt', 1800);
@@ -571,9 +581,9 @@ export class BattleSession {
         this._schedule(d.defender, 'stunned', d.stunBar * 4, 4, true);
         this._schedule(d.attacker, 'cheer', Math.ceil(beatNow + 0.5), 2, false);
         this.hud.showBanner(d.defender === 'player' ? 'STUNNED!' : `${rivalName} STUNNED!`, d.defender === 'player' ? 'bad' : 'good', 1300);
-        if (d.defender === 'player') {
+        if (d.defender === 'player' || this.twoPlayer) {
           const tt = this._taunt(d.attacker);
-          this.hud.disrupt(tt.disrupt, { sprite: tt.projectile, color: tt.color, ms: this.clock.spb * 1000 * (4 * (d.stunBar + 1) - beatNow) });
+          this.hud.disrupt(tt.disrupt, { sprite: tt.projectile, color: tt.color, ms: this.clock.spb * 1000 * (4 * (d.stunBar + 1) - beatNow), who: d.defender });
         }
         this.director.cut('close', beatNow, 2, { who: d.attacker });
         this.world.react('tauntLanded', d);
