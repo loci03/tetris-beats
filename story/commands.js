@@ -80,6 +80,11 @@ export const RULES = {
   // An early press this soon after a command appears is a late / doubled
   // press on the previous one, not a commitment to the new one.
   graceAfterShow: 0.25,
+  // A missed beat 4 is called this long after its window closes, so a press
+  // that happened inside the window but reaches the game a frame late (slow
+  // frame, busy device) still counts — it's judged by its own timestamp.
+  // The battle session raises it with the measured frame time.
+  inputGrace: 0.1,
 };
 
 // The windows at a tempo: never more than 45% of a beat, so a window can't

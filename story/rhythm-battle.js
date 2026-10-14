@@ -74,6 +74,7 @@ export class RhythmBattle {
     this.ai = new OpponentAI(aiProfile, makeRng((seed ^ 0x9e3779b9) >>> 0));
     this.practice = practice;
     this.win = windowsFor(clock.spb, timing || RULES.timing);
+    this.inputGrace = RULES.inputGrace;   // song seconds (see RULES.inputGrace)
     this.player = newDancer('player', 'human');
     this.rival = newDancer('rival', practice && practice.rival === 'none' ? 'none' : rival);
     for (const d of [this.player, this.rival]) this._restart(d);
@@ -81,6 +82,7 @@ export class RhythmBattle {
     this.groove = 0;            // tug of war: -1 rival … +1 player
     this.nextBuild = this.startBar;
     this.lastBarSeen = this.introStartBar - 1;
+    this.lastBeatSeen = this.introStartBar * (clock.beatsPerBar || 4) - 1;
     this.listeners = [];
     this.ended = false;
     this.songTime = -Infinity;
@@ -440,6 +442,19 @@ export class RhythmBattle {
     this.songTime = songTime;
     if (this.ended) return;
     const clock = this.clock;
+    // Beats (for the HUD's pulse — the same grid beat 4 is judged on). A
+    // jump back (seek) restarts the count; a jump forward reports the beats
+    // passed, the last one being the current.
+    const curBeat = Math.floor(clock.beatAt(songTime) + 1e-9);
+    if (curBeat < this.lastBeatSeen) this.lastBeatSeen = curBeat - 1;
+    if (curBeat - this.lastBeatSeen > 8) this.lastBeatSeen = curBeat - 1;
+    while (this.lastBeatSeen < curBeat) {
+      const k = ++this.lastBeatSeen;
+      if (k >= this.introStartBar * clock.beatsPerBar && k < this.endBar * clock.beatsPerBar) {
+        const bar = Math.floor(k / clock.beatsPerBar);
+        this.emit('beat', { beat: k, bar, count: k - bar * clock.beatsPerBar + 1, time: clock.barTime(bar) + (k - bar * clock.beatsPerBar) * clock.spb });
+      }
+    }
     // Bar starts (intro + battle).
     const curBar = Math.floor(clock.beatAt(songTime) / clock.beatsPerBar);
     while (this.lastBarSeen < curBar) {
@@ -484,7 +499,7 @@ export class RhythmBattle {
             if (!b.prepared) { const pt = this._prepareTime(d, b); consider(pt, () => this._prepare(d, b, pt)); }
             else {
               const tt = b.finish + this.win.good;
-              consider(tt + 1e-6, () => {
+              consider(tt + this.inputGrace + 1e-6, () => {
                 if (b.type === 'dodge') this._resolveDodge(d, b, 'miss', this.win.good, tt);
                 else {
                   const st = commandStatus(b.cands);

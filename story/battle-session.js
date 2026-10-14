@@ -15,10 +15,11 @@ import { createCharacter, CHARACTERS } from './characters.js';
 import { DanceController, MOVE_LABELS } from './dance.js';
 import { Choreographer, ACTION_STATE, ROW_NAMES } from './choreo.js';
 import { InputMapper, loadControls, bindingsFor } from './input.js';
-import { soloCommandFor, GLYPH } from './commands.js';
+import { soloCommandFor, GLYPH, RULES } from './commands.js';
 import { PracticePanel } from './practice.js';
 import { CameraDirector } from './camera.js';
-import { BoardTransition, cameraAlongPath, START_POSE } from './transition.js';
+import { BoardTransition, cameraAlongPath, START_POSE, ease } from './transition.js';
+const ease01 = (u) => ease(Math.max(0, Math.min(1, u)));
 import { BattleHUD } from './hud.js';
 import { StorySfx } from './sfx.js';
 import { AnimeFx } from './anime-fx.js';
@@ -95,7 +96,9 @@ export class BattleSession {
     this.pChoreo = new Choreographer(pDef, level.dancers.player);
     this.rChoreo = new Choreographer(rDef, level.dancers.rival);
     this.fx = new AnimeFx(this.scene);
-    this.director = new CameraDirector(this.camera, this.world.anchors);
+    // The camera frames the dancers where they actually stand (narrow
+    // screens bring them closer together — _resize).
+    this.director = new CameraDirector(this.camera, { player: this.pRig.root.position, rival: this.rRig.root.position });
     this.director.motion = this.motion;
 
     // ── Board transition ──
@@ -135,7 +138,8 @@ export class BattleSession {
     this.input.claims = (action) => this.phase !== 'dead' && this.phase !== 'done' && !this.bridge.uiBlocking()
       && !document.querySelector('.ctl-wrap') && (action === 'P' || !this.paused);
     const names = (a, pl = 1) => { const b = bindingsFor(this.controls, a, pl); return b.keys.slice(0, 2).map(KEY_NAME).join('/'); };
-    const k1 = (a, pl) => names(a, pl).split('/')[pl === 1 && 'UDLR'.includes(a) ? 1 : 0] || names(a, pl);
+    // One key per action (P1's directions show WASD in 2P, where P2 has the arrows).
+    const k1 = (a, pl, wasd = twoPlayer) => { const k = bindingsFor(this.controls, a, pl).keys; const pick = pl === 1 && wasd && 'UDLR'.includes(a) ? (k[1] ?? k[0]) : k[0]; return pick ? KEY_NAME(pick) : ''; };
     const hint2 = (pl) => `${pl === 2 ? 'P2' : 'P1'}: ${['U', 'L', 'D', 'R'].map(a => k1(a, pl)).join(' ')} · ${GLYPH.X} ${k1('X', pl)} · ${GLYPH.O} ${k1('O', pl)} · ${GLYPH.T} ${k1('T', pl)} · ${GLYPH.S} ${k1('S', pl)}`;
     this.hud = new BattleHUD({
       names: twoPlayer ? { player: `P1 ${pDef.name}`, rival: `P2 ${rDef.name}` } : { player: pDef.name, rival: rDef.name },
@@ -144,7 +148,7 @@ export class BattleSession {
       isTouch: bridge.isTouch,
       onPad: (a, ts) => this.input.touch(a, ts ?? performance.now()),
       onPause: () => this._togglePause(),
-      controlsHint: `Directions ${names('U')}${names('L') ? ' · ' + names('L') : ''}… any time · ${GLYPH.X} ${names('X')} · ${GLYPH.O} ${names('O')} on beat 4 · ${GLYPH.T} attack ${names('T')} · ${GLYPH.S} dodge ${names('S')}`,
+      controlsHint: `${['U', 'D', 'L', 'R'].map(a => k1(a, 1)).join('')} / WASD any time · ${GLYPH.X} ${k1('X', 1)} or ${GLYPH.O} ${k1('O', 1)} on beat 4 · ${GLYPH.T} ${k1('T', 1)} attack · ${GLYPH.S} ${k1('S', 1)} dodge`,
     });
 
     if (practice) this.practicePanel = new PracticePanel(this, { onRestart: onPracticeRestart });
@@ -219,8 +223,8 @@ export class BattleSession {
     const m = this.mcfg;
     const f = this.director.framing();
     this.camera.position.copy(f.pos); this.camera.fov = f.fov; this.camera.lookAt(f.look);
-    this.camera.updateProjectionMatrix();
     this.director.snapTo(f.pos, f.look, f.fov);
+    this.director.applyView(1);
     this.world.setLightLevel(1);
     this.renderer.compile(this.scene, this.camera);
     this.renderer.render(this.scene, this.camera);
@@ -414,6 +418,10 @@ export class BattleSession {
     const beatNow = this.clock.beatAt(this.battle.songTime);
     const rivalName = this.rDef.name;
     switch (type) {
+      case 'beat':
+        // Every beat of the song, on the judge's clock: the HUD pulses.
+        this.hud.onBeat(d.beat, d.bar, d.time);
+        break;
       case 'barStart': {
         const m = this.mcfg;
         const i = d.bar - (m.battleStartBar - m.introBars);   // intro bar index (0..introBars-1)
@@ -670,7 +678,12 @@ export class BattleSession {
   // ── Frame ─────────────────────────────────────────────────────────
   _frame(nowMs) {
     this._raf = requestAnimationFrame((t) => this._frame(t));
-    const dt = Math.min(0.1, (nowMs - this._last) / 1000);
+    const rawDt = (nowMs - this._last) / 1000;
+    const dt = Math.min(0.1, rawDt);
+    // Input delivery grace follows the frame time (a slow device delivers
+    // presses a frame late) — see RULES.inputGrace.
+    this._dtAvg = this._dtAvg == null ? rawDt : this._dtAvg * 0.9 + Math.min(1, rawDt) * 0.1;
+    this.battle.inputGrace = Math.min(0.5, Math.max(RULES.inputGrace, this._dtAvg * 1.5, Math.min(0.5, rawDt))) * (this.clock.rate || 1);
     this._last = nowMs;
     const songTime = this.clock.songTime(nowMs);
     const beat = this.clock.beatAt(songTime);
@@ -697,6 +710,7 @@ export class BattleSession {
       const u = Math.max(0, Math.min(1, (t - 0.55) / (IN_DUR - 0.55)));
       const f = this.director.framing();
       cameraAlongPath(this.camera, u, f.pos, f.look, f.fov);
+      this.director.applyView(ease01(u));     // the stage framing blends in as the camera lands
       this.world.setLightLevel((t - 1.05) / 0.6);
       if (t >= IN_DUR) {
         this.transition.group.visible = false;
@@ -709,10 +723,14 @@ export class BattleSession {
       const t = songTime - this.outAtSong;
       const u = 1 - Math.max(0, Math.min(1, t / (OUT_DUR - 0.55)));
       cameraAlongPath(this.camera, u, this.outFrom.pos, this.outFrom.look, this.outFrom.fov);
+      this.director.applyView(ease01(u));
       this.world.setLightLevel(1 - (t - 0.2) / 0.9);
       this.transition.updateOut(t, OUT_DUR);
       if (t >= OUT_DUR) this._finish();
     } else {
+      // The HUD's free area can change (fonts, orientation, panels): check
+      // it now and then.
+      if ((this._layoutTick = (this._layoutTick || 0) + 1) % 30 === 0) this._layoutStage();
       this.director.update(dt, { beat, leader: this.battle.groove });
       if (this.phase === 'result' && songTime >= this.outAtSong) this.standalone ? this._finishStandalone() : this._startOut();
     }
@@ -743,6 +761,19 @@ export class BattleSession {
   }
 
   // ── Layout ────────────────────────────────────────────────────────
+  // Fit the stage framing to what the HUD leaves free (and the practice
+  // panel, when it's open beside the stage on a wide screen).
+  _layoutStage(force = false) {
+    const L = this.hud.layout();
+    const pr = this.practicePanel && this.practicePanel.rect && this.practicePanel.rect();
+    if (pr && L.W > 900) for (const r of L.rects) r.left = Math.max(r.left, pr.right + 6);
+    const key = L.W + 'x' + L.H + ':' + L.rects.map(r => [r.left, r.top, r.right, r.bottom].map(Math.round).join(',')).join('|');
+    if (!force && key === this._layoutKey) return;
+    this._layoutKey = key;
+    const rect = this.director.setStage(L);
+    this.hud.setStage(rect);
+  }
+
   _boardRect() {
     const r = this.bridge.getBoardCanvas().getBoundingClientRect();
     // Content box (the canvas has a 1 px border).
@@ -755,6 +786,12 @@ export class BattleSession {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.hud.resize();
+    // Portrait screens are narrow: the dancers stand closer together so
+    // they can be framed bigger (±1.6 on wide screens, ±1.0 in portrait).
+    const a = w / h, spread = a >= 1.3 ? 1.6 : a <= 0.75 ? 1.0 : 1.0 + (a - 0.75) / 0.55 * 0.6;
+    this.pRig.root.position.x = -spread;
+    this.rRig.root.position.x = spread;
+    this._layoutStage(true);
     if (this.transition && (this.trans === 'in' || this.phase === 'init')) this.transition.layout(this._boardRect(), w, h);
   }
 }

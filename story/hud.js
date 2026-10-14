@@ -1,11 +1,19 @@
-// BattleHUD — the rhythm battle's 2D overlay: both dancers' score, move
-// level, dance-string progress, enthusiasm and jammers, the groove
-// tug-of-war meter and timer, and — at the bottom — each dancer's COMMAND
-// BAR (CommandBar): the command(s) on offer (TOP line, and the harder
-// BOTTOM line when it's eligible) as direction boxes plus a separate ✕ / ○
-// box, filled in as the directions are entered, a BEAT 1-2-3-4 track with
-// the marker driven by the same audio clock as the judge, and the
-// judgment. On touch screens: swipe for directions, ✕ ○ △ □ pads.
+// BattleHUD — the rhythm battle's 2D overlay, kept small so the dancers own
+// the screen:
+//   • a slim TOP BAR: each dancer's name, score, combo, Enthusiasm and
+//     attacks, the timer + pause in the middle, and the rival's command as
+//     one compact line under it;
+//   • a compact BOTTOM DOCK: a one-line ticker for callouts, then YOUR
+//     command strip (CommandBar) — the command(s) on offer as direction
+//     boxes plus the ✕ / ○ box, two fixed rows when a branch is open, and a
+//     1-2-3-4 beat track with beat 4's timing window.
+// The strip PULSES ON EVERY BEAT of the song: the battle emits a 'beat'
+// event from the same audio clock its judge uses (onBeat), and each frame
+// the pulse envelope is computed from that clock's song time — so it can't
+// drift, freezes on pause and is right again after a seek or a slow frame.
+// Beat 4 of the command's measure gets its own, stronger gold pulse.
+// Touch: swipe anywhere for the directions; tap the ✕ / ○ (or □) box in the
+// strip and the △ chip — no permanent pad buttons.
 // Everything here only *reads* battle state; it never decides a result.
 
 import { DRAW } from './anime-fx.js';
@@ -16,6 +24,22 @@ const DIR_COLOR = { L: '#ff4f9a', U: '#39d0ff', D: '#4be08a', R: '#ffa53a' };
 const BTN_COLOR = { X: '#7fb2ff', O: '#ff6b6b', T: '#5dffb0', S: '#ff8ad8' };
 const JUDGE_COLOR = { perfect: '#ffe45c', great: '#5dffb0', good: '#7ecbff', miss: '#ff5a6e' };
 const REASON = { early: 'TOO EARLY', late: 'TOO LATE', incomplete: 'INCOMPLETE', 'wrong-button': 'WRONG BUTTON' };
+
+// Beat pulse (real-time seconds): a quick attack, then an exponential decay.
+// Beat 4 of the command's measure decays slower.
+export const PULSE = { attack: 0.04, decay: 0.14, decay4: 0.28 };
+export function pulseEnvelope(dt, attack = PULSE.attack, decay = PULSE.decay) {
+  if (!(dt >= 0)) return 0;
+  if (dt < attack) return dt / attack;
+  return Math.exp(-(dt - attack) / decay);
+}
+// The beat a song time falls in and how long ago (real seconds) it hit,
+// from the music clock — the same grid the judge uses.
+export function beatPhase(clock, songTime) {
+  const beat = clock.beatAt(songTime);
+  const k = Math.floor(beat + 1e-9);
+  return { beat, k, since: (beat - k) * clock.spb / (clock.rate || 1) };
+}
 
 function el(tag, cls, parent, html) {
   const e = document.createElement(tag);
@@ -29,11 +53,16 @@ export class BattleHUD {
   // controlsHint: e.g. 'Arrows / WASD · ✕ J · ○ K · △ I · □ U'
   constructor({ names, isTouch, onPad, onPause, controlsHint = '', twoPlayer = false, hints2 = null }) {
     this.names = names;
-    this.root = el('div', 'story-hud' + (twoPlayer ? ' sh-2p' : ''));
+    this.isTouch = !!isTouch;
+    this.twoPlayer = twoPlayer;
+    this.root = el('div', 'story-hud' + (twoPlayer ? ' sh-2p' : '') + (isTouch ? ' sh-touch' : ''));
     this.root.setAttribute('aria-live', 'polite');
-    const top = el('div', 'sh-top', this.root);
-    this.p = this._panel(top, 'sh-p1', names.player);
-    const mid = el('div', 'sh-mid', top);
+
+    // ── Top bar ──
+    const top = this.top = el('div', 'sh-top', this.root);
+    const row = el('div', 'sh-toprow', top);
+    this.p = this._panel(row, 'sh-p1', names.player, !(isTouch && !twoPlayer));
+    const mid = el('div', 'sh-mid', row);
     const timerRow = el('div', 'sh-timer-row', mid);
     this.timer = el('div', 'sh-timer', timerRow, '1:00');
     if (onPause) {
@@ -42,79 +71,60 @@ export class BattleHUD {
       pb.setAttribute('aria-label', 'Pause');
       pb.addEventListener('click', (e) => { e.preventDefault(); onPause(); });
     }
-    const gm = el('div', 'sh-groove', mid);
-    el('span', 'sh-groove-l', gm, twoPlayer ? 'P1' : 'YOU');
-    this.grooveBar = el('div', 'sh-groove-bar', gm);
+    this.grooveBar = el('div', 'sh-groove-bar', mid);
+    this.grooveBar.title = 'Groove: who is leading';
     this.grooveKnob = el('i', '', this.grooveBar);
-    el('span', 'sh-groove-r', gm, names.rival);
-    this.r = this._panel(top, 'sh-p2', names.rival);
+    this.r = this._panel(row, 'sh-p2', names.rival, true);
 
     this.banner = el('div', 'sh-banner', this.root);
-    this.callout = el('div', 'sh-callout', this.root);
 
-    // Command bars: YOU at the bottom centre, the rival's compact one to the
-    // right — each with its own state, judgments and feedback.
-    // 2P VS: two full-size bars side by side, each with its keys.
-    const bottom = this.bottom = el('div', 'sh-bottom', this.root);
+    // ── Bottom dock: ticker + command strip(s) ──
+    const dock = this.dock = el('div', 'sh-dock', this.root);
+    this.ticker = el('div', 'sh-ticker', dock);
+    this.hint = isTouch ? 'SWIPE <b>← ↑ ↓ →</b> ANY TIME · TAP <b>✕</b> / <b>○</b> ON BEAT 4' : controlsHint;
+    const pad = onPad || (() => {});
     if (twoPlayer) {
-      const col = (who, hint) => { const c = el('div', 'sh-col', bottom); el('div', 'sh-hint', c, isTouch ? '' : hint); return c; };
-      const c1 = col('player', hints2 ? hints2[0] : ''), c2 = col('rival', hints2 ? hints2[1] : '');
+      const cols = el('div', 'sh-cols', dock);
       this.bars = {
-        player: new CommandBar(c1, { who: 'player', label: names.player }),
-        rival: new CommandBar(c2, { who: 'rival', label: names.rival }),
+        player: new CommandBar(el('div', 'sh-col', cols), { who: 'player', label: names.player, variant: 'strip', onPad: pad, hint: hints2 && hints2[0] }),
+        rival: new CommandBar(el('div', 'sh-col', cols), { who: 'rival', label: names.rival, variant: 'strip', hint: hints2 && hints2[1] }),
       };
     } else {
-      this.hint = el('div', 'sh-hint', bottom, isTouch ? '' : controlsHint);
       this.bars = {
-        player: new CommandBar(bottom, { who: 'player', label: names.player }),
-        rival: new CommandBar(this.root, { who: 'rival', label: names.rival, small: true }),
+        player: new CommandBar(dock, { who: 'player', label: names.player, variant: 'strip', onPad: pad, attack: isTouch }),
+        // The rival's command: one compact line under the top bar.
+        rival: new CommandBar(top, { who: 'rival', label: names.rival, variant: 'mini' }),
       };
     }
 
     if (isTouch) {
-      // Touch: swipe anywhere for the directions; the four face buttons.
-      this.root.classList.add('sh-touch');
+      // Touch: swipe anywhere (under the HUD) for the directions.
       this.swipeZone = el('div', 'sh-swipe', this.root);
-      this._initSwipe(this.swipeZone, onPad);
-      const pads = el('div', 'sh-pads', this.root);
-      el('div', 'sh-swipe-hint', pads, 'SWIPE <b>←&#8202;↑&#8202;↓&#8202;→</b> ANY TIME<br>THEN ✕ / ○ ON BEAT 4');
-      const face = el('div', 'sh-face', pads);
-      for (const [a, cls] of [['T', 'n'], ['S', 'w'], ['O', 'e'], ['X', 's']]) {
-        const b = this._pad(face, `sh-pad sh-face-${cls}`, GLYPH[a], (ts) => onPad(a, ts), BTN_COLOR[a]);
-        if (a === 'T') this.tauntPad = b;
-      }
+      this.root.insertBefore(this.swipeZone, this.root.firstChild);
+      this._initSwipe(this.swipeZone, pad);
     }
     document.body.appendChild(this.root);
     this._bannerTimer = 0;
     this._calloutTimer = 0;
+    this._callout = false;
+    this._beatK = null;
+    this._showHint(true);
     this.resize();
   }
 
-  _panel(parent, cls, name) {
-    const p = el('div', 'sh-panel ' + cls, parent);
-    el('div', 'sh-name', p, name);
-    const score = el('div', 'sh-score', p, '0');
-    const row = el('div', 'sh-row', p);
-    const lv = el('div', 'sh-lv', row, 'LV 1');
-    // Dance-string progress: 8 rows, the last one the freeze.
-    const str = el('div', 'sh-string', row);
-    const rows = [0, 1, 2, 3, 4, 5, 6, 7].map(i => el('i', i === 7 ? 'fz' : '', str));
-    const combo = el('div', 'sh-combo', row, '');
-    const enth = el('div', 'sh-enth', p);
+  _panel(parent, cls, name, showAttack) {
+    const p = el('div', 'sh-side ' + cls, parent);
+    const id = el('div', 'sh-id', p);
+    el('span', 'sh-name', id, name);
+    const score = el('span', 'sh-score', id, '0');
+    const combo = el('span', 'sh-combo', id, '');
+    const meta = el('div', 'sh-meta', p);
+    const enth = el('div', 'sh-enth', meta);
+    enth.title = 'Enthusiasm';
     const enthFill = el('i', '', enth);
-    el('span', '', enth, 'ENTHUSIASM');
-    const jam = el('div', 'sh-jam', p);
-    return { p, score, lv, rows, combo, enth, enthFill, jam };
-  }
-
-  _pad(parent, cls, label, fn, color) {
-    const b = el('button', cls, parent, label);
-    b.type = 'button';
-    if (color) b.style.setProperty('--pad', color);
-    b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); b.classList.add('down'); fn(e.timeStamp); });
-    const up = () => b.classList.remove('down');
-    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('pointerleave', up);
-    return b;
+    const jam = el('span', 'sh-jam', meta, '');
+    if (!showAttack) jam.style.display = 'none';
+    return { p, score, combo, enth, enthFill, jam };
   }
 
   // Swipe recognition. A swipe is judged at the onset of the flick — the
@@ -179,32 +189,77 @@ export class BattleHUD {
     setTimeout(() => fx.remove(), 450);
   }
 
+  // Where the HUD leaves room for the stage, in px: the band between the top
+  // bar and the dock, and (when the dock sits in a corner) the area beside
+  // it. The camera frames the dancers into the best of these.
+  layout() {
+    const W = window.innerWidth, H = window.innerHeight;
+    const t = this.top.getBoundingClientRect(), d = this.dock.getBoundingClientRect();
+    const topB = Math.min(H * 0.4, t.bottom + 4);
+    const rects = [{ left: 0, right: W, top: topB, bottom: Math.max(topB + 40, d.top - 4) }];
+    // A dock in the lower-left corner (short landscape): the stage can use
+    // the full height to its right.
+    if (d.right < W * 0.62 && d.left < W * 0.2) rects.push({ left: d.right + 4, right: W, top: topB, bottom: H });
+    return { W, H, rects };
+  }
+
+  // Banner height: the upper part of the stage band.
+  setStage(rect) {
+    if (!rect) return;
+    this.root.style.setProperty('--banner-y', `${Math.round(rect.top + (rect.bottom - rect.top) * 0.2)}px`);
+    this.root.style.setProperty('--banner-x', `${Math.round((rect.left + rect.right) / 2)}px`);
+  }
+
   resize() {}
 
   show(v) { this.root.classList.toggle('sh-on', !!v); }
 
+  // A beat of the song (from RhythmBattle's 'beat' event — the judge's own
+  // clock): beatIndex = song beat, measureIndex = bar, songTime = its time.
+  onBeat(beatIndex, measureIndex, songTime) {
+    this._beatK = beatIndex;
+    this._beatBar = measureIndex;
+    this._beatAt = songTime;
+  }
+
   // Per-frame refresh from battle state.
   update(battle, clock, songTime) {
+    // Beat pulse, from the music clock. The last beat event says which beat
+    // is on; if a frame skipped it (seek, stall) the clock decides.
+    const ph = beatPhase(clock, songTime);
+    if (this._beatK !== ph.k) this._beatK = ph.k;
+    const pulse = { k: ph.k, beat: ph.beat, since: ph.since };
+
     for (const [ui, d] of [[this.p, battle.player], [this.r, battle.rival]]) {
-      ui.score.textContent = d.score.toLocaleString();
-      const lv = `LV ${d.level}`;
-      if (ui.lv.textContent !== lv) ui.lv.textContent = lv;
-      if (ui._row !== d.row) { ui._row = d.row; ui.rows.forEach((r, i) => r.classList.toggle('on', i < d.row)); }
-      const combo = d.chain >= 3 ? `${d.chain} COMBO` : '';
+      const sc = d.score.toLocaleString();
+      if (ui.score.textContent !== sc) ui.score.textContent = sc;
+      const combo = d.chain >= 3 ? `×${d.chain}` : '';
       if (ui.combo.textContent !== combo) ui.combo.textContent = combo;
       ui.enthFill.style.width = d.enthusiasm + '%';
       ui.enth.classList.toggle('branch', d.enthusiasm >= 40);
-      const jam = `ATTACK △ ×${d.jammers}`;
-      if (ui.jam.textContent !== jam) { ui.jam.textContent = jam; ui.jam.classList.toggle('empty', d.jammers <= 0); }
+      const jam = `${GLYPH.T}${d.jammers}`;
+      if (ui.jam.textContent !== jam) { ui.jam.textContent = jam; ui.jam.classList.toggle('empty', d.jammers <= 0); ui.jam.title = `${d.jammers} attack${d.jammers === 1 ? '' : 's'} left`; }
     }
-    if (this.tauntPad) this.tauntPad.classList.toggle('ready', battle.player.jammers > 0);
     // Groove meter: player pushes it left, rival right.
     this.grooveKnob.style.left = (50 - battle.groove * 45) + '%';
     // Timer: time left in the battle.
     const left = Math.max(0, clock.barTime(battle.endBar) - Math.max(songTime, clock.barTime(battle.startBar)));
-    this.timer.textContent = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
-    this.bars.player.update(battle, clock, songTime);
-    this.bars.rival.update(battle, clock, songTime);
+    const tt = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
+    if (this.timer.textContent !== tt) this.timer.textContent = tt;
+    this.bars.player.update(battle, clock, songTime, pulse);
+    this.bars.rival.update(battle, clock, songTime, pulse);
+    // The controls hint stays in the ticker until the first commands land.
+    if (this._hintOn && battle.player.moves >= 2) this._showHint(false);
+  }
+
+  _showHint(on) {
+    this._hintOn = on && !!this.hint;
+    if (!this._callout) this._setTicker(this._hintOn ? this.hint : '', 'hint');
+  }
+  _setTicker(html, kind = '') {
+    const t = this.ticker;
+    t.className = 'sh-ticker' + (html ? ' show ' + kind : '');
+    if (html) t.innerHTML = html;
   }
 
   // Feedback hooks (driven by battle events).
@@ -224,12 +279,12 @@ export class BattleHUD {
     this._bannerTimer = setTimeout(() => { b.className = 'sh-banner ' + kind; }, ms);
   }
 
+  // Callouts run in the ticker above the strip — never over the dancers.
   showCallout(text, kind = '', ms = 1600) {
-    const c = this.callout;
-    c.className = 'sh-callout show ' + kind;
-    c.innerHTML = text;
+    this._callout = true;
+    this._setTicker(text, kind);
     clearTimeout(this._calloutTimer);
-    this._calloutTimer = setTimeout(() => { c.className = 'sh-callout ' + kind; }, ms);
+    this._calloutTimer = setTimeout(() => { this._callout = false; this._setTicker(this._hintOn ? this.hint : '', 'hint'); }, ms);
   }
 
   // A landed taunt messes with the victim's controls until the stun ends.
@@ -238,8 +293,8 @@ export class BattleHUD {
   //   float · fall · swirl · splat · cloud                        (marks of `sprite` over it)
   disrupt(kind, { sprite = 'note', color = '#ffffff', ms = 2500, who = 'player' } = {}) {
     const kinds = String(kind || 'shake').split('+');
-    // 2P: only the stunned player's column.
-    const b = this.root.classList.contains('sh-2p') ? this.bars[who].root.parentElement : this.bottom;
+    // Only the stunned dancer's command strip.
+    const b = (this.bars[who] || this.bars.player).root;
     const css = kinds.filter(k => ['shake', 'wobble', 'blur', 'glitch', 'flash', 'darkness', 'spin'].includes(k));
     for (const k of css) { b.classList.remove('dz-' + k); void b.offsetWidth; b.classList.add('dz-' + k); }
     b.style.setProperty('--dz-color', color);
@@ -295,90 +350,157 @@ export class BattleHUD {
 }
 
 // ── CommandBar ──────────────────────────────────────────────────────
-// One dancer's command display. The rows mirror the battle's candidates for
-// the bar being entered: arrows turn green as they're entered, the next
-// arrow pulses, a candidate the input ruled out greys out, the ✕ / ○ box
-// lights when its sequence is complete and flashes on beat 4.
+// One dancer's command display. variant 'strip' (yours, and both in 2P):
+//   head    YOU · MOVE 3/8  ……………………  status / judgment
+//   rows    TOP  ← ↓ →  ✕     (two fixed rows: the ★ BOTTOM line below)
+//   track   [1] [2] [3] [4]   marker + beat 4's timing window
+// variant 'mini' (the rival in 1P): one line — name, move, the options.
+// The rows mirror the battle's candidates for the bar being entered: arrows
+// turn green as they're entered, the next one is outlined, a candidate the
+// input ruled out greys out, the button box lights when its sequence is
+// complete and flashes on beat 4. With onPad, the button boxes are touch
+// targets (✕ / ○ / □), and `attack` adds a △ chip.
 class CommandBar {
-  constructor(parent, { who, label, small = false }) {
+  constructor(parent, { who, label, variant = 'strip', onPad = null, attack = false, hint = '' }) {
     this.who = who;
-    this.root = el('div', `ch ch-${who}${small ? ' ch-small' : ''}`, parent);
+    this.variant = variant;
+    this.onPad = onPad;
+    this.root = el('div', `ch ch-${variant} ch-${who}`, parent);
     const head = el('div', 'ch-head', this.root);
-    el('span', 'ch-who', head, label);
+    // (the rival's mini line sits under its own score panel: no name again)
+    if (variant !== 'mini') el('span', 'ch-who', head, label);
     this.move = el('span', 'ch-move', head, '');
+    if (attack && onPad) {
+      this.atk = el('button', 'ch-atk', head, `${GLYPH.T}`);
+      this.atk.type = 'button';
+      this.atk.setAttribute('aria-label', 'Attack (△ on beat 4)');
+      this._tap(this.atk, 'T');
+    }
+    if (hint) el('span', 'ch-keys', head, hint);
+    this.status = el('span', 'ch-status', head, '');
     this.rowsEl = el('div', 'ch-rows', this.root);
-    const beats = el('div', 'ch-beats', this.root);
-    this.cells = [1, 2, 3, 4].map(n => el('span', 'ch-cell' + (n === 4 ? ' b4' : ''), beats, n === 4 ? '4' : String(n)));
-    this.marker = el('i', 'ch-marker', beats);
-    this.status = el('div', 'ch-status', this.root, '');
-    this.judgeEl = el('div', 'ch-judge', this.root);
+    if (variant === 'strip') {
+      const track = el('div', 'ch-track', this.root);
+      this.win = el('i', 'ch-win', track);
+      this.pills = [1, 2, 3, 4].map(n => el('span', 'ch-pill' + (n === 4 ? ' b4' : ''), track, String(n)));
+      this.marker = el('i', 'ch-marker', track);
+    }
     this._key = '';
     this._rows = [];
+    this._judgeUntil = -Infinity;
+    this._build(null);
+  }
+
+  // pointerdown on a box = that button, timed at the touch.
+  _tap(node, action) {
+    node.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (typeof action === 'function') action = action();
+      if (!action) return;
+      node.classList.remove('tap'); void node.offsetWidth; node.classList.add('tap');
+      this.onPad(action, e.timeStamp);
+    });
+  }
+
+  _row(cls) {
+    const row = el('div', 'ch-row ' + cls, this.rowsEl);
+    return row;
+  }
+
+  _btn(row, button) {
+    const tag = this.onPad && this.variant === 'strip' ? 'button' : 'b';
+    const btn = el(tag, `ch-btn ch-btn-${button}`, row, GLYPH[button]);
+    btn.style.setProperty('--c', BTN_COLOR[button]);
+    if (tag === 'button') {
+      btn.type = 'button';
+      btn.setAttribute('aria-label', `${GLYPH[button]} on beat 4`);
+      this._tap(btn, button);
+    }
+    return btn;
   }
 
   _build(b) {
     this.rowsEl.innerHTML = '';
     this._rows = [];
     this.root.dataset.type = b ? b.type : 'none';
-    if (!b) return;
-    if (b.type === 'command' && b.cands) {
+    const strip = this.variant === 'strip';
+    if (b && b.type === 'command' && b.cands) {
       for (const o of b.cands) {
-        const row = el('div', `ch-row ${o.slot} ${o.kind}`, this.rowsEl);
-        el('span', 'ch-tag', row, o.kind === 'solo' ? '★★ SOLO' : o.slot === 'top' ? 'TOP' : '★ BOTTOM');
+        const row = this._row(`${o.slot} ${o.kind}`);
+        el('span', 'ch-tag', row, o.kind === 'solo' ? '★★' : o.slot === 'top' ? 'TOP' : '★');
         const seq = el('span', 'ch-seq', row);
         const arrows = o.seq.map(d => {
           const a = el('i', 'ch-dir', seq, DIR_GLYPH[d]);
           a.style.setProperty('--c', DIR_COLOR[d]);
           return a;
         });
-        if (!o.seq.length) el('i', 'ch-none', seq, 'no arrows');
-        el('span', 'ch-sep', row, '▸');
-        const btn = el('b', `ch-btn ch-btn-${o.button}`, row, GLYPH[o.button]);
-        btn.style.setProperty('--c', BTN_COLOR[o.button]);
-        el('span', 'ch-lv', row, o.kind === 'solo' ? '' : `LV ${o.col + 1}`);
+        if (!o.seq.length && strip) el('i', 'ch-none', seq, 'no arrows');
+        const btn = this._btn(row, o.button);
+        if (strip) el('span', 'ch-lv', row, o.kind === 'solo' ? 'SOLO' : `LV${o.col + 1}`);
         this._rows.push({ o, row, arrows, btn, sig: '' });
       }
-    } else if (b.type === 'dodge') {
-      const row = el('div', 'ch-row note dodge', this.rowsEl);
-      el('span', 'ch-tag', row, 'INCOMING!');
-      el('span', 'ch-note', row, 'DODGE');
-      el('span', 'ch-sep', row, '▸');
-      const btn = el('b', 'ch-btn ch-btn-S', row, GLYPH.S);
-      btn.style.setProperty('--c', BTN_COLOR.S);
+    } else if (b && b.type === 'dodge') {
+      const row = this._row('note dodge');
+      el('span', 'ch-note', row, strip ? 'INCOMING! DODGE ON 4' : 'DODGE');
+      const btn = this._btn(row, 'S');
       this._rows.push({ o: null, row, arrows: [], btn, sig: '' });
-    } else {
-      const label = { stunned: 'STUNNED…', rest: 'FREEZE! — rest bar', solo: '★★ SOLO TIME ★★', watch: 'WATCH THE SOLO', idle: 'GROOVING' }[b.type] || '';
+    } else if (b) {
+      const label = { stunned: 'STUNNED…', rest: 'FREEZE! — REST BAR', solo: '★★ SOLO TIME ★★', watch: 'WATCH THE SOLO', idle: 'GROOVING' }[b.type] || '';
       el('div', `ch-row note ${b.type}`, this.rowsEl, label);
+    } else if (strip) {
+      el('div', 'ch-row note idle', this.rowsEl, 'GET READY');
     }
+    // Strips keep two row slots so the layout never jumps when a branch opens.
+    if (strip) while (this.rowsEl.children.length < 2) el('div', 'ch-row empty', this.rowsEl);
   }
 
-  update(battle, clock, now) {
+  update(battle, clock, now, pulse) {
     const b = battle.commandFor(this.who, now);
     const key = !b ? 'none' : `${b.bar}:${b.type}:${b.cands ? b.cands.map(o => o.node + o.slot).join('|') : ''}`;
     if (key !== this._key) { this._key = key; this._build(b); }
-    const d = battle.dancer(this.who);
-    // Move type (row 1-8) and level of the TOP command.
+    // Move type (row 1-8) of the TOP command.
     const top = b && b.cands && b.cands[0];
-    const mv = top ? (top.kind === 'solo' ? 'SOLO' : `MOVE ${top.row}/8`) : '';
+    const mv = top ? (top.kind === 'solo' ? 'SOLO' : this.variant === 'mini' ? `${top.row}/8` : `MOVE ${top.row}/8`) : '';
     if (this.move.textContent !== mv) this.move.textContent = mv;
-    // Beat track for the bar being entered (same audio clock as the judge).
-    const beat = clock.beatAt(now);
-    const base = b ? b.bar * clock.beatsPerBar : Math.floor(beat / 4) * 4;
-    const x = beat - base;
-    const pos = Math.max(-0.5, Math.min(4, x));
-    this.marker.style.left = `${(pos / 4) * 100}%`;
-    this.marker.classList.toggle('pre', x < 0);
-    const cell = x >= 0 && x < 4 ? Math.floor(x) : -1;
-    if (cell !== this._cell) { this._cell = cell; this.cells.forEach((c, i) => c.classList.toggle('on', i === cell)); }
-    const onFour = x >= 2.92 && x < 3.25;
-    this.cells[3].classList.toggle('hit', onFour);
+
+    // Where the command's measure is: u = beats since its beat 1.
+    const input = b && (b.type === 'command' || b.type === 'dodge');
+    const u = b ? pulse.beat - b.bar * clock.beatsPerBar : -9;
+    const win = battle.win ? battle.win.good / clock.spb : 0.2;       // ± beats
+    const inWindow = input && !b.resolved && Math.abs(u - 3) <= win;
+    // Beat 4 of a measure this dancer had to press in (from that beat until
+    // the next — independent of which command is on screen by then).
+    const kBar = Math.floor(pulse.k / clock.beatsPerBar), kb = battle.dancer(this.who).bars.get(kBar);
+    const four = pulse.k - kBar * clock.beatsPerBar === 3 && !!kb && (kb.type === 'command' || kb.type === 'dodge');
+    const p = pulseEnvelope(pulse.since, PULSE.attack, four ? PULSE.decay4 : PULSE.decay);
+    const rs = this.root.style;
+    rs.setProperty('--p', four ? '0' : p.toFixed(3));
+    rs.setProperty('--p4', four ? p.toFixed(3) : '0');
+    this.root.classList.toggle('four', !!four);
+    this.root.classList.toggle('window', !!inWindow);
+
+    if (this.variant === 'strip') {
+      // Beat track: pill k lights on beat k (centred on it); beat 4's
+      // window is the gold band; the marker runs on the audio clock.
+      const x = Math.max(-0.5, Math.min(4, u + 0.5));
+      this.marker.style.left = `${(x / 4) * 100}%`;
+      this.marker.classList.toggle('pre', !b || u < -0.5);
+      const cur = b && u >= -0.02 && u < 4 ? Math.floor(u + 0.02) : -1;
+      if (cur !== this._cur) {
+        this._cur = cur;
+        this.pills.forEach((c, i) => { c.classList.toggle('on', i === cur); c.classList.toggle('past', cur > i); });
+      }
+      const w = Math.min(0.5, win);
+      if (this._w !== w) { this._w = w; this.win.style.left = `${((3.5 - w) / 4) * 100}%`; this.win.style.width = `${(2 * w / 4) * 100}%`; }
+    }
     if (!b) { this._status(''); return; }
+
     // Rows.
     for (const r of this._rows) {
       const o = r.o;
       const prog = o ? o.progress : 0, alive = o ? o.alive : true;
       const done = o ? prog === o.seq.length && alive : true;
-      const chosen = b.resolved && b.chosen === o && b.success;
+      const chosen = b.resolved && b.success && (b.chosen === o || b.type === 'dodge');
       const failed = b.resolved && !b.success;
       const sig = `${prog}${alive}${done}${chosen}${failed}${b.resolved}`;
       if (sig !== r.sig) {
@@ -389,40 +511,51 @@ class CommandBar {
         });
         r.row.classList.toggle('dead', !alive || (b.resolved && !chosen && b.type === 'command'));
         r.row.classList.toggle('ready', !b.resolved && done);
-        r.row.classList.toggle('hit', chosen || (b.type === 'dodge' && b.resolved && b.success));
+        r.row.classList.toggle('hit', chosen);
         r.row.classList.toggle('fail', failed);
       }
-      r.btn.classList.toggle('flash', onFour && !b.resolved && (done || !o));
+      r.btn.classList.toggle('flash', four && b.bar === kBar && !b.resolved && done);
     }
-    // Status line.
+
+    // Status: what to do next (or the judgment for a moment — timed on the
+    // song, so a pause holds it).
+    if (this._judgeNew) { this._judgeNew = false; this._judgeUntil = now + 0.6 * (clock.rate || 1); }
+    if (now < this._judgeUntil) return;
     let st = '';
     if (b.type === 'command' && b.cands) {
       if (b.resolved) st = b.success ? `${(b.judged || '').toUpperCase()}!` : (REASON[b.reason] || 'MISS');
       else {
         const s = commandStatus(b.cands);
-        if (s.phase === 'dirs') st = `ENTER ${s.next.map(d => DIR_GLYPH[d]).join(' / ')} — ${s.entered} OF ${s.total}`;
-        else if (s.phase === 'button') st = `${s.buttons.map(k => GLYPH[k]).join(' OR ')} ON BEAT 4!`;
+        if (s.phase === 'dirs') st = this.variant === 'mini' ? '' : `ENTER ${s.next.map(d => DIR_GLYPH[d]).join('/')} · ${s.entered}/${s.total}`;
+        else if (s.phase === 'button') st = `${s.buttons.map(k => GLYPH[k]).join(' or ')} ON 4`;
       }
-    } else if (b.type === 'dodge') st = b.resolved ? (b.success ? 'DODGED!' : 'HIT!') : `${GLYPH.S} ON BEAT 4 TO DODGE`;
-    this._status(st);
-    this.root.classList.toggle('waiting', b.type === 'command' && !b.resolved && x < 0);
-    void d;
+    } else if (b.type === 'dodge') st = b.resolved ? (b.success ? 'DODGED!' : 'HIT!') : `${GLYPH.S} ON 4`;
+    this._status(st, '');
   }
 
-  _status(t) { if (this.status.textContent !== t) this.status.textContent = t; }
+  _status(t, color = '') {
+    if (this.status.textContent !== t) this.status.textContent = t;
+    if (this.status.style.color !== color) this.status.style.color = color;
+  }
 
   flashWrong() {
     const r = this.root;
     r.classList.remove('wrong'); void r.offsetWidth; r.classList.add('wrong');
   }
 
+  // Instant result: the strip flashes (green ✓ / red ✗) and the status shows
+  // the judgment with the offset.
   judge(judgment, delta, reason) {
-    const e = this.judgeEl;
-    const txt = judgment === 'miss' ? (REASON[reason] || 'MISS') : judgment.toUpperCase() + '!';
-    const ms = judgment !== 'miss' && Number.isFinite(delta) ? `${delta >= 0 ? '+' : ''}${Math.round(delta * 1000)} ms` : '';
-    e.innerHTML = `${judgment === 'miss' ? 'MISS!' : txt}${judgment === 'miss' && reason ? `<small>${txt}</small>` : ms ? `<small>${ms}</small>` : ''}`;
-    e.style.color = JUDGE_COLOR[judgment];
-    e.classList.remove('pop'); void e.offsetWidth; e.classList.add('pop');
+    const ok = judgment !== 'miss';
+    const off = Math.round((delta || 0) * 1000);
+    const ms = ok && Number.isFinite(delta) ? ` ${off >= 0 ? '+' : '−'}${Math.abs(off)}ms` : '';
+    const txt = ok ? `${judgment.toUpperCase()}!${this.variant === 'strip' ? ms : ''}` : `MISS${reason && this.variant === 'strip' ? ' · ' + (REASON[reason] || '') : '!'}`;
+    this._judgeNew = true;
+    this._status(txt, JUDGE_COLOR[judgment]);
+    const r = this.root;
+    r.classList.remove('ok', 'bad'); void r.offsetWidth; r.classList.add(ok ? 'ok' : 'bad');
+    const s = this.status;
+    s.classList.remove('pop'); void s.offsetWidth; s.classList.add('pop');
   }
 
   destroy() { this.root.remove(); }

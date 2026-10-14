@@ -54,22 +54,55 @@ Two things the sources don't settle, so we chose:
 
 The rival AI produces timestamped inputs that go through the same buffer and judge as the player's.
 
-## 4. The command bar
+## 4. The battle HUD and the command strip
+
+The dancers come first. The HUD is a slim **top bar** plus a compact **bottom dock**, and the camera frames both dancers, head to feet, into the space between them (§4.3). Nothing opaque sits over the stage.
 
 ```
-YOU                                         MOVE 4/8
-TOP       [↓]               ▸ (○)  LV 2       ← arrows turn green as entered,
-★ BOTTOM  [↑][↑]            ▸ (✕)  LV 3          the next one pulses; dead line dims
-[BEAT 1][BEAT 2][BEAT 3][BEAT 4]              ← marker on the audio clock; BEAT 4 flashes
-          ENTER ↓ / ↑ — 1 OF 2                ← what's still needed
+YOU 1,390 ×4 ▬▬▬▬     2:14 ❚❚     ×3 398 NULL ▬▬ △2      ← score · combo · Enthusiasm · attacks
+                         ─●─       4/8 ✕ ON 4 [↓✕] [★↓○]  ← the rival's command, one line
+
+                  (both dancers, full body)
+
+        ★ 4/8 LOCK & POP · PERFECT +972                    ← ticker: callouts / controls hint
+┌ YOU · MOVE 4/8  △                       PERFECT! −3ms ┐  ← status / judgment + offset
+│ TOP  [↓]                            (○)  LV2          │  ← two fixed rows (no jump when
+│ ★    [↑][↑]                         (✕)  LV3          │    a branch opens)
+│ [ 1 ][ 2 ][ 3 ][▮4▮]                                   │  ← each lights on its beat; gold band
+└────────────────────────────────────────────────────────┘    = beat 4's timing window
 ```
 
-- The bar shows the command from the moment it appears until its beat-4 result, and then the result for a moment.
-- A wrong arrow flashes the bar red.
-- On beat 4 the button box flashes when the arrows are complete.
-- PERFECT / GREAT / GOOD / MISS pops up with the offset in ms.
-- Dodge, stunned, rest (Freeze), solo and watch measures have their own rows.
-- The rival has a smaller bar of its own. The top panels show each dancer's LV, string pips, combo, Enthusiasm and attacks left.
+- **Arrows** turn green as you enter them; the next one is outlined; a line your input ruled out dims; a wrong arrow shakes the strip red.
+- **The final button box** lights when its arrows are complete. It fills (gold ring) while beat 4's window is open, and flashes on beat 4.
+- **Feedback:** the strip flashes green on a hit and red on a miss; the status shows PERFECT / GREAT / GOOD / MISS (with the reason) and the offset in ms. These judgments are a modern addition.
+- **Other measures:** dodge (`INCOMING! DODGE ON 4 [□]`), stunned, rest (Freeze), solo and watch measures replace the rows.
+- **Removed duplication:** the move-row pips and LV in the score panels (MOVE n/8 and LV are on the strip), the separate status line (now in the strip header), and the full controls line (shown in the ticker only until your first commands land).
+
+### 4.1 Beat pulse (synchronised to the music)
+- **Source:** RhythmBattle (the judge) emits a `beat` event for every beat of the song on its own grid. Beat 4's event time is exactly the judge's beat 4. The HUD receives it as `onBeat(beatIndex, measureIndex, songTime)`.
+- **Envelope:** every frame, the strip's pulse is computed from the music clock's song time: `pulseEnvelope(since beat)`, a 40 ms attack and a 140 ms decay.
+  - Beats 1–3 brighten the border glow, scale the strip by ~1.2 % and light that beat's pill.
+  - Beat 4 of a measure you had to press in is a separate, stronger gold pulse: a 280 ms decay, the gold ring, the gold pill and the button box scaled up.
+- **Why it can't drift:**
+  - There is no timer and no CSS animation on an interval: the pulse is computed from song time each frame.
+  - A pause freezes it.
+  - A seek or a dropped frame is corrected on the next frame.
+  - Practice's slowed playback keeps the 40/140 ms in real time.
+- **Tested** in `tests/hud.test.mjs` and in-game: every sampled frame matched the clock-derived envelope, including across a real pause and resume.
+
+### 4.2 Touch (no pad buttons)
+- **Directions:** swipe anywhere on the stage.
+- **✕ / ○ (and □ on a dodge measure):** tap that box in your strip. Both rows' boxes work, so ✕ and ○ stay separately selectable when both lines are open. Each box has a padded touch target.
+- **△ attack:** the small △ chip in the strip header.
+- **Timing:** taps and swipes are timed at touch-down. A missed beat 4 is only called after a short input-delivery grace (100 ms, or more on slow devices, following the measured frame time). A press that happened inside the window but reached the game a frame late still counts, judged by its own timestamp.
+
+### 4.3 Stage framing
+- **Free area:** `BattleHUD.layout()` reports the free screen area: the band between the top bar and the dock, and in short landscape (dock in the lower-left corner) the full height beside the dock.
+- **Fitting:** `CameraDirector.setStage()` picks where the pair comes out biggest. Each shot is fitted by projecting the dancers' real 3D bounds (feet to raised hands, arms' reach, a step of depth) through its actual pose, so perspective, side angles and dutch roll are all accounted for. A projection offset (`setViewOffset`) places the pair low in the area, with headroom for banners.
+- **Shots:**
+  - All cuts during normal play keep both dancers in frame; only SOLO TIME and the winner's shot frame one dancer.
+  - Narrow screens bring the dancers closer together (±1.0 instead of ±1.6) so they can be larger.
+  - The camera keeps front-of-stage props (fences, the crowd's heads) below its line to the dancers' feet.
 
 ## 5. 2P VS
 

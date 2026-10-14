@@ -17,10 +17,13 @@ function css() {
   const st = document.createElement('style');
   st.id = 'pr-css';
   st.textContent = `
-  .pr { position: fixed; left: 12px; top: 150px; z-index: 12; width: 300px; max-height: calc(100vh - 330px); overflow: auto;
+  .pr { position: fixed; left: calc(env(safe-area-inset-left, 0px) + 8px); top: calc(env(safe-area-inset-top, 0px) + 92px); z-index: 12; width: 290px; max-height: calc(100vh - 250px); overflow: auto;
     background: rgba(12, 6, 22, 0.88); border: 1px solid rgba(255, 201, 58, 0.45); border-radius: 14px; padding: 10px 12px;
     font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: #efe8ff; pointer-events: auto; }
-  .pr h3 { margin: 0 0 6px; font: 900 12px var(--font-display, system-ui); letter-spacing: 3px; color: #ffc93a; display: flex; justify-content: space-between; }
+  .pr h3 { margin: 0 0 6px; font: 900 12px var(--font-display, system-ui); letter-spacing: 3px; color: #ffc93a; display: flex; justify-content: space-between; cursor: pointer; user-select: none; }
+  .pr.min { width: auto; padding: 6px 10px; overflow: hidden; }
+  .pr.min h3 { margin: 0; }
+  .pr.min > :not(h3) { display: none; }
   .pr .k { color: rgba(255,255,255,0.55); }
   .pr .ok { color: #5dffb0; } .pr .bad { color: #ff6b7e; } .pr .dim { color: rgba(255,255,255,0.35); }
   .pr .row { margin: 2px 0; }
@@ -31,7 +34,7 @@ function css() {
   .pr .ctl { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
   .pr button, .pr select { font: 700 11px var(--font-ui, system-ui); color: #fff; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.22); border-radius: 7px; padding: 4px 7px; cursor: pointer; }
   .pr button.on { border-color: #ffc93a; color: #ffc93a; }
-  @media (max-width: 760px) { .pr { top: auto; bottom: 330px; left: 6px; width: 62vw; max-height: 34vh; font-size: 10px; } }`;
+  @media (max-width: 760px) { .pr { top: calc(env(safe-area-inset-top, 0px) + 96px); width: 70vw; max-height: 45vh; font-size: 10px; } }`;
   document.head.appendChild(st);
 }
 
@@ -49,7 +52,7 @@ export class PracticePanel {
     this.offsets = [];
     this.root = document.createElement('div');
     this.root.className = 'pr';
-    this.root.innerHTML = `<h3><span>PRACTICE</span><span data-f="speed"></span></h3>
+    this.root.innerHTML = `<h3 title="show / hide"><span>PRACTICE ▾</span><span data-f="speed"></span></h3>
       <div data-f="beat" class="row"></div>
       <div class="row"><span class="k">EXPECTED</span><div data-f="exp" class="big"></div></div>
       <div class="row"><span class="k">RECEIVED</span><div data-f="got" class="big"></div></div>
@@ -71,6 +74,9 @@ export class PracticePanel {
         <button data-c="controls">CONTROLS</button>
       </div>`;
     document.body.appendChild(this.root);
+    // Collapsible (starts collapsed on phones so the stage stays clear).
+    if (window.innerWidth < 760) this.root.classList.add('min');
+    this.root.querySelector('h3').onclick = () => this.root.classList.toggle('min');
     this.f = (k) => this.root.querySelector(`[data-f="${k}"]`);
     this.c = (k) => this.root.querySelector(`[data-c="${k}"]`);
     this._wire();
@@ -110,6 +116,9 @@ export class PracticePanel {
     this.c('row').value = String(p.row);
     this.c('col').value = String(p.col);
   }
+
+  // The panel's screen rect while it's open (the camera keeps clear of it).
+  rect() { return this.root.classList.contains('min') ? null : this.root.getBoundingClientRect(); }
 
   // Practise from a given row / level: the next command the player gets.
   _setStart(row, col) {

@@ -75,7 +75,8 @@ test('3. button outside the beat-4 window → MISS (early press / time-out), win
   let rb = makeBattle();
   assert.deepEqual([playBar(rb, 'player', 4, { offset: -0.2 }).judgment, lastJudge(rb).reason], ['miss', 'early']);
   rb = makeBattle();
-  playBar(rb, 'player', 4, { offset: 0.2 });                // later than GOOD: the window closed first
+  playBar(rb, 'player', 4, { offset: 0.2 });                // later than GOOD: outside the window
+  rb.update(rb.player.bars.get(4).finish + 0.15 + rb.inputGrace + 0.01);
   assert.equal(lastJudge(rb).judgment, 'miss'); assert.equal(lastJudge(rb).reason, 'late');
   assert.equal(ev(rb, 'judge', 'player').length, 1, 'the stray late press is not charged to the next command');
   rb = makeBattle();
@@ -85,10 +86,17 @@ test('3. button outside the beat-4 window → MISS (early press / time-out), win
   // Never pressed: judged once the window has closed.
   rb = makeBattle();
   offered(rb, 'player', 4);
-  rb.update(rb.clock.barTime(4) + 3 * rb.clock.spb + 0.149);
+  // (called once the input-delivery grace has passed too)
+  rb.update(rb.clock.barTime(4) + 3 * rb.clock.spb + 0.149 + rb.inputGrace);
   assert.equal(ev(rb, 'judge', 'player').length, 0);
-  rb.update(rb.clock.barTime(4) + 3 * rb.clock.spb + 0.151);
+  rb.update(rb.clock.barTime(4) + 3 * rb.clock.spb + 0.151 + rb.inputGrace);
   assert.equal(lastJudge(rb).reason, 'late');
+  // A press stamped inside the window that arrives during the grace counts.
+  rb = makeBattle();
+  const b4 = offered(rb, 'player', 4);
+  rb.update(b4.finish + 0.15 + rb.inputGrace * 0.9);       // the frame ran past the window…
+  assert.equal(b4.resolved, false);
+  assert.equal(rb.inputAt('player', 'O', b4.finish + 0.03).judgment, 'perfect');   // …the press is judged by its time
 });
 
 // 4 ────────────────────────────────────────────────────────────────
@@ -293,6 +301,7 @@ test('14. low and high tempos: full strings at 60 and 180 BPM; windows never rea
   // At 240 BPM the GOOD window is capped below 150 ms.
   const fast = makeBattle({ bpm: 240 });
   playBar(fast, 'player', 4, { offset: 0.14 });
+  fast.update(fast.player.bars.get(4).finish + 0.5);
   assert.equal(lastJudge(fast).judgment, 'miss');
 });
 
@@ -542,7 +551,7 @@ test('20. attack △ / dodge □ never corrupt either string', () => {
   rb.inputAt('player', 'T', b8.finish);
   const d9 = offered(rb, 'rival', 9);
   rb.inputAt('rival', 'X', d9.finish);                      // wrong button
-  rb.update(d9.finish + 0.2);
+  rb.update(d9.finish + 0.4);
   assert.equal(rb.rival.chain, 0); assert.equal(rb.rival.row, 0);
   assert.equal(rb.rival.bars.get(10).type, 'stunned');
   assert.equal(ev(rb, 'tauntLanded').length, 1);
