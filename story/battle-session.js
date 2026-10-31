@@ -34,6 +34,14 @@ const OUT_DUR = 2.4;      // seconds, world → board
 // Short key names for the controls hint.
 const KEY_NAME = (code) => ({ Period: '.', Slash: '/', Semicolon: ';', Quote: "'", Space: 'Space', Enter: 'Enter', ShiftLeft: 'Shift', ShiftRight: 'Shift', Escape: 'Esc', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[code] || code.replace(/^Key/, '').replace(/^Digit/, ''));
 
+// Dance-battle renderer resolution by graphics level (0 high … 3 lowest,
+// see GFX in index.html): starting pixel ratio, how far the dynamic
+// resolution may lower it, and the most it may climb back to.
+export function resPlan(level, dpr = 1, auto = true) {
+  const start = [Math.min(dpr, 1.5), Math.min(dpr, 1.25), 1, 0.75][Math.max(0, Math.min(3, level | 0))];
+  return { pr: start, ceil: start, min: Math.max(0.5, start * 0.6), auto, t0: 0, n: 0, sum: 0, good: 0 };
+}
+
 export class BattleSession {
   // `standalone`: Bust a Beat — the battle on its own, no Tetris board to
   // fly through; it fades in on the stage and ends on the result screen.
@@ -60,12 +68,16 @@ export class BattleSession {
     const st = bridge.settings();
     this.low = st.lowGraphics;
     this.motion = st.motion;
+    this.gfx = st.gfxLevel ?? (this.low ? 2 : 1);
 
     // ── Renderer / scene ──
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'story-stage';
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: !this.low, alpha: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.low ? 1 : 1.5));
+    // Resolution: from the graphics level, then lowered / raised while
+    // dancing to hold the frame rate (_governRes).
+    this.res = resPlan(this.gfx, window.devicePixelRatio || 1, st.gfxAuto !== false);
+    this.renderer.setPixelRatio(this.res.pr);
     this.renderer.setClearColor(0x000000, 0);
     document.body.appendChild(this.canvas);
     this.scene = new THREE.Scene();
@@ -268,6 +280,9 @@ export class BattleSession {
   }
 
   setPaused(p) {
+    // (a press from before the resume — e.g. the controller's A on RESUME —
+    // must not also land in the battle)
+    if (this.paused && !p) this._resumedAt = performance.now();
     this.paused = !!p;
     try { p ? this.ctx.suspend() : this.ctx.resume(); } catch {}
   }
@@ -341,6 +356,7 @@ export class BattleSession {
 
   _input(action, ts, who = 'player') {
     if (this.paused || (this.phase !== 'battle' && this.phase !== 'intro')) return;
+    if (this._resumedAt && ts != null && ts <= this._resumedAt) return;
     this.battle.input(who, action, ts ?? performance.now());
   }
 
@@ -685,6 +701,7 @@ export class BattleSession {
     this._dtAvg = this._dtAvg == null ? rawDt : this._dtAvg * 0.9 + Math.min(1, rawDt) * 0.1;
     this.battle.inputGrace = Math.min(0.5, Math.max(RULES.inputGrace, this._dtAvg * 1.5, Math.min(0.5, rawDt))) * (this.clock.rate || 1);
     this._last = nowMs;
+    this._governRes(nowMs, rawDt * 1000);
     const songTime = this.clock.songTime(nowMs);
     const beat = this.clock.beatAt(songTime);
     const inWorld = this.ctx.currentTime >= this.dropTime - 0.02;
@@ -786,6 +803,29 @@ export class BattleSession {
     const r = this.bridge.getBoardCanvas().getBoundingClientRect();
     // Content box (the canvas has a 1 px border).
     return { left: r.left + 1, top: r.top + 1, width: r.width - 2, height: r.height - 2 };
+  }
+
+  // Dynamic resolution: a 1.5 s window averaging under ~45 fps lowers the
+  // renderer's pixel ratio 20% (down to res.min); steady 60 fps for 4.5 s
+  // raises it 10% again, but not back to a ratio that was already too slow.
+  _governRes(nowMs, dtMs) {
+    const g = this.res;
+    if (!g || !g.auto || this.paused || document.hidden || !(dtMs > 0)) { if (g) g.t0 = 0; return; }
+    if (dtMs > 250) { g.t0 = 0; return; }
+    if (!g.t0) { g.t0 = nowMs; g.n = 0; g.sum = 0; return; }
+    g.n++; g.sum += dtMs;
+    if (nowMs - g.t0 < 1500) return;
+    const avg = g.sum / g.n;
+    g.t0 = 0;
+    let pr = g.pr;
+    if (avg > 22 && pr > g.min) { g.ceil = Math.min(g.ceil, pr * 0.95); pr = Math.max(g.min, pr * 0.8); g.good = 0; }
+    else if (avg < 17.6) { if (++g.good >= 3 && pr < g.ceil) { pr = Math.min(g.ceil, pr * 1.1); g.good = 0; } }
+    else g.good = 0;
+    if (Math.abs(pr - g.pr) > 0.01) {
+      g.pr = pr;
+      this.renderer.setPixelRatio(pr);
+      this.renderer.setSize(window.innerWidth, window.innerHeight, false);
+    }
   }
 
   _resize() {

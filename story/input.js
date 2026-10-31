@@ -12,6 +12,8 @@
 // 2P VS (players = 2): P2 has its own keyboard map (keys2, checked first —
 // the arrow keys move to P2, P1 keeps WASD) and the second gamepad.
 
+import { normalizePad } from './gamepad.js';
+
 export const ACTIONS = ['U', 'D', 'L', 'R', 'X', 'O', 'T', 'S', 'P'];
 export const ACTION_LABEL = { U: '↑ Up', D: '↓ Down', L: '← Left', R: '→ Right', X: '✕ Cross', O: '○ Circle', T: '△ Attack', S: '□ Dodge', P: 'Pause' };
 const STORE = 'tb.controls.v1';
@@ -29,7 +31,9 @@ export function defaultControls() {
     },
     // Standard gamepad mapping: 0 = bottom face (✕ / A), 1 = right (○ / B),
     // 2 = left (□ / X), 3 = top (△ / Y), 9 = start, 12-15 = d-pad.
-    pad: { 12: 'U', 13: 'D', 14: 'L', 15: 'R', 0: 'X', 1: 'O', 3: 'T', 2: 'S', 9: 'P' },
+    // (indices in the standard layout — non-standard pads are normalized
+    // first, see gamepad.js)
+    pad: { 12: 'U', 13: 'D', 14: 'L', 15: 'R', 0: 'X', 1: 'O', 3: 'T', 2: 'S', 9: 'P', 8: 'P' },
     // P2's keyboard in 2P VS.
     keys2: {
       ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R',
@@ -167,18 +171,20 @@ export class InputMapper {
       if (!st) {
         // A pad that (re)appears: whatever is already held counts as held,
         // so it doesn't fire on connect.
-        st = { id: gp.id, buttons: (gp.buttons || []).map(b => (typeof b === 'object' ? (b.pressed || b.value > 0.5) : b > 0.5)), dirs: { U: false, D: false, L: false, R: false } };
-        const ax = gp.axes || [];
-        if (this.controls.stick) st.dirs = { L: -(ax[0] || 0) > STICK_ON, R: (ax[0] || 0) > STICK_ON, U: -(ax[1] || 0) > STICK_ON, D: (ax[1] || 0) > STICK_ON };
+        const memo = {}, n0 = normalizePad(gp, memo);
+        st = { id: gp.id, memo, buttons: n0.buttons.slice(), dirs: { U: false, D: false, L: false, R: false } };
+        if (this.controls.stick) st.dirs = { L: -n0.lx > STICK_ON, R: n0.lx > STICK_ON, U: -n0.ly > STICK_ON, D: n0.ly > STICK_ON };
         this.pads.set(gp.index, st);
         if (this.onDevice) this.onDevice({ connected: true, index: gp.index, id: gp.id });
       }
+      // Standard layout whatever the pad (hat d-pads, raw Xbox / Sony orders).
+      const norm = normalizePad(gp, st.memo);
       const ts = gp.timestamp && gp.timestamp <= now + 1 && gp.timestamp > now - 100 ? gp.timestamp : now;
       // Directions first so a direction + button in the same poll stay in
       // order (arrows before the final button).
       const player = this.players === 2 && gp.index >= 1 ? 2 : 1;
       const push = (order, action, control) => fires.push({ ts, order, action, info: { source: 'pad', pad: gp.index, control, player } });
-      const ax = gp.axes || [], x = ax[0] || 0, y = ax[1] || 0;
+      const x = norm.lx, y = norm.ly;
       if (this.controls.stick) {
         for (const [dir, v] of [['L', -x], ['R', x], ['U', -y], ['D', y]]) {
           const was = st.dirs[dir], on = was ? v > STICK_OFF : v > STICK_ON;
@@ -186,8 +192,7 @@ export class InputMapper {
           st.dirs[dir] = on;
         }
       }
-      (gp.buttons || []).forEach((b, i) => {
-        const on = typeof b === 'object' ? (b.pressed || b.value > 0.5) : b > 0.5;
+      norm.buttons.forEach((on, i) => {
         if (this._capture && on && !st.buttons[i]) { const cb = this._capture; this._capture = null; cb({ type: 'button', index: i, pad: gp.index }); }
         else if (on && !st.buttons[i]) {
           const action = this.controls.pad[i];

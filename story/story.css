@@ -273,7 +273,8 @@ button.ch-btn::before { content: ''; position: absolute; inset: -8px -12px; }   
 
 /* Feedback: wrong arrow (red shake), success (green flash), miss (red). */
 .ch.wrong { animation: chWrong 0.28s ease; }
-@keyframes chWrong { 30% { border-color: var(--bad); box-shadow: 0 0 14px rgba(255, 50, 90, 0.6); translate: -4px 0; } 60% { translate: 3px 0; } }
+/* (left, not translate: works in older browsers and doesn't fight the pulse transform) */
+@keyframes chWrong { 30% { border-color: var(--bad); box-shadow: 0 0 14px rgba(255, 50, 90, 0.6); left: -4px; } 60% { left: 3px; } }
 .ch.ok { animation: chOk 0.45s ease-out; }
 @keyframes chOk { 0% { border-color: var(--green-hi); box-shadow: 0 0 26px rgba(80, 255, 170, 0.85); } }
 .ch.bad { animation: chBad 0.45s ease-out; }
@@ -309,6 +310,7 @@ button.ch-btn::before { content: ''; position: absolute; inset: -8px -12px; }   
 .sh-swipe-fx {
   position: absolute; z-index: 1; width: 56px; height: 56px; margin: -28px 0 0 -28px;
   border-radius: 50%; border: 3px solid var(--c, #fff);
+  background: rgba(255, 255, 255, 0.3);          /* (browsers without color-mix, e.g. older car browsers) */
   background: color-mix(in srgb, var(--c, #fff) 35%, transparent);
   color: #fff; font: 900 26px/50px var(--font-display, system-ui); text-align: center;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
@@ -394,7 +396,7 @@ button.ch-btn::before { content: ''; position: absolute; inset: -8px -12px; }   
 .ch.dz-spin { animation: dz-spin 1.6s ease-in-out infinite; }
 .ch.dz-glitch { animation: dz-glitch 0.35s steps(2) infinite; }
 .ch.dz-blur .ch-rows, .ch.dz-blur .ch-track { filter: blur(3px); transition: filter 0.2s; }
-.ch.dz-flash { background: color-mix(in srgb, var(--dz-color, #fff) 45%, rgba(10, 5, 20, 0.72)); }
+.ch.dz-flash { background: rgba(120, 110, 140, 0.72); background: color-mix(in srgb, var(--dz-color, #fff) 45%, rgba(10, 5, 20, 0.72)); }
 .ch.dz-flash .ch-rows, .ch.dz-flash .ch-track { animation: dz-flash 1.2s ease-out forwards; }
 .ch.dz-darkness .ch-rows, .ch.dz-darkness .ch-track { animation: dz-dark 0.9s ease-in-out infinite alternate; }
 @keyframes dz-shake { 0%,100% { transform: translate(0,0); } 25% { transform: translate(-5px,2px); } 50% { transform: translate(4px,-2px); } 75% { transform: translate(-3px,-1px); } }

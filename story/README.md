@@ -24,6 +24,7 @@ object; the mode never touches game internals directly.
 | `music-clock.js` | `MusicClock` — the beat/BPM manager. Song position from the AudioContext clock, latency- and user-offset-compensated; grid phase check and drum-hit (kick / snare) analysis of the decoded song. **Everything is timed in song time.** |
 | `commands.js` | The command system as data + pure functions (see COMMANDS.md): Bust a Groove's original 8-row command tree, the TOP / BOTTOM resolver, the candidate prefix matcher, beat-4 judge windows, the ordered input buffer, per-character move definitions, solo commands. |
 | `input.js`, `controls-ui.js` | `InputMapper`: keyboard + gamepad (d-pad, stick, face buttons) → battle actions with accurate timestamps; remapping, per-device latency, debounce, connect / disconnect. The CONTROLS screen. |
+| `gamepad.js` | Controllers for the whole game: `normalizePad` reads any pad into the standard layout (also unmapped ones — hat-switch d-pads, raw Xbox / PlayStation button orders, common in car and Linux browsers); `PadLayer` plays Tetris through the game's bound keys, moves a focus ring through menus (A choose, B back, Start start / resume) and leaves dance battles to `InputMapper`. |
 | `practice.js` | Practice mode panel: slowed playback, pick the row / level, hold a row, force branches, rival off, live EXPECTED / RECEIVED / STATUS buffer readout, offsets, move id and animation. |
 | `chart.js` | `makeRng` (seeded RNG). |
 | `rhythm-battle.js` | `RhythmBattle` — pure rules: one command per measure (arrows any time before beat 4, ✕ / ○ on beat 4), the dance string and Freeze, attack △ / dodge □ / stun, scoring, enthusiasm, solo; the AI plays through the same judge. Event-ordered, frame-rate independent. Emits events. |
@@ -117,6 +118,24 @@ screen (Bust a Beat tab), with per-device latency offsets on top of the
 On touch screens: **swipe anywhere** for the arrows (zig-zags chain without
 lifting); tap the ✕ / ○ button (□ on a dodge) in your command panel on beat 4, and the △ chip to attack — no pad buttons over the stage. **2P VS** (Bust a Beat tab): P2 plays
 the rival on the arrows + . / ; ' or the second gamepad. See COMMANDS.md.
+
+## Controllers and graphics (whole game)
+
+Any controller works in menus (d-pad / stick moves the yellow ring, A selects,
+B backs out, Start starts or resumes) and in Tetris (d-pad / stick move, ↑ hard
+drop, ↓ soft drop, A rotate right, B / X rotate left, Y / LB hold, RB zone,
+Start pause). Unplugging mid-game pauses. Settings → Controller shows live what
+the browser reports — browsers only reveal a pad after one of its buttons is
+pressed, and only on https pages.
+
+Graphics run at four levels (`GFX` in index.html: High, Balanced, Low,
+Lowest). AUTO picks the start from the device (`DEVICE`: Tesla browsers —
+Intel Atom cars start at Low, AMD cars at Balanced — weak or software GPUs,
+core / memory counts) and a governor steps down when 2 s of frames average
+under ~48 fps (and climbs back, within the device's level, when there's
+room). The 2D backdrops stay at 60 fps speed at any frame rate (missed steps
+run "muted"), and the dance battle lowers its own resolution to hold the
+frame rate. `?gfx=0..3` pins a level, `?tesla=1` pretends to be the car.
 
 ## Testing notes
 
