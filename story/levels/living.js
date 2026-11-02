@@ -11,10 +11,10 @@ import boss from './living/boss.js';
 import mv from './living/moves.js';
 import { buildWorld } from './living/world.js';
 import sprites from './living/sprites.js';
-import { createTetrisWorld } from './living/tetris.js';
+import { createBoardWorld } from './living/board-world.js';
 
 export default {
   boss, moves: mv.moves, moveMeta: mv.moveMeta, sprites,
   buildWorld,
-  backdrop: { camera: { pos: [0, 2.1, 8.6], look: [0, 1.5, 0], fov: 50 }, spread: 3.5, forward: 0.9, create: createTetrisWorld },
+  backdrop: { camera: { pos: [0, 2.1, 8.6], look: [0, 1.5, 0], fov: 50 }, spread: 3.5, forward: 0.9, create: createBoardWorld },
 };

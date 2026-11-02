@@ -1,4 +1,4 @@
-# Deploying Tetris Beats (free, no home-IP exposure)
+# Deploying T-MINO BEATS (free, no home-IP exposure)
 
 Architecture:
 

@@ -1,13 +1,13 @@
-// StoryModeManager — runs a Story Mode level on top of the Tetris match.
+// StoryModeManager — runs a Story Mode level on top of the puzzle match.
 //
-//   TetrisGameplay → StoryTrigger → WorldTransition → RhythmBattle
+//   PuzzleGameplay → StoryTrigger → WorldTransition → RhythmBattle
 //        ▲                                                 │
 //        └──────── ReturnTransition ◄── BattleResult ◄─────┘
 //
-// It also runs BUST A BEAT: the same dance battle on its own (no Tetris),
+// It also runs BUST A BEAT: the same dance battle on its own (no puzzle),
 // with its own pause menu and result screen (startBeat()).
 //
-// It decides when the special tetrimino enters the queue, fires the story
+// It decides when the special piece enters the queue, fires the story
 // event when a line is cleared with it, freezes the match (nothing is
 // reset — board, score, queue, hold and level are preserved), runs a
 // BattleSession, then hands the match back with the battle bonus added.
@@ -22,7 +22,7 @@ class StoryModeManager {
   constructor(bridge) {
     this.bridge = bridge;
     this.level = STORY_LEVELS[DEFAULT_LEVEL];
-    this.phase = 'idle';        // idle | tetris | triggered | battle | beat
+    this.phase = 'idle';        // idle | puzzle | triggered | battle | beat
     this.run = null;
     this.session = null;
     this._timers = [];
@@ -43,7 +43,7 @@ class StoryModeManager {
 
   // Pick the Story level for the next run (start-screen level cards).
   selectLevel(id) {
-    if (STORY_LEVELS[id] && (this.phase === 'idle' || this.phase === 'tetris')) this.level = STORY_LEVELS[id];
+    if (STORY_LEVELS[id] && (this.phase === 'idle' || this.phase === 'puzzle')) this.level = STORY_LEVELS[id];
   }
 
   // ── Hooks called by the game ──────────────────────────────────────
@@ -51,14 +51,14 @@ class StoryModeManager {
     this.teardown();
     this.run = { specialQueued: false, battles: 0, result: null, bonus: 0, hinted: false };
     this.bridge.registerSpecialPiece(this.level.special.base);
-    this.phase = 'tetris';
+    this.phase = 'puzzle';
     this._toast(`<b>${this.level.title}</b>Clear a line with the golden piece to start the dance battle!`, 4200);
     // Warm the battle code in the background while the player stacks.
     this._sessionModule = this._sessionModule || import('./battle-session.js');
   }
 
   onPieceLocked({ special, cleared }) {
-    if (this.phase !== 'tetris' || !this.run || this.run.battles > 0) return;
+    if (this.phase !== 'puzzle' || !this.run || this.run.battles > 0) return;
     const s = this.level.special;
     if (!this.run.specialQueued
         && (this.bridge.lines >= s.appearAfterLines || this.bridge.piecesLocked >= s.appearAfterPieces)) {
@@ -75,7 +75,7 @@ class StoryModeManager {
   }
 
   onSpecialLineClear({ rows }) {
-    if (this.phase !== 'tetris' || !this.run || this.run.battles > 0) return;
+    if (this.phase !== 'puzzle' || !this.run || this.run.battles > 0) return;
     this.phase = 'triggered';
     this.bridge.freeze();
     const cells = this.bridge.specialCells();
@@ -249,7 +249,7 @@ class StoryModeManager {
     this.bridge.setHide2D(false);
     this.bridge.resume(300);
     if (this.run) this.run.battles++;
-    this.phase = 'tetris';
+    this.phase = 'puzzle';
     this._toast('The dance floor couldn\'t open on this device — keep stacking!', 3200);
   }
 
@@ -268,7 +268,7 @@ class StoryModeManager {
     document.body.classList.remove('story-dim');
     this._later(() => { s.destroy(); if (this.session === s) this.session = null; }, 420);
     this.bridge.resume(700);
-    this.phase = 'tetris';
+    this.phase = 'puzzle';
     const won = summary && summary.winner === 'player';
     this._toast(`<b>${won ? 'BATTLE WON' : 'BATTLE LOST'}</b>GROOVE BONUS +${bonus.toLocaleString()} · back to the board!`, 3400);
   }

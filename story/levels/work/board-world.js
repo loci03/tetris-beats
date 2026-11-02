@@ -1,4 +1,4 @@
-// WORK — the living Tetris world: an open-plan office after hours, seen
+// WORK — the living board world: an open-plan office after hours, seen
 // from your desk. Rows of cubicles run down to a wall of night windows,
 // fluorescent panels hum overhead, co-workers hunch over glowing monitors,
 // the "FUCK WORK" neon flickers on the back wall, the calendar keeps
@@ -13,16 +13,16 @@
 // neon cuts out, the desk jolts (mug hops), a paper stack topples (scaled
 // by rows); holds fire the copier (paper stream); clears grow the coffee
 // stain and flip the calendar (one day per line), co-workers rage with
-// their arms up, the inbox counter climbs; a Tetris is a paper storm with
+// their arms up, the inbox counter climbs; a quad is a paper storm with
 // every monitor flashing and the clock spinning; combos speed the calendar
 // and frenzy the cursor; level up rings 5 o'clock (clock spins, confetti
 // from the vents, monitors party); a high stack = DEADLINE: red alarm
 // strobes and red screens; game over kills the lights (monitors to
 // screensavers); start flickers the panels back on row by row.
 
-import { makeKit } from '../underground/tetris-kit.js';
+import { makeKit } from '../underground/board-kit.js';
 
-export function createTetrisWorld(ctx) {
+export function createBoardWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const K = makeKit(THREE), keep = K.keep;
@@ -239,7 +239,7 @@ export function createTetrisWorld(ctx) {
     st.calRate = Math.max(0, st.calRate - dt * 0.8);
     if (st.calAcc >= 1) { st.calAcc = 0; flipDay(); }
     peel.visible = st.flipT > 0; peel.rotation.x = -(1 - st.flipT / 0.25) * 2.6;
-    // Clock ticks (spins on Tetris / level up).
+    // Clock ticks (spins on quad / level up).
     st.clockSpin = Math.max(0, st.clockSpin - dt);
     clockT += dt * (st.clockSpin > 0 ? 3 : 1 / 600);
     minH.rotation.z = -(clockT % 1) * 6.283; hourH.rotation.z = -((clockT % 12) / 12) * 6.283;

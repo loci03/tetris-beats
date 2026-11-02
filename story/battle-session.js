@@ -43,7 +43,7 @@ export function resPlan(level, dpr = 1, auto = true) {
 }
 
 export class BattleSession {
-  // `standalone`: Bust a Beat — the battle on its own, no Tetris board to
+  // `standalone`: Bust a Beat — the battle on its own, no puzzle board to
   // fly through; it fades in on the stage and ends on the result screen.
   // `buildWorld`: the level's stage builder (from loadLevel()).
   // `practice`: Practice mode options (see practice.js) — { speed, holdRow,
@@ -194,7 +194,7 @@ export class BattleSession {
     this.canvas.classList.add('on');
     this.bridge.setHide2D(true);
 
-    // Music: filter-sweep the Tetris track down, riser, then drop the battle
+    // Music: filter-sweep the puzzle track down, riser, then drop the battle
     // section in exactly as the camera passes through the board.
     const ctx = this.ctx, now = ctx.currentTime;
     this.dropTime = now + DROP_AT;
@@ -612,7 +612,7 @@ export class BattleSession {
         this.director.cut('close', beatNow, 2, { who: d.attacker });
         this.world.react('tauntLanded', d);
         this.sfx.crowdOoh(1.1);
-        this._voice(d.attacker, 'tetris');
+        this._voice(d.attacker, 'quad');
         break;
       case 'tauntNotReady':
         if (d.who === 'player') this.hud.showCallout(`No attacks left (${GLYPH.T} is twice per battle)`, '', 1100);
@@ -687,7 +687,7 @@ export class BattleSession {
     this.hud.showBanner(
       `${win ? 'YOU WIN!' : `${this.rDef.name} WINS`}<small>${summary.player.score.toLocaleString()} — ${summary.rival.score.toLocaleString()} · GROOVE BONUS +${this.bonus.toLocaleString()}</small>`,
       win ? 'big win' : 'big lose', len * this.clock.spb * 1000);
-    if (!win) this.cues.push({ beat: this.clock.beatAt(this.battle.songTime) + 4, fn: () => this._voice('rival', 'tetris') });
+    if (!win) this.cues.push({ beat: this.clock.beatAt(this.battle.songTime) + 4, fn: () => this._voice('rival', 'quad') });
     this.outAtSong = this.clock.barTime(bar + m.resultBars);
   }
 
@@ -779,7 +779,7 @@ export class BattleSession {
   _finish() {
     if (this.phase === 'done') return;
     this.phase = 'done';
-    // The song keeps playing: hand it to the Tetris level as its track.
+    // The song keeps playing: hand it to the puzzle level as its track.
     this._removeFilter();
     this.bridge.adoptMusic(this.music.node, this.music.gain, this.mcfg.track);
     this.onDone({ summary: this.summary, bonus: this.bonus || 0 });

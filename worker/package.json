@@ -1,8 +1,8 @@
 {
-  "name": "tetris-beats-worker",
+  "name": "t-mino-beats-worker",
   "version": "1.0.0",
   "private": true,
-  "description": "Cloudflare Worker backend (leaderboard + PvP signaling) for Tetris Beats.",
+  "description": "Cloudflare Worker backend (leaderboard + PvP signaling) for T-MINO BEATS.",
   "main": "index.js",
   "type": "module",
   "scripts": {

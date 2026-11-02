@@ -1,13 +1,13 @@
 // Story Mode / Bust a Beat level registry.
 //
-// One entry per level that has a real song: the Tetris world (themeIndex in
+// One entry per level that has a real song: the board world (themeIndex in
 // index.html's LEVEL_THEMES) + a dance battle against that world's boss.
 // Song grids were measured from the MP3s (onset autocorrelation + whole-song
 // comb fit, see README); MusicClock.alignPhase() re-checks the phase against
 // the decoded audio at runtime.
 //
 // Everything visual for a level — the boss (look, moves, solo, taunt), the
-// 3D stage and the Tetris backdrop framing — lives in its module,
+// 3D stage and the board backdrop framing — lives in its module,
 // story/levels/<id>.js, loaded on demand by loadLevel().
 //
 // Songs faster than ~130 BPM battle on the half-time grid (`bounce: 2`):
@@ -65,7 +65,7 @@ function makeLevel([id, themeIndex, title, track, bpm, firstBeat, dur, bounce, b
   const storyStart = Math.max(6, Math.min(bars - storyBars - 3, Math.round(bars * 0.33)));
   return {
     id, number: themeIndex, title, themeIndex,
-    // The special tetrimino plays exactly like `base`; clearing a line with
+    // The special piece plays exactly like `base`; clearing a line with
     // any of its cells opens the battle. It joins the NEXT queue after 3
     // lines or 20 locked pieces, at the back so it's seen coming.
     special: { base: 'T', appearAfterLines: 3, appearAfterPieces: 20, queueSlot: 4 },
