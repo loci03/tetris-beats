@@ -1,4 +1,4 @@
-// HIGHER — the living Tetris world: a rooftop lounge floating over a hazy
+// HIGHER — the living board world: a rooftop lounge floating over a hazy
 // neon city at night.
 //
 // A 3D take on the old drawHazeScene. You're on a roof garden high above
@@ -20,7 +20,7 @@
 //              boardDropPulse), scaled by rows; the plants and lamp jolt
 //   hold     → a smoke ring drifts out over the city
 //   clear    → trip meter up, haze flood, mandala rings, leaf blizzard
-//              (old cheer); 3+: the sky colour-waves; 4 (TETRIS) "HIGHER!":
+//              (old cheer); 3+: the sky colour-waves; 4 (QUAD) "HIGHER!":
 //              the whole lounge levitates, a giant mandala blooms, the moon
 //              grows rainbow halos · combos escalate the trip
 //   levelUp  → you go HIGHER: the camera rises a notch, sky lanterns float
@@ -36,7 +36,7 @@
 
 import { createKit, rng } from './kit.js';
 
-export function createTetrisWorld(ctx) {
+export function createBoardWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const K = createKit(THREE);
@@ -475,7 +475,7 @@ export function createTetrisWorld(ctx) {
     blimp.position.set(bx, 22 + Math.sin(t * 0.3) * 0.8, -95); blimp.rotation.y = 0.0;
     blimp.userData.banner.material.color.setScalar((0.6 + 0.4 * onBeat) * (0.3 + 0.7 * live));
 
-    // Lounge: levitation on a Tetris (HIGHER!), gentle hover with the trip.
+    // Lounge: levitation on a quad (HIGHER!), gentle hover with the trip.
     groups.forEach((G, i) => {
       const hover = st.lift * (0.7 + 0.25 * Math.sin(t * 1.1 + G.ph)) + st.trip * 0.04 * Math.sin(t * 0.8 + G.ph);
       G.g.position.y = Math.max(0, hover);

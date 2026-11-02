@@ -1,4 +1,4 @@
-// TRIGGERED — the living Tetris world: a night-time warzone seen from a
+// TRIGGERED — the living board world: a night-time warzone seen from a
 // sandbag bunker. Soldiers hold the line at both flanks behind sandbag
 // emplacements, a burning city smoulders on the horizon (windows flicker,
 // roofs catch fire), fire columns roar at the flanks, smoke columns billow,
@@ -13,13 +13,13 @@
 // no-man's land where the piece is (dirt + fireball, scaled by rows; a huge
 // one flashes the screen); holds pop a parachute flare that lights the
 // field; clears = distant explosions with shockwave rings + artillery
-// flashes and the city burns brighter (one per line; a Tetris is a massive
+// flashes and the city burns brighter (one per line; a quad is a massive
 // fireball + debris + orange flash + the chopper swoops in); combos walk a
 // chain of blasts across the field; level up = a pair of jets streak over
 // with afterburners; a high stack sounds the red alarm beacons; game over
 // = the field goes dark and smoky; start = a flare and a volley.
 
-import { makeKit } from '../underground/tetris-kit.js';
+import { makeKit } from '../underground/board-kit.js';
 
 const SKY_FS = `
 varying vec3 vP; uniform float uT, uFlash, uArt, uArtX, uRed;
@@ -39,7 +39,7 @@ void main(){
   gl_FragColor = vec4(c, 1.0);
 }`;
 
-export function createTetrisWorld(ctx) {
+export function createBoardWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const K = makeKit(THREE), keep = K.keep;
@@ -208,7 +208,7 @@ export function createTetrisWorld(ctx) {
     const energy = 0.4 + 0.4 * onBeat + cheer * 0.4;
     const aimK = K.spring(st.aim, dt, 1.5, 0.3), sweepK = K.spring(st.sweep, dt, 0.8, 0.25);
 
-    // Chain explosions (combos / Tetris).
+    // Chain explosions (combos / quad).
     for (let i = st.chain.length - 1; i >= 0; i--) { const c = st.chain[i]; c.t -= dt; if (c.t <= 0) { explode(c.x, c.z, c.k, c.y || 0.4); st.art = Math.max(st.art, 0.6); st.artX = Math.atan2(c.x, -c.z + 10); st.chain.splice(i, 1); } }
 
     // Soldiers: idle sway, bursts, recoil, duck/crouch, aim.

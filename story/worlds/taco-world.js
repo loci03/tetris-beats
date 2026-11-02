@@ -333,7 +333,7 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
       t.obj.visible = true;
     }
   }
-  // Tetris piece reactions: a crowd member lobs a taco onto the stage where
+  // falling piece reactions: a crowd member lobs a taco onto the stage where
   // the piece is (it splats on the floor), tortilla chips burst from slams,
   // hot-sauce shockwave rings + sky flash on clears. All pooled.
   const SPLAT_COLS = [0xd8231a, 0x6cc23a, 0xf2b02e, 0xc4141a];
@@ -614,7 +614,7 @@ export function buildTacoWorld({ lowGraphics = false } = {}) {
   }
 
   // Stage reactions to battle events.
-  // Tetris backdrop piece actions (the old 2D food fight: customers wind
+  // board backdrop piece actions (the old 2D food fight: customers wind
   // up and throw on input, chip burst + golden flash + a food volley on
   // hard drops, hot-sauce flash + shockwave rings + a full salvo on clears).
   function piece(d) {

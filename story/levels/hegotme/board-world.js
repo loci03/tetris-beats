@@ -1,4 +1,4 @@
-// HE GOT ME — the Tetris world: a radiant gothic cathedral, mid-service.
+// HE GOT ME — the board world: a radiant gothic cathedral, mid-service.
 //
 // The old 2D scene: a cathedral with god-rays from the rose window
 // (brighter with the music and clears), blue / red stained-glass windows,
@@ -31,11 +31,11 @@
 //   gameOver → the candles snuff out; one shaft of light remains
 //   start    → the lights rise
 
-import { createKit, frac, clamp, lerp } from '../violins/tetris-kit.js';
+import { createKit, frac, clamp, lerp } from '../violins/board-kit.js';
 
 const TAU = Math.PI * 2;
 
-export function createTetrisWorld(ctx) {
+export function createBoardWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const kit = createKit(THREE);
@@ -334,7 +334,7 @@ export function createTetrisWorld(ctx) {
     if (Math.random() < dt * (6 + 30 * cheer)) { const o = parts.spawn((Math.random() - 0.5) * 26, 0.5, 8 - Math.random() * 40, C.glow, 4); o.vy = 1 + Math.random(); o.wob = 0.5; o.size = 0.12; o.r = 1; o.gg = 0.85; o.b = 0.5; }
     if (st.swell > 0.05 && Math.random() < dt * 10) { const o = parts.spawn((Math.random() - 0.5) * 3, 3, END + 6, C.puff, 3); o.vy = 0.8; o.grow = 0.8; o.size = 1.2; o.r = 0.4; o.gg = 0.35; o.b = 0.3; o.a = 0.5; }
 
-    // Angels: sway, wings beat (spread wide on Tetris), rise on hold, halos, gasp, notes.
+    // Angels: sway, wings beat (spread wide on quad), rise on hold, halos, gasp, notes.
     const singing = st.gasp < 0.2 && !st.over;
     for (let i = 0; i < AN; i++) {
       const a = angels[i];
@@ -398,7 +398,7 @@ export function createTetrisWorld(ctx) {
     }
     doveBody.instanceMatrix.needsUpdate = doveWing.instanceMatrix.needsUpdate = true;
 
-    // Descending cross of light (Tetris).
+    // Descending cross of light (quad).
     crossV.visible = crossH.visible = st.cross > 0.01;
     if (crossV.visible) { const u = 1 - st.cross; crossV.position.y = 15 + 10 * Math.max(0, 1 - u * 4); crossH.position.y = 12 + 10 * Math.max(0, 1 - u * 4); crossMat.uniforms.uK.value = Math.min(1, st.cross * 1.6) * 0.9; }
 

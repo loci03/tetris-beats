@@ -1,4 +1,4 @@
-# Deploying Tetris Beats (free, no home-IP exposure)
+# Deploying BEAT STACK (free, no home-IP exposure)
 
 Architecture:
 

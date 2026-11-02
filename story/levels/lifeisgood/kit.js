@@ -1,4 +1,4 @@
-// Small shared toolkit for the living Tetris worlds of this level:
+// Small shared toolkit for the living board worlds of this level:
 // a merged-geometry builder (vertex colours + uvs → one draw call), a
 // GPU billboard sprite pool (one instanced draw for hundreds of glows /
 // confetti / text pops, sampled from a 4×4 atlas), a toon gradient and a

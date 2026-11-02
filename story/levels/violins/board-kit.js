@@ -1,4 +1,4 @@
-// Small toolkit for the living Tetris worlds (violins, trumpets, hegotme,
+// Small toolkit for the living board worlds (violins, trumpets, hegotme,
 // living): one batched sprite renderer for every particle / glow / glyph
 // (one draw call per batch, immediate mode — fill it each frame), a pooled
 // particle simulator that feeds it, a vertex-coloured geometry merger for

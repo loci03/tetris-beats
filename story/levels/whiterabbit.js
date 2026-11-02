@@ -5,10 +5,10 @@ import boss from './whiterabbit/boss.js';
 import mv from './whiterabbit/moves.js';
 import { buildWorld } from './whiterabbit/world.js';
 import sprites from './whiterabbit/sprites.js';
-import { createTetrisWorld } from './whiterabbit/tetris.js';
+import { createBoardWorld } from './whiterabbit/board-world.js';
 
 export default {
   boss, moves: mv.moves, moveMeta: mv.moveMeta, sprites,
   buildWorld,
-  backdrop: { camera: { pos: [0, 2.1, 8.6], look: [0, 1.6, 0], fov: 50 }, spread: 3.5, forward: 0.9, create: createTetrisWorld },
+  backdrop: { camera: { pos: [0, 2.1, 8.6], look: [0, 1.6, 0], fov: 50 }, spread: 3.5, forward: 0.9, create: createBoardWorld },
 };

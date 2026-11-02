@@ -1,4 +1,4 @@
-// TACO TOWN — the living Tetris world: a food fight in a packed taqueria.
+// TACO TOWN — the living board world: a food fight in a packed taqueria.
 // Terracotta walls with talavera tile bands, a saltillo floor, papel picado
 // and string lights under the beams, a ceiling fan, the kitchen pass-through
 // (back left) with the cook shouting over a flaming comal and steam rolling
@@ -12,14 +12,14 @@
 // hard drops burst tortilla chips off the floor with a golden flash and a
 // volley (scaled by rows); holds make the cook flip a tortilla; clears fire
 // hot-sauce shockwave rings, a red flash, the cook shouts and everyone
-// throws (bigger per line, combos escalate); a Tetris also bursts the piñata;
+// throws (bigger per line, combos escalate); a quad also bursts the piñata;
 // level up bursts it too with a light chase; a high stack sets the kitchen
 // ablaze (smoke, red light, HOT sign strobing); game over flips OPEN to
 // CLOSED and the room goes dim; start lights it back up.
 
-import { makeKit } from '../underground/tetris-kit.js';
+import { makeKit } from '../underground/board-kit.js';
 
-export function createTetrisWorld(ctx) {
+export function createBoardWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const K = makeKit(THREE), keep = K.keep;

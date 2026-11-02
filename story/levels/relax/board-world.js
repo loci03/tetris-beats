@@ -1,4 +1,4 @@
-// RELAX YOUR MIND — the living Tetris world: a mirror lake at dusk.
+// RELAX YOUR MIND — the living board world: a mirror lake at dusk.
 //
 // The old 2D background was a zen night: a purple-pink sky with twinkling
 // stars, a soft moon with a halo, drifting pink clouds (nudged along by
@@ -25,7 +25,7 @@
 //   hold     → an ensō is brushed round the moon
 //   clear    → a brainwave pulse runs along the horizon (taller per line),
 //              the aurora swells, meditation rings speed up, the candles
-//              flare; TETRIS = the aurora blooms, the mandala blazes and
+//              flare; QUAD = the aurora blooms, the mandala blazes and
 //              sky lanterns float up off the lake
 //   combo    → the aurora shifts hue faster, more lanterns rise
 //   levelUp  → an ensō + a lantern release + the mandala spins up
@@ -164,7 +164,7 @@ void main(){
   gl_FragColor = vec4(c * (1.0 - 0.7 * uDim) * smoothstep(1.0, 0.95, r), 1.0);
 }`;
 
-export function createTetrisWorld(ctx) {
+export function createBoardWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const root = new THREE.Group();

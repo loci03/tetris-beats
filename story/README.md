@@ -1,15 +1,15 @@
 # Story Mode
 
-Tetris levels that open into a Bust a Groove–style 3D dance battle and back.
+Falling-block puzzle levels that open into a Bust a Groove–style 3D dance battle and back.
 
 ```
-Tetris ─► special piece ─► clear a line with it ─► transition in ─► rhythm battle (~60 s)
+Puzzle ─► special piece ─► clear a line with it ─► transition in ─► rhythm battle (~60 s)
    ▲                                                                        │
    └──────────── same match, state preserved ◄── transition out ◄── result ─┘
 ```
 
 Everything here is native ES modules, loaded on demand when the player opens
-the STORY tab. `index.html` only has small hooks plus the `window.TetrisBridge`
+the STORY tab. `index.html` only has small hooks plus the `window.GameBridge`
 object; the mode never touches game internals directly.
 
 ## Files
@@ -17,14 +17,14 @@ object; the mode never touches game internals directly.
 | File | Role |
 |---|---|
 | `levels.js` | Level registry: every level with a song (18) — theme, special-piece rules, the measured song grid + Story / Bust a Beat sections, boss, AI (harder each level), rewards — and `loadLevel(id)`, which imports `levels/<id>.js`. |
-| `levels/<id>.js` (+ `levels/<id>/`) | One level each: the **boss** (look via `build(kit)`, style, routines, moves per tier, ★ branch moves, solo, intro + battle taunt with its projectile and HUD disruption), its **moves**, its 3D **stage** and its Tetris **backdrop** framing. |
-| `backdrop.js` | The level's stage in 3D behind the Tetris board: YOU and the boss dance either side of the board to the song and react to clears; adaptive resolution / frame-rate governor, falls back to the 2D scene. |
+| `levels/<id>.js` (+ `levels/<id>/`) | One level each: the **boss** (look via `build(kit)`, style, routines, moves per tier, ★ branch moves, solo, intro + battle taunt with its projectile and HUD disruption), its **moves**, its 3D **stage** and its quad **backdrop** framing. |
+| `backdrop.js` | The level's stage in 3D behind the puzzle board: YOU and the boss dance either side of the board to the song and react to clears; adaptive resolution / frame-rate governor, falls back to the 2D scene. |
 | `story-mode.js` | `StoryModeManager`: special-piece timing, trigger, freeze/resume, battle bonus. Entry point (`createStoryMode(bridge)`). |
 | `battle-session.js` | One trip into the world: renderer, music hand-off, input, and the event wiring between the systems below. |
 | `music-clock.js` | `MusicClock` — the beat/BPM manager. Song position from the AudioContext clock, latency- and user-offset-compensated; grid phase check and drum-hit (kick / snare) analysis of the decoded song. **Everything is timed in song time.** |
 | `commands.js` | The command system as data + pure functions (see COMMANDS.md): Bust a Groove's original 8-row command tree, the TOP / BOTTOM resolver, the candidate prefix matcher, beat-4 judge windows, the ordered input buffer, per-character move definitions, solo commands. |
 | `input.js`, `controls-ui.js` | `InputMapper`: keyboard + gamepad (d-pad, stick, face buttons) → battle actions with accurate timestamps; remapping, per-device latency, debounce, connect / disconnect. The CONTROLS screen. |
-| `gamepad.js` | Controllers for the whole game: `normalizePad` reads any pad into the standard layout (also unmapped ones — hat-switch d-pads, raw Xbox / PlayStation button orders, common in car and Linux browsers); `PadLayer` plays Tetris through the game's bound keys, moves a focus ring through menus (A choose, B back, Start start / resume) and leaves dance battles to `InputMapper`. |
+| `gamepad.js` | Controllers for the whole game: `normalizePad` reads any pad into the standard layout (also unmapped ones — hat-switch d-pads, raw Xbox / PlayStation button orders, common in car and Linux browsers); `PadLayer` plays the puzzle through the game's bound keys, moves a focus ring through menus (A choose, B back, Start start / resume) and leaves dance battles to `InputMapper`. |
 | `practice.js` | Practice mode panel: slowed playback, pick the row / level, hold a row, force branches, rival off, live EXPECTED / RECEIVED / STATUS buffer readout, offsets, move id and animation. |
 | `chart.js` | `makeRng` (seeded RNG). |
 | `rhythm-battle.js` | `RhythmBattle` — pure rules: one command per measure (arrows any time before beat 4, ✕ / ○ on beat 4), the dance string and Freeze, attack △ / dodge □ / stun, scoring, enthusiasm, solo; the AI plays through the same judge. Event-ordered, frame-rate independent. Emits events. |
@@ -43,7 +43,7 @@ object; the mode never touches game internals directly.
 | `anime-fx.js` | Manga marks over the dancers (hearts, sparkles, notes, sweat drops, anger veins, "!", plus level sprites) and thrown taunt projectiles. |
 | `worlds/underground-world.js` | Level 1 stage: graffiti warehouse, neon, lasers, passing subway train. |
 | `worlds/taco-world.js` | Level 16 stage: sunset taco-shell street party. |
-| `dev/level.html`, `dev/backdrop.html` | Dev harnesses: render a level's stage / moves from any camera, or its Tetris backdrop, headless. |
+| `dev/level.html`, `dev/backdrop.html` | Dev harnesses: render a level's stage / moves from any camera, or its board backdrop, headless. |
 
 `vendor/three/` holds three.js r170 (MIT), so the mode works offline and on
 GitHub Pages without a CDN.
@@ -61,7 +61,7 @@ GitHub Pages without a CDN.
 2. **Module:** `levels/<id>.js` default-exports `{ boss, moves, moveMeta,
    sprites, buildWorld, backdrop }` — see any finished level. Move names are
    global: prefix them with the boss id.
-3. Story / Bust a Beat sections, the menu cards and the Tetris backdrop all
+3. Story / Bust a Beat sections, the menu cards and the board backdrop all
    follow from the registry.
 
 ## How a battle plays (Bust a Groove rules)
@@ -96,7 +96,7 @@ drum-hit layer makes them hit the song's actual kicks and snares.
 ## BUST A BEAT
 
 The **BEAT** tab on the start screen plays the same battle on its own — no
-Tetris. `StoryModeManager.startBeat(levelId)` runs a `BattleSession` with
+puzzle. `StoryModeManager.startBeat(levelId)` runs a `BattleSession` with
 `standalone: true`: no board transition (it opens on the stage), its own
 pause card (Esc / P / the ❚❚ button) and a result screen with PLAY AGAIN /
 MENU. It plays the level's whole song from the top. Levels, bosses and the
@@ -122,7 +122,7 @@ the rival on the arrows + . / ; ' or the second gamepad. See COMMANDS.md.
 ## Controllers and graphics (whole game)
 
 Any controller works in menus (d-pad / stick moves the yellow ring, A selects,
-B backs out, Start starts or resumes) and in Tetris (d-pad / stick move, ↑ hard
+B backs out, Start starts or resumes) and in the puzzle (d-pad / stick move, ↑ hard
 drop, ↓ soft drop, A rotate right, B / X rotate left, Y / LB hold, RB zone,
 Start pause). Unplugging mid-game pauses. Settings → Controller shows live what
 the browser reports — browsers only reveal a pad after one of its buttons is

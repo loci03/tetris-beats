@@ -1,4 +1,4 @@
-// Gamepad support for the whole game (menus, Tetris, the dance battle).
+// Gamepad support for the whole game (menus, the puzzle, the dance battle).
 //
 //  • normalizePad(gp) reads any controller into the standard layout
 //    (A B X Y · LB RB LT RT · Select Start · sticks · d-pad 12-15), also when
@@ -7,7 +7,7 @@
 //    "hat" axis (one axis, eight positions) or as axes 6/7, and Xbox / Sony
 //    pads use their raw HID button order.
 //  • PadLayer polls every pad and, depending on what's on screen, either
-//      - plays Tetris (presses the game's own bound keys, so DAS/ARR and any
+//      - plays the puzzle (presses the game's own bound keys, so DAS/ARR and any
 //        remapping work unchanged),
 //      - navigates menus (d-pad / stick moves a visible focus ring between
 //        buttons, A selects, B goes back, Start starts / pauses), or
@@ -86,7 +86,7 @@ export function stickDirs(lx, ly, held = {}) {
   return { L: on('L', -lx), R: on('R', lx), U: on('U', -ly), D: on('D', ly) };
 }
 
-// Tetris on a controller (standard indices → the game's actions).
+// The puzzle on a controller (standard indices → the game's actions).
 export const PLAY_MAP = [
   [B.LEFT, 'left'], [B.RIGHT, 'right'], [B.DOWN, 'soft'], [B.UP, 'hard'],
   [B.A, 'cw'], [B.B, 'ccw'], [B.X, 'ccw'], [B.Y, 'hold'],

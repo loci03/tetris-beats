@@ -300,7 +300,7 @@ export function buildUndergroundWorld({ lowGraphics = false } = {}) {
     }
   }
 
-  // ── Tetris reactions (backdrop piece events) ─────────────────────
+  // ── Board reactions (backdrop piece events) ─────────────────────
   // Confetti rains from the girders on line clears (pooled instanced quads),
   // phones flash in the crowd, the LED floor chases the piece, lasers and
   // lamps get kicked around. All pooled at build time.
@@ -558,7 +558,7 @@ export function buildUndergroundWorld({ lowGraphics = false } = {}) {
     hemi.intensity *= pk * (1 + strobeOn * 0.8);
   }
 
-  // Tetris backdrop piece actions (the old 2D warehouse: crowd bob + DJ
+  // board backdrop piece actions (the old 2D warehouse: crowd bob + DJ
   // twitch on input, confetti from the truss and a white stage flash on
   // clears, camera flashes in the crowd).
   function piece(d) {
