@@ -10,7 +10,7 @@
   The deploy GitHub Action substitutes this automatically - see DEPLOY.md.
 -->
 <meta name="api-base" content="">
-<title>T-MINO BEATS</title>
+<title>BEAT STACK</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- Non-blocking: if the font CDN is slow or unreachable the game still
@@ -2070,7 +2070,7 @@
        overhead spotlight cone + brick-wall texture. Animates only while
        gameStarted is false (saves perf during the actual game). -->
   <canvas id="home-bg-canvas"></canvas>
-  <h1>T-MINO BEATS</h1>
+  <h1>BEAT STACK</h1>
   <!-- Cycles through map names so the front page advertises the breadth
        of vibes available. Updates via wireTagline IIFE. -->
   <div class="tagline" id="start-tagline">19 VIBES · 4 MODES · ONE BEAT</div>
@@ -2495,10 +2495,10 @@
 
 <script>
 // One-time carry-over of saved settings, replays and scores from the old
-// storage prefix ('tetris.*') to 'tmino.*' after the T-MINO BEATS rebrand.
+// storage prefix ('tetris.*') to 'beatstack.*' after the BEAT STACK rebrand.
 (function migrateStorageKeys() {
   try {
-    const OLD = 'tetris' + '.', NEW = 'tmino.';
+    const OLD = 'tetris' + '.', NEW = 'beatstack.';
     if (localStorage.getItem(NEW + 'migrated')) return;
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
@@ -2511,7 +2511,7 @@
   } catch {}
 })();
 // ============================================================
-// T-MINO BEATS
+// BEAT STACK
 // ============================================================
 
 const COLS = 10, ROWS = 20;
@@ -2531,13 +2531,13 @@ var CELL = 30;
 // Preference persists to localStorage; toggleable from the start screen and
 // via the `V` key.
 let voiceEnabled = (() => {
-  try { const v = localStorage.getItem('tmino.voice'); return v === null ? true : v === 'true'; }
+  try { const v = localStorage.getItem('beatstack.voice'); return v === null ? true : v === 'true'; }
   catch { return true; }
 })();
 function setVoiceEnabled(v) {
   const wasOn = voiceEnabled;
   voiceEnabled = !!v;
-  try { localStorage.setItem('tmino.voice', String(voiceEnabled)); } catch {}
+  try { localStorage.setItem('beatstack.voice', String(voiceEnabled)); } catch {}
   const cb = document.getElementById('voice-toggle');
   if (cb) cb.checked = voiceEnabled;
   // Surface the muted state on the start screen so returning users (who
@@ -2571,7 +2571,7 @@ function setVoiceEnabled(v) {
 // Toggleable via the desktop HUD mute button, the mobile mute icon, or the
 // `M` key; persists like the other options.
 let muted = (() => {
-  try { return localStorage.getItem('tmino.muted') === 'true'; }
+  try { return localStorage.getItem('beatstack.muted') === 'true'; }
   catch { return false; }
 })();
 // Desktop-only trim (mobile has no slider - see #mobile-mute-btn). Kept as
@@ -2579,13 +2579,13 @@ let muted = (() => {
 // dialled in rather than jumping back to full volume.
 let volume = (() => {
   try {
-    const v = parseFloat(localStorage.getItem('tmino.volume'));
+    const v = parseFloat(localStorage.getItem('beatstack.volume'));
     return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
   } catch { return 1; }
 })();
 function setMuted(v) {
   muted = !!v;
-  try { localStorage.setItem('tmino.muted', String(muted)); } catch {}
+  try { localStorage.setItem('beatstack.muted', String(muted)); } catch {}
   if (audioEngine.masterGain) {
     audioEngine.masterGain.gain.value = muted ? 0 : audioEngine.MASTER_LEVEL * volume;
   }
@@ -2593,7 +2593,7 @@ function setMuted(v) {
 }
 function setVolume(v) {
   volume = Math.min(1, Math.max(0, v));
-  try { localStorage.setItem('tmino.volume', String(volume)); } catch {}
+  try { localStorage.setItem('beatstack.volume', String(volume)); } catch {}
   if (audioEngine.masterGain && !muted) {
     audioEngine.masterGain.gain.value = audioEngine.MASTER_LEVEL * volume;
   }
@@ -2835,12 +2835,12 @@ const alfredVoice = makeClipVoice('alfred', {
 alfredVoice.trashTalk = (cleared, combo) => alfredVoice.announceClear(cleared, combo);
 
 let showGhost = (() => {
-  try { const v = localStorage.getItem('tmino.showGhost'); return v === null ? true : v === 'true'; }
+  try { const v = localStorage.getItem('beatstack.showGhost'); return v === null ? true : v === 'true'; }
   catch { return true; }
 })();
 function setShowGhost(v) {
   showGhost = !!v;
-  try { localStorage.setItem('tmino.showGhost', String(showGhost)); } catch {}
+  try { localStorage.setItem('beatstack.showGhost', String(showGhost)); } catch {}
   const cb = document.getElementById('ghost-toggle');
   if (cb) cb.checked = showGhost;
 }
@@ -3927,13 +3927,13 @@ const AI_DIFFICULTIES = {
   hard:   { thinkPause: 13, movePause: 6,  dropPause: 24, mistakeChance: 0.13, garbageMult: 0.80 },
 };
 let aiDifficulty = (() => {
-  try { const v = localStorage.getItem('tmino.aiDifficulty'); return AI_DIFFICULTIES[v] ? v : 'medium'; }
+  try { const v = localStorage.getItem('beatstack.aiDifficulty'); return AI_DIFFICULTIES[v] ? v : 'medium'; }
   catch { return 'medium'; }
 })();
 function setAiDifficulty(v) {
   if (!AI_DIFFICULTIES[v]) return;
   aiDifficulty = v;
-  try { localStorage.setItem('tmino.aiDifficulty', v); } catch {}
+  try { localStorage.setItem('beatstack.aiDifficulty', v); } catch {}
 }
 
 // Starting-level selection. Persists across sessions so the player who likes
@@ -3941,7 +3941,7 @@ function setAiDifficulty(v) {
 // theme range at read-time in case LEVEL_THEMES shrinks in a future build.
 let startLevel = (() => {
   try {
-    const v = parseInt(localStorage.getItem('tmino.startLevel'), 10);
+    const v = parseInt(localStorage.getItem('beatstack.startLevel'), 10);
     return (Number.isFinite(v) && v >= 1) ? v : 1;
   } catch { return 1; }
 })();
@@ -3949,7 +3949,7 @@ function setStartLevel(v) {
   v = parseInt(v, 10);
   if (!Number.isFinite(v) || v < 1) return;
   startLevel = v;
-  try { localStorage.setItem('tmino.startLevel', String(v)); } catch {}
+  try { localStorage.setItem('beatstack.startLevel', String(v)); } catch {}
 }
 
 // Fields that live in the globals and belong to whichever player is currently
@@ -4067,8 +4067,8 @@ function _garbageRand() { return _seedRandGarbage ? _seedRandGarbage() : Math.ra
 // replay is deterministic IFF the run used a seeded PRNG (Daily, PvP,
 // future replay-only modes). Solo runs without a seed are recorded but
 // won't replay byte-identically because Math.random() drives bag/garbage.
-// Storage: localStorage `tmino.replays.v1` keyed by start-timestamp.
-const REPLAY_KEY = 'tmino.replays.v1';
+// Storage: localStorage `beatstack.replays.v1` keyed by start-timestamp.
+const REPLAY_KEY = 'beatstack.replays.v1';
 const REPLAY_MAX_KEEP = 25;
 const _replay = {
   recording: false,
@@ -6257,7 +6257,7 @@ async function fetchSharedScores(mode) {
 // merged top-10 so we can refresh the local cache from it. If the server is
 // unreachable, the score is queued and retried on next refresh - without this,
 // a flaky network would silently drop a hard-earned high score.
-const PENDING_KEY = 'tmino.pendingScores.v1';
+const PENDING_KEY = 'beatstack.pendingScores.v1';
 function loadPendingScores() {
   try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; }
 }
@@ -6716,7 +6716,7 @@ function lobbyLeave() {
 // SPRINT / ULTRA each get their own ranked list. The legacy v1 key (without
 // a mode suffix) is still read on first load + migrated to STORY for
 // backwards compatibility — old players' best runs aren't lost.
-const LB_KEY_BASE = 'tmino.leaderboard.v1';
+const LB_KEY_BASE = 'beatstack.leaderboard.v1';
 const LB_MAX = 50;
 const LB_MODES = ['story', 'marathon', 'sprint', 'ultra', 'daily'];
 // UTC date string YYYY-MM-DD — used as the daily-challenge seed AND as a
@@ -19815,7 +19815,7 @@ const DEFAULT_KEYMAP = {
 const SETTINGS_DEFAULTS = { das: 133, arr: 30, shake: true, quality: 'auto', rhythmOffset: 0, keymap: DEFAULT_KEYMAP };
 const settings = (() => {
   let saved = {};
-  try { saved = JSON.parse(localStorage.getItem('tmino.settings.v1') || '{}') || {}; } catch {}
+  try { saved = JSON.parse(localStorage.getItem('beatstack.settings.v1') || '{}') || {}; } catch {}
   const km = {};
   for (const a of Object.keys(DEFAULT_KEYMAP)) {
     km[a] = (saved.keymap && Array.isArray(saved.keymap[a]) && saved.keymap[a].length) ? saved.keymap[a].slice() : DEFAULT_KEYMAP[a].slice();
@@ -19832,7 +19832,7 @@ const settings = (() => {
   };
 })();
 function saveSettings() {
-  try { localStorage.setItem('tmino.settings.v1', JSON.stringify(settings)); } catch {}
+  try { localStorage.setItem('beatstack.settings.v1', JSON.stringify(settings)); } catch {}
 }
 // DAS: how long a held direction waits before auto-repeating.
 // ARR: time between repeats (0 = slide instantly to the wall).
@@ -20228,7 +20228,7 @@ function startGame() {
     setNetworkSeed(null);
   }
   // Begin replay capture. Recording is cheap (a few hundred KB max for a
-  // long run); persisted on game-over to localStorage tmino.replays.v1.
+  // long run); persisted on game-over to localStorage beatstack.replays.v1.
   startReplayRecording(_netSeed, gameMode);
   document.getElementById('start-screen').style.display = 'none';
   document.getElementById('game-over-screen').style.display = 'none';
@@ -21879,7 +21879,7 @@ window.addEventListener('resize', () => positionP2Monitor());
   if (!el) return;
   const quotes = [
     // Dave Chappelle energy
-    'I\'m rich, biatch! ...in T-MINO points.',
+    'I\'m rich, biatch! ...in BEAT STACK points.',
     'The S-piece is problematic and I will not be taking questions.',
     'You know what the difference between me and you is? I\'d clear that line.',
     'I turned down a 50-piece endorsement deal once. True story.',

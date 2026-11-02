@@ -1,4 +1,4 @@
-// T-MINO BEATS — shared leaderboard + PvP lobby server.
+// BEAT STACK — shared leaderboard + PvP lobby server.
 //
 // Local development server only. Production deploy uses GitHub Pages for the
 // static frontend + a Cloudflare Worker for the leaderboard/PvP API — see
@@ -549,6 +549,6 @@ server.listen(PORT, '0.0.0.0', () => {
       if (a.family === 'IPv4' && !a.internal) lan.push(a.address);
     }
   }
-  console.log(`[t-mino] listening on 0.0.0.0:${PORT}`);
-  for (const ip of lan) console.log(`[t-mino]   LAN: http://${ip}:${PORT}`);
+  console.log(`[beat-stack] listening on 0.0.0.0:${PORT}`);
+  for (const ip of lan) console.log(`[beat-stack]   LAN: http://${ip}:${PORT}`);
 });

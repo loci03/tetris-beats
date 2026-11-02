@@ -1,4 +1,4 @@
-# Cloudflare Worker config for T-MINO BEATS backend.
+# Cloudflare Worker config for BEAT STACK backend.
 #
 # Provisioning is one-time:
 #   1. `npm install -g wrangler` (or use `npx wrangler` everywhere)

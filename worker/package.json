@@ -1,8 +1,8 @@
 {
-  "name": "t-mino-beats-worker",
+  "name": "beat-stack-worker",
   "version": "1.0.0",
   "private": true,
-  "description": "Cloudflare Worker backend (leaderboard + PvP signaling) for T-MINO BEATS.",
+  "description": "Cloudflare Worker backend (leaderboard + PvP signaling) for BEAT STACK.",
   "main": "index.js",
   "type": "module",
   "scripts": {
