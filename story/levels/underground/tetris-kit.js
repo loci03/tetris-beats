@@ -1,4 +1,4 @@
-// Shared bits for the living board worlds (underground, taco, triggered,
+// Shared bits for the living Tetris worlds (underground, taco, triggered,
 // work): canvas textures, damped springs, a pooled instanced particle
 // system (billboard / tumbling / velocity-stretched quads with per-particle
 // colour + alpha, one draw call), and a vertex-animated instanced crowd

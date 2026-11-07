@@ -1,4 +1,4 @@
-// DREAM OR NIGHTMARE — the living board world: ROBOT CITY.
+// DREAM OR NIGHTMARE — the living Tetris world: ROBOT CITY.
 //
 // A cyberpunk megacity at dusk, seen from street level: an over-large pink
 // moon, an indigo sky fading into magenta haze, three layers of skyline
@@ -21,7 +21,7 @@
 //   hold      robots spin their heads 360°, the far robot pops up to look
 //   clear     eye-lasers into the sky (1–4 lines → 2–8 beams), crowd cheers,
 //             searchlights swing onto the robots, mood → dream; 3+ lines a
-//             purple sky blast; QUAD: arms-up pose, criss-cross lasers,
+//             purple sky blast; TETRIS: arms-up pose, criss-cross lasers,
 //             blast rings, every window in the city blazes, FOV punch
 //   combo     more beams, hue-cycling lasers + glow sticks, window chase
 //   levelUp   power surge rolls across the skyline, robots spin a full turn
@@ -164,7 +164,7 @@ const GROUND_FS = `uniform float uTime, uBeat, uMood, uFlash, uSoft, uPower, uLi
     #include <fog_fragment>
   }`;
 
-export function createBoardWorld(ctx) {
+export function createTetrisWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const prevFog = scene.fog, prevBg = scene.background;

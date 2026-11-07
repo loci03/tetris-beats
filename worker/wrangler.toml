@@ -1,4 +1,4 @@
-# Cloudflare Worker config for BEAT STACK backend.
+# Cloudflare Worker config for Tetris Beats backend.
 #
 # Provisioning is one-time:
 #   1. `npm install -g wrangler` (or use `npx wrangler` everywhere)

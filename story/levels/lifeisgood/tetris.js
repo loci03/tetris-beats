@@ -1,4 +1,4 @@
-// LIFE IS GOOD — the living board world: a Caribbean night street dance.
+// LIFE IS GOOD — the living Tetris world: a Caribbean night street dance.
 //
 // A 3D take on the old drawDancehallScene: a sandy street under criss-
 // crossing chaser string lights strung between wooden poles, swaying palm
@@ -9,7 +9,7 @@
 // dancehall (wine, bogle, rag wave, signal-the-plane, gully creepa, point-
 // up) to the riddim.
 //
-// It reacts to quad like the old scene did (energy bounce, cheer arms-up
+// It reacts to Tetris like the old scene did (energy bounce, cheer arms-up
 // + confetti from the string lights + streamers + stage flash, the golden
 // drop pulse) and much more:
 //   move     → a light wave races along the strings that way, crowd leans
@@ -20,7 +20,7 @@
 //              rolls down the street (all scaled by rows), crowd hops
 //   hold     → air horn: "BRAP BRAP!", sound rings from the speakers
 //   clear    → 1: confetti + arms up · 2: + streamers · 3: + lighters +
-//              fireworks · 4 (QUAD): "BIG TUNE!", fireworks barrage, the
+//              fireworks · 4 (TETRIS): "BIG TUNE!", fireworks barrage, the
 //              whole street jumps, bulbs strobe gold · combos escalate
 //   levelUp  → "LEVEL UP!", firework salute, more people join the dance
 //   danger   → police sirens wash the street red/blue, wind in the palms
@@ -44,7 +44,7 @@ const SHIRTS = [0xff3333, 0x00cc44, 0xffd700, 0xff69b4, 0x00bfff, 0xff8c00, 0xee
 const PANTS = [0x1a1a6e, 0x330066, 0x8b0000, 0x006600, 0x4b0082, 0x006400, 0x1c1c1c, 0x00008b, 0xf0f0f0, 0x2a2a2a, 0xd0a060];
 const SKINS = [0x8b4513, 0xc68642, 0x4a2c0a, 0xd2691e, 0x6b3a1a, 0x9a5a2a, 0x5a3010];
 
-export function createBoardWorld(ctx) {
+export function createTetrisWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const K = createKit(THREE);

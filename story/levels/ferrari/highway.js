@@ -1,13 +1,13 @@
-// FERRARI WINDOW — the board backdrop: a night-highway chase.
+// FERRARI WINDOW — the Tetris backdrop: a night-highway chase.
 //
 // Rhett's red supercar bobs and weaves through interstate traffic at full
 // tilt under sodium street lamps, desert mesas and a glowing city on the
 // horizon; oncoming headlights stream past beyond the median. Line clears
-// are overtakes (a quad lights the nitro), drops thump the suspension,
+// are overtakes (a Tetris lights the nitro), drops thump the suspension,
 // a level-up is a gear change with a backfire, combos flash the high
 // beams, game over is a spin-out onto the shoulder, start is a launch.
 //
-// Framing: the puzzle board (+ HOLD/NEXT panels) covers the middle ~56% of
+// Framing: the Tetris board (+ HOLD/NEXT panels) covers the middle ~56% of
 // the screen, so the camera sits over the centre of the road and the car
 // lives in an OUTER lane — whichever side it's on, it reads in the visible
 // strip — and swoops across to the other side to overtake. In portrait the
@@ -688,7 +688,7 @@ export function createHighway(ctx) {
     if (kind === 'clear') {
       const n = Math.max(1, data.lines || 1);
       if (st.stopped || st.spin >= 0) return;
-      if (n >= 4) {                       // QUAD: nitro — cross, then weave back
+      if (n >= 4) {                       // TETRIS: nitro — cross, then weave back
         st.nitro = 1.25; st.flash = 1; cross(1.5);
         st.second = 0.9;
       } else {

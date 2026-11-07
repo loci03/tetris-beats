@@ -1,7 +1,7 @@
 {
-  "name": "beat-stack-server",
+  "name": "tetris-beats-server",
   "version": "1.0.0",
-  "description": "BEAT STACK \u2014 shared leaderboard + PvP lobbies over LAN/Tailscale",
+  "description": "Tetris Beats \u2014 shared leaderboard + PvP lobbies over LAN/Tailscale",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

@@ -1,4 +1,4 @@
-// NUCLEAR WASTE — the living board world: a toxic junkyard at night.
+// NUCLEAR WASTE — the living Tetris world: a toxic junkyard at night.
 //
 // A nuclear plant on the horizon (four cooling towers venting steam, the
 // reactor hall with its green-lit windows), a chain-link fence with
@@ -18,7 +18,7 @@
 //   clear     siren flash, toxic explosion + shockwave ring, every creature
 //             reacts (zombies break into the Thriller claw dance, skeletons
 //             rattle); 1–4 lines → 1–4 pool geysers; 3+ a cooling tower
-//             vents green; QUAD: reactor flash, mushroom glow over the
+//             vents green; TETRIS: reactor flash, mushroom glow over the
 //             plant, all towers vent, zombies throw their arms up
 //   combo     more geysers, faster sirens, skeletons headbang harder
 //   levelUp   sirens whoop, a fresh wave of zombies claws up out of the
@@ -113,7 +113,7 @@ const GROUND_FS = `uniform float uTime, uBeat, uFlash, uRed, uBlue, uDanger, uMe
     #include <fog_fragment>
   }`;
 
-export function createBoardWorld(ctx) {
+export function createTetrisWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const prevFog = scene.fog, prevBg = scene.background;
@@ -420,7 +420,7 @@ export function createBoardWorld(ctx) {
     z.torso.rotation.set(0.45 * (1 - thr) * (1 - up) + z.lurch.x * 0.0 + Math.abs(z.lurch.x) * 0.3 - z.stagger.x * 0.05 * 0, 0.25 * Math.sin(w * Math.PI * 0.5) * (1 - thr) + 0.35 * shuf, 0.12 * Math.sin(w * 0.7) + z.stagger.x * 0.08);
     z.head.rotation.set(0.25 + 0.15 * Math.sin(w * 1.3) * (1 - thr), 0.2 * Math.sin(w * 0.6) + z.twitch.x, 0.35 * Math.sin(w * 0.4 + z.ph) * (1 - thr) + 0.2 * shuf + z.twitch.x * 0.6);
     z.arms.forEach((a, k) => {
-      // classic arms-out reach … Thriller claws … arms up (quad)
+      // classic arms-out reach … Thriller claws … arms up (Tetris)
       const reach = -1.45 - 0.1 * Math.sin(w * 2 + k) - 0.3 * Math.abs(z.lurch.x);
       const clawSh = -0.6 + 0.35 * Math.sin(bt * 2 + k * Math.PI), clawZ = a.sx * (0.9 + 0.2 * Math.sin(bt));
       a.s.rotation.set(lerp(lerp(reach, clawSh, thr), -3.0, up), 0, lerp(lerp(a.sx * 0.08, clawZ, thr), a.sx * 0.35, up));
@@ -568,7 +568,7 @@ export function createBoardWorld(ctx) {
     }
     for (const T of towers) { T.vent = Math.max(0, T.vent - dt * 0.25); if (Math.floor(st.t * 1.2 + T.x) % 2 === 0) glow(T.x, T.top + 0.5, T.z, 1.8, 1.8, 0xff2020, 0.8); }
     for (const S of stacks) if (Math.floor(st.t * 1.6 + S.x) % 2 === 0) glow(S.x, S.y + 0.5, S.z, 1.6, 1.6, 0xff3030, 0.8);
-    // Reactor mushroom glow (quad) / meltdown.
+    // Reactor mushroom glow (Tetris) / meltdown.
     const mush = smooth(st.mushroom), melt = st.melt;
     if (mush > 0.01 || melt > 0.01) {
       glow(0, 16 + 22 * (1 - st.mushroom * 0.5), -95, 50 * (0.5 + mush), 34 * (0.5 + mush), melt > 0.3 ? 0xff5010 : 0x80ff40, Math.max(mush * 0.6, melt * 0.4));

@@ -5,10 +5,10 @@ import boss from './backformore/boss.js';
 import mv from './backformore/moves.js';
 import { buildWorld } from './backformore/world.js';
 import sprites from './backformore/sprites.js';
-import { createBoardWorld } from './backformore/board-world.js';
+import { createTetrisWorld } from './backformore/tetris.js';
 
 export default {
   boss, moves: mv.moves, moveMeta: mv.moveMeta, sprites,
   buildWorld,
-  backdrop: { camera: { pos: [0, 2.1, 8.6], look: [0, 1.5, 0], fov: 50 }, spread: 3.5, forward: 0.9, create: createBoardWorld },
+  backdrop: { camera: { pos: [0, 2.1, 8.6], look: [0, 1.5, 0], fov: 50 }, spread: 3.5, forward: 0.9, create: createTetrisWorld },
 };

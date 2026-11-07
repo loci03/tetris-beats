@@ -1,4 +1,4 @@
-// LIVING MY LIFE — the board world: a sunny coast-highway beach cruise.
+// LIVING MY LIFE — the Tetris world: a sunny coast-highway beach cruise.
 //
 // The old 2D scene: blue sky, a big sun with rays and a corona (brighter
 // with the music and clears), drifting clouds, a sparkling ocean with a
@@ -21,7 +21,7 @@
 //   drop     → wave CRASH (spray + foam ∝ rows), gulls scatter, the ball is slammed into the sand, cars bounce
 //   hold     → lowrider hop: every car bounces on its hydraulics, a sax solo
 //   clear n  → all cars speed up + honk + sax-note bursts (∝ n), palms + umbrellas sway harder, sun corona swells;
-//              2 = volleyball spike; 3 = dolphins leap; 4 = QUAD: a rainbow arcs over the sea, the surfer airs,
+//              2 = volleyball spike; 3 = dolphins leap; 4 = TETRIS: a rainbow arcs over the sea, the surfer airs,
 //              dolphins + a whale spout, beach balls fly
 //   combo    → horns chain, notes escalate, the rainbow deepens
 //   levelUp  → the sun flares, a banner plane flies over, beach balls rain
@@ -29,12 +29,12 @@
 //   gameOver → sunset: the sky goes orange and dim, the cars pull over
 //   start    → bright morning, engines rev
 
-import { createKit, frac, clamp, lerp } from '../violins/board-kit.js';
+import { createKit, frac, clamp, lerp } from '../violins/tetris-kit.js';
 
 const TAU = Math.PI * 2;
 const SUN = [0.5, 0.3, -0.8];
 
-export function createBoardWorld(ctx) {
+export function createTetrisWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const kit = createKit(THREE);
@@ -371,7 +371,7 @@ export function createBoardWorld(ctx) {
     });
     plMesh.instanceMatrix.needsUpdate = true;
 
-    // Surfer rides the swell (360 on rotate, air on quad), sailboat bobs.
+    // Surfer rides the swell (360 on rotate, air on Tetris), sailboat bobs.
     const sx = 22 + Math.sin(t * 0.25) * 6;
     surfer.position.set(sx, 0.15 + Math.sin(t * 1.6) * 0.15 + (st.spin > 0 ? 0 : 0) + Math.max(0, st.air || 0), -26 + Math.sin(t * 0.4) * 2);
     st.air = Math.max(0, (st.air || 0) - dt * 3);

@@ -1,4 +1,4 @@
-// MAC & CHEESE — the living board world: inside the world's biggest pot.
+// MAC & CHEESE — the living Tetris world: inside the world's biggest pot.
 //
 // The old 2D background hung thick molten-cheese ribbons from the top of
 // the screen (stretching longer on clears, swaying on piece moves) over a
@@ -19,7 +19,7 @@
 //              splash crown + ripples + macaroni hop, scaled by rows
 //   hold     → a big cheese bubble swells up out of the lake and pops
 //   clear    → drips stretch long and let go (n of them), bubbles swell
-//              and rise faster, macaroni jump; QUAD = a cheese geyser
+//              and rise faster, macaroni jump; TETRIS = a cheese geyser
 //              erupts, flinging macaroni and cheese everywhere
 //   combo    → the pot runs hotter: rolling boil, steam, orange glow
 //   levelUp  → it rains macaroni from the lid and every drip lets go
@@ -89,7 +89,7 @@ void main(){
   gl_FragColor = vec4(mix(c, uFogC, fd), 1.0);
 }`;
 
-export function createBoardWorld(ctx) {
+export function createTetrisWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const root = new THREE.Group();
@@ -293,7 +293,7 @@ export function createBoardWorld(ctx) {
   root.add(spoon);
   const SP = { x: 13, z: -30 };
 
-  // ── Geyser column (quad) ──────────────────────────────────────
+  // ── Geyser column (Tetris) ──────────────────────────────────────
   const geyser = new THREE.Mesh(keep(new THREE.CylinderGeometry(0.9, 1.5, 1, 14, 1, true)), cheeseMat);
   const crown = new THREE.Mesh(blobGeo, cheeseMat); crown.visible = false; root.add(crown);
   const GZ = { x: 9, z: -14 };

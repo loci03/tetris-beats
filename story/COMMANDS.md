@@ -158,7 +158,7 @@ On the Bust a Beat tab, turn on **PRACTICE** and pick a speed: 1×, ¾× or ½×
 - rival attacks: dodged, and hit (stun);
 - an earned solo;
 - 2P VS;
-- Story mode: the puzzle state is preserved and the arrows go back to the puzzle.
+- Story mode: the Tetris state is preserved and the arrows go back to Tetris.
 
 The HUD never disagreed with the battle state.
 

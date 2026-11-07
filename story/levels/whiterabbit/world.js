@@ -358,7 +358,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
 
   // ── State + update ──────────────────────────────────────────────
   const S = { L: 1, flash: 0, cheer: 0, focus: 0, rip: null, solo: null, tT: 0, spin: 0, wob: 0, lastBeat: -99,
-    // falling piece reactions (backdrop only).
+    // Tetris piece reactions (backdrop only).
     cardNext: [0, 0], clockOff: 0, clockTo: 0, twist: 0, twistV: 0, pull: 0, rev: 0, shX: 0, shV: 0, bitBoost: 0,
     laser: 0, laserFan: 0, signK: 0, hop: [0, 0], hopV: [0, 0], lean: [0, 0], capSpin: 0, capTo: 0, glow: 0, glowHz: 0, chaseHead: 0, chaseLeft: 0, chaseRate: 0, pipsOn: false, dustPush: 0 };
   const pipK = new Float32Array(24);
@@ -536,7 +536,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
   }
   function smooth01(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
 
-  // falling piece actions (the old 2D level was purple code rain that pinged
+  // Tetris piece actions (the old 2D level was purple code rain that pinged
   // columns on moves and rushed on clears; here it's Wonderland's take):
   // each move flips the next playing card on that side and blows the
   // sparkle dust over, a spin twists the rabbit hole and turns the clock
@@ -544,7 +544,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
   // bounces the mushrooms and ripples the checkerboard from the piece's
   // column, a hold runs the clock BACKWARDS (I'm late!), clears run a
   // chase of light round the hole's pips and flip cards in waves, a
-  // quad flips every card and sends the clock spinning.
+  // Tetris flips every card and sends the clock spinning.
   const colX = (c) => ((c ?? 4.5) - 4.5) * 0.34;
   function chase(n, rate) { S.chaseLeft += n; S.chaseRate = Math.max(S.chaseRate * (S.chaseLeft > n ? 1 : 0), rate); }
   function flipNext(side, t) {

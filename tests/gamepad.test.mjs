@@ -1,5 +1,5 @@
 // Controller layer tests (story/gamepad.js): any pad → the standard layout,
-// and the PadLayer that plays the puzzle / navigates menus / yields to battles.
+// and the PadLayer that plays Tetris / navigates menus / yields to battles.
 //   node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -78,7 +78,7 @@ function rig(mode = 'play') {
   return { L, pads, pad, set, log };
 }
 
-test('The puzzle on a controller: press / release map to the game actions (DAS works through release)', () => {
+test('Tetris on a controller: press / release map to the game actions (DAS works through release)', () => {
   const { L, pads, pad, set, log } = rig('play');
   pads.push(pad); L.poll();
   assert.deepEqual(log, [['dev', true]]);

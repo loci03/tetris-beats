@@ -1,4 +1,4 @@
-// Cloudflare Worker: leaderboard + PvP signaling for BEAT STACK.
+// Cloudflare Worker: leaderboard + PvP signaling for Tetris Beats.
 //
 // Mirrors the API of server.js so the static client (served from GitHub Pages)
 // can talk to it as a drop-in replacement when it isn't running locally.

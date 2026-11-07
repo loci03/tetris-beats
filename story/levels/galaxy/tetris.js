@@ -1,4 +1,4 @@
-// GALAXY — the living board world: drifting through deep space.
+// GALAXY — the living Tetris world: drifting through deep space.
 //
 // A vast spiral galaxy wheels behind the board (its arms reach out into the
 // side strips), three nebula clouds drift and breathe, a ringed gas giant
@@ -16,7 +16,7 @@
 //   hold      a comet swings across the sky
 //   clear     shockwave rings expand from the board (one per line), the
 //             nebulae pulse, the galaxy spins up; 2+ lines a constellation
-//             lights up; 3+ a supernova bursts; QUAD: hyperspace jump —
+//             lights up; 3+ a supernova bursts; TETRIS: hyperspace jump —
 //             stars become warp lines, FOV punch, galaxy core flares
 //   combo     constellations draw in one by one, nebula hues cycle
 //   levelUp   warp to a new sector: the nebulae shift hue
@@ -69,7 +69,7 @@ const SKY_FS = `varying vec3 vP; uniform float uTime, uRed, uFade;
     #include <colorspace_fragment>
   }`;
 
-export function createBoardWorld(ctx) {
+export function createTetrisWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const prevFog = scene.fog, prevBg = scene.background;
