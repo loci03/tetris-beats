@@ -407,7 +407,7 @@ export function buildWorld({ lowGraphics = false } = {}) {
 
   // ── State + update ──────────────────────────────────────────────
   const S = { L: 1, flash: 0, cheer: 0, focus: 0, rip: null, solo: null, glitch: 0, rainT: 0, rainBoost: 0, red: 0,
-    // falling piece reactions (backdrop only).
+    // Tetris piece reactions (backdrop only).
     flickSeed: 0, flick: 0, scanY: 0, scanV: 0, scanK: 0, white: 0, panelK: [0, 0], rip2: null, sweep: -1, sweepK: 0,
     rack: 0, freeze: 0, heat: 0, coneKick: 0, coneV: 0, signK: 0, dead: 0, push: 0 };
   const tint = new THREE.Color(), redC = new THREE.Color(0xff2a3a), greenC = new THREE.Color(GREEN);
@@ -567,12 +567,12 @@ export function buildWorld({ lowGraphics = false } = {}) {
     top.color.copy(tint).lerp(col.set(0xffffff), 0.5);
   }
 
-  // falling piece actions (the old 2D matrix rain pinged random columns on
+  // Tetris piece actions (the old 2D matrix rain pinged random columns on
   // every move and rushed on clears) — here: a fresh set of rain columns
   // lights on each move and the data-glass on that side flares, spins
   // sweep a scan band, soft drops race a scanline down the grid, hard
   // drops ripple the floor from the piece's column, holds glitch the
-  // rain white (déjà vu), clears flash the racks + burners, a quad
+  // rain white (déjà vu), clears flash the racks + burners, a Tetris
   // freezes the rain in bullet time then lets it rush.
   const colX = (c) => ((c ?? 4.5) - 4.5) * 0.34;
   function piece(d) {

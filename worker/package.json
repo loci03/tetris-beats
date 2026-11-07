@@ -1,8 +1,8 @@
 {
-  "name": "beat-stack-worker",
+  "name": "tetris-beats-worker",
   "version": "1.0.0",
   "private": true,
-  "description": "Cloudflare Worker backend (leaderboard + PvP signaling) for BEAT STACK.",
+  "description": "Cloudflare Worker backend (leaderboard + PvP signaling) for Tetris Beats.",
   "main": "index.js",
   "type": "module",
   "scripts": {

@@ -1,6 +1,6 @@
-// Backdrop3D — a level's 3D world rendered behind the puzzle board: the
+// Backdrop3D — a level's 3D world rendered behind the Tetris board: the
 // stage, the crowd and both dancers grooving to the song, reacting to the
-// match (line clears are dance moves, a quad is a big move with the
+// match (line clears are dance moves, a Tetris is a big move with the
 // stage going off). Rendered at reduced resolution (it sits behind the
 // board — a soft backdrop reads as depth of field) with an adaptive
 // quality governor; if frames get slow it drops resolution and frame rate,
@@ -29,10 +29,10 @@ import { STORY_LEVELS, loadLevel } from './levels.js';
 export async function createBackdrop(levelId, { canvas, low = false, stage = false } = {}) {
   const mod = await loadLevel(levelId);
   const level = STORY_LEVELS[levelId], m = level.music, spb = 60 / m.bpm;
-  // Behind the puzzle a level shows its own living world (backdrop.create);
+  // Behind Tetris a level shows its own living world (backdrop.create);
   // the dance stage is only for the battle. `stage: true` (dev only) shows
   // the stage instead.
-  if (!(mod.backdrop && mod.backdrop.create) && !stage) throw new Error('no board world for ' + levelId);
+  if (!(mod.backdrop && mod.backdrop.create) && !stage) throw new Error('no Tetris world for ' + levelId);
   if (mod.backdrop && mod.backdrop.create && !stage) return createLiving(mod, level, { canvas, low });
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' });
   renderer.setClearColor(0x000000, 1);
@@ -217,7 +217,7 @@ export async function createBackdrop(levelId, { canvas, low = false, stage = fal
   return api;
 }
 
-// A level's living board world: backdrop.create(ctx) builds everything
+// A level's living Tetris world: backdrop.create(ctx) builds everything
 // (no dance stage, no dancers). ctx = { THREE, scene, camera, low, level }.
 // It gets update(dt, { beat, songTime, pieceX, danger, move, cheer, flash })
 // and react(kind, data) for every piece action / clear / level up.

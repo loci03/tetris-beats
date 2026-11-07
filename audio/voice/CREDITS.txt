@@ -1,4 +1,0 @@
-quad-1..5.mp3 and alfred/quad-baby.mp3 ("Quad!" four-line-clear callouts) were generated
-with Kokoro-82M TTS (https://github.com/hexgrad/kokoro, Apache-2.0) via kokoro-onnx:
-announcer = blend of "am_fenrir" + "am_michael", Alfred = "bm_george". Replace with real
-recordings any time; keep the file names.

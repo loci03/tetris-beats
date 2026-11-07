@@ -1,4 +1,4 @@
-// MATRIX RAIN — the living board world shared by BACK FOR MORE (green,
+// MATRIX RAIN — the living Tetris world shared by BACK FOR MORE (green,
 // hot-air balloons drifting up through the rain) and WHITE RABBIT (purple,
 // with Wonderland in the code: pocket watches and playing cards tumbling
 // through the rain and a glowing white rabbit to follow).
@@ -20,7 +20,7 @@
 //              shake scaled by rows; a long slam bursts motes outward
 //   hold     → déjà vu: the rain glitches white and jitters sideways
 //   clear    → rain surges, heads flare, scan band (1-3 lines get bigger),
-//              balloon burners / white rabbit react; QUAD = bullet time:
+//              balloon burners / white rabbit react; TETRIS = bullet time:
 //              the rain freezes, the camera orbits, then it all rushes
 //   combo    → the code runs hotter and faster, escalating rings
 //   levelUp  → ACCESS GRANTED banner, all streams flare, rings

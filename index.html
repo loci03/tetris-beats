@@ -10,7 +10,7 @@
   The deploy GitHub Action substitutes this automatically - see DEPLOY.md.
 -->
 <meta name="api-base" content="">
-<title>BEAT STACK</title>
+<title>TETRIS BEATS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- Non-blocking: if the font CDN is slow or unreachable the game still
@@ -2066,11 +2066,11 @@
 
 <div id="start-screen">
   <!-- Underground-lair backdrop: a separate canvas pinned behind every
-       start-screen child. Renders looping falling pieces + a single
+       start-screen child. Renders looping falling tetrominoes + a single
        overhead spotlight cone + brick-wall texture. Animates only while
        gameStarted is false (saves perf during the actual game). -->
   <canvas id="home-bg-canvas"></canvas>
-  <h1>BEAT STACK</h1>
+  <h1>TETRIS BEATS</h1>
   <!-- Cycles through map names so the front page advertises the breadth
        of vibes available. Updates via wireTagline IIFE. -->
   <div class="tagline" id="start-tagline">19 VIBES · 4 MODES · ONE BEAT</div>
@@ -2114,13 +2114,13 @@
     <button class="mode-btn" data-mode="ultra"    data-tab="more" style="display:none;" title="Score as much as possible in 2 minutes.">ULTRA</button>
     <button class="mode-btn" data-mode="daily"    data-tab="more" style="display:none;" title="Today's seeded run. Same pieces for everyone, leaderboard resets daily.">DAILY ★</button>
   </div>
-  <!-- STORY MODE: level list. Each level is a board world that opens
+  <!-- STORY MODE: level list. Each level is a Tetris world that opens
        into a rhythm dance battle (story/*.js). -->
   <div id="story-panel" style="display:none;">
     <div class="story-kicker">STORY MODE</div>
     <div class="story-levels" data-kind="story"></div>
   </div>
-  <!-- BUST A BEAT: the Story Mode dance battle by itself — no puzzle.
+  <!-- BUST A BEAT: the Story Mode dance battle by itself — no Tetris.
        Same levels / music / boss; ALFRED'S DIFFICULTY applies. Cards are
        built from story/levels.js. -->
   <div id="beat-panel" style="display:none;">
@@ -2337,7 +2337,7 @@
       <h3>Controller</h3>
       <p class="set-note" id="set-pad-status"></p>
       <div class="pad-live" id="set-pad-live" aria-live="polite"></div>
-      <p class="set-note">Puzzle: d-pad / left stick move · ↑ hard drop · ↓ soft drop · A rotate right · B / X rotate left · Y / LB hold · RB zone · Start pause.<br>Menus: d-pad + A to choose, B to go back. Dance battles: arrows any time, then A (✕) or B (○) on beat 4 · Y attack · X dodge.</p>
+      <p class="set-note">Tetris: d-pad / left stick move · ↑ hard drop · ↓ soft drop · A rotate right · B / X rotate left · Y / LB hold · RB zone · Start pause.<br>Menus: d-pad + A to choose, B to go back. Dance battles: arrows any time, then A (✕) or B (○) on beat 4 · Y attack · X dodge.</p>
     </section>
     <section class="desktop-only">
       <h3>Keys</h3>
@@ -2494,24 +2494,8 @@
 </div>
 
 <script>
-// One-time carry-over of saved settings, replays and scores from the old
-// storage prefix ('tetris.*') to 'beatstack.*' after the BEAT STACK rebrand.
-(function migrateStorageKeys() {
-  try {
-    const OLD = 'tetris' + '.', NEW = 'beatstack.';
-    if (localStorage.getItem(NEW + 'migrated')) return;
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith(OLD)) {
-        const nk = NEW + k.slice(OLD.length);
-        if (localStorage.getItem(nk) === null) localStorage.setItem(nk, localStorage.getItem(k));
-      }
-    }
-    localStorage.setItem(NEW + 'migrated', '1');
-  } catch {}
-})();
 // ============================================================
-// BEAT STACK
+// TETRIS BEATS - The Kanye Collection
 // ============================================================
 
 const COLS = 10, ROWS = 20;
@@ -2523,21 +2507,21 @@ var CELL = 30;
 // the current piece will land on hard-drop; some players prefer it off for
 // a harder challenge.
 // ============================================================
-// VOICE CALLOUTS - "Single / Double / Triple / Quad" on line clears
+// VOICE CALLOUTS - "Single / Double / Triple / Tetris" on line clears
 // ============================================================
 // Uses the browser's built-in SpeechSynthesis (Web Speech API). Zero assets,
 // works offline, Safari/iOS supported. We pick an English voice with a
-// preference for British/American natural voices so "Quad" lands well.
+// preference for British/American natural voices so "Tetris" lands well.
 // Preference persists to localStorage; toggleable from the start screen and
 // via the `V` key.
 let voiceEnabled = (() => {
-  try { const v = localStorage.getItem('beatstack.voice'); return v === null ? true : v === 'true'; }
+  try { const v = localStorage.getItem('tetris.voice'); return v === null ? true : v === 'true'; }
   catch { return true; }
 })();
 function setVoiceEnabled(v) {
   const wasOn = voiceEnabled;
   voiceEnabled = !!v;
-  try { localStorage.setItem('beatstack.voice', String(voiceEnabled)); } catch {}
+  try { localStorage.setItem('tetris.voice', String(voiceEnabled)); } catch {}
   const cb = document.getElementById('voice-toggle');
   if (cb) cb.checked = voiceEnabled;
   // Surface the muted state on the start screen so returning users (who
@@ -2571,7 +2555,7 @@ function setVoiceEnabled(v) {
 // Toggleable via the desktop HUD mute button, the mobile mute icon, or the
 // `M` key; persists like the other options.
 let muted = (() => {
-  try { return localStorage.getItem('beatstack.muted') === 'true'; }
+  try { return localStorage.getItem('tetris.muted') === 'true'; }
   catch { return false; }
 })();
 // Desktop-only trim (mobile has no slider - see #mobile-mute-btn). Kept as
@@ -2579,13 +2563,13 @@ let muted = (() => {
 // dialled in rather than jumping back to full volume.
 let volume = (() => {
   try {
-    const v = parseFloat(localStorage.getItem('beatstack.volume'));
+    const v = parseFloat(localStorage.getItem('tetris.volume'));
     return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1;
   } catch { return 1; }
 })();
 function setMuted(v) {
   muted = !!v;
-  try { localStorage.setItem('beatstack.muted', String(muted)); } catch {}
+  try { localStorage.setItem('tetris.muted', String(muted)); } catch {}
   if (audioEngine.masterGain) {
     audioEngine.masterGain.gain.value = muted ? 0 : audioEngine.MASTER_LEVEL * volume;
   }
@@ -2593,7 +2577,7 @@ function setMuted(v) {
 }
 function setVolume(v) {
   volume = Math.min(1, Math.max(0, v));
-  try { localStorage.setItem('beatstack.volume', String(volume)); } catch {}
+  try { localStorage.setItem('tetris.volume', String(volume)); } catch {}
   if (audioEngine.masterGain && !muted) {
     audioEngine.masterGain.gain.value = audioEngine.MASTER_LEVEL * volume;
   }
@@ -2629,7 +2613,7 @@ const voiceEngine = (() => {
     1: ['single-1', 'single-2', 'single-3', 'single-4'],
     2: ['double-1', 'double-2', 'double-3', 'double-4'],
     3: ['triple-1', 'triple-2', 'triple-3', 'triple-4'],
-    4: ['quad-1', 'quad-2', 'quad-3', 'quad-4', 'quad-5'],
+    4: ['tetris-1', 'tetris-2', 'tetris-3', 'tetris-4', 'tetris-5'],
   };
   const COMBO_FILES = {
     2: ['combo-2a', 'combo-2b'],
@@ -2790,7 +2774,7 @@ function makeClipVoice(folder, pools, defaultGain) {
     if (now - _lastPlayedAt < (throttleMs || 1500)) return;
     let pool;
     if (combo >= 3 && pools.combo) pool = pools.combo;
-    else if (cleared >= 4 && pools.quad) pool = pools.quad;
+    else if (cleared >= 4 && pools.tetris) pool = pools.tetris;
     else if (cleared === 3 && pools.triple) pool = pools.triple;
     else if (cleared === 2 && pools.double) pool = pools.double;
     else pool = pools.single;
@@ -2816,7 +2800,7 @@ const playerVoice = makeClipVoice('oracle', {
   single: ['nice', 'keep-going', 'good', 'stay-focused'],
   double: ['nice-clear', 'you-got-this', 'stay-sharp'],
   triple: ['youre-cooking', 'show-him', 'dont-let-up'],
-  quad: ['take-that', 'destroy-him', 'youre-winning', 'go-go-go'],
+  tetris: ['take-that', 'destroy-him', 'youre-winning', 'go-go-go'],
   combo:  ['on-fire', 'unstoppable-o', 'beat-alfred', 'crush-him'],
   praise: ['praise-destroyed', 'praise-take-that', 'praise-earned', 'praise-champion'],
 }, 0.85);
@@ -2826,7 +2810,7 @@ const alfredVoice = makeClipVoice('alfred', {
   single: ['easy', 'too-easy', 'come-on', 'try-harder', 'slow', 'is-that-all'],
   double: ['nice-try', 'getting-closer', 'still-mine'],
   triple: ['stacking-up', 'youre-cooked', 'watch-me'],
-  quad: ['massacre', 'cleaned-house', 'quad-baby', 'demolished'],
+  tetris: ['massacre', 'cleaned-house', 'tetris-baby', 'demolished'],
   combo:  ['rolling', 'unstoppable'],
   dunk:   ['dunk-gym', 'dunk-day-job', 'dunk-practice', 'dunk-barely', 'dunk-solo', 'dunk-hard'],
 }, 0.95);
@@ -2835,12 +2819,12 @@ const alfredVoice = makeClipVoice('alfred', {
 alfredVoice.trashTalk = (cleared, combo) => alfredVoice.announceClear(cleared, combo);
 
 let showGhost = (() => {
-  try { const v = localStorage.getItem('beatstack.showGhost'); return v === null ? true : v === 'true'; }
+  try { const v = localStorage.getItem('tetris.showGhost'); return v === null ? true : v === 'true'; }
   catch { return true; }
 })();
 function setShowGhost(v) {
   showGhost = !!v;
-  try { localStorage.setItem('beatstack.showGhost', String(showGhost)); } catch {}
+  try { localStorage.setItem('tetris.showGhost', String(showGhost)); } catch {}
   const cb = document.getElementById('ghost-toggle');
   if (cb) cb.checked = showGhost;
 }
@@ -2871,7 +2855,7 @@ function _themePieceColor(type) {
 }
 
 // ============================================================
-// LEVEL THEMES
+// LEVEL THEMES - Kanye Eras
 // ============================================================
 const LEVEL_THEMES = [
   null, // index 0 unused
@@ -2893,7 +2877,7 @@ const LEVEL_THEMES = [
     colors: { bg1: '#0a0c10', bg2: '#05060a', accent: '#00d4ff', glow: '#33eeff' },
     particleHue: 195,
     particleStyle: 'warehouse', // dancing silhouette figures over warehouse bg
-    blockStyle: 'glossy',  // glossy 3D bevel + shimmer
+    blockStyle: 'tetrisEffect',  // glossy 3D bevel + shimmer
     blockGlow: 10,
     // Drum/bass/synth patterns retained as a fallback if the MP3 fails to load,
     // so the level still plays. Same pattern as the original College Dropout.
@@ -2929,14 +2913,14 @@ const LEVEL_THEMES = [
     // Mid-tempo guess; nudge if visual beat-pulse drifts from the track.
     bpm: 127.295,
     track: 'falling-violins.mp3',
-    // Gold face, lemon-yellow highlight. glossy block style paints every
+    // Gold face, lemon-yellow highlight. tetrisEffect block style paints every
     // block in `colors.accent` with a top gradient that lifts toward the
     // shadeColor(+50) of accent - for #ffd700 that lands close to bright yellow,
     // and the white bevel on top reads as a yellow rim over the gold.
     colors: { bg1: '#1a1200', bg2: '#0a0700', accent: '#ffd700', glow: '#ffeb3b' },
     particleHue: 50,
     particleStyle: 'violins', // violin silhouettes raining from the sky, reactive
-    blockStyle: 'glossy',
+    blockStyle: 'tetrisEffect',
     blockGlow: 14,
     // Procedural fallback drum/bass - used only if falling-violins.mp3 fails to
     // load. Soft pizzicato-ish pattern so the level still feels orchestral.
@@ -3030,7 +3014,7 @@ const LEVEL_THEMES = [
     bpm: 94.005,
     track: 'mac-and-cheese.mp3',
     // Warm cheese-and-pasta palette. Yellow accent so the ghost piece
-    // (which uses theme.accent for glossy/matrix/tires/macncheese
+    // (which uses theme.accent for tetrisEffect/matrix/tires/macncheese
     // block styles) renders as a yellow guide outline - Sir asked for
     // yellow ghost pieces specifically. Glow brightens to gold.
     colors: { bg1: '#3a1c00', bg2: '#1a0f00', accent: '#ffcc33', glow: '#ffe070' },
@@ -3195,7 +3179,7 @@ const LEVEL_THEMES = [
     particleHue: 290,
     particleStyle: 'robot-city', // giant dancing robots + helicopters over neon skyline
     blockGlow: 14,
-    // Purple piece palette: every falling piece is rendered as a purple
+    // Purple piece palette: every Tetris piece is rendered as a purple
     // variant on this level so the play board fits the dream-or-nightmare
     // mood instead of clashing with the canon piece colours.
     piecePalette: {
@@ -3822,16 +3806,16 @@ var paused, gameStarted, animFrame;
 var _modeStartTime = 0, _modeFinishTime = null, _ultraTimeLimit = 0, _sprintTarget = 0;
 // `_pieceLockCount`: total pieces locked this run — drives Sprint's
 // pieces-per-second readout (the standard sprint speed metric).
-// `_marathonGoal`: line target for Marathon (default 150 per quad
+// `_marathonGoal`: line target for Marathon (default 150 per Tetris
 // Effect's standard). Reaching it ends the run as a SUCCESS.
 var _pieceLockCount = 0;
 // Per-run stats for the results screen (human player only). `_runId`
 // bumps on every startGame so async game-over work from a previous run
 // can tell it's stale. Paused time is tracked so the TIME stat is real
 // play time.
-var _runStats = { quads: 0, maxCombo: -1 };
+var _runStats = { tetrises: 0, maxCombo: -1 };
 // Story Mode host state. The mode itself lives in story/*.js (lazy-loaded);
-// these flags let it suspend the puzzle match in place — nothing is reset,
+// these flags let it suspend the Tetris match in place — nothing is reset,
 // so board, score, queue, hold and level are exactly preserved.
 var storyFreeze = false;   // no gravity / input / timers while true
 var storyHide2D = false;   // skip 2D drawing while the 3D world covers it
@@ -3865,7 +3849,7 @@ var _blockMiniCache = new Map();
 // Recomputed only when canvas size or game state changes.
 var _playRectsCache = null;
 var _playRectsCacheKey = '';
-// ─── glossy-style FX (shared, not per-player) ──────────────
+// ─── Tetris Effect-style FX (shared, not per-player) ──────────────
 // Shockwaves: rings emitted from cleared rows that expand and fade.
 // Each entry: { x, y, r, maxR, alpha, color, life }
 var shockwaves = [];
@@ -3884,7 +3868,7 @@ var cheerPulse = 0;
 // bigger bump on hard-drop. Lets the crowd + DJ react to the player's
 // touch input itself, not just music + clears. Decays fast.
 var movePulse = 0;
-// Stage flash: full white-pulse overlay set on triple/quad, decays in
+// Stage flash: full white-pulse overlay set on triple/tetris, decays in
 // render(). Fires on top of the bg canvas so it bathes the venue in light.
 var stageFlash = 0;
 // Confetti pieces. Each has x, y, vx, vy, rot, rotV, color, size, life.
@@ -3904,7 +3888,7 @@ var activePlayer = null;   // whichever player's fields currently live in global
 // mistakes for someone wanting a real fight. Selected via the start-screen
 // dropdown; persisted in localStorage so the choice sticks.
 // Difficulty presets. Tuned 2026-04-30 so even MEDIUM Alfred actively chases
-// line clears + quads rather than passively stacking. Sir's complaint was
+// line clears + Tetrises rather than passively stacking. Sir's complaint was
 // "I'm winning by not filling up Alfred's game" — that meant Alfred wasn't
 // CLEARING anything (so no garbage flowed to Sir, and the only top-out path
 // was AI bad placement). With the heuristic clear-weight bumped, Alfred
@@ -3927,13 +3911,13 @@ const AI_DIFFICULTIES = {
   hard:   { thinkPause: 13, movePause: 6,  dropPause: 24, mistakeChance: 0.13, garbageMult: 0.80 },
 };
 let aiDifficulty = (() => {
-  try { const v = localStorage.getItem('beatstack.aiDifficulty'); return AI_DIFFICULTIES[v] ? v : 'medium'; }
+  try { const v = localStorage.getItem('tetris.aiDifficulty'); return AI_DIFFICULTIES[v] ? v : 'medium'; }
   catch { return 'medium'; }
 })();
 function setAiDifficulty(v) {
   if (!AI_DIFFICULTIES[v]) return;
   aiDifficulty = v;
-  try { localStorage.setItem('beatstack.aiDifficulty', v); } catch {}
+  try { localStorage.setItem('tetris.aiDifficulty', v); } catch {}
 }
 
 // Starting-level selection. Persists across sessions so the player who likes
@@ -3941,7 +3925,7 @@ function setAiDifficulty(v) {
 // theme range at read-time in case LEVEL_THEMES shrinks in a future build.
 let startLevel = (() => {
   try {
-    const v = parseInt(localStorage.getItem('beatstack.startLevel'), 10);
+    const v = parseInt(localStorage.getItem('tetris.startLevel'), 10);
     return (Number.isFinite(v) && v >= 1) ? v : 1;
   } catch { return 1; }
 })();
@@ -3949,7 +3933,7 @@ function setStartLevel(v) {
   v = parseInt(v, 10);
   if (!Number.isFinite(v) || v < 1) return;
   startLevel = v;
-  try { localStorage.setItem('beatstack.startLevel', String(v)); } catch {}
+  try { localStorage.setItem('tetris.startLevel', String(v)); } catch {}
 }
 
 // Fields that live in the globals and belong to whichever player is currently
@@ -4067,8 +4051,8 @@ function _garbageRand() { return _seedRandGarbage ? _seedRandGarbage() : Math.ra
 // replay is deterministic IFF the run used a seeded PRNG (Daily, PvP,
 // future replay-only modes). Solo runs without a seed are recorded but
 // won't replay byte-identically because Math.random() drives bag/garbage.
-// Storage: localStorage `beatstack.replays.v1` keyed by start-timestamp.
-const REPLAY_KEY = 'beatstack.replays.v1';
+// Storage: localStorage `tetris.replays.v1` keyed by start-timestamp.
+const REPLAY_KEY = 'tetris.replays.v1';
 const REPLAY_MAX_KEEP = 25;
 const _replay = {
   recording: false,
@@ -4142,7 +4126,7 @@ function spawnPiece() {
   currentY = 0;
   canHold = true;
   isLocking = false;
-  // Lock-delay-reset budget per modern falling-block convention: each piece can reset
+  // Lock-delay-reset budget per modern Tetris guideline: each piece can reset
   // its lock timer at most LOCK_RESET_LIMIT times by movement/rotation while
   // grounded. Closes the infinite-spin exploit at L1-10 where lockDelay=500ms.
   lockResets = 0;
@@ -4266,7 +4250,7 @@ const _SRS_KICK_I = {
   '3,0':  [[0,0],[1,0],[-2,0],[1,2],[-2,-1]],
   '0,3':  [[0,0],[-1,0],[2,0],[-1,-2],[2,1]],
 };
-// ── Story Mode special piece ──
+// ── Story Mode special tetrimino ──
 // A real extra piece type that borrows a base piece's shape, rotation states
 // and kick table, so it plays exactly like that piece. It is never produced
 // by the 7-bag — Story Mode injects it into the NEXT queue — and its cells
@@ -4516,7 +4500,7 @@ function lockPiece() {
 }
 
 // Attack table (PPT-flavoured; no T-spin or B2B in MVP):
-//   single = 1, double = 2, triple = 3, quad = 5 lines sent
+//   single = 1, double = 2, triple = 3, tetris = 5 lines sent
 // Single = 1 (was 0) so even small clears keep pressure on the opponent.
 // Combo bonus stacks on top of the base attack so 3+ chained clears hurt.
 const GARBAGE_ATTACK = { 1: 1, 2: 2, 3: 3, 4: 5 };
@@ -4542,7 +4526,7 @@ function riseGarbage(n) {
     try { audioEngine.playGarbageReceive(n); } catch {}
     // Light shake: short + subtle. Peak displacement is shakeMag*(frames/28)
     // px, so this tops out under ~1px and decays over ~10 frames (~165ms) —
-    // well below a quad clear's 4-8 magnitude / 28 frames. Scales a touch
+    // well below a Tetris clear's 4-8 magnitude / 28 frames. Scales a touch
     // with the rows that landed and is capped so a big dump can't nauseate.
     const gMag = Math.min(3.0, 1.8 + n * 0.3);
     if (gMag > shakeMag) { shakeMag = gMag; }
@@ -4585,7 +4569,7 @@ function clearLines() {
     for (const r of clearRows) {
       for (let c = 0; c < COLS; c++) spawnParticles(c * CELL + CELL / 2, r * CELL + CELL / 2, board[r][c], 5);
     }
-    // glossy-style FX: shockwave per cleared row + screen shake on big clears.
+    // Tetris Effect-style FX: shockwave per cleared row + screen shake on big clears.
     // Shockwave only on the active (human) player's board so AI clears don't strobe
     // the screen. Magnitude scales with line count + current level intensity.
     if (!activePlayer || !activePlayer.isAI) {
@@ -4605,7 +4589,7 @@ function clearLines() {
         // Bright band over the row itself — the "zap" that sells the clear.
         rowFlashes.push({ y: r * CELL, h: CELL, t: performance.now() });
       }
-      // Screen shake: doubles → tiny, triples → light, quad → heavy. Scales
+      // Screen shake: doubles → tiny, triples → light, tetris → heavy. Scales
       // up at high levels so L19 has real punch even on a single.
       const lvlBoost = Math.max(0, (level - 13)) * 0.3;
       const shakeBase = [0, 0.6, 2, 4, 8][cleared] || 8;
@@ -4615,7 +4599,7 @@ function clearLines() {
         shakeFrames = Math.min(28, 8 + cleared * 3 + Math.max(0, combo) * 2);
       }
       // Crowd reaction. Stronger clears → bigger cheer that lasts longer.
-      // Stacks with combo so a 3-combo quad really pops the crowd.
+      // Stacks with combo so a 3-combo Tetris really pops the crowd.
       const cheerBase = [0, 0.35, 0.55, 0.78, 1.0][cleared] || 1.0;
       const cheerComboBoost = Math.min(0.4, Math.max(0, combo) * 0.12);
       cheerPulse = Math.min(1.2, Math.max(cheerPulse, cheerBase + cheerComboBoost));
@@ -4626,15 +4610,15 @@ function clearLines() {
       if (theme && theme.particleStyle === 'ferrari-highway') {
         triggerFerrariOvertake(cleared);
       }
-      // Confetti + stage flash on Underground (and any future glossy
+      // Confetti + stage flash on Underground (and any future Tetris-Effect
       // styled level - matrix + tires count as visually-rich for these FX
-      // too, so a quad on Back for More / Ferrari Window gets the same
+      // too, so a Tetris on Back for More / Ferrari Window gets the same
       // shockwave/flash treatment). Volume scales with line count + combo.
-      if (theme && (theme.blockStyle === 'glossy' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star' || theme.blockStyle === 'taco' || theme.blockStyle === 'beachball' || theme.blockStyle === 'skull')) {
+      if (theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star' || theme.blockStyle === 'taco' || theme.blockStyle === 'beachball' || theme.blockStyle === 'skull')) {
         const pieces = [0, 12, 22, 36, 60][cleared] || 60;
         const totalPieces = pieces + Math.max(0, combo) * 8;
         spawnConfetti(totalPieces, theme);
-        // Stage flash: small for single, big for triple/quad/combo
+        // Stage flash: small for single, big for triple/tetris/combo
         const flashStrength = [0, 0.15, 0.35, 0.6, 0.85][cleared] || 0.85;
         stageFlash = Math.max(stageFlash, flashStrength + Math.min(0.3, Math.max(0, combo) * 0.08));
       }
@@ -4658,15 +4642,15 @@ function clearLines() {
     }
     combo++;
     if (!activePlayer || (!activePlayer.isAI && !activePlayer.isRemote)) {
-      if (cleared === 4) _runStats.quads++;
+      if (cleared === 4) _runStats.tetrises++;
       if (combo > _runStats.maxCombo) _runStats.maxCombo = combo;
     }
     const basePoints = [0, 100, 300, 500, 800];
     // Zone mode multiplies line-clear score 2.5×. Combined with combo this
-    // means a quad-while-Zoned with a 3-combo is huge - exactly the burst
+    // means a Tetris-while-Zoned with a 3-combo is huge - exactly the burst
     // of points the user is supposed to want from chaining clears.
     const zoneMul = zoneActive ? 2.5 : 1;
-    // Modern falling-block scoring: T-Spin and quad are "difficult" line clears.
+    // Modern Tetris scoring: T-Spin and Tetris are "difficult" line clears.
     // Chain them back-to-back (no non-difficult clear between) for a +50%
     // multiplier on the next difficult clear. A perfect-clear (board empty
     // after the clear) is a separate flat bonus.
@@ -4692,7 +4676,7 @@ function clearLines() {
     // Update B2B chain: difficult clear extends, anything else breaks it.
     if (cleared > 0) b2bChain = isDifficult ? b2bChain + 1 : 0;
     // Perfect Clear: board empty after the splice. Big flat bonus per spec
-    // (1.5k single, 2.3k double, 2.8k triple, 3.6k quad-PC).
+    // (1.5k single, 2.3k double, 2.8k triple, 3.6k tetris-PC).
     let isPerfectClear = true;
     for (let r = 0; r < ROWS && isPerfectClear; r++) {
       for (let c = 0; c < COLS; c++) if (board[r][c]) { isPerfectClear = false; break; }
@@ -4709,7 +4693,7 @@ function clearLines() {
       }
     } else if (cleared === 4 && b2bChain >= 2) {
       if (typeof showAlfredClearBanner === 'function') {
-        showAlfredClearBanner('B2B QUAD ×' + b2bChain);
+        showAlfredClearBanner('B2B TETRIS ×' + b2bChain);
       }
     }
     // Consume the rotation flag so the next non-rotated lock can't fake a T-spin.
@@ -4722,10 +4706,10 @@ function clearLines() {
       _modeFinishTime = performance.now();
     }
     // Sprint and Ultra LOCK gravity at L1 — pure speed/score modes per the
-    // standard falling-block convention (sprint/ultra modes in modern falling-block games).
+    // standard Tetris guideline (TETR.IO 40 LINES, Tetris Effect Ultra).
     // Levels still tick visually for theme cycling? No — keep them static
     // so the music + visuals stay consistent for the whole run. Marathon
-    // caps at L19 (final theme) per glossy's "Endless toggled off"
+    // caps at L19 (final theme) per Tetris Effect's "Endless toggled off"
     // L15 cap pattern, adapted to our 19 themes.
     if (gameMode !== 'sprint' && gameMode !== 'ultra') {
       const cap = (gameMode === 'marathon') ? (LEVEL_THEMES.length - 1) : 999;
@@ -4848,7 +4832,7 @@ function onLevelChange() {
 }
 
 // ============================================================
-// AUDIO ENGINE
+// AUDIO ENGINE - Kanye Production
 // ============================================================
 const audioEngine = {
   ctx: null,
@@ -5878,7 +5862,7 @@ const audioEngine = {
   // Outgoing (you → Alfred): brighter, sweeps down from 3kHz to 800Hz, lighter
   // body — feels like launching something away. Incoming (Alfred → you):
   // darker, 1.6kHz → 200Hz, heavier impact — feels like getting hit. Scaled
-  // by `amount` so a 5-line quad attack lands harder than a single. Plays
+  // by `amount` so a 5-line tetris attack lands harder than a single. Plays
   // regardless of which side fired it (this is intentionally NOT gated by
   // _isAiPlayer — the human needs to hear both directions).
   playGarbageSend(amount, incoming) {
@@ -6105,12 +6089,12 @@ function initBgParticles() {
 
 function showCombo(cleared) {
   const theme = getTheme(level);
-  const names = ['', 'Single', 'Double', 'Triple', 'QUAD!'];
-  let text = names[cleared] || 'QUAD!';
+  const names = ['', 'Single', 'Double', 'Triple', 'TETRIS!'];
+  let text = names[cleared] || 'TETRIS!';
   if (combo > 0) text += ` x${combo + 1}`;
 
   // Voice callout - split by who's clearing:
-  //  - Local human → MP3 announcer ("Single!" / "QUAD!") + center banner
+  //  - Local human → MP3 announcer ("Single!" / "TETRIS!") + center banner
   //  - AI (Alfred) → Web Speech API trash talk + separate red Alfred banner
   //    near his monitor (so the player's HUD isn't hijacked by AI clears)
   //  - Remote opponent → silent here (their client narrates on their end)
@@ -6122,7 +6106,7 @@ function showCombo(cleared) {
     return;
   }
   if (!activePlayer || !activePlayer.isRemote) {
-    // Player clear: MP3 announcer ("Single!" / "QUAD!") always.
+    // Player clear: MP3 announcer ("Single!" / "TETRIS!") always.
     voiceEngine.announceClear(cleared, combo + 1);
     // In vs-Alfred, Oracle layers encouragement on top - also pre-rendered
     // clips, so no music dim. Throttled inside the module.
@@ -6257,7 +6241,7 @@ async function fetchSharedScores(mode) {
 // merged top-10 so we can refresh the local cache from it. If the server is
 // unreachable, the score is queued and retried on next refresh - without this,
 // a flaky network would silently drop a hard-earned high score.
-const PENDING_KEY = 'beatstack.pendingScores.v1';
+const PENDING_KEY = 'tetris.pendingScores.v1';
 function loadPendingScores() {
   try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch { return []; }
 }
@@ -6716,7 +6700,7 @@ function lobbyLeave() {
 // SPRINT / ULTRA each get their own ranked list. The legacy v1 key (without
 // a mode suffix) is still read on first load + migrated to STORY for
 // backwards compatibility — old players' best runs aren't lost.
-const LB_KEY_BASE = 'beatstack.leaderboard.v1';
+const LB_KEY_BASE = 'tetris.leaderboard.v1';
 const LB_MAX = 50;
 const LB_MODES = ['story', 'marathon', 'sprint', 'ultra', 'daily'];
 // UTC date string YYYY-MM-DD — used as the daily-challenge seed AND as a
@@ -6986,7 +6970,7 @@ async function showGameOver() {
       [lines, 'Lines'],
       [sprintDone ? finalScore.toLocaleString() : level, sprintDone ? 'Score' : 'Level'],
       [sprintDone ? pps.toFixed(2) : fmtClock(playMs), sprintDone ? 'Pieces/s' : 'Time'],
-      [_runStats.quads, 'Quads', _runStats.quads > 0],
+      [_runStats.tetrises, 'Tetrises', _runStats.tetrises > 0],
       [chain, 'Best combo', _runStats.maxCombo > 0],
       [sprintDone ? _pieceLockCount : pps.toFixed(2), sprintDone ? 'Pieces' : 'Pieces/s'],
     ];
@@ -7202,7 +7186,7 @@ function shadeColor(color, percent) {
 // highlight so it reads as "outline of where the piece will land" instead of
 // a washed-out twin of the real piece.
 //
-// On glossy levels (Underground), every block face is the theme's
+// On Tetris-Effect levels (Underground), every block face is the theme's
 // accent color regardless of piece type - so the ghost should match. Other
 // levels keep the piece-colored ghost for clarity.
 // Ghost cells are deterministic per (colour, size) too, so they get their own
@@ -7211,12 +7195,12 @@ function shadeColor(color, percent) {
 const _ghostMiniCache = new Map();
 function drawGhostBlock(context, x, y, color, size) {
   const theme = getTheme(level);
-  // glossy, matrix, tires, and macncheese all override face colour,
+  // tetrisEffect, matrix, tires, and macncheese all override face colour,
   // so the ghost piece should outline in the theme accent - otherwise the
   // dashed ghost reads as a different piece type than what's about to
   // lock. For Mac & Cheese the accent is yellow, which means the ghost
   // automatically renders as the yellow guide outline Sir asked for.
-  const useThemeColor = theme && (theme.blockStyle === 'glossy' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star' || theme.blockStyle === 'taco');
+  const useThemeColor = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star' || theme.blockStyle === 'taco');
   const outlineColor = useThemeColor ? theme.colors.accent : color;
   const key = `${outlineColor}-${size}`;
   let mini = _ghostMiniCache.get(key);
@@ -7251,7 +7235,7 @@ function drawGhostBlock(context, x, y, color, size) {
 
 // Reverse map of piece-color → piece-type so locked blocks (which only carry
 // the color in board[r][c]) can render the correct embossed icon in the
-// glossy block style.
+// Tetris-Effect block style.
 const COLOR_TO_TYPE = Object.fromEntries(
   Object.entries(PIECES).map(([k, v]) => [v.color, k])
 );
@@ -7262,7 +7246,7 @@ const COLOR_TO_TYPE = Object.fromEntries(
 // incoming T still reads differently from an L at a glance. Applied once per
 // sprite when it's cached - zero per-frame cost. Only styles that ignore the
 // piece colour are listed; themes with real per-piece colours are untouched.
-const PIECE_SHADE_STYLES = new Set(['glossy', 'tires', 'macncheese', 'beefpatty', 'brain', 'trumpet', 'mug', 'bullet', 'leaf']);
+const PIECE_SHADE_STYLES = new Set(['tetrisEffect', 'tires', 'macncheese', 'beefpatty', 'brain', 'trumpet', 'mug', 'bullet', 'leaf']);
 const PIECE_SHADES = {         // [hue shift in degrees, lightness multiplier]
   I: [0, 1.0], O: [16, 1.1], T: [-16, 0.93], S: [30, 1.0],
   Z: [-30, 1.05], J: [8, 0.8], L: [-8, 1.18],
@@ -7366,7 +7350,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
   // Cuts shadowBlur + gradient cost to zero for cached calls (board rebuild,
   // active piece, ghost). Only skips time-dependent styles (matrix, star).
   if (_bs === 'beefpatty' || _bs === 'trumpet' || _bs === 'brain' ||
-      _bs === 'mug' || _bs === 'glossy' || _bs === 'tires' || _bs === 'macncheese' ||
+      _bs === 'mug' || _bs === 'tetrisEffect' || _bs === 'tires' || _bs === 'macncheese' ||
       _bs === 'bullet' || _bs === 'leaf' || _bs === 'taco' || _bs === 'beachball' || _bs === 'skull' ||
       _bs === 'default') {
     const key = `${_bs}-${color}-${size}`;
@@ -7375,7 +7359,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
       mini = hiDpi(document.createElement('canvas'));
       mini.width = size; mini.height = size;
       const mc = mini.getContext('2d');
-      if      (_bs === 'glossy') drawBlockTE(mc, 0, 0, color, size, 1);
+      if      (_bs === 'tetrisEffect') drawBlockTE(mc, 0, 0, color, size, 1);
       else if (_bs === 'tires')        drawBlockTires(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'macncheese')   drawBlockMacNCheese(mc, 0, 0, color, size, 1, theme);
       else if (_bs === 'beefpatty')    drawBlockBeefPatty(mc, 0, 0, color, size, 1, theme);
@@ -7396,7 +7380,7 @@ function drawBlock(context, x, y, color, size, alpha = 1) {
     if (alpha !== 1) context.globalAlpha = 1;
     return;
   }
-  if (theme && theme.blockStyle === 'glossy') {
+  if (theme && theme.blockStyle === 'tetrisEffect') {
     drawBlockTE(context, x, y, color, size, alpha);
     return;
   }
@@ -7501,7 +7485,7 @@ function drawBlockDefault(context, x, y, color, size) {
   context.fillRect(bx + r * 0.6, by + bs - 2, bs - r * 1.2, 1.6);
 }
 
-// glossy-style block: glossy 3D bevel (bright top-left highlight,
+// Tetris Effect-style block: glossy 3D bevel (bright top-left highlight,
 // dark bottom-right shadow) over a deep gradient face, with an embossed
 // per-piece glyph in the centre. The face is painted in the theme's accent
 // colour rather than the piece's native colour - every piece looks the same
@@ -7533,7 +7517,7 @@ function drawBlockTE(context, x, y, color, size, alpha = 1) {
   // O, purple T, etc.) at low alpha on top of the gold face, so each piece
   // type carries a slight hue signature. Together with the larger glyph
   // below this gives the same instant "that's a T-piece" recognition that
-  // glossy's per-piece block art does, without abandoning the
+  // Tetris Effect's per-piece block art does, without abandoning the
   // theme's all-gold aesthetic.
   if (type && color) {
     const [pr, pg, pb] = hexToRgb(color);
@@ -7809,7 +7793,7 @@ function drawBlockMacNCheese(context, x, y, color, size, alpha, theme) {
 }
 
 // Per-piece glyph carved into the block face. Same shape language as the
-// glossy blocks: a small geometric mark hinting at the piece's
+// Tetris Effect blocks: a small geometric mark hinting at the piece's
 // silhouette. Now sized large enough (~half the face) and double-stamped
 // (bright highlight + dark shadow) so the I/O/T/S/Z/J/L silhouettes are
 // distinguishable at a glance even when every face is the same accent
@@ -7923,7 +7907,7 @@ function drawBoard() {
   const [r, g, b] = hexToRgb(theme.colors.bg2);
   const cw = mainCanvas.width, ch = mainCanvas.height;
 
-  const useAlpha = theme && (theme.blockStyle === 'glossy' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star');
+  const useAlpha = theme && (theme.blockStyle === 'tetrisEffect' || theme.blockStyle === 'matrix' || theme.blockStyle === 'tires' || theme.blockStyle === 'macncheese' || theme.blockStyle === 'beefpatty' || theme.blockStyle === 'brain' || theme.blockStyle === 'trumpet' || theme.blockStyle === 'mug' || theme.blockStyle === 'star');
   const fillAlpha = !useAlpha ? null
     : (theme.blockStyle === 'tires')    ? 0.82
     : (theme.blockStyle === 'brain')    ? 0.42
@@ -8131,12 +8115,12 @@ function drawBoard() {
     }
   }
 
-  // glossy shimmer pass - diagonal highlight stripe sweeping across
+  // Tetris-Effect shimmer pass - diagonal highlight stripe sweeping across
   // every filled cell. Single global pass with `source-atop` so it only paints
   // on top of existing pixels (block faces), not the empty grid background.
   // Drawn AFTER active piece so both locked and active blocks shimmer alike.
   // Ghost piece is excluded since it's a dashed outline, not a filled block.
-  if (theme && theme.blockStyle === 'glossy') {
+  if (theme && theme.blockStyle === 'tetrisEffect') {
     const w = mainCanvas.width, h = mainCanvas.height;
     const cycle = 2400; // ms per full sweep
     const phase = (Date.now() % cycle) / cycle;       // 0..1
@@ -8218,7 +8202,7 @@ function drawBoard() {
     ctx.restore();
   }
 
-  // glossy-style shockwaves: expanding rings drawn over the board after
+  // Tetris Effect-style shockwaves: expanding rings drawn over the board after
   // a line clear. Lives in shared state (not per-player) so we only draw them
   // on the human player's main canvas (skipped for the AI mini board).
   if (shockwaves.length && (!activePlayer || !activePlayer.isAI)) {
@@ -8654,7 +8638,7 @@ function drawWarehouseScene(theme, now) {
   //     the crowd so pieces appear in front of dancers.
   drawConfetti();
 
-  // 12. STAGE FLASH - full-bg white pulse on triple/quad. Drawn last so
+  // 12. STAGE FLASH - full-bg white pulse on triple/tetris. Drawn last so
   //     it bathes everything (and the front-row dancer rim glow) at once.
   if (stageFlash > 0) {
     bgCtx.fillStyle = `rgba(255,255,255,${stageFlash * 0.45})`;
@@ -9159,7 +9143,7 @@ function drawPhone(handX, handY, scale, accentRgb) {
 //   - cheerPulse (line clears)  → fall accelerates briefly
 //   - movePulse  (piece moves)  → random columns flicker brighter
 //   - kick beat                 → head glyphs scale + glow pulse
-//   - stageFlash (glossy)→ whole field brightens for the FX moment
+//   - stageFlash (Tetris-Effect)→ whole field brightens for the FX moment
 //
 // Column state lives on the function itself (cached on a closure-static
 // `_cols` array) so it persists across frames without globals. Initial
@@ -9305,7 +9289,7 @@ function drawMatrixRain(theme, now, playRects) {
 //   - cheerPulse (line clears) → triggers lane change + speed surge
 //   - movePulse  (piece moves) → small steering wobble in current lane
 //   - kick beat                → headlights flash brighter
-//   - stageFlash (quad FX)   → whole road momentarily brightens
+//   - stageFlash (Tetris-FX)   → whole road momentarily brightens
 //
 // Owns its own scene state on closure-static vars.
 let _ferrariMarkerScroll = 0;
@@ -9734,7 +9718,7 @@ function drawCheeseWhips(theme, now, playRects) {
   for (let i = 0; i < _cheeseDrips.length; i++) {
     const d = _cheeseDrips[i];
     // Length pulses with cheer + slight breathing - drips literally
-    // stretch down on a quad combo.
+    // stretch down on a Tetris combo.
     const breathe = Math.sin(now / 1800 + d.wobblePhase) * 8;
     const len = d.baseLen + breathe + cheer * 80;
     // Sideways wobble from movePulse (per-drip phase so they don't
@@ -10938,10 +10922,10 @@ function drawZenScene(theme, now, playRects) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BEEF PATTY BLOCK (Level 8 - Life is Good)
-// Each board cell renders as a cartoon Jamaican beef patty: a semicircular
+// Each Tetris cell renders as a cartoon Jamaican beef patty: a semicircular
 // turnover with golden-brown flaky pastry, a visible reddish-brown meat filling
 // in the center, scalloped crimped edge at the top, and a buttery sheen.
-// Each piece type uses a slightly different shade variant so the stack
+// Each tetromino type uses a slightly different shade variant so the stack
 // reads as a golden pyramid of patties.
 // ─────────────────────────────────────────────────────────────────────────────
 function drawBlockBeefPatty(context, x, y, color, size, alpha, theme) {
@@ -15671,7 +15655,7 @@ function drawCathedralScene(theme, now, playRects) {
 
   // ── SINGING CHOIR ──
   // Smoothed sing intensity from audio energy + sustained cheer. Goes
-  // up to ~1.2 on a quad/perfect-clear, falls back to a chill ~0.3 hum
+  // up to ~1.2 on a Tetris/perfect-clear, falls back to a chill ~0.3 hum
   // when nothing's happening so the choir is always visibly singing.
   const baseSing = 0.30 + energy * 0.50 + cheer * 0.50;
   sc.choirSwell = sc.choirSwell * 0.85 + baseSing * 0.15;
@@ -15973,7 +15957,7 @@ let _foodFightScene = null;
 //   • Wall splats with drip trails
 //   • Shockwave rings on line clears (same as Galaxy)
 //   • Burst of flying chips + hot-flash on hard drop
-//   • Colored confetti (taco palette) on quad
+//   • Colored confetti (taco palette) on Tetris
 //
 // All characters repositioned below the board on mobile (w < 600).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -18931,7 +18915,7 @@ function drawBackground() {
         //                        every piece move
         //   - cheerPulse       → speeds the fall, widens the sway, brightens
         //                        the gold (line clears)
-        //   - stageFlash       → strings light on glossy FX
+        //   - stageFlash       → strings light on Tetris-Effect FX
         //   - boardDropPulse   → JOLT downward on hard-drop (Sir slams the
         //                        piece, the sky responds)
         //   - audio energy     → constant base-speed multiplier so the rain
@@ -18945,7 +18929,7 @@ function drawBackground() {
         const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
         const onKick = (beatPhase % 4 === 0);
         // Reactive fall multiplier — every signal stacks. Baseline 1.0,
-        // typical playing range 1.3-2.5, peaks 4-5× during a quad combo +
+        // typical playing range 1.3-2.5, peaks 4-5× during a Tetris combo +
         // hard-drop. The 2.4× scalar then sits on top of the bumped raw
         // speed (0.55-1.10 in initBgParticles) so the visible fall rate at
         // 1080p hits ~80-150 px/s during normal play, ~250 px/s on slams.
@@ -18991,7 +18975,7 @@ function drawBackground() {
     // Sway can carry one onto the board mid-flight - we let it keep
     // travelling so it emerges on the far side, but hide it while it's
     // behind the board so it doesn't read through the semi-transparent
-    // glossy / matrix tiles.
+    // tetris-effect / matrix tiles.
     if (usesPlayAreaMask && playRects.length) {
       let hidden = false;
       for (const r of playRects) {
@@ -19047,7 +19031,7 @@ function drawBackground() {
         const flash = (typeof stageFlash     === 'number') ? stageFlash     : 0;
         const drop  = (typeof boardDropPulse === 'number') ? boardDropPulse : 0;
         const energy = (audioEngine && audioEngine.getAudioEnergy) ? audioEngine.getAudioEnergy() : 0;
-        // Body scale pumps on cheer, hard-drop, and audio energy. A quad
+        // Body scale pumps on cheer, hard-drop, and audio energy. A Tetris
         // combo + slam can briefly inflate the rain by ~2×.
         const reactive = 1 + cheer * 0.45 + drop * 0.30 + energy * 0.20;
         const S = p.size * beatBump * reactive;        // body width unit
@@ -19138,7 +19122,7 @@ function drawBackground() {
         bgCtx.stroke();
 
         // ─── STRINGS: four bright filaments from peg-box → tailpiece ────
-        // Brightness tied to stageFlash (glossy FX) AND movePulse
+        // Brightness tied to stageFlash (Tetris-Effect FX) AND movePulse
         // (per-piece moves) so every left/right/soft/hard you press
         // visibly plucks the strings on every visible violin.
         const move = (typeof movePulse === 'number') ? movePulse : 0;
@@ -19337,7 +19321,7 @@ function updateUI() {
 
   // ── Mode HUD (Sprint lines-left / Ultra time-left) ─────────────────────
   // Big labelled panel above the play area. Sprint shows TIME as the
-  // primary metric (per the usual 40-line sprint — sprint is timed) plus
+  // primary metric (per TETR.IO 40 LINES — sprint is timed) plus
   // lines-remaining + pieces-per-second secondary. Ultra shows
   // time-remaining as the primary plus current score secondary. Goes
   // urgent (red, pulse) at 5 lines / 10 seconds.
@@ -19526,9 +19510,9 @@ function aiPlanMove(p) {
       while (compact.length < ROWS) compact.unshift(new Array(COLS).fill(null));
       const m = aiEvalBoard(compact);
       // Quadratic line-clear bonus so Alfred chases bigger combos. Single = +3,
-      // Double = +12, Triple = +27, quad = +48. Was 1.5*cleared (quad = 6),
+      // Double = +12, Triple = +27, Tetris = +48. Was 1.5*cleared (Tetris = 6),
       // which barely beat the -4 hole penalty so Alfred would stack flat
-      // forever. Now quad dominates — Alfred actively builds quad-wells
+      // forever. Now Tetris dominates — Alfred actively builds tetris-wells
       // and sends garbage to Sir.
       const clearBonus = 3.0 * cleared * cleared;
       const score = clearBonus - 4.0 * m.holes - 0.55 * m.aggH - 0.25 * m.bump;
@@ -19815,7 +19799,7 @@ const DEFAULT_KEYMAP = {
 const SETTINGS_DEFAULTS = { das: 133, arr: 30, shake: true, quality: 'auto', rhythmOffset: 0, keymap: DEFAULT_KEYMAP };
 const settings = (() => {
   let saved = {};
-  try { saved = JSON.parse(localStorage.getItem('beatstack.settings.v1') || '{}') || {}; } catch {}
+  try { saved = JSON.parse(localStorage.getItem('tetris.settings.v1') || '{}') || {}; } catch {}
   const km = {};
   for (const a of Object.keys(DEFAULT_KEYMAP)) {
     km[a] = (saved.keymap && Array.isArray(saved.keymap[a]) && saved.keymap[a].length) ? saved.keymap[a].slice() : DEFAULT_KEYMAP[a].slice();
@@ -19832,7 +19816,7 @@ const settings = (() => {
   };
 })();
 function saveSettings() {
-  try { localStorage.setItem('beatstack.settings.v1', JSON.stringify(settings)); } catch {}
+  try { localStorage.setItem('tetris.settings.v1', JSON.stringify(settings)); } catch {}
 }
 // DAS: how long a held direction waits before auto-repeating.
 // ARR: time between repeats (0 = slide instantly to the wall).
@@ -19960,7 +19944,7 @@ window.addEventListener('pageshow', () => {
 });
 
 // Soft drop factor: while held, soft drop runs ~20× faster than gravity
-// (modern falling-block convention). At top levels gravity is ~35ms — without this,
+// (modern Tetris guideline). At top levels gravity is ~35ms — without this,
 // holding Down barely beats gravity and feels broken. We dispatch multiple
 // softDrops per tick to approximate ~20G, capped per tick so the loop
 // can't churn the whole board on a single iteration.
@@ -20203,7 +20187,7 @@ function startGame() {
     loadStoryMode().then(ok => { if (ok) startGame(); });
     return;
   }
-  // BUST A BEAT skips the puzzle match entirely: straight to the stage.
+  // BUST A BEAT skips the Tetris match entirely: straight to the stage.
   if (gameMode === 'bustabeat') {
     if (!window.StoryMode) { loadStoryMode().then(ok => { if (ok) startGame(); }); return; }
     document.getElementById('start-screen').style.display = 'none';
@@ -20228,7 +20212,7 @@ function startGame() {
     setNetworkSeed(null);
   }
   // Begin replay capture. Recording is cheap (a few hundred KB max for a
-  // long run); persisted on game-over to localStorage beatstack.replays.v1.
+  // long run); persisted on game-over to localStorage tetris.replays.v1.
   startReplayRecording(_netSeed, gameMode);
   document.getElementById('start-screen').style.display = 'none';
   document.getElementById('game-over-screen').style.display = 'none';
@@ -20334,7 +20318,7 @@ function startGame() {
   _sprintTarget   = (gameMode === 'sprint')   ? 40     : 0;
   _marathonGoal   = (gameMode === 'marathon') ? 150    : 0;
   _pieceLockCount = 0;
-  _runStats = { quads: 0, maxCombo: -1 };
+  _runStats = { tetrises: 0, maxCombo: -1 };
   _runId++;
   _pausedTotalMs = 0;
   _pauseStartedAt = null;
@@ -20702,9 +20686,9 @@ function quitToMenu() {
 
 // ── Story Mode bridge ─────────────────────────────────────────────
 // Story Mode lives in story/*.js (ES modules, loaded on demand). This is
-// the whole surface it uses to talk to the puzzle match, so the mode never
+// the whole surface it uses to talk to the Tetris match, so the mode never
 // reaches into game internals directly.
-window.GameBridge = {
+window.TetrisBridge = {
   SPECIAL_TYPE, SPECIAL_COLOR, LEVEL_THEMES,
   get gameMode() { return gameMode; },
   isLive() { return gameStarted && !gameOver; },
@@ -20791,7 +20775,7 @@ window.GameBridge = {
     try { drawBoard(); } finally { storyHide2D = hide; }
     return document.getElementById('main-canvas');
   },
-  // Hand a playing music source to the level so the puzzle keeps the song
+  // Hand a playing music source to the level so Tetris keeps the song
   // going (and later level logic treats it as the current track).
   adoptMusic(node, gain, name) {
     audioEngine._trackSource = { node, gain };
@@ -20801,7 +20785,7 @@ window.GameBridge = {
   togglePause() { togglePause(); },
   // True while a modal UI (settings) should swallow gameplay keys.
   uiBlocking() { return _settingsOpen(); },
-  // Bust a Beat: make sure the audio graph exists (no puzzle track starts).
+  // Bust a Beat: make sure the audio graph exists (no Tetris track starts).
   ensureAudio() {
     audioEngine.init();
     if (audioEngine.ctx.state === 'suspended') audioEngine.ctx.resume().catch(() => {});
@@ -20867,7 +20851,7 @@ function loadStoryMode(quiet) {
   const btn = document.getElementById('start-btn');
   if (!_storyLoading) {
     _storyLoading = import('./story/story-mode.js')
-      .then(m => { window.StoryMode = m.createStoryMode(window.GameBridge); return true; })
+      .then(m => { window.StoryMode = m.createStoryMode(window.TetrisBridge); return true; })
       .catch(e => { console.error('[story] failed to load', e); _storyLoading = null; return false; });
   }
   if (!quiet && btn && !btn.dataset.loading) {
@@ -21123,7 +21107,7 @@ function monitorFrameRate(rawDt) {
 
 // ── Controllers ──
 // story/gamepad.js reads any connected pad (standard or not) and, by what's
-// on screen: plays the puzzle by pressing the game's own bound keys (so DAS /
+// on screen: plays Tetris by pressing the game's own bound keys (so DAS /
 // ARR / rebinding all apply), moves a yellow focus ring through menus
 // (d-pad or stick, A choose, B back, Start start / resume), or leaves the
 // pads to a dance battle's own input. Settings → Controller shows what
@@ -21364,12 +21348,12 @@ setInterval(() => {
 
 // ============================================================================
 // HOME-PAGE UNDERGROUND-LAIR ANIMATION
-// Sir's idea: "an underground lair and blocks are falling from the sky".
+// Sir's idea: "an underground lair and tetris are falling from the sky".
 // Layered behind the start-screen content:
 //   1. Dim brick wall (procedural — diagonal mortar lines + brick stagger)
 //   2. Single overhead spotlight cone
 //   3. Small floor spotlight pool
-//   4. Continuously-falling pieces in the per-piece accent colours,
+//   4. Continuously-falling tetrominoes in the per-piece accent colours,
 //      with rotation, parallax depth, and gentle horizontal sway
 //   5. Faint dust motes drifting up through the spotlight beam
 // Loop pauses when gameStarted goes true (saves perf during the actual game)
@@ -21380,7 +21364,7 @@ setInterval(() => {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
-  // Piece shapes in 4-cell offset form, plus per-piece accent colours
+  // Tetromino shapes in 4-cell offset form, plus per-piece accent colours
   // that match the in-game palette so the home page reads as the same
   // game's universe.
   const HOME_PIECES = [
@@ -21879,14 +21863,14 @@ window.addEventListener('resize', () => positionP2Monitor());
   if (!el) return;
   const quotes = [
     // Dave Chappelle energy
-    'I\'m rich, biatch! ...in BEAT STACK points.',
+    'I\'m rich, biatch! ...in Tetris points.',
     'The S-piece is problematic and I will not be taking questions.',
     'You know what the difference between me and you is? I\'d clear that line.',
-    'I turned down a 50-piece endorsement deal once. True story.',
+    'I turned down a 50-piece Tetris deal once. True story.',
     'The game is rigged. The S-piece is always coming.',
-    'Man, I had a quad lined up and they gave me four S-pieces in a row. I QUIT.',
+    'Man, I had a Tetris and they gave me four S-pieces in a row. I QUIT.',
     'They tried to make me hold the Z-piece. I held the power instead.',
-    'I\'m not addicted. I can stop after one more quad. ...one more.',
+    'I\'m not addicted. I can stop after one more Tetris. ...one more.',
     'Gravity is just the government telling your pieces where to go.',
     'Every time I\'m about to do a T-spin, my homie starts talking.',
     'The I-piece is out there. I\'ve seen it. It exists.',
@@ -21914,7 +21898,7 @@ window.addEventListener('resize', () => positionP2Monitor());
     'The harder I drop, the luckier I get.',
     'Success is 10% inspiration and 90% T-spin doubles.',
     'Rotate, don\'t ruminate.',
-    'Aim for the quad. Settle for nothing less.',
+    'Aim for the Tetris. Settle for nothing less.',
     'The impossible is just an undocumented kick.',
     'Some days you\'re the I-piece. Some days you\'re the gap.',
     'Wisdom comes from S-pieces you didn\'t want.',
@@ -21932,14 +21916,14 @@ window.addEventListener('resize', () => positionP2Monitor());
 
     // More Chappelle / absurdist
     'This game done lost its mind. I love it.',
-    'The real quad was the gaps we made along the way.',
-    'Sir, this is a puzzle board. Sir. SIR.',
+    'The real Tetris was the gaps we made along the way.',
+    'Sir, this is a Tetris board. Sir. SIR.',
     'My therapist said stop stacking your feelings. So I stacked the board instead.',
     'Hot take: the S-piece is a hate crime.',
     'I\'m not losing. I\'m doing speed runs in the wrong direction.',
     'The T-piece spun into my life and did NOT rotate out.',
     'You ever soft-drop in life? That\'s called settling.',
-    'I told my boss I couldn\'t come in. I was one piece away from a quad.',
+    'I told my boss I couldn\'t come in. I was one piece away from a Tetris.',
     'Some people see blocks. I see generational trauma.',
     'My doctor said reduce stress. He clearly never played Marathon mode.',
     'At what level does the game apologize to me?',
@@ -21952,13 +21936,13 @@ window.addEventListener('resize', () => positionP2Monitor());
     'That T-spin was so clean even my haters liked it.',
     'Level 19 don\'t care about your feelings. Or your future.',
     'I asked the piece queue for help. It sent me four Z\'s and left.',
-    'You can\'t spell QUAD without a little desperation. Okay, you can. Still.',
+    'You can\'t spell Tetris without "it\'s" rearranged and desperate.',
     'The well is deep. Like my commitment to this game at 2am.',
     'This is fine. (It is not fine.)',
     'The I-piece ghost haunts those who stacked crooked.',
     'My stack is like my life — one bad decision away from collapse.',
     'Block by block, line by line, dignity by dignity.',
-    'I didn\'t choose the stacking life. The stacking life chose me at 3am.',
+    'I didn\'t choose the Tetris life. The Tetris life chose me at 3am.',
     'Every S-piece is a test of character. I have failed every test.',
     'Hard dropping into the weekend like it owes me money.',
     'They gave me an S-piece. I gave it back sideways. We call that growth.',
@@ -21971,7 +21955,7 @@ window.addEventListener('resize', () => positionP2Monitor());
     'My stack speaks fluent S-piece. Unfortunately.',
     'They said teamwork makes the dream work. I solo-queued and lost.',
     'One man. One board. Twenty lines of regret.',
-    'The I-piece is the headliner of the stack — arrives exactly when you need it.',
+    'The I-piece is the Taylor Swift of Tetris — arrives exactly when you need it.',
     'Plot twist: I was the gap the whole time.',
     'Play stupid pieces, win stupid prizes.',
     'Respect the T-spin. Fear the S-piece. Pray for the I.',

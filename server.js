@@ -1,4 +1,4 @@
-// BEAT STACK — shared leaderboard + PvP lobby server.
+// Tetris Beats — shared leaderboard + PvP lobby server.
 //
 // Local development server only. Production deploy uses GitHub Pages for the
 // static frontend + a Cloudflare Worker for the leaderboard/PvP API — see
@@ -28,7 +28,7 @@ const DATA_DIR = path.join(os.homedir(), '.openclaw', 'data');
 const SCORES_FILE = path.join(DATA_DIR, 'tetris-scores.json');
 const MAX_SCORES = 10;
 // Cap a single score at a sanity threshold — beyond this it's almost certainly
-// a replay-bot or someone poking the endpoint manually. Real play at
+// a replay-bot or someone poking the endpoint manually. Real Tetris at
 // reasonable depth maxes around 1–2 M; 10 M is a comfortable ceiling.
 const MAX_SCORE_VALUE = 10_000_000;
 // Per-mode/per-day leaderboards live in separate files under DATA_DIR/leaderboards.
@@ -549,6 +549,6 @@ server.listen(PORT, '0.0.0.0', () => {
       if (a.family === 'IPv4' && !a.internal) lan.push(a.address);
     }
   }
-  console.log(`[beat-stack] listening on 0.0.0.0:${PORT}`);
-  for (const ip of lan) console.log(`[beat-stack]   LAN: http://${ip}:${PORT}`);
+  console.log(`[tetris] listening on 0.0.0.0:${PORT}`);
+  for (const ip of lan) console.log(`[tetris]   LAN: http://${ip}:${PORT}`);
 });

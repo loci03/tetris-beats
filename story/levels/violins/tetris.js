@@ -1,10 +1,10 @@
-// FALLING VIOLINS — the board world: a golden night sky raining violins.
+// FALLING VIOLINS — the Tetris world: a golden night sky raining violins.
 //
 // The old 2D scene was the gold concert-hall sky with violin silhouettes
 // raining down, reacting to everything: every move kicked them sideways
 // (fanned out) with a snap of tilt and plucked their strings, clears sped
 // the rain up, widened the sway and brightened the gold, a hard drop jolted
-// the whole sky downward and pitched them forward, quad FX lit the strings.
+// the whole sky downward and pitched them forward, Tetris FX lit the strings.
 //
 // In 3D: violins tumble out of a warm black-gold sky in deep parallax and
 // splash into a mirror lake; golden music staves ripple across the sky with
@@ -16,7 +16,7 @@
 //   drop     → the sky JOLTS: rain slams down + pitches forward + swells (∝ rows), shock rings on the lake
 //   hold     → fermata: the rain freezes in the air for a moment, cool white shimmer
 //   clear n  → rain speeds / sway widens / gold brightens; gilded violins cascade at the piece's side,
-//              notes burst off the staves; 3 = lake rings, 4 = QUAD: strings blaze, sky + aurora flare,
+//              notes burst off the staves; 3 = lake rings, 4 = TETRIS: strings blaze, sky + aurora flare,
 //              cascade everywhere, shafts converge and strobe
 //   combo    → escalating: more notes light, aurora cycles faster, shafts strobe more
 //   levelUp  → crescendo: the whole rain swirls into a golden vortex, the aurora changes key (hue)
@@ -24,7 +24,7 @@
 //   gameOver → the music stops: the rain drops into the lake, lights go down
 //   start    → lights up, a fresh downpour
 
-import { createKit, frac, clamp, lerp } from './board-kit.js';
+import { createKit, frac, clamp, lerp } from './tetris-kit.js';
 
 const TAU = Math.PI * 2;
 
@@ -43,7 +43,7 @@ function violinShape(THREE) {
   return s;
 }
 
-export function createBoardWorld(ctx) {
+export function createTetrisWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const kit = createKit(THREE);

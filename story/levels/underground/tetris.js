@@ -1,4 +1,4 @@
-// THE UNDERGROUND — the living board world: you're in the crowd at a
+// THE UNDERGROUND — the living Tetris world: you're in the crowd at a
 // warehouse rave. A DJ works the decks on a riser (back left), an LED wall
 // pumps EQ bars (back right), speaker stacks boom, moving heads on the truss
 // throw beams and light pools onto the concrete, lasers sweep the room, the
@@ -9,7 +9,7 @@
 // soft drops pump the subs; hard drops are bass drops (strobe + a jump wave
 // through the crowd + fogger puff, scaled by rows); holds swap the record;
 // clears rain confetti from the truss (12/22/36/60 + combo), triples and
-// quads white-flash the room, quads fire the CO2 cannons; combos
+// Tetrises white-flash the room, Tetrises fire the CO2 cannons; combos
 // escalate (CO2, laser strobe, colour chase); level up is a laser show;
 // a high stack turns the room red with alarm beacons; game over kills the
 // lights; start slams them back on.
@@ -18,7 +18,7 @@
 // strips, the truss + sign above, crowd heads/hands below. Portrait pulls
 // back so the truss reads above the board and the crowd below it.
 
-import { makeKit } from './board-kit.js';
+import { makeKit } from './tetris-kit.js';
 
 const NEON = [0xff2d6f, 0x29e7ff, 0xb35cff, 0xffd23f, 0x3dff9a];
 
@@ -64,7 +64,7 @@ void main() {
   gl_FragColor = vec4(c, 1.0);
 }`;
 
-export function createBoardWorld(ctx) {
+export function createTetrisWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const K = makeKit(THREE), keep = K.keep;

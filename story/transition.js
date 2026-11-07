@@ -1,6 +1,6 @@
 // BoardTransition — the "enter the world behind the board" effect.
 //
-// The frozen puzzle board is captured into a texture and rebuilt as a grid
+// The frozen Tetris board is captured into a texture and rebuilt as a grid
 // of 3D tiles positioned so they sit exactly on top of the 2D board on
 // screen. Going in, the tiles charge up, ripple, then shatter outward from
 // the cleared line while the camera flies through the gap into the stage.

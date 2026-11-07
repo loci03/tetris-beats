@@ -1,4 +1,4 @@
-// TRUMPETS PLEASE — the board world: a Hollywood movie premiere at night.
+// TRUMPETS PLEASE — the Tetris world: a Hollywood movie premiere at night.
 //
 // The old 2D scene: a velvet jazz-club stage under a midnight sky with the
 // Hollywood Hills + sign, six klieg searchlights sweeping (faster on every
@@ -8,7 +8,7 @@
 // + ticker tape (heavier on clears / drops), smoke rings drifting up on
 // every move, an audience bobbing (arms up on clears), a band silhouette
 // (bass, drums, sax — the sax bell lifting on clears), paparazzi flashes on
-// hard drops and big clears, and "BRAVO!"-style text on a quad.
+// hard drops and big clears, and "BRAVO!"-style text on a Tetris.
 //
 // In 3D: the red carpet runs up to a movie palace with a bulb-chased
 // marquee and the neon sign; the hills and the HOLLYWOOD letters glow
@@ -23,19 +23,19 @@
 //              ticker tape shower
 //   hold     → spotlight solo: kliegs converge on the bandstand, the sax player leans back, bell up, notes
 //   clear n  → confetti (∝ n) + crowd arms up + flashes; 2 = every bulb blazes; 3 = kliegs converge overhead;
-//              4 = QUAD: "BRAVO!"-style banner over the marquee, fireworks over the hills, klieg strobe
+//              4 = TETRIS: "BRAVO!"-style banner over the marquee, fireworks over the hills, klieg strobe
 //   combo    → gel colours on the kliegs cycle faster, more flashes, fireworks escalate
 //   levelUp  → the HOLLYWOOD sign chases letter by letter + fireworks + a bulb wave
 //   danger   → kliegs go red, the marquee stutters, the crowd gets restless
 //   gameOver → lights out: one klieg left on the empty carpet, neon dies
 //   start    → lights pop on in sequence
 
-import { createKit, frac, clamp, lerp } from '../violins/board-kit.js';
+import { createKit, frac, clamp, lerp } from '../violins/tetris-kit.js';
 
 const TAU = Math.PI * 2;
 const PHRASES = ['BRAVO!', 'ENCORE!', 'MAGNIFICENT!', 'LIGHTS! CAMERA!', 'ACTION!', 'AND THE WINNER IS...'];
 
-export function createBoardWorld(ctx) {
+export function createTetrisWorld(ctx) {
   const { THREE, scene, camera } = ctx;
   const low = !!ctx.low;
   const kit = createKit(THREE);

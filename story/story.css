@@ -36,7 +36,7 @@ body.story-charge #main-canvas {
 }
 body.story-charge #game-container .side-panel { opacity: 0.35; transition: opacity 0.4s ease; }
 
-/* ── Toast (puzzle phase messages) ──────────────────────────────────── */
+/* ── Toast (Tetris phase messages) ──────────────────────────────────── */
 .story-toast {
   position: fixed; left: 50%; top: 18%;
   transform: translate(-50%, -10px);
